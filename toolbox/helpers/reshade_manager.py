@@ -500,6 +500,9 @@ def set_enabled(home, rom, enabled):
 def event(home, rom, action, runner='', bottles=Path('/userdata/system/wine-bottles/windows'), legacy=False):
     cfg = read_json(home / 'reshade/games' / (key(rom) + '.json'))
     if not cfg:
+        if action == 'gameStart':
+            import reshade_external
+            reshade_external.apply(home, rom, runner, bottles, legacy)
         return
     if action == 'gameStop':
         for jp in (home / 'reshade/installations' / key(rom)).glob('*.json'):
@@ -551,6 +554,10 @@ def list_statuses(home, paths):
         if config.stem in wanted:
             cfg = read_json(config)
             states[config.stem] = 'enabled' if cfg.get('enabled') else 'disabled' if cfg else 'missing'
+    import reshade_external
+    for config in (home / 'reshade/external').glob('*.json'):
+        if config.stem in wanted and config.stem not in states:
+            states[config.stem] = reshade_external.state(read_json(config))
     return [(p, states.get(key(p), 'missing')) for p in games]
 
 
@@ -563,6 +570,15 @@ def configured_games(home, enabled_only=False):
         path = Path(cfg['rom'])
         if path.suffix.casefold() in ('.wine', '.pc', '.wsquashfs') and path.exists():
             games.append((str(path), 'enabled' if cfg.get('enabled') else 'disabled'))
+    import reshade_external
+    known = {p for p, _ in games}
+    for config in (home / 'reshade/external').glob('*.json'):
+        cfg = read_json(config)
+        if not cfg.get('files') or cfg['rom'] in known or not Path(cfg['rom']).exists():
+            continue
+        status = reshade_external.state(cfg)
+        if not enabled_only or status == 'external-enabled':
+            games.append((cfg['rom'], status))
     return sorted(games, key=lambda item: item[0].casefold())
 
 
@@ -593,7 +609,7 @@ def main():
     parser.add_argument('--bottles', type=Path, default=Path('/userdata/system/wine-bottles/windows'))
     parser.add_argument('--runner', default='')
     parser.add_argument('--legacy', action='store_true')
-    parser.add_argument('command', choices=['exes', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
+    parser.add_argument('command', choices=['exes', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'external-scan', 'external-info', 'external-enable', 'external-disable', 'external-release', 'wiki-title', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
                                            'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details'])
     parser.add_argument('rom', nargs='?', type=Path)
     parser.add_argument('args', nargs='*')
@@ -620,6 +636,33 @@ def main():
                 sys.stdout.buffer.write(os.fsencode(path) + b'\0' + state.encode() + b'\0')
         elif args.command == 'export':
             export_preset(home, rom, args.args[0], args.args[1:] == ['overwrite'])
+        elif args.command == 'wiki-title':
+            import reshade_api
+            print(reshade_api.game_title(str(args.rom)))
+        elif args.command.startswith('external-'):
+            import reshade_external
+            if args.command == 'external-scan':
+                paths = sys.stdin.read().splitlines()
+                failures = 0
+                for number, path in enumerate(paths, 1):
+                    try:
+                        if not read_json(home / 'reshade/games' / (key(path)+'.json')):
+                            reshade_external.scan_game(home, Path(path))
+                    except (ValueError, OSError):
+                        failures += 1
+                        print('Unable to inspect: '+path, file=sys.stderr)
+                    print(f'{number}/{len(paths)} {path}', file=sys.stderr, flush=True)
+                if failures:
+                    raise ValueError(f'{failures} games could not be inspected; index of other games retained')
+            elif args.command == 'external-info':
+                cfg = reshade_external.scan_game(home, rom)
+                print(reshade_external.state(cfg))
+                for file in cfg.get('files', []):
+                    print(file['path'])
+            elif args.command == 'external-release':
+                reshade_external.release(home, rom)
+            else:
+                reshade_external.toggle(home, rom, args.command == 'external-enable', args.runner, args.bottles, args.legacy)
         elif args.command == 'api':
             import reshade_api
             exe = relative(args.args[0])
@@ -660,6 +703,11 @@ def main():
         elif args.command in ('gameStart', 'gameStop'):
             event(home, rom, args.command, args.runner, args.bottles, args.legacy)
         elif args.command == 'disable-all':
+            import reshade_external
+            for config in (home / 'reshade/external').glob('*.json'):
+                cfg = read_json(config)
+                if cfg.get('controlled'):
+                    reshade_external.release(home, Path(cfg['rom']))
             for config in (home / 'reshade/games').glob('*.json'):
                 cfg = read_json(config)
                 set_enabled(home, Path(cfg['rom']), False)

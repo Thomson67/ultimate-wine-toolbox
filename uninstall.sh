@@ -35,7 +35,7 @@ if [ -L "$DXVK_PATH" ]; then
     esac
 fi
 
-if [ -d "$DEST/reshade/games" ]; then
+if [ -d "$DEST/reshade" ]; then
     python3 "$DEST/toolbox/helpers/reshade_manager.py" --home "$DEST" disable-all || {
         say "ERREUR : restauration ReShade incomplète. Installation et sauvegardes conservées." \
             "ERROR: incomplete ReShade restoration. Installation and backups preserved."

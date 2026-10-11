@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Bounded PE import hints and optional PCGamingWiki lookup (no game execution)."""
 import json
+import difflib
+import unicodedata
 import re
 import struct
 import subprocess
@@ -88,9 +90,38 @@ def wiki_request(parameters):
     return json.loads(result.stdout)
 
 
+def game_title(value):
+    value = value.rsplit('/', 1)[-1]
+    value = re.sub(r'(?i)\.(wsquashfs|wine|pc)$', '', value)
+    # Runner annotations and distribution tags do not belong to the game title.
+    value = re.sub(r'(?i)\[(?:wine|proton|ge-proton|vanilla|cachyos|umu|dxvk|vkd3d)[^]]*\]', ' ', value)
+    value = re.sub(r'(?i)\((?:wine|proton|ge-proton|umu|dxvk|vkd3d)[^)]*\)', ' ', value)
+    return re.sub(r'\s+', ' ', value.replace('_', ' ')).strip()
+
+
+def normalized_title(value):
+    value = unicodedata.normalize('NFKD', game_title(value)).casefold()
+    value = ''.join(c for c in value if not unicodedata.combining(c))
+    return ' '.join(re.findall(r'[a-z0-9]+', value))
+
+
+def rank_titles(query, titles):
+    target = normalized_title(query)
+    def score(title):
+        name = normalized_title(title)
+        if name == target:
+            return 2.0
+        tokens = set(target.split())
+        overlap = len(tokens & set(name.split())) / max(1, len(tokens | set(name.split())))
+        return .7*difflib.SequenceMatcher(None, target, name).ratio()+.3*overlap
+    # Sorting only proposes a title; never silently select a remaster or sequel.
+    return sorted(titles, key=score, reverse=True)
+
+
 def wiki_search(title):
+    title = game_title(title)
     data = wiki_request(dict(action='query', list='search', srsearch=title, srnamespace=0, srlimit=8))
-    return [r['title'] for r in data.get('query', {}).get('search', [])]
+    return rank_titles(title, [r['title'] for r in data.get('query', {}).get('search', [])])
 
 
 def wiki_apis(text):

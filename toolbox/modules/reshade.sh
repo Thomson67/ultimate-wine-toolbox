@@ -137,7 +137,7 @@ resh_api_select() {
             dxgi|d3d9|opengl32) printf '%s' "$choice"; return 0 ;;
             diagnostic) resh_diagnostic "$rom" && return 2; continue ;;
             wiki)
-                query="${rom##*/}"; query="${query%.*}"; query="${query%%\[*}"
+                query="$(resh_cmd wiki-title "$rom")"
                 query="$(input_text "$(i18n resh_api_wiki)" "$(i18n resh_wiki_query)" "$query")" || continue
                 titles="$(resh_cmd wiki-search "$query" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
                     msgbox "$(i18n resh_title)" "$(i18n resh_wiki_unavailable)"; continue;
@@ -145,7 +145,7 @@ resh_api_select() {
                 names=(); rows=(); idx=0
                 while IFS= read -r title; do
                     [ -n "$title" ] || continue
-                    names+=("$title"); idx=$((idx+1)); rows+=("$idx" "$title")
+                    names+=("$title"); idx=$((idx+1)); if [ "$idx" -eq 1 ]; then rows+=("$idx" "$title — $(i18n resh_wiki_first)"); else rows+=("$idx" "$title"); fi
                 done <<< "$titles"
                 [ "$idx" -gt 0 ] || { msgbox "$(i18n resh_title)" "$(i18n resh_no_match)"; continue; }
                 selected="$(menu_select "$(i18n resh_api_wiki)" "$(i18n resh_wiki_choose)" "${rows[@]}")" || continue
@@ -260,10 +260,49 @@ resh_install_game() {
     msgbox "$(i18n resh_title)" "$(i18n resh_installed "$log")"
 }
 
+resh_external_menu() {
+    local rom="$1" details="$2" state="${2%%$'\n'*}" choice label
+    while true; do
+        case "$state" in
+            external-enabled) label="$(i18n resh_external_enabled)" ;;
+            external-disabled) label="$(i18n resh_external_disabled)" ;;
+            *) label="$(i18n resh_external_unknown)" ;;
+        esac
+        choice="$(menu_select "$(i18n resh_title) — ${rom##*/}" "$(i18n resh_external_info "$label"$'\n'"${details#*$'\n'}")" \
+            enable "$(i18n resh_enable)" disable "$(i18n resh_disable)" \
+            release "$(i18n resh_external_release)" diagnostic "$(i18n resh_diag_title)" back "$(i18n back)")" || return
+        case "$choice" in
+            enable|disable)
+                if [ "$state" = external-unsupported ]; then
+                    msgbox "$(i18n resh_title)" "$(i18n resh_external_unsupported)"; continue
+                fi
+                resh_cmd "external-$choice" "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 && {
+                    msgbox "$(i18n resh_title)" "$(i18n resh_external_done)"
+                } || msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")" ;;
+            release)
+                resh_cmd external-release "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
+                    msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"; continue;
+                }
+                return ;;
+            diagnostic) resh_diagnostic "$rom" && exit 0 ;;
+            *) return ;;
+        esac
+        details="$(resh_cmd external-info "$rom")"; state="${details%%$'\n'*}"
+    done
+}
+
 resh_game_menu() {
     local rom="$1" state choice preset profile details version arch dll exe packs prompt
     while true; do
         state="$(resh_cmd status "$rom")" || return
+        if [ "$state" = missing ]; then
+            details="$(resh_cmd external-info "$rom" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
+                msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"; return;
+            }
+            case "${details%%$'\n'*}" in
+                external-*) resh_external_menu "$rom" "$details"; return ;;
+            esac
+        fi
         prompt="$(i18n resh_game_status "$(i18n "resh_status_$state")")"
         if [ "$state" != missing ]; then
             details="$(resh_cmd details "$rom")" || return
@@ -319,11 +358,14 @@ resh_game_rows() {
 }
 
 resh_pick_game() {
-    local filter="${1:-all}" query="${2:-}" rom choice path name state label enabled_label disabled_label missing_label
+    local filter="${1:-all}" query="${2:-}" rom choice path name state label enabled_label disabled_label missing_label external_enabled external_disabled external_unsupported
     local -a games=() items=()
     enabled_label="$(i18n resh_status_enabled)"
     disabled_label="$(i18n resh_status_disabled)"
     missing_label="$(i18n resh_status_missing)"
+    external_enabled="$(i18n resh_external_enabled)"
+    external_disabled="$(i18n resh_external_disabled)"
+    external_unsupported="$(i18n resh_external_unknown)"
     while IFS= read -r -d '' path && IFS= read -r -d '' state; do
         name="${path##*/}"
         [[ -z "$query" || "${name,,}" == *"${query,,}"* ]] || continue
@@ -331,6 +373,9 @@ resh_pick_game() {
         case "$state" in
             enabled) label="$enabled_label" ;;
             disabled) label="$disabled_label" ;;
+            external-enabled) label="$external_enabled" ;;
+            external-disabled) label="$external_disabled" ;;
+            external-unsupported) label="$external_unsupported" ;;
             *) label="$missing_label" ;;
         esac
         items+=("${#games[@]}" "$name — $label")
@@ -348,10 +393,23 @@ resh_menu() {
     msgbox "$(i18n resh_title)" "$(i18n resh_intro)" || return
     while true; do
         choice="$(menu_select "$(i18n resh_title)" "$(i18n resh_list_prompt)" \
-            enabled "$(i18n resh_list_enabled)" installed "$(i18n resh_list_installed)" \
+            installed "$(i18n resh_list_installed)" scan "$(i18n resh_external_scan)" \
             all "$(i18n resh_list_all)" search "$(i18n resh_list_search)" back "$(i18n back)")" || return
         case "$choice" in
-            enabled|installed|all) resh_pick_game "$choice" ;;
+            installed|all) resh_pick_game "$choice" ;;
+            scan)
+                msgbox "$(i18n resh_title)" "$(i18n resh_external_scan_wait)" || continue
+                local scan_log="${WT_LOG_DIR:-/userdata/system/logs/ultimate-wine-toolbox}/reshade-discovery.log"
+                mkdir -p "${scan_log%/*}"
+                : > "$scan_log"
+                if have_dialog; then
+                    dialog --no-shadow --title "$(i18n resh_title)" --infobox "$(i18n resh_external_scan_wait)" 14 90 || true
+                fi
+                mangohud_list_games | resh_cmd external-scan >> "$scan_log" 2>&1 && {
+                    msgbox "$(i18n resh_title)" "$(i18n resh_external_scan_done)"
+                } || msgbox "$(i18n resh_title)" "$(i18n resh_failed "$scan_log")"
+                resh_pick_game installed ;;
+
             search)
                 query="$(input_text "$(i18n resh_title)" "$(i18n resh_search_prompt)" "")" || continue
                 [ -z "$query" ] || resh_pick_game all "$query" ;;
