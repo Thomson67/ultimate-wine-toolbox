@@ -1,4 +1,6 @@
 import os
+import contextlib
+import io
 from pathlib import Path
 import subprocess
 import sys
@@ -129,3 +131,22 @@ class ExternalTests(unittest.TestCase):
         self.assertEqual(cfg['files'][0]['path'],'drive_c/game/dxgi.dll')
         with patch.object(e,'find_dlls',side_effect=AssertionError('unchanged archive rescanned')):
             self.assertEqual(e.scan_game(self.home,archive),cfg)
+
+class DiscoveryResultTests(unittest.TestCase):
+    def test_individual_failure_does_not_cancel_scan_and_reason_is_logged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home=Path(tmp)/'home'; output=io.StringIO()
+            paths=['/games/Good.wine','/games/Bad.wsquashfs','/games/Next.wine']
+            with patch.object(e,'scan_game',side_effect=[{},ValueError('archive metadata unreadable'),{}]) as scan,contextlib.redirect_stderr(output):
+                self.assertEqual(r.scan_external_games(home,paths),(3,2,1))
+            self.assertEqual(scan.call_count,3)
+            self.assertIn('/games/Bad.wsquashfs',output.getvalue())
+            self.assertIn('Reason: archive metadata unreadable',output.getvalue())
+
+    def test_unsquashfs_error_output_is_retained(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp);exe=folder/'unsquashfs'
+            exe.write_text('#!/bin/sh\necho "Failed to read superblock" >&2\nexit 1\n');exe.chmod(0o755)
+            with patch.dict(os.environ,PATH=str(folder)+os.pathsep+os.environ['PATH']):
+                with self.assertRaisesRegex(ValueError,'Failed to read superblock'):
+                    list(e.find_dlls(folder/'Broken.wsquashfs'))

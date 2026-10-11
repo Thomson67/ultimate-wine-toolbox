@@ -3,6 +3,7 @@ declare -gA I18N=(
   [resh_wiki_first]="suggested match"
   [resh_external_scan]="Find / refresh ReShade bundled with games"
   [resh_external_scan_wait]="Detection checks ReShade DLLs bundled with games. WSquashFS archives are inspected without full extraction or modification. The first scan can take time on a large library or NAS. Results are indexed to keep lists fast; unchanged archives are not inspected again."
+  [resh_external_scan_partial]="Scan complete: %s of %s entries checked.\n%s entries could not be inspected.\n\nResults for other games are available. An individual error does not cancel discovery. The log contains the affected game and exact reason:\n%s"
   [resh_external_scan_done]="Detection complete. Bundled installations appear in the list of games with ReShade installed."
   [resh_external_enabled]="Bundled ReShade, not disabled"
   [resh_external_disabled]="Bundled ReShade, disabled by toolbox"

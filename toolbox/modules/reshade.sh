@@ -405,9 +405,17 @@ resh_menu() {
                 if have_dialog; then
                     dialog --no-shadow --title "$(i18n resh_title)" --infobox "$(i18n resh_external_scan_wait)" 14 90 || true
                 fi
-                mangohud_list_games | resh_cmd external-scan >> "$scan_log" 2>&1 && {
-                    msgbox "$(i18n resh_title)" "$(i18n resh_external_scan_done)"
-                } || msgbox "$(i18n resh_title)" "$(i18n resh_failed "$scan_log")"
+                local summary total completed failures
+                if summary="$(mangohud_list_games | resh_cmd external-scan 2>> "$scan_log")"; then
+                    IFS=$'\t' read -r total completed failures <<< "$summary"
+                    if [ "${failures:-0}" -gt 0 ]; then
+                        msgbox "$(i18n resh_title)" "$(i18n resh_external_scan_partial "$completed" "$total" "$failures" "$scan_log")"
+                    else
+                        msgbox "$(i18n resh_title)" "$(i18n resh_external_scan_done)"
+                    fi
+                else
+                    msgbox "$(i18n resh_title)" "$(i18n resh_failed "$scan_log")"
+                fi
                 resh_pick_game installed ;;
 
             search)

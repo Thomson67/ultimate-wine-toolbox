@@ -37,19 +37,23 @@ def config_path(home, rom):
 
 def find_dlls(rom):
     if rom.suffix.casefold() == '.wsquashfs':
-        proc = subprocess.Popen(['unsquashfs', '-ls', str(rom)], stdout=subprocess.PIPE,
-                                stderr=subprocess.DEVNULL, text=True)
-        with proc:
-            for line in proc.stdout:
-                if line.startswith('squashfs-root/'):
-                    path = line.strip()[len('squashfs-root/'):]
-                    if PurePosixPath(path).name.casefold() in NAMES:
-                        try:
-                            yield relative(path)
-                        except ValueError:
-                            pass
-            if proc.wait():
-                raise ValueError('cannot read archive file listing')
+        with tempfile.TemporaryFile() as errors:
+            proc = subprocess.Popen(['unsquashfs', '-ls', str(rom)], stdout=subprocess.PIPE,
+                                    stderr=errors, text=True)
+            with proc:
+                for line in proc.stdout:
+                    if line.startswith('squashfs-root/'):
+                        path = line.strip()[len('squashfs-root/'):]
+                        if PurePosixPath(path).name.casefold() in NAMES:
+                            try:
+                                yield relative(path)
+                            except ValueError:
+                                pass
+                code = proc.wait()
+                if code:
+                    errors.seek(0)
+                    detail = errors.read(4096).decode(errors='replace').strip()
+                    raise ValueError(f'unsquashfs listing failed (exit {code}): {detail or "no diagnostic output"}')
     else:
         for folder, dirs, names in os.walk(rom, followlinks=False):
             dirs[:] = [name for name in dirs if name.casefold() not in ('windows', 'users', 'dosdevices')
@@ -61,6 +65,10 @@ def find_dlls(rom):
 
 
 def scan_game(home, rom, force=False):
+    if rom.is_symlink():
+        raise ValueError(f'game path is a symbolic link: {rom} -> {os.readlink(rom)}; this scanner expects the original game path')
+    if not rom.exists():
+        raise FileNotFoundError(f'game path no longer exists: {rom}')
     valid_rom(rom)
     path = config_path(home, rom)
     old = read_json(path)

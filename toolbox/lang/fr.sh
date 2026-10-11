@@ -3,6 +3,7 @@ declare -gA I18N=(
   [resh_wiki_first]="correspondance proposée"
   [resh_external_scan]="Rechercher / actualiser les ReShade intégrés aux jeux"
   [resh_external_scan_wait]="La détection vérifie les DLL ReShade présentes dans les jeux. Les archives WSquashFS sont consultées sans décompression complète ni modification. La première recherche peut prendre du temps sur une grande collection ou un NAS. Les résultats sont indexés pour garder les listes rapides ; les archives inchangées ne sont pas réinspectées."
+  [resh_external_scan_partial]="Recherche terminée : %s entrée(s) vérifiée(s) sur %s.\n%s entrée(s) non inspectée(s).\n\nLes résultats des autres jeux sont disponibles. Une erreur isolée n’annule pas la détection. Le journal indique le jeu concerné et la raison précise :\n%s"
   [resh_external_scan_done]="Détection terminée. Les installations intégrées figurent dans la liste des jeux avec ReShade installé."
   [resh_external_enabled]="ReShade intégré au jeu, non désactivé"
   [resh_external_disabled]="ReShade intégré au jeu, désactivé par la toolbox"

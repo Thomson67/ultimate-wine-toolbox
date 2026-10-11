@@ -603,6 +603,21 @@ def export_preset(home, rom, destination, overwrite=False):
     atomic_bytes(destination, source.read_bytes())
 
 
+def scan_external_games(home, paths):
+    import reshade_external
+    completed = failures = 0
+    for number, path in enumerate(paths, 1):
+        try:
+            if not read_json(home / 'reshade/games' / (key(path)+'.json')):
+                reshade_external.scan_game(home, Path(path))
+            completed += 1
+        except (ValueError, OSError, subprocess.CalledProcessError) as error:
+            failures += 1
+            print(f'Unable to inspect: {path}\nReason: {error}', file=sys.stderr)
+        print(f'{number}/{len(paths)} {path}', file=sys.stderr, flush=True)
+    return len(paths), completed, failures
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--home', type=Path, default=Path('/userdata/system/ultimate-wine-toolbox'))
@@ -642,18 +657,8 @@ def main():
         elif args.command.startswith('external-'):
             import reshade_external
             if args.command == 'external-scan':
-                paths = sys.stdin.read().splitlines()
-                failures = 0
-                for number, path in enumerate(paths, 1):
-                    try:
-                        if not read_json(home / 'reshade/games' / (key(path)+'.json')):
-                            reshade_external.scan_game(home, Path(path))
-                    except (ValueError, OSError):
-                        failures += 1
-                        print('Unable to inspect: '+path, file=sys.stderr)
-                    print(f'{number}/{len(paths)} {path}', file=sys.stderr, flush=True)
-                if failures:
-                    raise ValueError(f'{failures} games could not be inspected; index of other games retained')
+                summary = scan_external_games(home, sys.stdin.read().splitlines())
+                print('\t'.join(map(str, summary)))
             elif args.command == 'external-info':
                 cfg = reshade_external.scan_game(home, rom)
                 print(reshade_external.state(cfg))
