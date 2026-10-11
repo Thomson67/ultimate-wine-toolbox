@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -11,6 +12,27 @@ class ReShadeUiTests(unittest.TestCase):
     def environment(self, base):
         return dict(os.environ, WT_ROOT=str(ROOT / 'toolbox'), TEST_HOME=str(base/'home'),
                     WT_LANGUAGE='fr', SUMMARY=str(base/'summary'), CHECKLIST=str(base/'checklist'))
+
+    def test_diagnostic_resume_returns_to_api_for_the_chosen_executable(self):
+        for remembered, changed in [('drive_c/game/Chosen Game.exe',False),('drive_c/game/Removed.exe',True)]:
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as folder:
+                base=Path(folder);state=base/'home/state';state.mkdir(parents=True)
+                (state/'reshade-diagnostic.json').write_text(json.dumps({'rom':'/games/Game.wine','installation_exe':remembered}))
+                result=subprocess.run(['bash','-c','''source "$WT_ROOT/lib/common.sh"
+WT_HOME="$TEST_HOME"
+source "$WT_ROOT/lang/fr.sh"
+source "$WT_ROOT/modules/reshade.sh"
+msgbox() { return 0; }
+resh_cmd() { [ "$1" = exes ] && printf 'drive_c/game/Chosen Game.exe\\ndrive_c/game/Other.exe\\n'; }
+menu_select() { printf '%s' "$2" > "$CHECKLIST"; printf 1; }
+resh_api_select() { printf 'api:%s\\n' "$2" >> "$SUMMARY"; return 1; }
+resh_game_menu() { printf 'game-menu\\n' >> "$SUMMARY"; }
+resh_resume_diagnostic
+'''],env=self.environment(base),capture_output=True,text=True)
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertEqual((base/'summary').read_text(),'api:drive_c/game/Chosen Game.exe\ngame-menu\n')
+                self.assertEqual((base/'checklist').exists(),changed)
+                self.assertFalse((state/'reshade-diagnostic.json').exists())
 
     def test_named_templates_go_straight_to_confirmation_without_checklist(self):
         for model, expected in [('retro', ['crt-royale', 'rsretroarch-shaders', 'scaling-shaders', 'reshade-bur']),

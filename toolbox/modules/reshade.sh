@@ -77,16 +77,16 @@ resh_preset_file() {
 }
 
 resh_diagnostic() {
-    local rom="$1"
+    local rom="$1" exe="${2:-}"
     yesno_default_no "$(i18n resh_title)" "$(i18n resh_diag_confirm)" || return 1
-    python3 "$WT_ROOT/helpers/reshade_diagnostic.py" --home "$WT_HOME" request "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
+    python3 "$WT_ROOT/helpers/reshade_diagnostic.py" --home "$WT_HOME" --exe "$exe" request "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
         msgbox "$(i18n resh_title)" "$(i18n resh_diag_pending)"; return 1;
     }
     return 0
 }
 
 resh_resume_diagnostic() {
-    local rom detected candidates evidence result
+    local rom exe detected candidates evidence result
     rom="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["rom"])' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || return
     if [ "$(cat "$WT_HOME/state/launch-game.request" 2>/dev/null)" = "$rom" ]; then
         rm -f -- "$WT_HOME/state/launch-game.request"
@@ -95,11 +95,13 @@ resh_resume_diagnostic() {
         msgbox "$(i18n resh_title)" "$(i18n resh_diag_active)"
         return
     fi
+    exe="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("installation_exe", ""))' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || exe=""
     rm -f -- "$WT_HOME/state/reshade-diagnostic.json" "$WT_HOME/state/reshade-diagnostic.stop"
     detected="$(python3 "$WT_ROOT/helpers/reshade_diagnostic.py" --home "$WT_HOME" result "$rom")"
     candidates="${detected%%$'\t'*}"; evidence="${detected##*$'\t'}"
     result="$(cat "$WT_HOME/state/wsq-launch-result" 2>/dev/null)"
     msgbox "$(i18n resh_title)" "$(i18n resh_diag_result "${candidates:-?}" "${evidence:-?}" "${result:-?}")"
+    [ -z "$exe" ] || resh_install_game "$rom" "$exe"
     resh_game_menu "$rom"
 }
 
@@ -135,7 +137,7 @@ resh_api_select() {
         choice="$(menu_select "$(i18n resh_title)" "$prompt" "${rows[@]}" diagnostic "$(i18n resh_diag_title)" wiki "$(i18n resh_api_wiki)")" || return 1
         case "$choice" in
             dxgi|d3d9|opengl32) printf '%s' "$choice"; return 0 ;;
-            diagnostic) resh_diagnostic "$rom" && return 2; continue ;;
+            diagnostic) resh_diagnostic "$rom" "$exe" && return 2; continue ;;
             wiki)
                 query="$(resh_cmd wiki-title "$rom")"
                 query="$(input_text "$(i18n resh_api_wiki)" "$(i18n resh_wiki_query)" "$query")" || continue
@@ -165,6 +167,7 @@ resh_api_select() {
 
 resh_install_game() {
     local rom="$1" exe selected dll version packs state workspace name label model defaults current
+    local resume_exe="${2:-}" resumed=0 index
     local -a exes=() items=() shaders=()
     local listing
     listing="$(resh_cmd exes "$rom" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
@@ -177,10 +180,17 @@ resh_install_game() {
         items+=("${#exes[@]}" "$exe")
     done <<< "$listing"
     [ "${#exes[@]}" -gt 0 ] || { msgbox "$(i18n resh_title)" "$(i18n resh_no_exe)"; return 1; }
-    selected="$(menu_select "$(i18n resh_title)" "$(i18n resh_exe_prompt)" "${items[@]}")" || return 1
-    case "$selected" in ''|*[!0-9]*) return 1 ;; esac
-    [ "$selected" -ge 1 ] && [ "$selected" -le "${#exes[@]}" ] || return 1
-    exe="${exes[$((selected-1))]}"
+    for index in "${!exes[@]}"; do
+        if [ "${exes[$index]}" = "$resume_exe" ]; then
+            exe="$resume_exe"; resumed=1; break
+        fi
+    done
+    if [ "$resumed" -eq 0 ]; then
+        selected="$(menu_select "$(i18n resh_title)" "$(i18n resh_exe_prompt)" "${items[@]}")" || return 1
+        case "$selected" in ''|*[!0-9]*) return 1 ;; esac
+        [ "$selected" -ge 1 ] && [ "$selected" -le "${#exes[@]}" ] || return 1
+        exe="${exes[$((selected-1))]}"
+    fi
     dll="$(resh_api_select "$rom" "$exe")" || {
         [ ! -f "$WT_HOME/state/reshade-diagnostic.json" ] || exit 0
         return 1

@@ -8,7 +8,7 @@ import re
 import time
 
 from reshade_api import DLL_APIS
-from reshade_manager import atomic_bytes, key, read_json, save_json, valid_rom
+from reshade_manager import atomic_bytes, key, read_json, relative, save_json, valid_rom
 
 IGNORED = {'wineserver', 'wineboot.exe', 'services.exe', 'explorer.exe', 'rundll32.exe', 'winedevice.exe', 'plugplay.exe', 'rpcss.exe', 'conhost.exe', 'svchost.exe', 'xalia.exe', 'tabtip.exe'}
 
@@ -120,6 +120,7 @@ def observe(rom, report, stop, proc=Path('/proc'), interval=0.5, limit=3600):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--home', type=Path, required=True)
+    p.add_argument('--exe', default='', help='resume installation at the API choice for this executable')
     p.add_argument('action', choices=['request', 'observe', 'result', 'active'])
     p.add_argument('rom', type=Path)
     args = p.parse_args()
@@ -130,6 +131,9 @@ def main():
     stop = state / 'reshade-diagnostic.stop'
     if args.action == 'request':
         valid_rom(rom)
+        context = {'rom': str(rom)}
+        if args.exe:
+            context['installation_exe'] = relative(args.exe)
         state.mkdir(parents=True, exist_ok=True)
         if request.exists() or (state / 'launch-game.request').exists() or (state / 'restart-es.request').exists():
             raise ValueError('another game launch/diagnostic is pending; reopen the toolbox to review it')
@@ -138,7 +142,7 @@ def main():
         (state / 'wsq-launch-result').unlink(missing_ok=True)
         stop.unlink(missing_ok=True)
         report.unlink(missing_ok=True)
-        save_json(request, {'rom': str(rom)})
+        save_json(request, context)
         atomic_bytes(state / 'launch-game.request', (str(rom)+'\n').encode())
         # ES still considers this Ports launcher a running game until it exits.
         # Use the proven WSquashFS restart handoff before posting the new launch;

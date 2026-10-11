@@ -106,6 +106,19 @@ class DiagnosticTests(unittest.TestCase):
             self.assertFalse((state/'reshade-diagnostic.json').exists())
             self.assertEqual((state/'restart-es.request').read_text(),'existing request')
 
+    def test_installation_executable_is_saved_for_resume_and_validated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp);game=p/'Game.wine';game.mkdir();home=p/'home'
+            command=[sys.executable,str(ROOT/'toolbox/helpers/reshade_diagnostic.py'),'--home',str(home),'--exe']
+            result=subprocess.run(command+['../Other.exe','request',str(game)],capture_output=True,text=True)
+            self.assertNotEqual(result.returncode,0)
+            self.assertFalse((home/'state/reshade-diagnostic.json').exists())
+            exe='drive_c/game/Folder with spaces/Game.exe'
+            result=subprocess.run(command+[exe,'request',str(game)],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            data=json.loads((home/'state/reshade-diagnostic.json').read_text())
+            self.assertEqual(data,{'rom':str(game),'installation_exe':exe})
+
     def test_port_stops_observer_before_resuming(self):
         source=(ROOT/'toolbox/ports/Ultimate Wine Toolbox.sh').read_text()
         function=source.split('monitor_wsq_launch() {',1)[1].split('\nresume_wsq_unavailable()',1)[0]
