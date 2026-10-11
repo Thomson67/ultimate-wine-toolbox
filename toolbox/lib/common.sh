@@ -84,7 +84,7 @@ yesno() {
     printf '%s [y/N] ' "$(i18n choice_prompt)"
     read -r ans
     case "$ans" in y|Y|o|O|oui|OUI|yes|YES) return 0 ;; *) return 1 ;; esac
-}
+} >&2 # Confirmations stay visible inside captured selectors, like msgbox.
 
 yesno_default_no() {
     local title="$1" body="$2"
@@ -103,7 +103,7 @@ yesno_default_no() {
     printf '%s [y/N] ' "$(i18n choice_prompt)"
     read -r ans
     case "$ans" in y|Y|o|O|oui|OUI|yes|YES) return 0 ;; *) return 1 ;; esac
-}
+} >&2 # Confirmations return a status, never selector data on stdout.
 
 menu_select() {
     local title="$1" prompt="$2"

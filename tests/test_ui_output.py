@@ -1,3 +1,4 @@
+import os
 import subprocess
 import unittest
 from pathlib import Path
@@ -7,6 +8,28 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class UIOutputTests(unittest.TestCase):
+    def test_confirmation_screen_is_visible_inside_captured_selector(self):
+        for function in ('yesno', 'yesno_default_no'):
+            for answer in (0, 1):
+                with self.subTest(function=function, answer=answer):
+                    result = subprocess.run(['bash', '-c', r'''
+source toolbox/lib/common.sh
+have_dialog() { return 0; }
+wt_clear_tty() { :; }
+i18n() { printf '%s' "$1"; }
+dialog() { printf '\033[?1049hConfirm launch\033[?1049l'; return "$ANSWER"; }
+selector() {
+    "$CONFIRM_FUNCTION" ReShade Continue || return 1
+    printf diagnostic
+}
+selected="$(selector)"
+rc=$?
+printf '%s:%s' "$rc" "$selected"
+'''], cwd=ROOT, capture_output=True, text=True,
+                        env=os.environ | {'CONFIRM_FUNCTION': function, 'ANSWER':str(answer)}, check=True)
+                    self.assertEqual(result.stdout, '0:diagnostic' if answer == 0 else '1:')
+                    self.assertIn('Confirm launch', result.stderr)
+
     def test_missing_executable_message_does_not_pollute_selection(self):
         result = subprocess.run(
             ["bash", "-c", r'''
