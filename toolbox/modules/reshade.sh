@@ -76,6 +76,33 @@ resh_preset_file() {
     fi
 }
 
+resh_diagnostic() {
+    local rom="$1"
+    yesno_default_no "$(i18n resh_title)" "$(i18n resh_diag_confirm)" || return 1
+    python3 "$WT_ROOT/helpers/reshade_diagnostic.py" --home "$WT_HOME" request "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
+        msgbox "$(i18n resh_title)" "$(i18n resh_diag_pending)"; return 1;
+    }
+    return 0
+}
+
+resh_resume_diagnostic() {
+    local rom detected candidates evidence result
+    rom="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["rom"])' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || return
+    if [ "$(cat "$WT_HOME/state/launch-game.request" 2>/dev/null)" = "$rom" ]; then
+        rm -f -- "$WT_HOME/state/launch-game.request"
+    fi
+    if python3 "$WT_ROOT/helpers/reshade_diagnostic.py" --home "$WT_HOME" active "$rom"; then
+        msgbox "$(i18n resh_title)" "$(i18n resh_diag_active)"
+        return
+    fi
+    rm -f -- "$WT_HOME/state/reshade-diagnostic.json" "$WT_HOME/state/reshade-diagnostic.stop"
+    detected="$(python3 "$WT_ROOT/helpers/reshade_diagnostic.py" --home "$WT_HOME" result "$rom")"
+    candidates="${detected%%$'\t'*}"; evidence="${detected##*$'\t'}"
+    result="$(cat "$WT_HOME/state/wsq-launch-result" 2>/dev/null)"
+    msgbox "$(i18n resh_title)" "$(i18n resh_diag_result "${candidates:-?}" "${evidence:-?}" "${result:-?}")"
+    resh_game_menu "$rom"
+}
+
 resh_api_select() {
     local rom="$1" exe="$2" detected candidates kind evidence prompt choice api label query titles title idx selected
     local -a rows=() names=()
@@ -83,6 +110,11 @@ resh_api_select() {
     IFS=$'\t' read -r candidates kind evidence <<< "$detected"
     # read treats tabs as whitespace; retain empty candidate fields explicitly.
     candidates="${detected%%$'\t'*}"
+    local observed
+    observed="$(python3 "$WT_ROOT/helpers/reshade_diagnostic.py" --home "$WT_HOME" result "$rom" 2>> "${WT_SESSION_LOG:-/dev/null}")"
+    if [ -n "${observed%%$'\t'*}" ]; then
+        candidates="${observed%%$'\t'*}"; evidence="${observed##*$'\t'}"
+    fi
     prompt="$(i18n resh_api_prompt)\n\n$(i18n resh_api_detection "${evidence:-?}")"
     while true; do
         rows=()
@@ -100,9 +132,10 @@ resh_api_select() {
         if [[ ",$candidates," == *',vulkan,'* || ",$candidates," == *',legacy,'* ]]; then
             prompt+="\n$(i18n resh_api_unsupported)"
         fi
-        choice="$(menu_select "$(i18n resh_title)" "$prompt" "${rows[@]}" wiki "$(i18n resh_api_wiki)")" || return 1
+        choice="$(menu_select "$(i18n resh_title)" "$prompt" "${rows[@]}" diagnostic "$(i18n resh_diag_title)" wiki "$(i18n resh_api_wiki)")" || return 1
         case "$choice" in
             dxgi|d3d9|opengl32) printf '%s' "$choice"; return 0 ;;
+            diagnostic) resh_diagnostic "$rom" && return 2; continue ;;
             wiki)
                 query="${rom##*/}"; query="${query%.*}"; query="${query%%\[*}"
                 query="$(input_text "$(i18n resh_api_wiki)" "$(i18n resh_wiki_query)" "$query")" || continue
@@ -148,7 +181,10 @@ resh_install_game() {
     case "$selected" in ''|*[!0-9]*) return 1 ;; esac
     [ "$selected" -ge 1 ] && [ "$selected" -le "${#exes[@]}" ] || return 1
     exe="${exes[$((selected-1))]}"
-    dll="$(resh_api_select "$rom" "$exe")" || return 1
+    dll="$(resh_api_select "$rom" "$exe")" || {
+        [ ! -f "$WT_HOME/state/reshade-diagnostic.json" ] || exit 0
+        return 1
+    }
     case "$dll" in dxgi|d3d9|opengl32) ;; *) return 1 ;; esac
     version="$(input_text "$(i18n resh_title)" "$(i18n resh_version_prompt)" latest)" || return 1
     [[ "$version" =~ ^(latest|[0-9]+\.[0-9]+\.[0-9]+)$ ]] || {
@@ -236,10 +272,11 @@ resh_game_menu() {
         fi
         choice="$(menu_select "$(i18n resh_title) — $(basename "$rom")" \
             "$prompt" \
-            install "$(i18n resh_install)" enable "$(i18n resh_enable)" disable "$(i18n resh_disable)" \
+            diagnostic "$(i18n resh_diag_title)" install "$(i18n resh_install)" enable "$(i18n resh_enable)" disable "$(i18n resh_disable)" \
             preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)" \
             back "$(i18n back)")" || return
         case "$choice" in
+            diagnostic) resh_diagnostic "$rom" && exit 0 ;;
             install) resh_install_game "$rom" ;;
             enable|disable)
                 resh_cmd "$choice" "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {

@@ -65,4 +65,9 @@ if [ "${WT_AUTO_RESUME_WSQ:-0}" = "1" ]; then
     [ "$wsq_rc" -eq 20 ] && exit 0
 fi
 
+if [ "${WT_AUTO_RESUME_RESH:-0}" = "1" ] || [ -f "$WT_HOME/state/reshade-diagnostic.json" ]; then
+    unset WT_AUTO_RESUME_RESH
+    resh_resume_diagnostic
+fi
+
 main_menu

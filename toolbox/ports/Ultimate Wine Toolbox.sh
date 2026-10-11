@@ -9,6 +9,8 @@ RESTART_REQUEST="$STATE_DIR/restart-es.request"
 LAUNCH_REQUEST="$STATE_DIR/launch-game.request"
 RESUME_REQUEST="$STATE_DIR/resume-wsq.request"
 RESULT_FILE="$STATE_DIR/wsq-launch-result"
+DIAG_REQUEST="$STATE_DIR/reshade-diagnostic.json"
+RESUME_ENV=WT_AUTO_RESUME_WSQ
 
 mkdir -p "$LOG_DIR" "$STATE_DIR"
 export DISPLAY="${DISPLAY:-:0}"
@@ -63,6 +65,7 @@ fi
 
 resume_requested=0
 if [ -f "$RESUME_REQUEST" ]; then
+    [ "$(cat "$RESUME_REQUEST")" != reshade ] || RESUME_ENV=WT_AUTO_RESUME_RESH
     rm -f -- "$RESUME_REQUEST"
     resume_requested=1
     echo "wsq_resume_request_consumed=1" >>"$BOOT_LOG"
@@ -74,7 +77,7 @@ if [ "${WT_SKIP_INITIAL_TOOLBOX:-0}" = "1" ]; then
     echo "initial_toolbox_skipped=1" >>"$BOOT_LOG"
 else
     if [ "$resume_requested" -eq 1 ]; then
-        WT_AUTO_RESUME_WSQ=1 /usr/bin/xterm \
+        env "$RESUME_ENV=1" /usr/bin/xterm \
             +lc \
             -u8 \
             -fa "DejaVu Sans Mono" \
@@ -209,7 +212,12 @@ wait_for_game_stop() {
 }
 
 monitor_wsq_launch() {
-    local result
+    local result diagnostic_pid=""
+    if [ -f "$DIAG_REQUEST" ]; then
+        python3 /userdata/system/ultimate-wine-toolbox/toolbox/helpers/reshade_diagnostic.py \
+            --home /userdata/system/ultimate-wine-toolbox observe "$launch_rom" >> "$BOOT_LOG" 2>&1 &
+        diagnostic_pid=$!
+    fi
     if ! launch_game_via_es "$launch_rom"; then
         result="launch_failed"
     elif ! wait_for_game_start; then
@@ -221,6 +229,10 @@ monitor_wsq_launch() {
         else
             result="normal"
         fi
+    fi
+    if [ -n "$diagnostic_pid" ]; then
+        : > "$STATE_DIR/reshade-diagnostic.stop"
+        wait "$diagnostic_pid" || true
     fi
     printf '%s\n' "$result" > "$RESULT_FILE.tmp"
     mv -f -- "$RESULT_FILE.tmp" "$RESULT_FILE"
@@ -239,7 +251,12 @@ resume_wsquashfs_toolbox() {
     # Relaunch the Toolbox through EmulationStation rather than spawning a
     # naked xterm. This restores Batocera's normal Ports lifecycle, including
     # evmapy/Pad2Key and Wayland compositor focus handling.
-    : > "$RESUME_REQUEST"
+    if [ -f "$DIAG_REQUEST" ]; then
+        RESUME_ENV=WT_AUTO_RESUME_RESH
+        printf '%s\n' reshade > "$RESUME_REQUEST"
+    else
+        : > "$RESUME_REQUEST"
+    fi
 
     if wait_for_es_api && launch_game_via_es "$TOOLBOX_PORT"; then
         echo "wsq_resume_via_es=1" >>"$BOOT_LOG"
@@ -249,7 +266,7 @@ resume_wsquashfs_toolbox() {
     echo "ERROR: WSquashFS resume via EmulationStation failed; using direct xterm fallback." >>"$BOOT_LOG"
     rm -f -- "$RESUME_REQUEST"
 
-    WT_AUTO_RESUME_WSQ=1 /usr/bin/xterm \
+    env "$RESUME_ENV=1" /usr/bin/xterm \
         +lc \
         -u8 \
         -fa "DejaVu Sans Mono" \
