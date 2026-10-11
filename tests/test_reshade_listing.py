@@ -61,7 +61,7 @@ source "$WT_ROOT/modules/reshade.sh"
 WINDOWS_ROMS="$TEST_ROMS"
 msgbox() { return 0; }
 menu_select() { shift 2; printf '%s\\0' "$@" > "$ROWS"; return 1; }
-resh_menu
+resh_pick_game all
 '''
             result = subprocess.run(['bash', '-c', script], env=env, capture_output=True, text=True)
             self.assertEqual(result.stderr, '')

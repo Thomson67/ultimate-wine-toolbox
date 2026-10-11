@@ -29,6 +29,32 @@ def pe(arch):
 
 
 class ReShadeTests(unittest.TestCase):
+    def test_export_uses_latest_game_preset_and_requires_overwrite_confirmation(self):
+        r.event(self.home, self.rom, 'gameStart')
+        (self.game / 'ReShadePreset.ini').write_text('Techniques=CAS@CAS.fx\n')
+        target = self.base / 'Export with spaces.ini'
+        r.export_preset(self.home, self.rom, target)
+        self.assertEqual(target.read_text(), 'Techniques=CAS@CAS.fx\n')
+        target.write_text('existing personal preset')
+        with self.assertRaisesRegex(ValueError, 'confirm overwrite'):
+            r.export_preset(self.home, self.rom, target)
+        self.assertEqual(target.read_text(), 'existing personal preset')
+        r.export_preset(self.home, self.rom, target, True)
+        self.assertEqual(target.read_text(), 'Techniques=CAS@CAS.fx\n')
+        target.unlink()
+        target.symlink_to(self.profile / 'ReShade.ini')
+        with self.assertRaises(ValueError):
+            r.export_preset(self.home, self.rom, target, True)
+
+    def test_configured_list_returns_enabled_only_without_scanning_rom_library(self):
+        self.assertEqual(r.configured_games(self.home, True), [(str(self.rom), 'enabled')])
+        self.cfg['enabled'] = False
+        r.save_json(self.config, self.cfg)
+        self.assertEqual(r.configured_games(self.home, True), [])
+        self.assertEqual(r.configured_games(self.home), [(str(self.rom), 'disabled')])
+        r.save_json(self.home / 'reshade/games/missing.json', {'rom': str(self.base / 'gone.wsquashfs'), 'enabled': True})
+        self.assertEqual(len(r.configured_games(self.home)), 1)
+
     def test_extractor_accepts_embedded_zip_and_ignores_other_entries(self):
         with tempfile.TemporaryDirectory() as folder:
             archive = Path(folder) / 'setup.exe'

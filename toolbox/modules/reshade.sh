@@ -48,8 +48,90 @@ resh_prepare_tools() {
     chmod +x "$shim/7z"
 }
 
+resh_model_packs() {
+    case "$1" in
+        standard) printf '%s' 'reshade-shaders,sweetfx-shaders' ;;
+        retro) printf '%s' 'reshade-shaders,sweetfx-shaders,crt-royale,rsretroarch-shaders,scaling-shaders,reshade-bur' ;;
+        thomson) printf '%s' 'reshade-shaders,sweetfx-shaders,reshade-shaders-legacy,fubax-shaders,quintfx,prod80-shaders,astrayfx-shaders,immerse-shaders' ;;
+        manual) printf '' ;;
+    esac
+}
+
+resh_preset_file() {
+    local mode="$1" rom="$2" name="${2##*/}" chosen
+    name="${name%.*}-ReShade.ini"
+    if command -v yad >/dev/null 2>&1; then
+        local -a flags=()
+        [ "$mode" != export ] || flags+=(--save --confirm-overwrite)
+        DISPLAY="${DISPLAY:-:0}" LANGUAGE="$WT_LANGUAGE" yad --file-selection "${flags[@]}" \
+            --filename="/userdata/$([ "$mode" != export ] || printf '%s' "$name")" \
+            --title="$(i18n "resh_${mode}_title")" --file-filter='ReShade presets | *.ini *.INI' \
+            --file-filter="$(i18n resh_all_files) | *" --width=1000 --height=700
+    else
+        chosen="$(input_text "$(i18n "resh_${mode}_title")" "$(i18n resh_preset_prompt)" "/userdata/$([ "$mode" != export ] || printf '%s' "$name")")" || return 1
+        if [ "$mode" = export ] && [ -e "$chosen" ]; then
+            yesno_default_no "$(i18n resh_title)" "$(i18n resh_export_overwrite "$chosen")" || return 1
+        fi
+        printf '%s' "$chosen"
+    fi
+}
+
+resh_api_select() {
+    local rom="$1" exe="$2" detected candidates kind evidence prompt choice api label query titles title idx selected
+    local -a rows=() names=()
+    detected="$(resh_cmd api "$rom" "$exe" 2>> "${WT_SESSION_LOG:-/dev/null}")" || detected=""
+    IFS=$'\t' read -r candidates kind evidence <<< "$detected"
+    # read treats tabs as whitespace; retain empty candidate fields explicitly.
+    candidates="${detected%%$'\t'*}"
+    prompt="$(i18n resh_api_prompt)\n\n$(i18n resh_api_detection "${evidence:-?}")"
+    while true; do
+        rows=()
+        for api in d3d9 dxgi opengl32; do
+            case "$api" in d3d9) label='DirectX 9 (d3d9)' ;; dxgi) label='DirectX 10 / 11 / 12 (dxgi)' ;; opengl32) label='OpenGL (opengl32)' ;; esac
+            if [[ ",$candidates," == *",$api,"* ]]; then
+                rows+=("$api" "$label — $(i18n resh_api_suggested)")
+            fi
+        done
+        for api in dxgi d3d9 opengl32; do
+            [[ ",$candidates," != *",$api,"* ]] || continue
+            case "$api" in d3d9) label='DirectX 9 (d3d9)' ;; dxgi) label='DirectX 10 / 11 / 12 (dxgi)' ;; opengl32) label='OpenGL (opengl32)' ;; esac
+            rows+=("$api" "$label")
+        done
+        if [[ ",$candidates," == *',vulkan,'* || ",$candidates," == *',legacy,'* ]]; then
+            prompt+="\n$(i18n resh_api_unsupported)"
+        fi
+        choice="$(menu_select "$(i18n resh_title)" "$prompt" "${rows[@]}" wiki "$(i18n resh_api_wiki)")" || return 1
+        case "$choice" in
+            dxgi|d3d9|opengl32) printf '%s' "$choice"; return 0 ;;
+            wiki)
+                query="${rom##*/}"; query="${query%.*}"; query="${query%%\[*}"
+                query="$(input_text "$(i18n resh_api_wiki)" "$(i18n resh_wiki_query)" "$query")" || continue
+                titles="$(resh_cmd wiki-search "$query" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
+                    msgbox "$(i18n resh_title)" "$(i18n resh_wiki_unavailable)"; continue;
+                }
+                names=(); rows=(); idx=0
+                while IFS= read -r title; do
+                    [ -n "$title" ] || continue
+                    names+=("$title"); idx=$((idx+1)); rows+=("$idx" "$title")
+                done <<< "$titles"
+                [ "$idx" -gt 0 ] || { msgbox "$(i18n resh_title)" "$(i18n resh_no_match)"; continue; }
+                selected="$(menu_select "$(i18n resh_api_wiki)" "$(i18n resh_wiki_choose)" "${rows[@]}")" || continue
+                case "$selected" in ''|*[!0-9]*) continue ;; esac
+                [ "$selected" -ge 1 ] && [ "$selected" -le "$idx" ] || continue
+                title="${names[$((selected-1))]}"
+                detected="$(resh_cmd wiki-page "$title" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
+                    msgbox "$(i18n resh_title)" "$(i18n resh_wiki_unavailable)"; continue;
+                }
+                candidates="${detected%%$'\t'*}"; evidence="${detected#*$'\t'}"
+                prompt="$(i18n resh_api_prompt)\n\nPCGamingWiki : $title\n${evidence:-?}\n$(i18n resh_wiki_hint)"
+                ;;
+            *) return 1 ;;
+        esac
+    done
+}
+
 resh_install_game() {
-    local rom="$1" exe selected dll version packs state workspace name label
+    local rom="$1" exe selected dll version packs state workspace name label model defaults current
     local -a exes=() items=() shaders=()
     local listing
     listing="$(resh_cmd exes "$rom" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
@@ -66,8 +148,7 @@ resh_install_game() {
     case "$selected" in ''|*[!0-9]*) return 1 ;; esac
     [ "$selected" -ge 1 ] && [ "$selected" -le "${#exes[@]}" ] || return 1
     exe="${exes[$((selected-1))]}"
-    dll="$(menu_select "$(i18n resh_title)" "$(i18n resh_api_prompt)" \
-        dxgi "DirectX 10 / 11 / 12 (dxgi)" d3d9 "DirectX 9 (d3d9)" opengl32 "OpenGL (opengl32)")" || return 1
+    dll="$(resh_api_select "$rom" "$exe")" || return 1
     case "$dll" in dxgi|d3d9|opengl32) ;; *) return 1 ;; esac
     version="$(input_text "$(i18n resh_title)" "$(i18n resh_version_prompt)" latest)" || return 1
     [[ "$version" =~ ^(latest|[0-9]+\.[0-9]+\.[0-9]+)$ ]] || {
@@ -75,22 +156,35 @@ resh_install_game() {
         return 1
     }
     resh_backend_ready || return 1
-    items=()
-    while IFS=$'\t' read -r name label; do
-        name="${name#  }"
-        [[ "$name" =~ ^[a-z0-9_-]+$ ]] && [ -n "$label" ] || continue
-        state=off
-        case "$name" in reshade-shaders|sweetfx-shaders) state=on ;; esac
-        items+=("$name" "$label" "$state")
-    done < <(MAIN_PATH="$WT_HOME/reshade/runtime" UI_BACKEND=cli NO_COLOR=1 \
-        bash "$RESH_BACKEND" --cli --list-shader-repos 2>> "${WT_SESSION_LOG:-/dev/null}")
-    [ "${#items[@]}" -gt 0 ] || return 1
-    selected="$(checklist_select "$(i18n resh_title)" "$(i18n resh_shaders_prompt)" "${items[@]}")" || return 1
-    while IFS= read -r name; do
-        [ -z "$name" ] || shaders+=("$name")
-    done <<< "$selected"
-    packs="$(IFS=','; printf '%s' "${shaders[*]}")"
-    packs="${packs:-none}"
+    items=(standard "$(i18n resh_model_standard)" retro "$(i18n resh_model_retro)" thomson "$(i18n resh_model_thomson)" manual "$(i18n resh_model_manual)")
+    current="$(resh_cmd details "$rom")"
+    [ -z "$current" ] || items+=(current "$(i18n resh_model_current)")
+    model="$(menu_select "$(i18n resh_title)" "$(i18n resh_model_prompt)" "${items[@]}")" || return 1
+    case "$model" in
+        standard|retro|thomson|manual) defaults="$(resh_model_packs "$model")" ;;
+        current) defaults="${current##*$'\t'}" ;;
+        *) return 1 ;;
+    esac
+    if [ "$model" = manual ]; then
+        items=()
+        while IFS=$'\t' read -r name label; do
+            name="${name#  }"
+            [[ "$name" =~ ^[a-z0-9_-]+$ ]] && [ -n "$label" ] || continue
+            state=off
+            [[ ",$defaults," != *",$name,"* ]] || state=on
+            items+=("$name" "$label" "$state")
+        done < <(MAIN_PATH="$WT_HOME/reshade/runtime" UI_BACKEND=cli NO_COLOR=1 \
+            bash "$RESH_BACKEND" --cli --list-shader-repos 2>> "${WT_SESSION_LOG:-/dev/null}")
+        [ "${#items[@]}" -gt 0 ] || return 1
+        selected="$(checklist_select "$(i18n resh_title)" "$(i18n resh_shaders_prompt)" "${items[@]}")" || return 1
+        while IFS= read -r name; do
+            [ -z "$name" ] || shaders+=("$name")
+        done <<< "$selected"
+        packs="$(IFS=','; printf '%s' "${shaders[*]}")"
+        packs="${packs:-none}"
+    else
+        packs="$defaults"
+    fi
     yesno_default_no "$(i18n resh_title)" "$(i18n resh_install_confirm "$(basename "$rom")" "$exe" "$dll" "$version" "$packs")" || return 1
     # Reconfiguration starts from restored originals; the saved preset survives.
     state="$(resh_cmd status "$rom")"
@@ -143,7 +237,7 @@ resh_game_menu() {
         choice="$(menu_select "$(i18n resh_title) — $(basename "$rom")" \
             "$prompt" \
             install "$(i18n resh_install)" enable "$(i18n resh_enable)" disable "$(i18n resh_disable)" \
-            preset "$(i18n resh_preset)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)" \
+            preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)" \
             back "$(i18n back)")" || return
         case "$choice" in
             install) resh_install_game "$rom" ;;
@@ -156,15 +250,22 @@ resh_game_menu() {
                 resh_cmd uninstall "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
                     msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"
                 } ;;
-            preset)
+            preset|export)
                 if [ "$state" = missing ]; then
                     msgbox "$(i18n resh_title)" "$(i18n resh_install_first)"
                     continue
                 fi
-                preset="$(input_text "$(i18n resh_title)" "$(i18n resh_preset_prompt)" /userdata/)" || continue
-                resh_cmd preset "$rom" "$preset" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
-                    msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"
-                } ;;
+                if [ "$choice" = preset ]; then
+                    preset="$(resh_preset_file import "$rom")" || continue
+                    resh_cmd preset "$rom" "$preset" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
+                        msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"
+                    }
+                else
+                    preset="$(resh_preset_file export "$rom")" || continue
+                    resh_cmd export "$rom" "$preset" overwrite >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 && {
+                        msgbox "$(i18n resh_title)" "$(i18n resh_export_done "$preset")"
+                    } || msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"
+                fi ;;
             profile)
                 profile="$(resh_cmd profile "$rom")" || continue
                 msgbox "$(i18n resh_title)" "$(i18n resh_profile_path "$profile")" ;;
@@ -173,27 +274,51 @@ resh_game_menu() {
     done
 }
 
-resh_menu() {
-    local rom choice path state label enabled_label disabled_label missing_label
+resh_game_rows() {
+    case "${1:-all}" in
+        enabled|installed) python3 "$RESH_HELPER" --home "$WT_HOME" configured-list "$1" ;;
+        *) mangohud_list_games | python3 "$RESH_HELPER" --home "$WT_HOME" status-list ;;
+    esac
+}
+
+resh_pick_game() {
+    local filter="${1:-all}" query="${2:-}" rom choice path name state label enabled_label disabled_label missing_label
     local -a games=() items=()
-    msgbox "$(i18n resh_title)" "$(i18n resh_intro)" || return
     enabled_label="$(i18n resh_status_enabled)"
     disabled_label="$(i18n resh_status_disabled)"
     missing_label="$(i18n resh_status_missing)"
     while IFS= read -r -d '' path && IFS= read -r -d '' state; do
+        name="${path##*/}"
+        [[ -z "$query" || "${name,,}" == *"${query,,}"* ]] || continue
         games+=("$path")
         case "$state" in
             enabled) label="$enabled_label" ;;
             disabled) label="$disabled_label" ;;
             *) label="$missing_label" ;;
         esac
-        items+=("${#games[@]}" "${path##*/} — $label")
-    done < <(mangohud_list_games | python3 "$RESH_HELPER" --home "$WT_HOME" status-list \
-        2>> "${WT_SESSION_LOG:-/dev/null}")
-    [ "${#games[@]}" -gt 0 ] || { msgbox "$(i18n resh_title)" "$(i18n mangohud_no_games)"; return; }
+        items+=("${#games[@]}" "$name — $label")
+    done < <(resh_game_rows "$filter" 2>> "${WT_SESSION_LOG:-/dev/null}")
+    [ "${#games[@]}" -gt 0 ] || { msgbox "$(i18n resh_title)" "$(i18n resh_no_match)"; return; }
     choice="$(menu_select "$(i18n resh_title)" "$(i18n resh_game_prompt)" "${items[@]}")" || return
     case "$choice" in ''|*[!0-9]*) return ;; esac
     [ "$choice" -ge 1 ] && [ "$choice" -le "${#games[@]}" ] || return
     rom="${games[$((choice-1))]}"
     resh_game_menu "$rom"
+}
+
+resh_menu() {
+    local choice query
+    msgbox "$(i18n resh_title)" "$(i18n resh_intro)" || return
+    while true; do
+        choice="$(menu_select "$(i18n resh_title)" "$(i18n resh_list_prompt)" \
+            enabled "$(i18n resh_list_enabled)" installed "$(i18n resh_list_installed)" \
+            all "$(i18n resh_list_all)" search "$(i18n resh_list_search)" back "$(i18n back)")" || return
+        case "$choice" in
+            enabled|installed|all) resh_pick_game "$choice" ;;
+            search)
+                query="$(input_text "$(i18n resh_title)" "$(i18n resh_search_prompt)" "")" || continue
+                [ -z "$query" ] || resh_pick_game all "$query" ;;
+            *) return ;;
+        esac
+    done
 }

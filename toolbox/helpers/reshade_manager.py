@@ -86,16 +86,16 @@ def source_bytes(rom, rel):
     return path.read_bytes()
 
 
-def source_header(rom, rel):
+def source_header(rom, rel, limit=1024*1024):
     if rom.suffix.casefold() != '.wsquashfs':
         path = safe_leaf(rom, rel)
         if not path.resolve().is_relative_to(rom.resolve()):
             raise ValueError('source executable escapes the game')
         with path.open('rb') as stream:
-            return stream.read(1024*1024)
+            return stream.read(limit)
     with subprocess.Popen(['unsquashfs', '-cat', str(rom), relative(rel)],
                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
-        data = proc.stdout.read(1024*1024)
+        data = proc.stdout.read(limit)
         proc.stdout.close()
         proc.terminate()
         proc.wait()
@@ -554,13 +554,46 @@ def list_statuses(home, paths):
     return [(p, states.get(key(p), 'missing')) for p in games]
 
 
+def configured_games(home, enabled_only=False):
+    games = []
+    for config in (home / 'reshade/games').glob('*.json'):
+        cfg = read_json(config)
+        if not cfg or (enabled_only and not cfg.get('enabled')):
+            continue
+        path = Path(cfg['rom'])
+        if path.suffix.casefold() in ('.wine', '.pc', '.wsquashfs') and path.exists():
+            games.append((str(path), 'enabled' if cfg.get('enabled') else 'disabled'))
+    return sorted(games, key=lambda item: item[0].casefold())
+
+
+def export_preset(home, rom, destination, overwrite=False):
+    cfg = read_json(home / 'reshade/games' / (key(rom) + '.json'))
+    if not cfg:
+        raise ValueError('install ReShade for this game first')
+    destination = Path(destination)
+    source = home / 'reshade/profiles' / key(rom) / 'ReShadePreset.ini'
+    if destination.suffix.casefold() != '.ini' or destination.is_symlink() or destination.resolve() == source.resolve():
+        raise ValueError('choose a separate regular .ini export file')
+    if destination.exists() and not overwrite:
+        raise ValueError('export destination exists; confirm overwrite')
+    journals = list((home / 'reshade/installations' / key(rom)).glob('*.json'))
+    for jp in journals:
+        j = read_json(jp)
+        ensure_idle(rom, Path(j['root']), Path(j['prefix']))
+    for jp in journals:
+        j = read_json(jp)
+        if directory_id(Path(j['root'])) == j.get('root_id'):
+            profile_save(home, rom, Path(j['root']), {'exe': j['exe']})
+    atomic_bytes(destination, source.read_bytes())
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--home', type=Path, default=Path('/userdata/system/ultimate-wine-toolbox'))
     parser.add_argument('--bottles', type=Path, default=Path('/userdata/system/wine-bottles/windows'))
     parser.add_argument('--runner', default='')
     parser.add_argument('--legacy', action='store_true')
-    parser.add_argument('command', choices=['exes', 'prepare', 'finish', 'status', 'status-list', 'enable', 'disable', 'uninstall',
+    parser.add_argument('command', choices=['exes', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
                                            'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details'])
     parser.add_argument('rom', nargs='?', type=Path)
     parser.add_argument('args', nargs='*')
@@ -582,6 +615,35 @@ def main():
             paths = sys.stdin.read().splitlines()
             for path, state in list_statuses(home, paths):
                 sys.stdout.buffer.write(os.fsencode(path) + b'\0' + state.encode() + b'\0')
+        elif args.command == 'configured-list':
+            for path, state in configured_games(home, str(args.rom) == 'enabled'):
+                sys.stdout.buffer.write(os.fsencode(path) + b'\0' + state.encode() + b'\0')
+        elif args.command == 'export':
+            export_preset(home, rom, args.args[0], args.args[1:] == ['overwrite'])
+        elif args.command == 'api':
+            import reshade_api
+            exe = relative(args.args[0])
+            header = source_header(rom, exe, 16*1024*1024)
+            candidates, kind, evidence = reshade_api.detect(header)
+            imports = reshade_api.imported_dlls(header)
+            if 'unityplayer.dll' in imports:
+                try:
+                    c, k, e = reshade_api.detect(source_header(rom, (PurePosixPath(exe).parent / 'UnityPlayer.dll').as_posix(), 16*1024*1024))
+                    candidates = sorted(set(candidates+c))
+                    evidence += ['UnityPlayer: '+v for v in e]
+                except (OSError, ValueError):
+                    pass
+            print(','.join(candidates) + '\t' + kind + '\t' + ', '.join(evidence))
+        elif args.command in ('wiki-search', 'wiki-page'):
+            import reshade_api
+            # Query text is the positional argument, not a filesystem path.
+            title = str(args.rom)
+            if args.command == 'wiki-search':
+                for name in reshade_api.wiki_search(title):
+                    print(name.replace('\n', ' ').replace('\t', ' '))
+            else:
+                candidates, evidence = reshade_api.wiki_page(title)
+                print(','.join(candidates) + '\t' + ', '.join(evidence))
         elif args.command == 'status':
             cfg = read_json(home / 'reshade/games' / (key(rom) + '.json'))
             print('enabled' if cfg.get('enabled') else 'disabled' if cfg else 'missing')
