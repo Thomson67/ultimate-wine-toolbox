@@ -671,7 +671,7 @@ declare -gA I18N=(
 
   [settings_language]="Langue"
   [settings_title]="Paramètres"
-  [wsq_update_title]="Mettre à jour un WSquashFS (bêta)"
+  [wsq_update_title]="Mettre à jour un WSquashFS"
   [wsq_update_intro]="Remplacez le dossier du jeu existant dans le préfixe par la nouvelle version du jeu. Le préfixe et les directives de lancement sont conservés. Un test et une vérification des sauvegardes précèdent la recompression. À la fin, choisissez de sauvegarder l’ancienne archive puis remplacer, ou de remplacer directement."
   [wsq_update_pending]="Une création ou mise à jour est déjà en attente. Reprenez-la depuis le menu ou annulez-la dans l’assistant avant de commencer un autre travail."
   [wsq_update_source_title]="Choisir le dossier de la nouvelle version du jeu"

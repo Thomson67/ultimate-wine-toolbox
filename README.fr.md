@@ -27,13 +27,13 @@ Créée par **Thomsonito**.
 
 ## Nouveautés de la v0.3.0
 
-- Mise à jour d’un jeu dans un WSquashFS **en bêta**, disponible après la création : reprise du préfixe, de l’exécutable, des réglages et des règles de sauvegarde existants.
+- Mise à jour d’un jeu dans un WSquashFS, disponible après la création : reprise du préfixe, de l’exécutable, des réglages et des règles de sauvegarde existants.
 - Déplacement de la nouvelle version du jeu, test du lancement et des sauvegardes, puis recompression avec contrôle complet d’intégrité.
 - Choix du remplacement direct ou de la sauvegarde de l’ancienne archive avant remplacement.
 - Reprise ou annulation des opérations en attente, et nettoyage des sauvegardes temporaires après réussite.
 - Exclusion des `autorun.cmd` de la sélection des exécutables.
 
-Cette nouvelle fonctionnalité reste en bêta pendant les tests sur plusieurs jeux. Les autres fonctionnalités gardent leur statut habituel.
+Le workflow de mise à jour est sorti de bêta en v0.5.3 après validation sur plusieurs jeux. Les autres fonctionnalités gardent leur statut habituel.
 
 [Notes de version complètes](release-notes/v0.3.0.md)
 
@@ -124,7 +124,7 @@ Les anciens lanceurs, hooks et répertoires runtime ne sont supprimés qu'après
 
 Les runners Wine/UMU, les jeux, les sauvegardes et les Wine bottles sont conservés.
 
-## Mettre à jour un WSquashFS (bêta)
+## Mettre à jour un WSquashFS
 
 Dans Gestion des WSquashFS, l’option suit immédiatement la création. Sélectionnez une archive contenant un préfixe Wine et un dossier contenant directement les fichiers de la nouvelle version du jeu. Le dossier source est déplacé dans le dossier du jeu identifié par `autorun.cmd` (souvent `drive_c/game`) d’un préfixe de test distinct. Les archives de type `.pc` sans préfixe Wine ne sont pas prises en charge.
 

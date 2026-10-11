@@ -671,7 +671,7 @@ declare -gA I18N=(
 
   [settings_language]="Language"
   [settings_title]="Settings"
-  [wsq_update_title]="Update a WSquashFS (beta)"
+  [wsq_update_title]="Update a WSquashFS"
   [wsq_update_intro]="Replace the existing game directory with a directory containing the new game version. Keep the prefix and launch directives. Test the game and review its saves before recompression. At completion, choose backup and replacement or direct replacement."
   [wsq_update_pending]="A creation or update is already pending. Resume it from the menu or cancel it in the wizard before starting another task."
   [wsq_update_source_title]="Choose the directory containing the new game version"

@@ -27,13 +27,13 @@ Created by **Thomsonito**.
 
 ## New in v0.3.0
 
-- **Beta** game updates inside an existing WSquashFS, immediately after Create: reuse the prefix, launcher, game settings and save rules.
+- Game updates inside an existing WSquashFS, immediately after Create: reuse the prefix, launcher, game settings and save rules.
 - Move the updated game directory, test launch and saves, then recompress with a full integrity check.
 - Replace directly or back up the previous archive before replacement.
 - Resume or cancel pending operations and clean temporary test saves after success.
 - Exclude `autorun.cmd` from executable selection.
 
-The new update feature remains in beta while more games are tested. Other features retain their existing status.
+The update workflow graduated from beta in v0.5.3 after validation on multiple games. Other features retain their existing status.
 
 [Full release notes](release-notes/v0.3.0.md)
 
@@ -130,7 +130,7 @@ Installing Ultimate Wine Toolbox over an older development build automatically m
 
 Wine/UMU runners, games, saves and bottles are preserved.
 
-## Update a WSquashFS (beta)
+## Update a WSquashFS
 
 In WSquashFS Management, Update follows Create. Select a Wine-prefix archive and a directory containing the updated game files directly. The source directory is moved into the existing game directory identified from `autorun.cmd` (often `drive_c/game`) of a separate test prefix. `.pc` archives without a Wine prefix are not supported.
 
