@@ -132,9 +132,10 @@ resh_api_select() {
         if [[ ",$candidates," == *',vulkan,'* || ",$candidates," == *',legacy,'* ]]; then
             prompt+="\n$(i18n resh_api_unsupported)"
         fi
-        choice="$(menu_select "$(i18n resh_title)" "$prompt" "${rows[@]}" wiki "$(i18n resh_api_wiki)")" || return 1
+        choice="$(menu_select "$(i18n resh_title)" "$prompt" "${rows[@]}" diagnostic "$(i18n resh_diag_title)" wiki "$(i18n resh_api_wiki)")" || return 1
         case "$choice" in
             dxgi|d3d9|opengl32) printf '%s' "$choice"; return 0 ;;
+            diagnostic) resh_diagnostic "$rom" && return 2; continue ;;
             wiki)
                 query="$(resh_cmd wiki-title "$rom")"
                 query="$(input_text "$(i18n resh_api_wiki)" "$(i18n resh_wiki_query)" "$query")" || continue
@@ -180,7 +181,10 @@ resh_install_game() {
     case "$selected" in ''|*[!0-9]*) return 1 ;; esac
     [ "$selected" -ge 1 ] && [ "$selected" -le "${#exes[@]}" ] || return 1
     exe="${exes[$((selected-1))]}"
-    dll="$(resh_api_select "$rom" "$exe")" || return 1
+    dll="$(resh_api_select "$rom" "$exe")" || {
+        [ ! -f "$WT_HOME/state/reshade-diagnostic.json" ] || exit 0
+        return 1
+    }
     case "$dll" in dxgi|d3d9|opengl32) ;; *) return 1 ;; esac
     version="$(input_text "$(i18n resh_title)" "$(i18n resh_version_prompt)" latest)" || return 1
     [[ "$version" =~ ^(latest|[0-9]+\.[0-9]+\.[0-9]+)$ ]] || {
@@ -307,11 +311,10 @@ resh_game_menu() {
         fi
         choice="$(menu_select "$(i18n resh_title) — $(basename "$rom")" \
             "$prompt" \
-            diagnostic "$(i18n resh_diag_title)" install "$(i18n resh_install)" enable "$(i18n resh_enable)" disable "$(i18n resh_disable)" \
+            install "$(i18n resh_install)" enable "$(i18n resh_enable)" disable "$(i18n resh_disable)" \
             preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)" \
             back "$(i18n back)")" || return
         case "$choice" in
-            diagnostic) resh_diagnostic "$rom" && exit 0 ;;
             install) resh_install_game "$rom" ;;
             enable|disable)
                 resh_cmd "$choice" "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
