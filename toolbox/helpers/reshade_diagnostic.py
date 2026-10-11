@@ -92,7 +92,7 @@ def main():
     if args.action == 'request':
         valid_rom(rom)
         state.mkdir(parents=True, exist_ok=True)
-        if request.exists() or (state / 'launch-game.request').exists():
+        if request.exists() or (state / 'launch-game.request').exists() or (state / 'restart-es.request').exists():
             raise ValueError('another game launch/diagnostic is pending; reopen the toolbox to review it')
         if scan(Path('/proc'), targets(rom))[0]:
             raise ValueError('close this game before starting a diagnostic')
@@ -101,6 +101,10 @@ def main():
         report.unlink(missing_ok=True)
         save_json(request, {'rom': str(rom)})
         atomic_bytes(state / 'launch-game.request', (str(rom)+'\n').encode())
+        # ES still considers this Ports launcher a running game until it exits.
+        # Use the proven WSquashFS restart handoff before posting the new launch;
+        # otherwise runningGame may report the toolbox and wait forever for it.
+        atomic_bytes(state / 'restart-es.request', b'')
     elif args.action == 'active':
         data = read_json(request)
         pid = data.get('observer_pid', 0)

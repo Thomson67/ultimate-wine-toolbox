@@ -56,8 +56,21 @@ class DiagnosticTests(unittest.TestCase):
             result=subprocess.run(command,capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertEqual((home/'state/launch-game.request').read_text(),str(game)+'\n')
+            self.assertTrue((home/'state/restart-es.request').exists())
             self.assertEqual(autorun.read_bytes(),b'ENV=FOO=bar\r\nCMD="Game.exe"\r\n')
             self.assertNotEqual(subprocess.run(command,capture_output=True).returncode,0)
+
+    def test_pending_es_handoff_is_not_overwritten(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp);home=p/'home';game=p/'Game.wine';game.mkdir()
+            state=home/'state';state.mkdir(parents=True)
+            (state/'restart-es.request').write_text('existing request')
+            command=[sys.executable,str(ROOT/'toolbox/helpers/reshade_diagnostic.py'),'--home',str(home),'request',str(game)]
+            result=subprocess.run(command,capture_output=True,text=True)
+            self.assertNotEqual(result.returncode,0)
+            self.assertFalse((state/'launch-game.request').exists())
+            self.assertFalse((state/'reshade-diagnostic.json').exists())
+            self.assertEqual((state/'restart-es.request').read_text(),'existing request')
 
     def test_port_stops_observer_before_resuming(self):
         source=(ROOT/'toolbox/ports/Ultimate Wine Toolbox.sh').read_text()
