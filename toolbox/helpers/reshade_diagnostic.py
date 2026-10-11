@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Observe one game's Wine DLL mappings without modifying launch configuration."""
 import argparse
+from functools import lru_cache
 import os
 from pathlib import Path
 import re
@@ -9,7 +10,23 @@ import time
 from reshade_api import DLL_APIS
 from reshade_manager import atomic_bytes, key, read_json, save_json, valid_rom
 
-IGNORED = {'wineserver', 'wineboot.exe', 'services.exe', 'explorer.exe', 'rundll32.exe', 'winedevice.exe', 'plugplay.exe', 'rpcss.exe', 'conhost.exe'}
+IGNORED = {'wineserver', 'wineboot.exe', 'services.exe', 'explorer.exe', 'rundll32.exe', 'winedevice.exe', 'plugplay.exe', 'rpcss.exe', 'conhost.exe', 'svchost.exe', 'xalia.exe', 'tabtip.exe'}
+
+
+@lru_cache(maxsize=512)
+def posix_cksum(data):
+    """UMU's adapter identity uses POSIX cksum, not zlib's reflected CRC32."""
+    crc = 0
+    length = len(data)
+    suffix = bytearray()
+    while length:
+        suffix.append(length & 255)
+        length >>= 8
+    for byte in data + suffix:
+        crc ^= byte << 24
+        for _ in range(8):
+            crc = ((crc << 1) ^ (0x04c11db7 if crc & 0x80000000 else 0)) & 0xffffffff
+    return crc ^ 0xffffffff
 
 
 def prefix_matches(value, candidates):
@@ -37,7 +54,9 @@ def scan(proc, candidates):
             with (entry / 'environ').open('rb') as stream:
                 env = dict(v.split(b'=', 1) for v in stream.read(65536).split(b'\0') if b'=' in v)
             prefix = os.fsdecode(env.get(b'WINEPREFIX', b''))
-            if not prefix_matches(prefix, candidates):
+            compat = os.fsdecode(env.get(b'STEAM_COMPAT_DATA_PATH', b''))
+            if not (prefix_matches(prefix, candidates) or
+                    (compat and prefix_matches(str(Path(compat)/'pfx'), candidates))):
                 continue
             comm = (entry / 'comm').read_text().strip()
             if comm.casefold() in IGNORED:
@@ -54,11 +73,31 @@ def scan(proc, candidates):
     return evidence, processes
 
 
-def targets(rom, bottles=Path('/userdata/system/wine-bottles/windows')):
-    candidates = [rom, Path('/var/run/wine') / rom.name, bottles / rom.name]
+def targets(rom, bottles=Path('/userdata/system/wine-bottles/windows'),
+            runners=Path('/userdata/system/wine/custom'),
+            compatdata=Path('/userdata/system/umu/compatdata')):
+    candidates = [rom, Path('/var/run/wine') / rom.name, Path('/run/wine') / rom.name,
+                  bottles / rom.name]
     # Include all runner-specific bottles: the effective runner is selected by ES.
     if bottles.is_dir():
         candidates += [folder / (rom.name + '.wine') for folder in bottles.iterdir() if folder.is_dir()]
+    # toolbox/overlay/bin/wine in umu-runner-toolbox binds/materializes the
+    # Batocera prefix as compatdata/<safe anchor>-<cksum>/pfx. Materialized
+    # prefixes have a different inode: samefile alone cannot identify them.
+    # Reproduce its exact identity for installed runners. Never match prefixes
+    # by a game-name substring: another game/runner could be mistaken for ours.
+    if runners.is_dir():
+        anchors = {rom.name, rom.name + '.wine'}
+        for runner in runners.iterdir():
+            if not runner.is_dir():
+                continue
+            for anchor in anchors:
+                stem = anchor[:-5] if anchor.endswith('.wine') else anchor
+                safe = re.sub(rb'[^A-Za-z0-9._-]', b'_', os.fsencode(stem)).decode('ascii')
+                for mode in ('embedded', 'compressed'):
+                    ident = os.fsencode(f'{mode}|{anchor}|{runner.name}')
+                    adapter = compatdata / f'{safe}-{posix_cksum(ident)}'
+                    candidates.extend((adapter, adapter/'pfx'))
     return candidates
 
 

@@ -36,6 +36,40 @@ class DiagnosticTests(unittest.TestCase):
             self.process(proc, 1, alias, '1 /wine/d3d9.dll.so\n2 /wine/d3d12.dll\n')
             self.assertEqual(d.scan(proc,[game])[0], {'d3d9.dll','d3d12.dll'})
 
+    def test_posix_checksum_matches_umu_and_system_cksum(self):
+        self.assertEqual(d.posix_cksum(b'compressed|30XX.wsquashfs|GE-Proton10-25-UMU'),517931436)
+        for data in (b'', b'embedded|Game.wine|Runner', 'compressed|Jeu é [Wine].wsquashfs|GE-Proton'.encode()):
+            expected = int(subprocess.check_output(['cksum'], input=data).split()[0])
+            self.assertEqual(d.posix_cksum(data),expected)
+
+    def test_umu_materialized_prefix_detects_live_d3d9_and_excludes_other_games(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp);proc=p/'proc';proc.mkdir();runners=p/'runners'
+            (runners/'GE-Proton10-25-UMU').mkdir(parents=True)
+            compat=p/'compatdata';rom=p/'30XX.wsquashfs'
+            candidates=d.targets(rom,p/'bottles',runners,compat)
+            prefix=compat/'30XX.wsquashfs-517931436'/'pfx'
+            self.assertIn(prefix,candidates)
+            self.process(proc,1,prefix,'1 /prefix/drive_c/windows/system32/d3d9.dll\n', '30XX.exe')
+            self.process(proc,2,compat/'30XX2.wsquashfs-517931436'/'pfx','1 /prefix/d3d12.dll\n')
+            self.process(proc,3,compat/'30XX.wsquashfs-1234'/'pfx','1 /prefix/d3d11.dll\n')
+            self.process(proc,4,prefix,'1 /prefix/opengl32.dll\n','xalia.exe')
+            self.assertEqual(d.scan(proc,candidates),({'d3d9.dll'},{'30XX.exe'}))
+            # A namespace may expose the prefix under a different path while
+            # keeping STEAM_COMPAT_DATA_PATH at the exact adapter identity.
+            (proc/'1/environ').write_bytes(b'WINEPREFIX=/namespace/pfx\0STEAM_COMPAT_DATA_PATH='+os.fsencode(prefix.parent)+b'\0')
+            self.assertEqual(d.scan(proc,candidates),({'d3d9.dll'},{'30XX.exe'}))
+
+    def test_umu_safe_names_and_wine_pc_anchors_match_the_wrapper(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp);runners=p/'runners';(runners/'Runner').mkdir(parents=True)
+            for name,anchor in (('Jeu é.wine','Jeu é.wine'),('Game.pc','Game.pc'),('Game.pc','Game.pc.wine')):
+                candidates=d.targets(p/name,p/'bottles',runners,p/'compat')
+                stem=anchor[:-5] if anchor.endswith('.wine') else anchor
+                safe=''.join(chr(b) if chr(b) in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-' else '_' for b in os.fsencode(stem))
+                crc=int(subprocess.check_output(['cksum'],input=os.fsencode(f'embedded|{anchor}|Runner')).split()[0])
+                self.assertIn(p/'compat'/f'{safe}-{crc}'/'pfx',candidates)
+
     def test_observation_finishes_on_stop_and_keeps_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp);proc=p/'proc';proc.mkdir();game=p/'Game.wine';game.mkdir(); stop=p/'stop';report=p/'report.json'
