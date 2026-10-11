@@ -35,7 +35,7 @@ resh_resume_diagnostic
                 self.assertFalse((state/'reshade-diagnostic.json').exists())
 
     def test_named_templates_go_straight_to_confirmation_without_checklist(self):
-        for model, expected in [('retro', ['crt-royale', 'rsretroarch-shaders', 'scaling-shaders', 'reshade-bur']),
+        for model, expected in [('retro', ['crt-royale', 'rsretroarch-shaders', 'scaling-shaders', 'reshade-shaders-legacy', 'guestrr-shaders']),
                                 ('thomson', ['sweetfx-shaders', 'reshade-shaders-legacy', 'fubax-shaders',
                                              'quintfx', 'prod80-shaders', 'astrayfx-shaders', 'immerse-shaders'])]:
             with tempfile.TemporaryDirectory() as folder:

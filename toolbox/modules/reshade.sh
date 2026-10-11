@@ -51,7 +51,7 @@ resh_prepare_tools() {
 resh_model_packs() {
     case "$1" in
         standard) printf '%s' 'reshade-shaders,sweetfx-shaders' ;;
-        retro) printf '%s' 'reshade-shaders,sweetfx-shaders,crt-royale,rsretroarch-shaders,scaling-shaders,reshade-bur' ;;
+        retro) printf '%s' 'reshade-shaders,sweetfx-shaders,reshade-shaders-legacy,crt-royale,rsretroarch-shaders,scaling-shaders,guestrr-shaders' ;;
         thomson) printf '%s' 'reshade-shaders,sweetfx-shaders,reshade-shaders-legacy,fubax-shaders,quintfx,prod80-shaders,astrayfx-shaders,immerse-shaders' ;;
         manual) printf '' ;;
     esac
