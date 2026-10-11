@@ -227,7 +227,9 @@ def finish(home, rom):
     if not (profile / 'ReShadePreset.ini').exists():
         atomic_bytes(profile / 'ReShadePreset.ini', b'Techniques=\nTechniqueSorting=\n')
     if not (profile / 'ReShade.ini').exists():
-        atomic_bytes(profile / 'ReShade.ini', b'[GENERAL]\nPerformanceMode=0\n[INPUT]\nKeyOverlay=36,0,0,0\n')
+        # Default shortcuts: Home opens the overlay, End toggles all effects.
+        # TutorialProgress=4 marks the overlay tutorial as completed.
+        atomic_bytes(profile / 'ReShade.ini', b'[GENERAL]\nPerformanceMode=0\n[INPUT]\nKeyOverlay=36,0,0,0\nKeyEffects=35,0,0,0\n[OVERLAY]\nTutorialProgress=4\n')
     return pending
 
 
