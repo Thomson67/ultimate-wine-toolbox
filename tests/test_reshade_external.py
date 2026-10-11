@@ -82,6 +82,31 @@ class ExternalTests(unittest.TestCase):
         r.save_json(self.home/'reshade/games'/(r.key(self.rom)+'.json'),{'rom':str(self.rom),'enabled':False})
         self.assertEqual(r.configured_games(self.home),[(str(self.rom),'disabled')])
 
+    def test_global_installer_payload_is_not_a_game_installation(self):
+        resources = self.rom/'drive_c/ProgramData/ReShade'
+        resources.mkdir(parents=True)
+        for name in ('ReShade32.dll', 'ReShade64.dll'):
+            (resources/name).write_bytes(dll())
+        self.assertEqual([f['path'] for f in e.scan_game(self.home,self.rom)['files']],
+                         ['drive_c/game/dxgi.dll'])
+        self.binary.unlink()
+        self.assertEqual(e.state(e.scan_game(self.home,self.rom)), 'missing')
+        # Other ProgramData directories can contain actual game installations.
+        game = self.rom/'drive_c/ProgramData/SomeGame'; game.mkdir()
+        (game/'d3d9.dll').write_bytes(dll())
+        self.assertEqual(e.state(e.scan_game(self.home,self.rom)), 'external-enabled')
+
+    def test_stale_archive_index_is_filtered_without_reopening_archive(self):
+        archive = self.base/'AC2.wsquashfs'; archive.touch()
+        files = [{'path':'drive_c/PROGRAMDATA/reshade/ReShade32.dll','controllable':False}]
+        cfg = {'rom':str(archive),'signature':e.signature(archive),'files':files,'enabled':True}
+        r.save_json(e.config_path(self.home,archive),cfg)
+        with patch.object(e,'find_dlls',side_effect=AssertionError('archive reopened')):
+            self.assertEqual(r.configured_games(self.home), [])
+            self.assertEqual(r.list_statuses(self.home,[str(archive)]),[(str(archive),'missing')])
+            self.assertEqual(e.scan_game(self.home,archive)['files'], [])
+        self.assertEqual(r.read_json(e.config_path(self.home,archive))['files'], [])
+
     def test_archive_mask_and_restore_do_not_change_archive_or_autorun(self):
         archive=self.base/'Packed.wsquashfs';archive.write_bytes(b'archive untouched')
         upper=self.base/'bottle.wine';upper.mkdir()

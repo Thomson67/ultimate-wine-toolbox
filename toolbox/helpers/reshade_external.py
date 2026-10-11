@@ -13,6 +13,17 @@ from reshade_manager import (atomic_bytes, directory_id, ensure_idle, key, locat
 NAMES = {'dxgi.dll', 'd3d9.dll', 'd3d10.dll', 'd3d11.dll', 'opengl32.dll', 'ddraw.dll', 'd3d8.dll', 'reshade.dll', 'reshade32.dll', 'reshade64.dll'}
 
 
+def game_files(cfg):
+    """Exclude prefix-wide installer resources, also when reading old indexes.
+
+    DLLs in ProgramData/ReShade do not establish injection into a game.
+    Other ProgramData folders may contain actual game installations.
+    """
+    return [f for f in cfg.get('files', [])
+            if tuple(p.casefold() for p in PurePosixPath(f['path']).parts[:3])
+            != ('drive_c', 'programdata', 'reshade')]
+
+
 def signature(rom):
     s = rom.stat()
     return [s.st_size, s.st_mtime_ns, s.st_ino]
@@ -73,6 +84,10 @@ def scan_game(home, rom, force=False):
     path = config_path(home, rom)
     old = read_json(path)
     if not force and rom.suffix.casefold() == '.wsquashfs' and old.get('signature') == signature(rom):
+        filtered = game_files(old)
+        if filtered != old.get('files', []):
+            old['files'] = filtered
+            save_json(path, old)
         return old
     found = []
     for rel in find_dlls(rom):
@@ -90,14 +105,16 @@ def scan_game(home, rom, force=False):
         found.extend(f for f in old.get('files', []) if f['path'] not in known)
     data = {'rom': str(rom), 'signature': signature(rom), 'files': found,
             'controlled': old.get('controlled', False), 'enabled': old.get('enabled', True)}
+    data['files'] = game_files(data)
     save_json(path, data)
     return data
 
 
 def state(cfg):
-    if not cfg.get('files'):
+    files = game_files(cfg)
+    if not files:
         return 'missing'
-    if not all(f['controllable'] for f in cfg['files']):
+    if not all(f['controllable'] for f in files):
         return 'external-unsupported'
     return 'external-enabled' if cfg.get('enabled', True) else 'external-disabled'
 

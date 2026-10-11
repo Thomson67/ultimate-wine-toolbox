@@ -577,6 +577,8 @@ def configured_games(home, enabled_only=False):
         if not cfg.get('files') or cfg['rom'] in known or not Path(cfg['rom']).exists():
             continue
         status = reshade_external.state(cfg)
+        if status == 'missing':
+            continue
         if not enabled_only or status == 'external-enabled':
             games.append((cfg['rom'], status))
     return sorted(games, key=lambda item: item[0].casefold())
