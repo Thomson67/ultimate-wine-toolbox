@@ -174,15 +174,22 @@ resh_game_menu() {
 }
 
 resh_menu() {
-    local rom choice path state
+    local rom choice path state label enabled_label disabled_label missing_label
     local -a games=() items=()
     msgbox "$(i18n resh_title)" "$(i18n resh_intro)" || return
-    while IFS= read -r path; do
-        case "${path,,}" in *.wine|*.pc|*.wsquashfs) ;; *) continue ;; esac
+    enabled_label="$(i18n resh_status_enabled)"
+    disabled_label="$(i18n resh_status_disabled)"
+    missing_label="$(i18n resh_status_missing)"
+    while IFS= read -r -d '' path && IFS= read -r -d '' state; do
         games+=("$path")
-        state="$(resh_cmd status "$path")"
-        items+=("${#games[@]}" "$(basename "$path") — $(i18n "resh_status_$state")")
-    done < <(mangohud_list_games)
+        case "$state" in
+            enabled) label="$enabled_label" ;;
+            disabled) label="$disabled_label" ;;
+            *) label="$missing_label" ;;
+        esac
+        items+=("${#games[@]}" "${path##*/} — $label")
+    done < <(mangohud_list_games | python3 "$RESH_HELPER" --home "$WT_HOME" status-list \
+        2>> "${WT_SESSION_LOG:-/dev/null}")
     [ "${#games[@]}" -gt 0 ] || { msgbox "$(i18n resh_title)" "$(i18n mangohud_no_games)"; return; }
     choice="$(menu_select "$(i18n resh_title)" "$(i18n resh_game_prompt)" "${items[@]}")" || return
     case "$choice" in ''|*[!0-9]*) return ;; esac

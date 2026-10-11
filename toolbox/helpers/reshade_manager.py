@@ -542,13 +542,25 @@ def locked(home):
         yield
 
 
+def list_statuses(home, paths):
+    """Read the small local configuration directory once, never open game archives."""
+    games = [p for p in paths if Path(p).suffix.casefold() in ('.wine', '.pc', '.wsquashfs')]
+    wanted = {key(p) for p in games}
+    states = {}
+    for config in (home / 'reshade/games').glob('*.json'):
+        if config.stem in wanted:
+            cfg = read_json(config)
+            states[config.stem] = 'enabled' if cfg.get('enabled') else 'disabled' if cfg else 'missing'
+    return [(p, states.get(key(p), 'missing')) for p in games]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--home', type=Path, default=Path('/userdata/system/ultimate-wine-toolbox'))
     parser.add_argument('--bottles', type=Path, default=Path('/userdata/system/wine-bottles/windows'))
     parser.add_argument('--runner', default='')
     parser.add_argument('--legacy', action='store_true')
-    parser.add_argument('command', choices=['exes', 'prepare', 'finish', 'status', 'enable', 'disable', 'uninstall',
+    parser.add_argument('command', choices=['exes', 'prepare', 'finish', 'status', 'status-list', 'enable', 'disable', 'uninstall',
                                            'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details'])
     parser.add_argument('rom', nargs='?', type=Path)
     parser.add_argument('args', nargs='*')
@@ -566,6 +578,10 @@ def main():
             print(prepare(home, rom, *args.args))
         elif args.command == 'finish':
             print(json.dumps(finish(home, rom)))
+        elif args.command == 'status-list':
+            paths = sys.stdin.read().splitlines()
+            for path, state in list_statuses(home, paths):
+                sys.stdout.buffer.write(os.fsencode(path) + b'\0' + state.encode() + b'\0')
         elif args.command == 'status':
             cfg = read_json(home / 'reshade/games' / (key(rom) + '.json'))
             print('enabled' if cfg.get('enabled') else 'disabled' if cfg else 'missing')
