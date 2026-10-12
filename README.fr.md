@@ -71,17 +71,7 @@ La Toolbox est ensuite accessible depuis :
 Ports -> Ultimate Wine Toolbox
 ```
 
-La version stable peut être mise à jour depuis la toolbox. Pour revenir d’une version de test à la dernière stable :
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/main/install.sh | WT_INSTALL_CHANNEL=stable bash
-```
-
-La branche de développement s’installe uniquement pour les tests :
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/test/install.sh | WT_INSTALL_CHANNEL=test bash
-```
+La version stable peut être mise à jour depuis la toolbox ou avec la commande d’installation ci-dessus.
 
 ## Sécurité
 

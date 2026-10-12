@@ -71,17 +71,7 @@ Launch from:
 Ports -> Ultimate Wine Toolbox
 ```
 
-Stable builds can be updated from the toolbox. To switch from a test build to the latest stable release:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/main/install.sh | WT_INSTALL_CHANNEL=stable bash
-```
-
-Install the development branch only for testing:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/test/install.sh | WT_INSTALL_CHANNEL=test bash
-```
+Stable builds can be updated from the toolbox or with the installation command above.
 
 ## Safety
 
