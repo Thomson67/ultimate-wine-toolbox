@@ -459,12 +459,7 @@ wsq_resume_update() {
         *) return ;;
     esac
     staged="$archive.update-tmp-$$"
-    if ! maintenance_squash_wine "$prefix" "$staged"; then
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
-    fi
-    if ! wsq_update_run "$(i18n wsq_update_title)" "$(i18n wsq_update_validate)" "$log" \
-        python3 "$WT_ROOT/helpers/wsquashfs_integrity.py" full "$staged" "$log" "$WSQ_STATE_DIR/update-cancel-$$"; then
-        rm -f -- "$staged"
+    if ! maintenance_squash_wine "$prefix" "$staged" ask-full "$log"; then
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
     fi
     [ ! -d "$prepared_save" ] || commit_args+=(--prepared-save "$prepared_save")

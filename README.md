@@ -129,7 +129,7 @@ The guided workflow prepares a Wine prefix and selects the executable **before t
 
 For saves, choose a folder (`SAVEDIR`), individual files inside the game directory (`SAVEFILES`), or registry saving. Create an actual save during the test to help detection. Created/modified files are suggested but unchecked: logs and settings may appear too. One `SAVEFILES` selection uses one folder; selected files are copied to Batocera saves and removed from the prefix before compression. Batocera recreates their links at launch without moving the game directory.
 
-Compression, integrity checks and pending-operation resume are part of the workflow. `SAVEDIR` externalization requires **Batocera v42 or later**; full integrity checks require unsquashfs `-pf` support. Creation is based on **DreamerCG**’s script.
+Compression, integrity checks and pending-operation resume are part of the workflow. After compression, run or skip the final quick check; Cancel preserves the prefix and does not replace an existing archive. `SAVEDIR` externalization requires **Batocera v42 or later**; full integrity checks require unsquashfs `-pf` support. Creation is based on **DreamerCG**’s script.
 
 ## Update a WSquashFS
 
@@ -137,7 +137,7 @@ In WSquashFS Management, Update follows Create. Select a Wine-prefix archive and
 
 The first test keeps the archive's existing launch command; executable selection is no longer a mandatory step before this test. Check launch, controller input, loading progress and saving again. On return, **Review / change the game executable** lets you correct it and retest. The original runner and game options are copied; testing uses a separate save copy except for shared-root links described below. Then confirm previous save rules or select another location through detection or the graphical browser.
 
-A full integrity check must pass before replacement. At completion, choose backup and replacement of the old archive or direct replacement. Original saves and changes to `batocera.conf` remain backed up. Compression failure leaves original saves in place. Resume pending updates from the menu. Temporary test saves are removed automatically after successful completion and retained on failure or while pending; deleting the working prefix is optional at completion.
+After compression, choose to run or skip the full integrity check before replacement. Checking is offered first; Cancel preserves the working prefix and the original archive. At completion, choose backup and replacement of the old archive or direct replacement. Original saves and changes to `batocera.conf` remain backed up. Compression failure leaves original saves in place. Resume pending updates from the menu. Temporary test saves are removed automatically after successful completion and retained on failure or while pending; deleting the working prefix is optional at completion.
 
 After successful replacement, bottles associated with the archive are cleaned so the next launch uses the updated files and settings. This prevents stale configurations such as an older MangoHud setup from surviving the update.
 
