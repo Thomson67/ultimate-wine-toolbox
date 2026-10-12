@@ -1,5 +1,6 @@
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -78,6 +79,30 @@ class ExtraShaderTests(unittest.TestCase):
         self.assertEqual(e.backend_packs('sweetfx-shaders'), 'sweetfx-shaders')
         with self.assertRaises(ValueError):
             e.backend_packs('bad;selection')
+
+    def test_backend_selection_cli_needs_no_userdata_directory(self):
+        home = self.base/'not-created'
+        result=subprocess.run([sys.executable,str(ROOT/'toolbox/helpers/reshade_manager.py'),
+                               '--home',str(home),'backend-packs','sweetfx-shaders,uwt-retro-extras'],
+                              capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout,'sweetfx-shaders\n')
+        self.assertFalse(home.exists())
+
+    def test_bundled_5xbr_retains_original_content_and_needs_no_download(self):
+        entry=next(v for v in json.loads(e.CATALOG.read_text())['effects'] if v.get('bundled'))
+        self.catalog.write_text(json.dumps({'effects':[entry]}))
+        with patch.object(e.subprocess,'run',side_effect=AssertionError('bundled shader downloaded')):
+            e.install(self.home,self.shaders,self.catalog)
+        source=(e.BUNDLED/entry['file']).read_bytes()
+        self.assertEqual((self.shaders/'Merged/Shaders'/entry['file']).read_bytes(),source)
+        self.assertEqual(e.digest(source),entry['sha256'])
+        self.assertIn(b'Ported by spiderh',source)
+        self.assertIn(b'GNU General Public License',source)
+        entry['bundled']='../outside.fx'
+        self.catalog.write_text(json.dumps({'effects':[entry]}))
+        with self.assertRaisesRegex(ValueError,'bundled extra shader path'):
+            e.install(self.home,self.shaders,self.catalog)
 
     def test_finish_validates_backend_packs_before_adding_requested_supplement(self):
         rom = self.base/'Game.wine';rom.mkdir()

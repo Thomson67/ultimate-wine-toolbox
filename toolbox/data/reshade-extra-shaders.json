@@ -1,6 +1,15 @@
 {
   "effects": [
     {
+      "file": "5XBR_NoBlend.fx",
+      "technique": "xBR5x_NoBlend",
+      "author": "spiderh; Hyllian/Jararaca",
+      "source": "https://reshade.me/forum/shader-presentation/4409-5xbr-filter",
+      "bundled": "5XBR_NoBlend.fx",
+      "sha256": "c19f84eae1c542ac682ab1a7001efcab9ffa335017cfe4848057dbd07dd19bad",
+      "license": "GPL-2.0-or-later; original notices and GPL text included"
+    },
+    {
       "file": "4xBRZ.fx",
       "technique": "xBRZ4x",
       "author": "spiderh; DeSmuME team; Hyllian",

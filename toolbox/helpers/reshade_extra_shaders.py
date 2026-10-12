@@ -9,6 +9,7 @@ import tempfile
 
 PACK = 'uwt-retro-extras'
 CATALOG = Path(__file__).resolve().parents[1] / 'data/reshade-extra-shaders.json'
+BUNDLED = CATALOG.parent / 'reshade-retro'
 
 
 def backend_packs(selection):
@@ -23,6 +24,11 @@ def digest(data):
 
 
 def payload(home, entry):
+    if entry.get('bundled'):
+        data = (BUNDLED / entry['bundled']).read_bytes()
+        if digest(data) != entry['sha256']:
+            raise ValueError(f"bundled extra shader SHA-256 check failed: {entry['file']}")
+        return data
     cache = home / 'reshade/runtime/extra-shaders'
     cache.mkdir(parents=True, exist_ok=True)
     if cache.is_symlink():
@@ -56,9 +62,13 @@ def install(home, shaders, catalog=CATALOG):
     planned = []
     for entry in entries:
         if (not re.fullmatch(r'[A-Za-z0-9_-]+\.fx', entry['file']) or
-                not re.fullmatch(r'[0-9a-f]{64}', entry['sha256']) or
-                not re.fullmatch(r'https://raw\.githubusercontent\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/[0-9a-f]{40}/[^\s?#]+', entry['url'])):
+                not re.fullmatch(r'[0-9a-f]{64}', entry['sha256'])):
             raise ValueError('invalid pinned extra shader entry')
+        if entry.get('bundled'):
+            if entry['bundled'] != entry['file']:
+                raise ValueError('invalid bundled extra shader path')
+        elif not re.fullmatch(r'https://raw\.githubusercontent\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/[0-9a-f]{40}/[^\s?#]+', entry.get('url', '')):
+            raise ValueError('invalid pinned extra shader source')
         target = safe_leaf(shaders, 'Merged/Shaders/' + entry['file'])
         if target.is_symlink():
             raise ValueError(f'extra shader collides with a shader pack: {target}')

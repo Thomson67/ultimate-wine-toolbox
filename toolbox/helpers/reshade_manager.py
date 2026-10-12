@@ -637,15 +637,17 @@ def main():
     parser.add_argument('rom', nargs='?', type=Path)
     parser.add_argument('args', nargs='*')
     args = parser.parse_args()
+    if args.command == 'backend-packs':
+        # Selection translation has no filesystem state and needs no lock.
+        from reshade_extra_shaders import backend_packs
+        print(backend_packs(str(args.rom)))
+        return
     home = args.home.resolve()
     if any(c in str(home) for c in ':;\n\r\t'):
         raise ValueError('unsupported toolbox path')
     rom = Path(os.path.abspath(args.rom)) if args.rom else None
     with locked(home):
-        if args.command == 'backend-packs':
-            from reshade_extra_shaders import backend_packs
-            print(backend_packs(str(args.rom)))
-        elif args.command == 'exes':
+        if args.command == 'exes':
             valid_rom(rom)
             for exe in executable_list(rom):
                 print(exe)
