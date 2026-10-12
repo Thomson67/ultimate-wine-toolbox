@@ -717,7 +717,7 @@ maintenance_run_progress() {
 }
 
 maintenance_squash_wine() {
-    local source="$1" dest="$2" tmp
+    local source="$1" dest="$2" validation="${3:-quick}" log="${4:-}" tmp
     [ -d "$source" ] || return 1
     [ -n "$dest" ] || return 1
 
@@ -732,7 +732,14 @@ maintenance_squash_wine() {
         return 1
     fi
 
-    if ! unsquashfs -s "$tmp" >/dev/null 2>&1; then
+    local validation_rc=0
+    case "$validation" in
+        ask-quick|ask-full)
+            wsq_final_archive_check "$tmp" "${validation#ask-}" "$log" || validation_rc=$? ;;
+        quick) unsquashfs -s "$tmp" >/dev/null 2>&1 || validation_rc=$? ;;
+        *) validation_rc=1 ;;
+    esac
+    if [ "$validation_rc" -ne 0 ]; then
         rm -f -- "$tmp" 2>/dev/null || true
         return 1
     fi

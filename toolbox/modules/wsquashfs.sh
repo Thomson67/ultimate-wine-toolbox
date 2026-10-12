@@ -1572,7 +1572,7 @@ wsq_resume_build() {
             return
         fi
 
-        if maintenance_squash_wine "$prefix" "$archive"; then
+        if maintenance_squash_wine "$prefix" "$archive" ask-quick; then
             wsq_finalize_runner_config "$final_game_name" "$runner" "$prefix" || {
                 msgbox "$(i18n wsq_create_title)" "$(i18n wsq_runner_finalize_failed "$archive")"
                 return
@@ -1601,6 +1601,40 @@ wsq_resume_build() {
 
 wsq_templates_info() {
     msgbox "$(i18n wsq_templates_title)" "$(i18n wsq_templates_info "$WSQ_TEMPLATES_DIR")"
+}
+
+wsq_final_archive_check() {
+    local archive="$1" mode="$2" log="${3:-}" choice label cancel
+    case "$mode" in
+        quick) label="$(i18n wsq_integrity_quick)" ;;
+        full) label="$(i18n wsq_integrity_full)" ;;
+        *) return 1 ;;
+    esac
+    choice="$(menu_select "$(i18n wsq_integrity_title)" "$(i18n wsq_final_check_prompt)" \
+        check "$label" skip "$(i18n wsq_final_check_skip)" cancel "$(i18n cancel)")" || return 1
+    case "$choice" in
+        skip)
+            [ -z "$log" ] || printf '\nFinal archive integrity check skipped by user.\n' >> "$log"
+            return 0 ;;
+        check) ;;
+        *) return 1 ;;
+    esac
+    mkdir -p "$WT_LOG_DIR" "$WSQ_STATE_DIR" || return 1
+    if [ -z "$log" ]; then
+        log="$(mktemp "$WT_LOG_DIR/wsquashfs-integrity-build-$(date +%Y%m%d-%H%M%S)-XXXXXX.log")" || return 1
+        wsq_integrity_rotate_logs "$log" || true
+    fi
+    if [ "$mode" = quick ]; then
+        wsq_update_run "$(i18n wsq_integrity_title)" "$label" "$log" unsquashfs -s "$archive"
+    else
+        cancel="$(mktemp "$WSQ_STATE_DIR/final-check-cancel-XXXXXX")" || return 1
+        rm -f -- "$cancel"
+        wsq_update_run "$(i18n wsq_integrity_title)" "$(i18n wsq_update_validate)" "$log" \
+            python3 "$WT_ROOT/helpers/wsquashfs_integrity.py" full "$archive" "$log" "$cancel"
+        local rc=$?
+        rm -f -- "$cancel"
+        return "$rc"
+    fi
 }
 
 wsq_integrity_rotate_logs() {

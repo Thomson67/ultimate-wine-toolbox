@@ -47,7 +47,22 @@ def ensure_root_alias(prefix):
     users.mkdir(parents=True, exist_ok=True)
     steam = users / 'steamuser'
     alias = users / 'root'
-    if steam.is_symlink() or (steam.exists() and not steam.is_dir()):
+    if steam.is_symlink():
+        # Older prefixes use the opposite alias. Move the real profile without
+        # copying or following its save links, then recreate the canonical alias.
+        if (alias.is_symlink() or not alias.is_dir()
+                or steam.resolve() != alias.resolve()):
+            raise ValueError('steamuser must be an internal real directory or a link to the root profile')
+        original = os.readlink(steam)
+        steam.unlink()
+        try:
+            alias.rename(steam)
+        except OSError:
+            steam.symlink_to(original, target_is_directory=True)
+            raise
+        alias.symlink_to('steamuser', target_is_directory=True)
+        return
+    if steam.exists() and not steam.is_dir():
         raise ValueError('steamuser must be an internal real directory')
     if alias.is_symlink() and alias.resolve() == steam.resolve():
         steam.mkdir(exist_ok=True)

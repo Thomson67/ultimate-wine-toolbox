@@ -65,6 +65,51 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(os.readlink(users / 'root'), 'steamuser')
         self.assertTrue((users / 'steamuser').is_dir())
 
+    def test_reversed_profile_alias_preserves_files_and_save_links(self):
+        for target in ('root', './root', str(self.prefix / 'drive_c/users/root')):
+            with self.subTest(target=target):
+                users = self.prefix / 'drive_c/users'
+                if users.exists():
+                    shutil.rmtree(users)
+                root = users / 'root'; root.mkdir(parents=True)
+                (root / 'profile').write_text('kept')
+                inode = (root / 'profile').stat().st_ino
+                (root / 'Saved').symlink_to(self.original_save)
+                steam = users / 'steamuser'; steam.symlink_to(target)
+                update.ensure_root_alias(self.prefix)
+                self.assertFalse(steam.is_symlink())
+                self.assertEqual(os.readlink(root), 'steamuser')
+                self.assertEqual((steam / 'profile').stat().st_ino, inode)
+                self.assertEqual(os.readlink(steam / 'Saved'), str(self.original_save))
+                update.ensure_root_alias(self.prefix)
+                self.assertEqual((root / 'profile').read_text(), 'kept')
+
+    def test_reversed_profile_alias_allows_update_with_save_isolation(self):
+        root = self.prefix / 'drive_c/users/root'; root.mkdir(parents=True)
+        (root / 'Saved').symlink_to(self.original_save)
+        (root.parent / 'steamuser').symlink_to('root')
+        test_save = self.prepare()
+        self.assertEqual((root / 'Saved').resolve(), test_save)
+        (root / 'Saved/slot').write_text('tested')
+        self.assertEqual((self.original_save / 'slot').read_text(), 'original')
+        self.assertTrue((self.game / 'new.exe').is_file())
+
+    def test_invalid_steamuser_alias_is_rejected_without_changes(self):
+        users = self.prefix / 'drive_c/users'; users.mkdir(parents=True)
+        outside = self.base / 'external-profile'; outside.mkdir()
+        for target in ('missing', str(outside), 'root'):
+            with self.subTest(target=target):
+                steam = users / 'steamuser'; steam.symlink_to(target)
+                with self.assertRaises(ValueError):
+                    update.ensure_root_alias(self.prefix)
+                self.assertEqual(os.readlink(steam), target)
+                steam.unlink()
+        (users / 'root').symlink_to(outside)
+        (users / 'steamuser').symlink_to('root')
+        with self.assertRaises(ValueError):
+            update.ensure_root_alias(self.prefix)
+        self.assertTrue((users / 'root').is_symlink())
+
     def test_save_isolation_and_launch_arguments(self):
         save_link = self.prefix / 'drive_c/users/root/Saved'
         save_link.parent.mkdir(parents=True); save_link.symlink_to(self.original_save)
