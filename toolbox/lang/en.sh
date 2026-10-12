@@ -736,6 +736,8 @@ declare -gA I18N=(
   [dxvk_nvapi_optical_flow_limited]="D3D12 NVIDIA Optical Flow requires VKD3D-Proton 2.14 or newer and a Wine implementation with HAGS."
   [dxvk_nvapi_shader_extensions_limited]="D3D12 CuBIN and NVIDIA shader extension features require VKD3D-Proton 3.0.1 or newer. Shader extensions remain experimental and require DXVK_NVAPI_D3D12_NV_SHADER_EXTN=1."
 
+  [wsq_sony_xinput_title]="PlayStation controller: HIDRAW to XInput (Proton)"
+  [wsq_sony_xinput_body]="For PlayStation controllers detected through HIDRAW whose controls do not work correctly in game. With a compatible Proton runner, adds PROTON_SONY_HIDRAW_XINPUT=1 to autorun.cmd. Also enable HIDRAW for this game if needed. Conversion may prevent native PlayStation features (haptics, adaptive triggers). Disabled writes 0; Inherit removes the variable. Launch again to test."
   [wsq_umu_direct_title]="UMU compatibility: direct launch (experimental)"
   [wsq_umu_direct_body]="For games that reject a redirected path, or crash because of that path. Requires the compatible test version of UMU Runner Toolbox. Does not fix all crashes. Disabled by default; saved in autorun.cmd for sharing."
 )

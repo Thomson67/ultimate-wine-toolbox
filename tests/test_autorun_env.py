@@ -31,3 +31,17 @@ class AutorunEnvTests(unittest.TestCase):
             self.assertIn('SAVEFILES=user.reg', text)
             self.assertTrue(module.enabled(text))
             self.assertEqual(text.count('ENV='),1)
+
+    def test_sony_xinput_states_and_env_preservation(self):
+        with tempfile.TemporaryDirectory() as folder:
+            p = Path(folder) / 'autorun.cmd'
+            p.write_text('DIR=game\nCMD=game.exe\nENV=MANGOHUD=1 UMU_DIRECT_GAME=1\nENV=PROTON_SONY_HIDRAW_XINPUT=0\n')
+            for value in ('1', '0', 'inherit'):
+                subprocess.run(['python3', str(HELPER), 'set', str(p), value, '--key', 'PROTON_SONY_HIDRAW_XINPUT'], check=True)
+                actual = subprocess.check_output(['python3', str(HELPER), 'get', str(p), '--key', 'PROTON_SONY_HIDRAW_XINPUT'], text=True).strip()
+                self.assertEqual(actual, value)
+                text = p.read_text()
+                self.assertEqual(text.count('ENV='), 1)
+                self.assertTrue(module.enabled(text))
+                self.assertIn('MANGOHUD=1', text)
+                self.assertEqual(text.count('PROTON_SONY_HIDRAW_XINPUT='), int(value != 'inherit'))
