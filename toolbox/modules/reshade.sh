@@ -51,7 +51,7 @@ resh_prepare_tools() {
 resh_model_packs() {
     case "$1" in
         standard) printf '%s' 'reshade-shaders,sweetfx-shaders' ;;
-        retro) printf '%s' 'reshade-shaders,sweetfx-shaders,reshade-shaders-legacy,crt-royale,rsretroarch-shaders,scaling-shaders,guestrr-shaders' ;;
+        retro) printf '%s' 'reshade-shaders,sweetfx-shaders,reshade-shaders-legacy,crt-royale,rsretroarch-shaders,scaling-shaders,guestrr-shaders,uwt-retro-extras' ;;
         thomson) printf '%s' 'reshade-shaders,sweetfx-shaders,reshade-shaders-legacy,fubax-shaders,quintfx,prod80-shaders,astrayfx-shaders,immerse-shaders' ;;
         manual) printf '' ;;
     esac
@@ -166,7 +166,7 @@ resh_api_select() {
 }
 
 resh_install_game() {
-    local rom="$1" exe selected dll version packs state workspace name label model defaults current
+    local rom="$1" exe selected dll version packs backend_packs state workspace name label model defaults current
     local resume_exe="${2:-}" resumed=0 index
     local -a exes=() items=() shaders=()
     local listing
@@ -231,6 +231,7 @@ resh_install_game() {
     else
         packs="$defaults"
     fi
+    backend_packs="$(resh_cmd backend-packs "$packs")" || return 1
     yesno_default_no "$(i18n resh_title)" "$(i18n resh_install_confirm "$(basename "$rom")" "$exe" "$dll" "$version" "$packs")" || return 1
     # Reconfiguration starts from restored originals; the saved preset survives.
     state="$(resh_cmd status "$rom")"
@@ -258,7 +259,7 @@ resh_install_game() {
         MAIN_PATH="$WT_HOME/reshade/runtime" WINEPREFIX="" UI_BACKEND=cli \
             RESHADE_VERSION="$version" RESHADE_ADDON_SUPPORT=0 NO_COLOR=1 PROGRESS_UI=0 \
             PATH="$shim:$PATH" bash "$RESH_BACKEND" --cli --game-path="$workspace" \
-            --dll-override="$dll" --shader-repos="$packs" <<< i
+            --dll-override="$dll" --shader-repos="$backend_packs" <<< i
     ) >> "$log" 2>&1 && resh_cmd finish "$rom" >> "$log" 2>&1 || {
         msgbox "$(i18n resh_title)" "$(i18n resh_failed "$log")"
         return 1

@@ -35,7 +35,7 @@ resh_resume_diagnostic
                 self.assertFalse((state/'reshade-diagnostic.json').exists())
 
     def test_named_templates_go_straight_to_confirmation_without_checklist(self):
-        for model, expected in [('retro', ['crt-royale', 'rsretroarch-shaders', 'scaling-shaders', 'reshade-shaders-legacy', 'guestrr-shaders']),
+        for model, expected in [('retro', ['crt-royale', 'rsretroarch-shaders', 'scaling-shaders', 'reshade-shaders-legacy', 'guestrr-shaders', 'uwt-retro-extras']),
                                 ('thomson', ['sweetfx-shaders', 'reshade-shaders-legacy', 'fubax-shaders',
                                              'quintfx', 'prod80-shaders', 'astrayfx-shaders', 'immerse-shaders'])]:
             with tempfile.TemporaryDirectory() as folder:
@@ -45,7 +45,7 @@ resh_resume_diagnostic
 WT_HOME="$TEST_HOME"
 source "$WT_ROOT/lang/fr.sh"
 source "$WT_ROOT/modules/reshade.sh"
-resh_cmd() { case "$1" in exes) printf 'Game.exe\\n' ;; details) return 0 ;; *) return 1 ;; esac; }
+resh_cmd() { case "$1" in exes) printf 'Game.exe\\n' ;; details) return 0 ;; backend-packs) python3 "$RESH_HELPER" backend-packs "$2" ;; *) return 1 ;; esac; }
 resh_api_select() { printf dxgi; }
 resh_backend_ready() { return 0; }
 input_text() { printf latest; }

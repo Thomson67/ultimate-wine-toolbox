@@ -213,9 +213,13 @@ def finish(home, rom):
         raise ValueError('d3dcompiler_47 integrity check failed')
     backend_state = (cache / 'game-state' / (pending['state_key'] + '.state')).read_text()
     installed = re.search(r'^selected_repos=(.*)$', backend_state, re.M)
-    requested = set(pending['repos'].split(',')) if pending['repos'] != 'none' else set()
+    from reshade_extra_shaders import PACK, backend_packs, install as install_extra_shaders
+    backend_selection = backend_packs(pending['repos'])
+    requested = set(backend_selection.split(',')) if backend_selection != 'none' else set()
     if not installed or set(filter(None, installed[1].split(','))) != requested:
         raise ValueError('not all requested shader packs were installed; check the log')
+    if PACK in pending['repos'].split(','):
+        install_extra_shaders(home, shaders)
     config = home / 'reshade/games' / (key(rom) + '.json')
     old = read_json(config)
     pending.update(enabled=old.get('enabled', False), runtime=str(dll), compiler=str(compiler),
@@ -628,7 +632,7 @@ def main():
     parser.add_argument('--bottles', type=Path, default=Path('/userdata/system/wine-bottles/windows'))
     parser.add_argument('--runner', default='')
     parser.add_argument('--legacy', action='store_true')
-    parser.add_argument('command', choices=['exes', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'external-scan', 'external-info', 'external-enable', 'external-disable', 'external-release', 'wiki-title', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
+    parser.add_argument('command', choices=['backend-packs', 'exes', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'external-scan', 'external-info', 'external-enable', 'external-disable', 'external-release', 'wiki-title', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
                                            'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details'])
     parser.add_argument('rom', nargs='?', type=Path)
     parser.add_argument('args', nargs='*')
@@ -638,7 +642,10 @@ def main():
         raise ValueError('unsupported toolbox path')
     rom = Path(os.path.abspath(args.rom)) if args.rom else None
     with locked(home):
-        if args.command == 'exes':
+        if args.command == 'backend-packs':
+            from reshade_extra_shaders import backend_packs
+            print(backend_packs(str(args.rom)))
+        elif args.command == 'exes':
             valid_rom(rom)
             for exe in executable_list(rom):
                 print(exe)
