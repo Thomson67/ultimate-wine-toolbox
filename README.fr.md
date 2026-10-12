@@ -6,6 +6,8 @@
 
 Créée par **Thomsonito**.
 
+**Version stable : [v0.5.3](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.3).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS et ReShade restent en bêta.
+
 ## Fonctionnalités
 
 - interface Français / Anglais
@@ -14,47 +16,44 @@ Créée par **Thomsonito**.
 - gestion individuelle des runners Wine classiques
 - prise en charge des anciens GE-Proton adaptés à Batocera
 - gestion globale et par jeu de MangoHud
-- gestion de bundles DXVK / VKD3D
-- sélection globale et par jeu de DXVK
+- bundles DXVK / VKD3D-Proton / DXVK-NVAPI, modèles Batocera 40 à 43 / 43.1 et choix global ou par jeu
+- filtrage des versions NVAPI selon la compatibilité connue avec DXVK
+- ReShade par jeu : installation, activation/désactivation, presets, modèles d’effets et aide au choix de l’API (bêta)
 - maintenance des Wine bottles et détection des bottles orphelines
 - diagnostics des runners et de DXVK / VKD3D
 - outils de squash / unsquash `.wine` / `.wsquashfs`
+- création guidée de WSquashFS (bêta) et mise à jour d’archives existantes, tests du jeu et reprise des opérations
+- sauvegardes externalisées via `SAVEDIR` / `SAVEFILES` et composants Winetricks supplémentaires pendant la création
 - suppression de jeux Windows
 - analyse, nettoyage, organisation et restauration sécurisés de `batocera.conf`
 - export / import additif des configurations Windows entre machines Batocera
 - sauvegarde automatique avant les opérations destructives sur `batocera.conf`
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
+- recherche de mises à jour au démarrage et depuis le menu de la toolbox
 
-## Nouveautés de la v0.3.0
+## Nouveautés de la v0.5.3
 
-- Mise à jour d’un jeu dans un WSquashFS, disponible après la création : reprise du préfixe, de l’exécutable, des réglages et des règles de sauvegarde existants.
-- Déplacement de la nouvelle version du jeu, test du lancement et des sauvegardes, puis recompression avec contrôle complet d’intégrité.
-- Choix du remplacement direct ou de la sauvegarde de l’ancienne archive avant remplacement.
-- Reprise ou annulation des opérations en attente, et nettoyage des sauvegardes temporaires après réussite.
-- Exclusion des `autorun.cmd` de la sélection des exécutables.
+- Intégration ReShade par jeu, y compris sur WSquashFS sans recompression de l’archive.
+- Listes rapides, recherche par nom et détection des installations ReShade déjà intégrées aux jeux.
+- Modèles de packs Standard, Rétro et Sélection Thomson ; import et export de presets avec YAD.
+- Aide au choix de l’API par analyse de l’exécutable, recherche PCGamingWiki et observation après lancement, compatible Wine et UMU.
+- Reprise de l’installation au choix de l’API après le diagnostic, pour l’exécutable déjà sélectionné.
+- Nouveaux profils ReShade : tutoriel passé, **Home** pour l’interface et **Fin** pour activer/désactiver les effets.
+- Retrait de la mention bêta du workflow **Mettre à jour un WSquashFS**, validé sur plusieurs jeux.
 
-Le workflow de mise à jour est sorti de bêta en v0.5.3 après validation sur plusieurs jeux. Les autres fonctionnalités gardent leur statut habituel.
-
-[Notes de version complètes](release-notes/v0.3.0.md)
-
-## Nouveautés de la v0.2.0
-
-- Création guidée de WSquashFS avec sauvegardes externalisées, test du jeu et reprise automatique.
-- Après un échec de lancement en création, installation de composants Winetricks dans le préfixe de travail, puis possibilité de retester le jeu.
-- Sélection graphique des dossiers de sauvegarde, inspection et alternative `user.reg`.
-- Sauvegarde/remplacement et renommage des archives, contrôle d’intégrité rapide ou complet et tutoriel intégré.
-- Profils MangoHud minimaliste, par défaut et détaillé.
-- Normalisation facultative des noms des runners, sauvegarde des références modifiées et installation multiple UMU sans interruption.
-
-L’externalisation via `SAVEDIR=` nécessite **Batocera v42 ou supérieure**. Le contrôle d’intégrité complet nécessite le support `-pf` d’unsquashfs.
-
-Création WSquashFS basée sur le script du Grand Maître **DreamerCG** :)
-
-[Notes de version complètes](release-notes/v0.2.0.md)
+[Notes de la v0.5.3](release-notes/v0.5.3.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 
 À exécuter en `root` sur Batocera :
+
+Installation rapide :
+
+```bash
+curl -fsSL https://bit.ly/ultimate-wine-toolbox | bash
+```
+
+Lien direct GitHub :
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/main/install.sh | bash
@@ -70,6 +69,18 @@ La Toolbox est ensuite accessible depuis :
 
 ```text
 Ports -> Ultimate Wine Toolbox
+```
+
+La version stable peut être mise à jour depuis la toolbox. Pour revenir d’une version de test à la dernière stable :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/main/install.sh | WT_INSTALL_CHANNEL=stable bash
+```
+
+La branche de développement s’installe uniquement pour les tests :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/test/install.sh | WT_INSTALL_CHANNEL=test bash
 ```
 
 ## Sécurité
@@ -124,13 +135,23 @@ Les anciens lanceurs, hooks et répertoires runtime ne sont supprimés qu'après
 
 Les runners Wine/UMU, les jeux, les sauvegardes et les Wine bottles sont conservés.
 
+## Créer un WSquashFS (bêta)
+
+Le workflow guidé prépare un préfixe Wine, demande l’exécutable **avant le premier lancement**, puis permet de tester le jeu, les manettes et les sauvegardes. Au retour, **Vérifier / modifier le choix de l’exécutable du jeu** permet de corriger le lancement. Après un échec, **Installer des Winetricks supplémentaires** ajoute des composants dans le préfixe de travail, avec le runner choisi, avant de retester.
+
+Pour les sauvegardes, choisir un dossier (`SAVEDIR`), des fichiers individuels dans le dossier du jeu (`SAVEFILES`) ou la sauvegarde du registre. Créer une vraie sauvegarde pendant le test aide la détection. Les fichiers créés/modifiés sont proposés mais décochés par défaut : des logs ou réglages peuvent aussi apparaître. Une sélection `SAVEFILES` concerne un seul dossier ; les fichiers choisis sont copiés dans les sauvegardes Batocera et retirés du préfixe avant compression. Batocera recrée leurs liens au lancement, sans déplacer le dossier du jeu.
+
+La compression, les contrôles d’intégrité et la reprise des opérations en attente font partie du workflow. L’externalisation via `SAVEDIR` nécessite **Batocera v42 ou supérieure** ; le contrôle complet nécessite le support `-pf` d’unsquashfs. Création basée sur le script de **DreamerCG**.
+
 ## Mettre à jour un WSquashFS
 
 Dans Gestion des WSquashFS, l’option suit immédiatement la création. Sélectionnez une archive contenant un préfixe Wine et un dossier contenant directement les fichiers de la nouvelle version du jeu. Le dossier source est déplacé dans le dossier du jeu identifié par `autorun.cmd` (souvent `drive_c/game`) d’un préfixe de test distinct. Les archives de type `.pc` sans préfixe Wine ne sont pas prises en charge.
 
-Sélectionnez l’exécutable, puis testez le lancement, la manette, le chargement de votre progression et une nouvelle sauvegarde. Le runner et les options du jeu sont repris ; le test utilise une copie des sauvegardes. Au retour, confirmez les règles de sauvegarde existantes ou choisissez un autre emplacement avec la détection ou l’explorateur.
+Le premier test conserve le lancement défini dans l’archive ; il n’y a plus de sélection systématique de l’exécutable avant ce test. Vérifiez le lancement, la manette, le chargement de votre progression et une nouvelle sauvegarde. Au retour, **Vérifier / modifier le choix de l’exécutable du jeu** permet de le corriger et de retester. Le runner et les options du jeu sont repris ; le test utilise une copie des sauvegardes, sauf les liens vers la racine partagée décrits ci-dessous. Confirmez ensuite les règles de sauvegarde existantes ou choisissez un autre emplacement avec la détection ou l’explorateur.
 
 La nouvelle archive doit passer un contrôle complet avant le remplacement. À la fin, choisissez « Sauvegarder l’ancien WSquashFS puis remplacer » ou « Remplacer directement ». Les sauvegardes originales et les modifications de `batocera.conf` restent sauvegardées. En cas d’échec de compression, les sauvegardes originales restent en place. Une mise à jour en attente se reprend depuis le menu. La copie temporaire des sauvegardes de test est supprimée automatiquement après réussite de la mise à jour et conservée si elle échoue ou reste en attente ; la suppression du préfixe de travail est proposée à la fin.
+
+Après remplacement réussi, les bottles associées à cette archive sont nettoyées pour que le prochain lancement reparte des fichiers et réglages mis à jour. Cela évite notamment de conserver une ancienne configuration MangoHud.
 
 Prévoyez de la place pour l’extraction, les sauvegardes de test et la nouvelle archive. La gestion `SAVEDIR=` nécessite Batocera v42 ou supérieur.
 
@@ -140,19 +161,25 @@ Avant le déplacement, l’ancien dossier du jeu est renommé en `<nom>.bak`. Le
 
 Le préfixe de test reprend le nom exact de l’archive en remplaçant `.wsquashfs` par `.wine`, balises comprises. Un dossier `.wine` existant déclenche le choix : remplacer le dossier, choisir un autre nom ou quitter. Les réglages ES du `.wsquashfs` sont prioritaires ; s’il n’a aucun réglage spécifique, ceux du `.wine` existant sont repris. Les réglages de `batocera.conf` sont sauvegardés avant modification. Un dossier contenant la source de mise à jour ne peut pas être supprimé : choisissez alors un autre nom de préfixe.
 
-## Modèles graphiques Batocera
+## DXVK, VKD3D-Proton et NVAPI
+
+**DXVK** traduit DirectX 9/10/11 vers Vulkan ; **VKD3D-Proton** fait de même pour DirectX 12. Un bundle permet de choisir ces composants indépendamment du runner, globalement ou pour un jeu précis. Le choix par jeu permet de garder une combinaison compatible sans imposer les mêmes versions à toute la collection.
+
+**DXVK-NVAPI** apporte une compatibilité avec des fonctions NVIDIA utilisées par certains jeux. Les versions proposées sont filtrées selon les exigences DXVK connues et les limitations connues avec VKD3D sont signalées. Le pilote, le matériel et le runner restent déterminants ; NVAPI ne donne pas à une GTX les fonctions matérielles d’une RTX.
+
+Une version plus récente ne garantit pas un meilleur résultat avec un ancien runner. Si un jeu cesse de fonctionner après changement de bundle, tester les composants Batocera par défaut ou une combinaison plus ancienne. **Vanilla-Proton-9.0-4 avec un VKD3D récent** a notamment provoqué des crashes sur des jeux DirectX 12 lors des tests.
+
+### Modèles graphiques Batocera
 
 Dans le gestionnaire DXVK / VKD3D, **Installer un modèle Batocera** propose les combinaisons officielles de Batocera 40, 41, 42 et 43 / 43.1. Les versions sont fixes, les archives sont vérifiées par SHA-256 et leur provenance est conservée dans `model.json`. Le catalogue se trouve dans `toolbox/data/batocera-dxvk-models.json`.
 
 Après installation, choisissez le modèle globalement ou par jeu. NVAPI reste contrôlé par les options du jeu. Le modèle ne remplace pas le runner, les pilotes ou la configuration de Batocera : notamment, un VKD3D récent peut provoquer des crashes DirectX 12 avec Vanilla-Proton-9.0-4. Les modèles 40 à 42 permettent de tester des composants plus anciens.
 
-Dans la création WSquashFS, la sélection des sauvegardes propose aussi les fichiers individuels du dossier du jeu (`SAVEFILES`). Créez une sauvegarde pendant le test, puis choisissez les fichiers créés/modifiés ou utilisez la liste manuelle. Les fichiers sont décochés par défaut : des réglages et logs peuvent aussi apparaître. Choisissez un seul dossier par sélection ; les fichiers choisis sont copiés dans les sauvegardes Batocera et retirés du préfixe avant compression ; Batocera recrée leurs liens au lancement, sans déplacer le dossier du jeu.
-
 ## ReShade par jeu (bêta)
 
 Dans **Réglages graphiques → ReShade (bêta)**, choisir le jeu puis **Installer / modifier version et shaders**. Sélectionner le véritable `.exe` (par exemple `Binaries/Win64/...exe` pour certains jeux Unreal), l’API du jeu **avant** traduction par DXVK/VKD3D, la version de ReShade et les packs de shaders. L’architecture 32/64 bits est détectée dans l’exécutable. Le téléchargement se fait à la demande ; le Starter Pack ne change pas.
 
-Lancer ensuite le jeu depuis EmulationStation et appuyer sur **Home** pour ouvrir ReShade. Aucun effet n’est imposé au premier démarrage : activer les effets souhaités dans l’interface ReShade. On peut importer un preset `.ini` depuis la toolbox ; ses shaders doivent être présents dans les packs choisis. ReShade reste le runtime Windows officiel exécuté dans Wine/Proton, pas une couche native Linux comme vkBasalt.
+Lancer ensuite le jeu depuis EmulationStation et appuyer sur **Home** pour ouvrir ReShade. Les nouveaux profils passent le tutoriel et utilisent **Fin** pour activer/désactiver les effets ; les profils déjà personnalisés sont conservés. Aucun effet n’est imposé au premier démarrage : activer les effets souhaités dans l’interface ReShade. On peut importer un preset `.ini` depuis la toolbox ; ses shaders doivent être présents dans les packs choisis. ReShade utilise le runtime Windows officiel dans Wine/Proton.
 
 - Formats proposés : `.wine`, `.pc`, `.wsquashfs` ; DirectX 9/10/11/12 et OpenGL. Vulkan natif n’est pas couvert par cette intégration.
 - Pour un `.pc`, lancer le jeu une fois avec le runner choisi afin d’initialiser sa bottle avant activation.
@@ -173,13 +200,15 @@ Le moteur utilise **[ReShadeLinux 1.3.5](https://github.com/asafelobotomy/reshad
 - Après sélection de l’exécutable, les imports PE et références aux DLL graphiques servent d’indices pour l’API. Pour Unity, `UnityPlayer.dll` adjacent est aussi analysé lorsque son import est trouvé. La lecture est limitée à 16 Mio par fichier, y compris dans les WSquashFS ; aucune extraction complète de l’archive. Des imports dynamiques, moteurs ou wrappers peuvent rendre le résultat incomplet. Le choix reste à confirmer.
 - **PCGamingWiki** est une recherche facultative, déclenchée pour le jeu choisi : sélectionner la bonne fiche avant de lire les API possibles. Aucun accès réseau lors du chargement des listes. Le site peut bloquer les requêtes automatiques (403 observé) ; la toolbox conserve alors le choix local/manuellement renseigné et indique où consulter la fiche. Les API possibles d’une fiche ne prouvent pas l’API active lors du lancement. Vulkan natif et DirectX 8 ou antérieur restent hors de cette intégration directe.
 
-Le menu du jeu et le choix d’API proposent **Détecter l’API en lançant le jeu**. Le lancement passe par EmulationStation ; allez jusqu’au menu ou en jeu, puis quittez normalement. La toolbox revient avec les DLL Windows observées (`d3d9`, `d3d11`, `d3d12`, `opengl32`, etc.) dans les processus de la bottle, y compris leurs processus enfants qui conservent le préfixe Wine. Cela fonctionne aussi avec les WSquashFS sans modifier l’archive, l’autorun ou les variables de lancement. Les bibliothèques Linux Vulkan ne sont pas prises comme preuve d’une API Vulkan native.
+Dans **Installer / modifier version et shaders**, après le choix de l’exécutable, le choix d’API propose **Détecter l’API en lançant le jeu**. Le lancement passe par EmulationStation ; allez jusqu’au menu ou en jeu, puis quittez normalement. Après le résultat, la toolbox reprend directement au choix d’API pour le même exécutable. Elle observe les DLL Windows (`d3d9`, `d3d11`, `d3d12`, `opengl32`, etc.) dans les processus des préfixes Wine et UMU. Cela fonctionne aussi avec les WSquashFS sans modifier l’archive, l’autorun ou les variables de lancement. Les bibliothèques Linux Vulkan ne sont pas prises comme preuve d’une API Vulkan native.
 
 Ces observations complètent les indices de l’exécutable et restent des **indices à confirmer** : plusieurs moteurs/API, wrappers ou un ReShade déjà installé peuvent influencer le résultat. Un résultat inconnu laisse le choix manuel disponible. L’observation s’arrête au retour du jeu, ou après une heure sans fermer le jeu. Le dernier rapport est conservé par jeu : refaire le diagnostic après un changement de runner, de version du jeu ou de mode graphique. La première reprise manuelle de la toolbox peut aussi consulter une demande interrompue.
 
 La recherche PCGamingWiki propose un nom nettoyé des mentions de runner, puis classe les résultats par similarité : le titre le plus proche apparaît en premier, sans valider automatiquement une édition ou une suite.
 
 **Rechercher / actualiser les ReShade intégrés aux jeux** inspecte les DLL de relais usuelles et leurs métadonnées ReShade. Le premier passage peut être long ; les résultats, y compris les archives sans ReShade, sont indexés. Les archives inchangées ne sont pas relues. Ouvrir un jeu vérifie aussi son installation existante. Les listes ordinaires ne lancent aucune inspection d’archive.
+
+Les DLL présentes uniquement dans `drive_c/ProgramData/ReShade` sont des ressources globales et ne suffisent pas à classer le jeu comme équipé. Une archive illisible est signalée avec sa raison dans `reshade-discovery.log` sans interrompre la recherche sur les autres jeux.
 
 La désactivation d’une installation intégrée conserve les DLL originales dans un journal de restauration et retire leur chargement depuis le dossier du jeu. Dans un WSquashFS, un marqueur OverlayFS dans la bottle masque la DLL archivée ; l’archive reste inchangée. Wine/DXVK continue à charger sa bibliothèque système habituelle. La réactivation restaure exactement la DLL ou retire le marqueur ; **Rétablir la gestion d’origine** rend le contrôle au jeu. Presets, shaders et autorun ne sont pas modifiés. Le choix s’applique aussi aux prochains lancements et aux bottles recréées.
 
