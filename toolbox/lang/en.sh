@@ -738,6 +738,6 @@ declare -gA I18N=(
 
   [wsq_sony_xinput_title]="PlayStation controller: HIDRAW to XInput (Proton)"
   [wsq_sony_xinput_body]="For PlayStation controllers detected through HIDRAW whose controls do not work correctly in game. With a compatible Proton runner, adds PROTON_SONY_HIDRAW_XINPUT=1 to autorun.cmd. Also enable HIDRAW for this game if needed. Conversion may prevent native PlayStation features (haptics, adaptive triggers). Disabled writes 0; Inherit removes the variable. Launch again to test."
-  [wsq_umu_direct_title]="UMU compatibility: direct launch (experimental)"
-  [wsq_umu_direct_body]="For games that reject a redirected path, or crash because of that path. Requires the compatible test version of UMU Runner Toolbox. Does not fix all crashes. Disabled by default; saved in autorun.cmd for sharing."
+  [wsq_umu_direct_title]="UMU compatibility: direct launch"
+  [wsq_umu_direct_body]="For games that reject a redirected path, or crash because of that path. Requires UMU Runner Toolbox 0.13.7 or newer. Does not fix all crashes. Disabled by default; saved in autorun.cmd for sharing."
 )

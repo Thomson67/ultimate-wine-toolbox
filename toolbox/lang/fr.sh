@@ -738,6 +738,6 @@ declare -gA I18N=(
 
   [wsq_sony_xinput_title]="Manette PlayStation : conversion HIDRAW en XInput (Proton)"
   [wsq_sony_xinput_body]="Pour les manettes PlayStation détectées via HIDRAW dont les commandes fonctionnent mal en jeu. Avec un runner Proton compatible, ajoute PROTON_SONY_HIDRAW_XINPUT=1 dans autorun.cmd. Activez aussi HIDRAW pour ce jeu si nécessaire. La conversion peut empêcher les fonctions natives PlayStation (haptiques, gâchettes adaptatives). Désactivé écrit 0 ; Hériter retire la variable. Relancez pour tester."
-  [wsq_umu_direct_title]="Compatibilité UMU : lancement direct (expérimental)"
-  [wsq_umu_direct_body]="Pour les jeux qui refusent un chemin redirigé, ou plantent à cause de ce chemin. Nécessite la version test compatible de UMU Runner Toolbox. Ne corrige pas tous les crashs. Désactivé par défaut ; enregistré dans autorun.cmd pour le partage."
+  [wsq_umu_direct_title]="Compatibilité UMU : lancement direct"
+  [wsq_umu_direct_body]="Pour les jeux qui refusent un chemin redirigé, ou plantent à cause de ce chemin. Nécessite UMU Runner Toolbox 0.13.7 ou plus. Ne corrige pas tous les crashs. Désactivé par défaut ; enregistré dans autorun.cmd pour le partage."
 )

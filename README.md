@@ -6,7 +6,7 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.5.3](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.3).** WSquashFS updates are validated; WSquashFS creation and ReShade remain in beta.
+**Stable version: [v0.5.4](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.4).** WSquashFS updates are validated; WSquashFS creation and ReShade remain in beta.
 
 ## Features
 
@@ -31,17 +31,14 @@ Created by **Thomsonito**.
 - native Batocera Ports launcher and Pad2Key support
 - update checks at startup and from the toolbox menu
 
-## New in v0.5.3
+## New in v0.5.4
 
-- Per-game ReShade integration, including WSquashFS without archive recompression.
-- Fast lists, name search and detection of ReShade bundled with games.
-- Standard, Retro and Thomson shader-pack templates; YAD preset import/export.
-- API hints from executables, optional PCGamingWiki lookup and launch observation supporting Wine and UMU.
-- Installation resumes at API selection after a diagnostic, retaining the chosen executable.
-- New ReShade profiles skip the tutorial; **Home** opens the overlay and **End** toggles effects.
-- **Update a WSquashFS** graduates from beta after validation on multiple games.
+- Per-game UMU direct mode available after a launch test in the WSquashFS workflow; requires UMU Runner Toolbox 0.13.7 or newer.
+- Optional PlayStation HIDRAW-to-XInput conversion with Enable, Disable and Inherit choices.
+- Compatibility variables share one `ENV=` line and survive final archive creation.
+- French and English interface; options available from the existing per-game menu.
 
-[v0.5.3 release notes](release-notes/v0.5.3.md) · [Release history](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
+[v0.5.4 release notes](release-notes/v0.5.4.md) · [Release history](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 

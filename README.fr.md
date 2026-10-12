@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.5.3](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.3).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS et ReShade restent en bêta.
+**Version stable : [v0.5.4](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.4).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS et ReShade restent en bêta.
 
 ## Fonctionnalités
 
@@ -31,17 +31,14 @@ Créée par **Thomsonito**.
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
 
-## Nouveautés de la v0.5.3
+## Nouveautés de la v0.5.4
 
-- Intégration ReShade par jeu, y compris sur WSquashFS sans recompression de l’archive.
-- Listes rapides, recherche par nom et détection des installations ReShade déjà intégrées aux jeux.
-- Modèles de packs Standard, Rétro et Sélection Thomson ; import et export de presets avec YAD.
-- Aide au choix de l’API par analyse de l’exécutable, recherche PCGamingWiki et observation après lancement, compatible Wine et UMU.
-- Reprise de l’installation au choix de l’API après le diagnostic, pour l’exécutable déjà sélectionné.
-- Nouveaux profils ReShade : tutoriel passé, **Home** pour l’interface et **Fin** pour activer/désactiver les effets.
-- Retrait de la mention bêta du workflow **Mettre à jour un WSquashFS**, validé sur plusieurs jeux.
+- Mode direct UMU par jeu accessible après l’essai dans le workflow WSquashFS ; nécessite UMU Runner Toolbox 0.13.7 ou plus.
+- Conversion facultative PlayStation HIDRAW vers XInput : Activer, Désactiver ou Hériter.
+- Variables de compatibilité regroupées dans une seule ligne `ENV=` et conservées dans l’archive finale.
+- Interface français/anglais, depuis le menu existant des options par jeu.
 
-[Notes de la v0.5.3](release-notes/v0.5.3.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
+[Notes de la v0.5.4](release-notes/v0.5.4.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 
