@@ -19,9 +19,9 @@ class FinalCheckTests(unittest.TestCase):
             q = shlex.quote
             script = f'''
 WT_ROOT={q(str(ROOT / 'toolbox'))}; WT_HOME={q(str(base))}
-WT_LOG_DIR={q(str(base / 'logs'))}
 source "$WT_ROOT/modules/maintenance.sh"
 source "$WT_ROOT/modules/wsquashfs.sh"
+WT_LOG_DIR={q(str(base / 'logs'))}
 i18n() {{ printf '%s' "$1"; }}
 menu_select() {{ printf '%s' "$CHOICE"; }}
 maintenance_run_progress() {{ shift 2; "$@"; }}
