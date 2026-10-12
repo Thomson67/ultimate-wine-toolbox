@@ -736,4 +736,6 @@ declare -gA I18N=(
   [dxvk_nvapi_optical_flow_limited]="NVIDIA Optical Flow en D3D12 demande VKD3D-Proton 2.14 ou plus et une implémentation Wine avec HAGS."
   [dxvk_nvapi_shader_extensions_limited]="Les fonctions CuBIN et extensions shader NVIDIA en D3D12 demandent VKD3D-Proton 3.0.1 ou plus. Les extensions shader restent expérimentales et nécessitent DXVK_NVAPI_D3D12_NV_SHADER_EXTN=1."
 
+  [wsq_umu_direct_title]="Compatibilité UMU : lancement direct (expérimental)"
+  [wsq_umu_direct_body]="Pour les jeux qui refusent un chemin redirigé, ou plantent à cause de ce chemin. Nécessite la version test compatible de UMU Runner Toolbox. Ne corrige pas tous les crashs. Désactivé par défaut ; enregistré dans autorun.cmd pour le partage."
 )
