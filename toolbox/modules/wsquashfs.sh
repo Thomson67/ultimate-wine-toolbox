@@ -364,6 +364,10 @@ wsq_write_autorun() {
         printf 'DIR=%s\n' "$exe_dir"
         printf 'CMD="%s"\n' "$exe_name"
     } > "$tmp"
+    # Preserve ENV settings when final save configuration rewrites autorun.
+    if [ -f "$prefix/autorun.cmd" ]; then
+        python3 "$WT_ROOT/helpers/autorun_env.py" copy "$prefix/autorun.cmd" "$tmp" || { rm -f -- "$tmp"; return 1; }
+    fi
     mv -f -- "$tmp" "$prefix/autorun.cmd"
 }
 
@@ -1233,9 +1237,29 @@ wsq_game_options_menu() {
             esac
             items+=("$key" "$(i18n "wsq_option_$key") : $label")
         done
+        value="$(python3 "$WT_ROOT/helpers/autorun_env.py" get "$prefix/autorun.cmd")" || return 1
+        if [ "$value" = 1 ]; then label="$(i18n enabled)"; else label="$(i18n disabled)"; fi
+        items+=("umu_direct_game" "$(i18n wsq_umu_direct_title) : $label")
+        value="$(python3 "$WT_ROOT/helpers/autorun_env.py" get "$prefix/autorun.cmd" --key PROTON_SONY_HIDRAW_XINPUT)" || return 1
+        case "$value" in
+            1) label="$(i18n enabled)" ;;
+            0) label="$(i18n disabled)" ;;
+            *) label="$(i18n wsq_option_inherit)" ;;
+        esac
+        items+=("sony_xinput" "$(i18n wsq_sony_xinput_title) : $label")
         items+=("relaunch" "$(i18n wsq_options_relaunch)" "back" "$(i18n back)")
         choice="$(menu_select "$(i18n wsq_options_title)" "$(i18n wsq_options_prompt)" "${items[@]}")" || return 1
         case "$choice" in
+            umu_direct_game)
+                value="$(menu_select "$(i18n wsq_umu_direct_title)" "$(i18n wsq_umu_direct_body)" "1" "$(i18n enabled)" "0" "$(i18n disabled)")" || continue
+                case "$value" in 0|1) ;; *) continue ;; esac
+                python3 "$WT_ROOT/helpers/autorun_env.py" set "$prefix/autorun.cmd" "$value" || return 1
+                ;;
+            sony_xinput)
+                value="$(menu_select "$(i18n wsq_sony_xinput_title)" "$(i18n wsq_sony_xinput_body)" "1" "$(i18n enabled)" "0" "$(i18n disabled)" "inherit" "$(i18n wsq_option_inherit)")" || continue
+                case "$value" in 0|1|inherit) ;; *) continue ;; esac
+                python3 "$WT_ROOT/helpers/autorun_env.py" set "$prefix/autorun.cmd" "$value" --key PROTON_SONY_HIDRAW_XINPUT || return 1
+                ;;
             relaunch) wsq_retry_pending; return 1 ;;
             back) return 0 ;;
             enable_hidraw|dxvk|fps_limit|force_large_adress|virtual_desktop)
