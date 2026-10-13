@@ -120,6 +120,10 @@ Installing Ultimate Wine Toolbox over an older development build automatically m
 
 Wine/UMU runners, games, saves and bottles are preserved.
 
+## In-app documentation
+
+The main **Documentation** menu groups WSquashFS creation and update guides, Wine prefix templates, MangoHud, DXVK/VKD3D and ReShade. Guides are available offline in French and English in a scrolling reader. The templates guide explains their purpose, location and expected format.
+
 ## Create a WSquashFS (beta)
 
 The guided workflow prepares a Wine prefix and selects the executable **before the first launch**, then lets you test the game, controller and saves. On return, **Review / change the game executable** can correct the launch choice. After a failure, **Install additional Winetricks** adds components to the working prefix with the selected runner before another test.

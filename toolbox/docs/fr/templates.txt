@@ -1,0 +1,20 @@
+MODÈLES DE PRÉFIXES WINE
+
+Un préfixe Wine est l’environnement Windows d’un jeu : disque C: (drive_c), registre, bibliothèques et réglages. Le runner est le programme qui fait fonctionner cet environnement. Changer de modèle de préfixe et changer de runner sont donc deux opérations différentes.
+
+À QUOI SERT UN MODÈLE ?
+Lors de la création d’un WSquashFS depuis un simple dossier de jeu, la Toolbox extrait le modèle choisi, puis place les fichiers du jeu dans drive_c/game. Un dossier .wine existant peut être réutilisé directement : aucun nouveau modèle n’est alors nécessaire.
+
+OÙ LES PLACER ?
+__TEMPLATES_DIR__
+
+Déposer les fichiers directement dans ce dossier, sans sous-dossier. Les modèles reconnus sont des archives SquashFS dont le nom se termine par .prefix ou .wsquashfs. Une archive .wsquashfs.prefix convient également. Le suffixe .prefix ne désigne pas un fichier texte.
+
+Exemples de noms : Model.wsquashfs.prefix, Model-DotNet4.wsquashfs.prefix, Model-Legacy32.wsquashfs.prefix. Ces noms sont des exemples, pas une liste de modèles automatiquement fournis.
+
+COMMENT CHOISIR ?
+Commencer avec un modèle propre et généraliste. Un modèle spécialisé peut contenir des composants nécessaires à certains jeux, comme .NET ou un environnement 32 bits. Il doit rester adapté au runner et au jeu : plus de composants ne garantit pas une meilleure compatibilité.
+
+Pour préparer son propre modèle, partir d’un préfixe Wine fonctionnel, sans jeu ni sauvegarde personnelle, puis l’archiver en SquashFS avec drive_c et les fichiers du registre à la racine. Renommer un dossier ou un ZIP en .prefix ne le convertit pas. Éviter les liens vers les sauvegardes ou les dossiers personnels d’une autre machine.
+
+Si aucun modèle n’est présent, la Toolbox propose le téléchargement du modèle par défaut, avec contrôle de taille et d’empreinte. Le dossier des modèles est conservé lors des mises à jour.

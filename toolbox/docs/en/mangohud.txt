@@ -1,0 +1,21 @@
+MANGOHUD: DISPLAY PERFORMANCE
+
+MangoHud displays information while playing: FPS and, depending on the profile, frame pacing, load, temperatures and memory. It helps observe performance; enabling it does not itself optimize the game.
+
+USE
+Open Graphics settings, then MangoHud. Choose global activation or a setting for one game. A game can inherit the global setting, be forced On or be forced Off.
+
+Choose a profile:
+- Minimal: FPS only.
+- Default: standard display.
+- Detailed: FPS, frame pacing, CPU/GPU load and temperatures, RAM and VRAM.
+
+Close and relaunch the game after a change. Toolbox settings apply to the Windows games it manages, rather than every emulator’s performance display.
+
+HOW TO COMPARE
+Use the same scene, resolution and graphics options. Look at consistency, rather than just the maximum FPS. Change one setting at a time to identify what actually helps.
+
+IF THE DISPLAY IS MISSING
+Check the game-specific setting: Off can override global activation. Also check settings already present in autorun and the runner’s behavior. Inspect Toolbox logs before manually editing variables.
+
+After updating a game, an old bottle may retain stale settings. The WSquashFS update workflow cleans the game’s bottles after success. Manually deleting a bottle can also delete user data: back up important contents first.

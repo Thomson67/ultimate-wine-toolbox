@@ -122,6 +122,10 @@ Les anciens lanceurs, hooks et répertoires runtime ne sont supprimés qu'après
 
 Les runners Wine/UMU, les jeux, les sauvegardes et les Wine bottles sont conservés.
 
+## Documentation dans la Toolbox
+
+Le menu principal **Documentation** regroupe les guides de création et de mise à jour WSquashFS, les modèles de préfixes Wine, MangoHud, DXVK/VKD3D et ReShade. Les textes sont disponibles hors ligne, en français et en anglais, dans un lecteur avec défilement. Le guide des modèles précise leur rôle, leur emplacement et le format attendu.
+
 ## Créer un WSquashFS (bêta)
 
 Le workflow guidé prépare un préfixe Wine, demande l’exécutable **avant le premier lancement**, puis permet de tester le jeu, les manettes et les sauvegardes. Au retour, **Vérifier / modifier le choix de l’exécutable du jeu** permet de corriger le lancement. Après un échec, **Installer des Winetricks supplémentaires** ajoute des composants dans le préfixe de travail, avec le runner choisi, avant de retester.
