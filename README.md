@@ -6,7 +6,7 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.5.6](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.6).** WSquashFS updates are validated; WSquashFS creation and ReShade remain in beta.
+**Stable version: [v0.5.7](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.7).** WSquashFS updates are validated; WSquashFS creation and ReShade remain in beta.
 
 ## Features
 
@@ -31,14 +31,14 @@ Created by **Thomsonito**.
 - native Batocera Ports launcher and Pad2Key support
 - update checks at startup and from the toolbox menu
 
-## New in v0.5.6
+## New in v0.5.7
 
 - Optional Batocera v41 compatibility for `SAVEDIR` and `SAVEFILES`, enabled or disabled from the Toolbox and reapplied at boot by a user service.
 - Main Documentation menu: offline French/English guides for WSquashFS creation and updates, prefix templates, MangoHud, DXVK/VKD3D and ReShade.
 - Expanded prefix template guide, including file locations and supported archive naming.
 - Preserves v0.5.5 integrity-check choices, steamuser symlink handling and Retro shaders, plus UMU and controller options.
 
-[v0.5.6 release notes](release-notes/v0.5.6.md) · [Release history](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
+[v0.5.7 release notes](release-notes/v0.5.7.md) · [Release history](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 
