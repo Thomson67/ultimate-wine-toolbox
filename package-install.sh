@@ -79,6 +79,12 @@ rm -f -- "$OLD_PORT" "$OLD_PORT.keys" "$OLD_MANGOHUD_HOOK" "$OLD_DXVK_HOOK"
 mkdir -p "$DEST" "$DEST/templates" "$PORTS" "$SCRIPTS" "$LOG_DIR" "$BACKUP_DIR"
 rm -rf "$DEST/toolbox"
 cp -a "$SRC/toolbox" "$DEST/toolbox"
+if [ -f "$DEST/v41-savedir/enabled" ]; then
+    if ! python3 "$DEST/toolbox/helpers/v41_savedir_service.py" refresh; then
+        say "Compatibilité SAVEDIR v41 non actualisée : consultez son menu dans la Toolbox." \
+            "SAVEDIR v41 compatibility was not refreshed: check its Toolbox menu."
+    fi
+fi
 cp -a "$SRC/VERSION" "$DEST/VERSION"
 cp -a "$SRC/uninstall.sh" "$DEST/uninstall.sh"
 

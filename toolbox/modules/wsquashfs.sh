@@ -1599,10 +1599,6 @@ wsq_resume_build() {
     fi
 }
 
-wsq_templates_info() {
-    msgbox "$(i18n wsq_templates_title)" "$(i18n wsq_templates_info "$WSQ_TEMPLATES_DIR")"
-}
-
 wsq_final_archive_check() {
     local archive="$1" mode="$2" log="${3:-}" choice label cancel
     case "$mode" in
@@ -1738,37 +1734,20 @@ wsq_integrity_check() {
     fi
 }
 
-wsq_creation_documentation() {
-    local document columns lines width height
-    columns="$(tput cols 2>/dev/null || printf '104')"
-    lines="$(tput lines 2>/dev/null || printf '28')"
-    case "$columns" in ''|*[!0-9]*) columns=104 ;; esac
-    case "$lines" in ''|*[!0-9]*) lines=28 ;; esac
-    width=$((columns-4))
-    height=$((lines-4))
-    [ "$width" -le 100 ] || width=100
-    [ "$height" -le 24 ] || height=24
-    [ "$width" -ge 20 ] || width=20
-    [ "$height" -ge 8 ] || height=8
-    document="$(mktemp /tmp/uwt-wsquashfs-guide.XXXXXX)" || return
-    printf '%b\n' "$(i18n wsq_creation_guide)" | python3 -c '
-import sys
-import textwrap
-width = int(sys.argv[1])
-for line in sys.stdin.read().splitlines():
-    print(textwrap.fill(line, width=width, break_long_words=True,
-                        break_on_hyphens=False) if line else "")
-' "$((width-6))" > "$document" || {
-        rm -f -- "$document"
-        return 1
-    }
-    if have_dialog; then
-        dialog --clear --no-shadow --exit-label "$(i18n back)" \
-            --title "$(i18n wsq_creation_documentation)" --textbox "$document" "$height" "$width"
+wsq_v41_savedir_menu() {
+    local helper="$WT_ROOT/helpers/v41_savedir_service.py" choice status log
+    status="$(python3 "$helper" status 2>/dev/null)" || status=changed
+    choice="$(menu_select "$(i18n wsq_v41_title)" "$(i18n wsq_v41_intro "$status")" \
+        enable "$(i18n wsq_v41_install)" disable "$(i18n wsq_v41_remove)" cancel "$(i18n back)")" || return
+    case "$choice" in enable|disable) ;; *) return ;; esac
+    yesno_default_no "$(i18n wsq_v41_title)" "$(i18n wsq_v41_confirm)" || return
+    mkdir -p "$WT_LOG_DIR" || return
+    log="$(mktemp "$WT_LOG_DIR/v41-savedir-XXXXXX.log")" || return
+    if python3 "$helper" "$choice" > "$log" 2>&1; then
+        msgbox "$(i18n wsq_v41_title)" "$(i18n wsq_v41_done)"
     else
-        cat -- "$document"
+        msgbox "$(i18n wsq_v41_title)" "$(i18n wsq_v41_failed "$(cat "$log")" "$log")"
     fi
-    rm -f -- "$document"
 }
 
 wsquashfs_menu() {
@@ -1781,9 +1760,8 @@ wsquashfs_menu() {
             "3" "$(i18n wsq_resume_action) $pending" \
             "4" "$(i18n squash_wine)" \
             "5" "$(i18n unsquash_wine)" \
-            "6" "$(i18n wsq_templates_title)" \
-            "7" "$(i18n wsq_integrity_title)" \
-            "8" "$(i18n wsq_creation_documentation)" \
+            "6" "$(i18n wsq_integrity_title)" \
+            "7" "$(i18n wsq_v41_title)" \
             "0" "$(i18n back)")" || return
         case "$choice" in
             1) wsq_create_new ;;
@@ -1791,9 +1769,8 @@ wsquashfs_menu() {
             3) wsq_resume_build ;;
             4) maintenance_select_and_squash ;;
             5) maintenance_select_and_unsquash ;;
-            6) wsq_templates_info ;;
-            7) wsq_integrity_check ;;
-            8) wsq_creation_documentation ;;
+            6) wsq_integrity_check ;;
+            7) wsq_v41_savedir_menu ;;
             0|"") return ;;
         esac
     done

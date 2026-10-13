@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.5.4](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.4).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS et ReShade restent en bêta.
+**Version stable : [v0.5.6](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.6).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS et ReShade restent en bêta.
 
 ## Fonctionnalités
 
@@ -31,14 +31,14 @@ Créée par **Thomsonito**.
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
 
-## Nouveautés de la v0.5.4
+## Nouveautés de la v0.5.6
 
-- Mode direct UMU par jeu accessible après l’essai dans le workflow WSquashFS ; nécessite UMU Runner Toolbox 0.13.7 ou plus.
-- Conversion facultative PlayStation HIDRAW vers XInput : Activer, Désactiver ou Hériter.
-- Variables de compatibilité regroupées dans une seule ligne `ENV=` et conservées dans l’archive finale.
-- Interface français/anglais, depuis le menu existant des options par jeu.
+- Compatibilité optionnelle Batocera v41 pour `SAVEDIR` et `SAVEFILES`, activable/désactivable depuis la Toolbox et réappliquée au démarrage par un service utilisateur.
+- Menu principal Documentation : guides hors ligne français/anglais sur la création et la mise à jour WSquashFS, les modèles de préfixes, MangoHud, DXVK/VKD3D et ReShade.
+- Guide des modèles de préfixes étoffé : emplacements des fichiers et noms d’archives attendus.
+- Conserve les choix de contrôle d’intégrité, la gestion du lien steamuser et les shaders Rétro de la v0.5.5, ainsi que les options UMU et manettes.
 
-[Notes de la v0.5.4](release-notes/v0.5.4.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
+[Notes de la v0.5.6](release-notes/v0.5.6.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 
@@ -122,13 +122,17 @@ Les anciens lanceurs, hooks et répertoires runtime ne sont supprimés qu'après
 
 Les runners Wine/UMU, les jeux, les sauvegardes et les Wine bottles sont conservés.
 
+## Documentation dans la Toolbox
+
+Le menu principal **Documentation** regroupe les guides de création et de mise à jour WSquashFS, les modèles de préfixes Wine, MangoHud, DXVK/VKD3D et ReShade. Les textes sont disponibles hors ligne, en français et en anglais, dans un lecteur avec défilement. Le guide des modèles précise leur rôle, leur emplacement et le format attendu.
+
 ## Créer un WSquashFS (bêta)
 
 Le workflow guidé prépare un préfixe Wine, demande l’exécutable **avant le premier lancement**, puis permet de tester le jeu, les manettes et les sauvegardes. Au retour, **Vérifier / modifier le choix de l’exécutable du jeu** permet de corriger le lancement. Après un échec, **Installer des Winetricks supplémentaires** ajoute des composants dans le préfixe de travail, avec le runner choisi, avant de retester.
 
 Pour les sauvegardes, choisir un dossier (`SAVEDIR`), des fichiers individuels dans le dossier du jeu (`SAVEFILES`) ou la sauvegarde du registre. Créer une vraie sauvegarde pendant le test aide la détection. Les fichiers créés/modifiés sont proposés mais décochés par défaut : des logs ou réglages peuvent aussi apparaître. Une sélection `SAVEFILES` concerne un seul dossier ; les fichiers choisis sont copiés dans les sauvegardes Batocera et retirés du préfixe avant compression. Batocera recrée leurs liens au lancement, sans déplacer le dossier du jeu.
 
-La compression, les contrôles d’intégrité et la reprise des opérations en attente font partie du workflow. Après compression, le contrôle rapide final peut être lancé ou ignoré ; Annuler conserve le préfixe et ne remplace pas l’archive existante. L’externalisation via `SAVEDIR` nécessite **Batocera v42 ou supérieure** ; le contrôle complet nécessite le support `-pf` d’unsquashfs. Création basée sur le script de **DreamerCG**.
+La compression, les contrôles d’intégrité et la reprise des opérations en attente font partie du workflow. Après compression, le contrôle rapide final peut être lancé ou ignoré ; Annuler conserve le préfixe et ne remplace pas l’archive existante. La prise en charge native de `SAVEDIR` nécessite **Batocera v42 ou supérieure** ; un correctif expérimental optionnel est disponible pour v41 ; le contrôle complet nécessite le support `-pf` d’unsquashfs. Création basée sur le script de **DreamerCG**.
 
 ## Mettre à jour un WSquashFS
 
@@ -140,7 +144,7 @@ Après compression, choisissez de lancer le contrôle complet ou de l’ignorer 
 
 Après remplacement réussi, les bottles associées à cette archive sont nettoyées pour que le prochain lancement reparte des fichiers et réglages mis à jour. Cela évite notamment de conserver une ancienne configuration MangoHud.
 
-Prévoyez de la place pour l’extraction, les sauvegardes de test et la nouvelle archive. La gestion `SAVEDIR=` nécessite Batocera v42 ou supérieur.
+Prévoyez de la place pour l’extraction, les sauvegardes de test et la nouvelle archive. La gestion native `SAVEDIR=` nécessite Batocera v42 ou supérieur. Pour v41 uniquement, Gestion des WSquashFS propose une compatibilité expérimentale activable au démarrage, avec sauvegarde et restauration du lanceur. Voir [le protocole de test v41](docs/V41_SAVEDIR_TEST_FR.md).
 
 La mise à jour propose d’abord le lancement défini dans `autorun.cmd`, y compris les `start.bat` originaux recopiés dans le nouveau dossier aux mêmes emplacements. Vous pouvez choisir un autre exécutable. Sans `SAVEDIR=`, les liens existants vers `/userdata/saves/windows` ou un de ses sous-dossiers sont détectés, restaurés dans le jeu mis à jour et proposés par défaut. Un lien vers la racine `/userdata/saves/windows` conserve exactement sa cible pendant le test et dans l’archive finale, sans fenêtre spéciale ni modification des références batch. Le test utilise donc directement les sauvegardes existantes dans ce cas. Vous pouvez conserver les liens ou sélectionner un autre emplacement au retour.
 

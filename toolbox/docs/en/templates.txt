@@ -1,0 +1,20 @@
+WINE PREFIX TEMPLATES
+
+A Wine prefix is a game’s Windows environment: its C: drive (drive_c), registry, libraries and settings. The runner is the program that runs this environment. Choosing a prefix template and choosing a runner are different operations.
+
+WHAT IS A TEMPLATE FOR?
+When creating a WSquashFS from a plain game folder, the Toolbox extracts the selected template and places the game files in drive_c/game. An existing .wine folder can be reused directly, without a new template.
+
+WHERE DO THEY GO?
+__TEMPLATES_DIR__
+
+Place files directly in this folder, without subfolders. Recognized templates are SquashFS archives with names ending in .prefix or .wsquashfs. A .wsquashfs.prefix archive also works. The .prefix extension does not mean a text file.
+
+Example names: Model.wsquashfs.prefix, Model-DotNet4.wsquashfs.prefix, Model-Legacy32.wsquashfs.prefix. These are examples, not a list of automatically supplied templates.
+
+WHICH ONE SHOULD I CHOOSE?
+Start with a clean general-purpose template. A specialized template may contain components required by particular games, such as .NET or a 32-bit environment. It must suit the runner and game: more components do not guarantee better compatibility.
+
+To prepare your own template, start with a working Wine prefix without a game or personal saves, then archive it as SquashFS with drive_c and registry files at its root. Renaming a folder or ZIP to .prefix does not convert it. Avoid links to saves or personal folders from another machine.
+
+If no template is available, the Toolbox offers to download the default template and checks its size and hash. The templates folder is preserved during updates.

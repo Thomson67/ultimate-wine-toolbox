@@ -1,0 +1,23 @@
+PER-GAME RESHADE — BETA
+
+ReShade applies effects to the game image: colors, sharpening, CRT rendering or retro filters. Effects have a performance cost; start with a few effects and compare the result.
+
+INSTALL
+In Graphics settings → ReShade, select the game, then Install / change version and shaders. Choose the actual game executable, API, ReShade version and shader packs.
+
+Select the game’s API before DXVK/VKD3D translation: a DirectX 11 game using DXVK remains DirectX 11 for this selection. Launch diagnostics and PCGamingWiki lookups provide hints to confirm. Native Vulkan is not covered by this integration.
+
+MODELS
+- Standard: ReShade and SweetFX.
+- Retro: CRT, HQ4X, guest(r), 4xBRZ, 5xBR NoBlend and AnomalousPixelBlending, among others.
+- Thomson selection: a selection of versatile shader packs.
+- Free selection: choose packs individually.
+
+Installing packs does not activate every effect. The visual output of new retro filters still needs checking for each game.
+
+IN GAME
+Home opens ReShade. New profiles use End to toggle effects; existing custom shortcuts are preserved. Enable the desired effects or import an .ini preset from the Toolbox. Its shaders must be available in the installed packs.
+
+Settings and presets are kept per game and retrieved when the game closes. Exporting a preset does not include shader packs. Close the game before modifying, disabling or uninstalling ReShade.
+
+WSquashFS games are supported without recompressing the archive. ReShade installations already bundled with a game are detected and managed separately; nonstandard loaders may require their original manager.

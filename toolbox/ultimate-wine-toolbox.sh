@@ -24,6 +24,7 @@ source "$WT_ROOT/modules/graphics.sh"
 source "$WT_ROOT/modules/reshade.sh"
 source "$WT_ROOT/modules/dxvk-manager.sh"
 source "$WT_ROOT/modules/settings.sh"
+source "$WT_ROOT/modules/documentation.sh"
 
 ensure_batocera_paths
 runner_offer_normalization_at_startup
@@ -43,6 +44,7 @@ $(i18n menu_umu): $(umu_toolbox_status)" \
             "5" "$(i18n menu_wsquashfs)" \
             "6" "$(i18n menu_maintenance)" \
             "7" "$(i18n menu_settings)" \
+            "8" "$(i18n menu_documentation)" \
             "0" "$(i18n exit)")" || exit 0
 
         case "$choice" in
@@ -53,6 +55,7 @@ $(i18n menu_umu): $(umu_toolbox_status)" \
             5) wsquashfs_menu ;;
             6) maintenance_menu ;;
             7) settings_menu ;;
+            8) documentation_menu ;;
             0|"") clear; exit 0 ;;
         esac
     done

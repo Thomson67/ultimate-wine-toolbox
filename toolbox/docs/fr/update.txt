@@ -1,0 +1,18 @@
+METTRE À JOUR UN WSQUASHFS
+
+BUT
+Remplacer les fichiers du jeu par une nouvelle version en conservant son lancement, ses réglages et ses sauvegardes. Le workflow concerne les archives contenant un préfixe Wine ; les archives .pc sans préfixe ne sont pas prises en charge.
+
+1. PRÉPARER LA NOUVELLE VERSION
+Dans Gestion des WSquashFS, choisir Mettre à jour un WSquashFS. Sélectionner l’archive puis le dossier contenant directement les nouveaux fichiers du jeu. Le dossier source sera déplacé dans le préfixe de travail : il ne restera pas à son emplacement initial. Prévoir de la place pour l’extraction et la recompression.
+
+2. TESTER LE JEU
+Le premier essai reprend l’exécutable et les arguments de l’archive. Vérifier le démarrage, les manettes, le chargement de la progression et une nouvelle sauvegarde. Au retour, Vérifier / modifier le choix de l’exécutable du jeu permet de corriger le lancement. Les anciens start.bat sont conservés. L’ancien dossier du jeu reste en .bak jusqu’à validation du lancement.
+
+3. CONFIRMER LES SAUVEGARDES
+Conserver les règles existantes ou choisir un autre emplacement. Les tests utilisent normalement une copie séparée des sauvegardes. Exception : un lien vers la racine /userdata/saves/windows conserve sa cible et utilise directement les sauvegardes partagées.
+
+4. COMPRESSER ET FINALISER
+Choisir de sauvegarder l’ancienne archive avant remplacement ou de la remplacer directement. Après compression, lancer le contrôle complet proposé ou l’ignorer. Annuler à ce stade ne remplace pas l’archive. Un contrôle ignoré peut être lancé plus tard depuis Gestion des WSquashFS.
+
+Une opération inachevée peut être reprise depuis le menu. Les erreurs indiquent le préfixe conservé et le journal à consulter. Après réussite, les anciennes bottles du jeu sont nettoyées et la suppression du préfixe de travail est proposée. Vérifier ensuite la progression en lançant le nouveau WSquashFS.

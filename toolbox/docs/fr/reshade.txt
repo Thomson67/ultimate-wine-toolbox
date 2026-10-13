@@ -1,0 +1,23 @@
+RESHADE PAR JEU — BÊTA
+
+ReShade applique des effets à l’image du jeu : couleurs, netteté, rendu CRT ou filtres rétro. Les effets ont un coût en performances ; commencer avec quelques effets et comparer le résultat.
+
+INSTALLER
+Dans Réglages graphiques → ReShade, choisir le jeu puis Installer / modifier version et shaders. Sélectionner le véritable exécutable du jeu, l’API, la version de ReShade et les packs de shaders.
+
+Choisir l’API du jeu avant traduction par DXVK/VKD3D : un jeu DirectX 11 utilisant DXVK reste un jeu DirectX 11 pour ce choix. Le diagnostic par lancement et la recherche PCGamingWiki donnent des indices à confirmer. Vulkan natif n’est pas couvert par cette intégration.
+
+MODÈLES
+- Standard : ReShade et SweetFX.
+- Rétro : CRT, HQ4X, guest(r), 4xBRZ, 5xBR NoBlend et AnomalousPixelBlending, notamment.
+- Sélection Thomson : une sélection de packs polyvalents.
+- Sélection libre : choisir les packs individuellement.
+
+Installer les packs ne signifie pas activer tous leurs effets. Le rendu des nouveaux filtres rétro reste à valider selon le jeu.
+
+EN JEU
+Home ouvre ReShade. Pour les nouveaux profils, Fin active/désactive les effets ; les raccourcis personnalisés existants sont conservés. Activer les effets souhaités ou importer un preset .ini depuis la Toolbox. Ses shaders doivent être présents dans les packs installés.
+
+Les réglages et presets sont conservés par jeu et récupérés à sa fermeture. Un export de preset ne contient pas les packs de shaders. Fermer le jeu avant de modifier, désactiver ou désinstaller ReShade.
+
+Les WSquashFS sont pris en charge sans recompression de l’archive. Les installations ReShade déjà intégrées au jeu sont détectées et disposent d’une gestion distincte ; un chargeur non standard peut nécessiter son gestionnaire d’origine.
