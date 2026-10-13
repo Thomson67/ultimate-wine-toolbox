@@ -81,7 +81,7 @@ else
             +lc \
             -u8 \
             -fa "DejaVu Sans Mono" \
-            -fs 10 \
+            -fs 11 \
             -title "Ultimate Wine Toolbox" \
             -geometry 120x36 \
             -e /bin/bash "$LAUNCHER" \
@@ -91,7 +91,7 @@ else
             +lc \
             -u8 \
             -fa "DejaVu Sans Mono" \
-            -fs 10 \
+            -fs 11 \
             -title "Ultimate Wine Toolbox" \
             -geometry 120x36 \
             -e /bin/bash "$LAUNCHER" \
@@ -270,7 +270,7 @@ resume_wsquashfs_toolbox() {
         +lc \
         -u8 \
         -fa "DejaVu Sans Mono" \
-        -fs 10 \
+        -fs 11 \
         -title "Ultimate Wine Toolbox" \
         -geometry 120x36 \
         -e /bin/bash "$LAUNCHER" \
