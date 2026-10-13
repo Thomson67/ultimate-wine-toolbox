@@ -128,7 +128,7 @@ Le workflow guidé prépare un préfixe Wine, demande l’exécutable **avant le
 
 Pour les sauvegardes, choisir un dossier (`SAVEDIR`), des fichiers individuels dans le dossier du jeu (`SAVEFILES`) ou la sauvegarde du registre. Créer une vraie sauvegarde pendant le test aide la détection. Les fichiers créés/modifiés sont proposés mais décochés par défaut : des logs ou réglages peuvent aussi apparaître. Une sélection `SAVEFILES` concerne un seul dossier ; les fichiers choisis sont copiés dans les sauvegardes Batocera et retirés du préfixe avant compression. Batocera recrée leurs liens au lancement, sans déplacer le dossier du jeu.
 
-La compression, les contrôles d’intégrité et la reprise des opérations en attente font partie du workflow. Après compression, le contrôle rapide final peut être lancé ou ignoré ; Annuler conserve le préfixe et ne remplace pas l’archive existante. L’externalisation via `SAVEDIR` nécessite **Batocera v42 ou supérieure** ; le contrôle complet nécessite le support `-pf` d’unsquashfs. Création basée sur le script de **DreamerCG**.
+La compression, les contrôles d’intégrité et la reprise des opérations en attente font partie du workflow. Après compression, le contrôle rapide final peut être lancé ou ignoré ; Annuler conserve le préfixe et ne remplace pas l’archive existante. La prise en charge native de `SAVEDIR` nécessite **Batocera v42 ou supérieure** ; un correctif expérimental optionnel est disponible pour v41 ; le contrôle complet nécessite le support `-pf` d’unsquashfs. Création basée sur le script de **DreamerCG**.
 
 ## Mettre à jour un WSquashFS
 
@@ -140,7 +140,7 @@ Après compression, choisissez de lancer le contrôle complet ou de l’ignorer 
 
 Après remplacement réussi, les bottles associées à cette archive sont nettoyées pour que le prochain lancement reparte des fichiers et réglages mis à jour. Cela évite notamment de conserver une ancienne configuration MangoHud.
 
-Prévoyez de la place pour l’extraction, les sauvegardes de test et la nouvelle archive. La gestion `SAVEDIR=` nécessite Batocera v42 ou supérieur.
+Prévoyez de la place pour l’extraction, les sauvegardes de test et la nouvelle archive. La gestion native `SAVEDIR=` nécessite Batocera v42 ou supérieur. Pour v41 uniquement, Gestion des WSquashFS propose un correctif expérimental à activer pour chaque session, avec sauvegarde et restauration du lanceur. Voir [le protocole de test v41](docs/V41_SAVEDIR_TEST_FR.md).
 
 La mise à jour propose d’abord le lancement défini dans `autorun.cmd`, y compris les `start.bat` originaux recopiés dans le nouveau dossier aux mêmes emplacements. Vous pouvez choisir un autre exécutable. Sans `SAVEDIR=`, les liens existants vers `/userdata/saves/windows` ou un de ses sous-dossiers sont détectés, restaurés dans le jeu mis à jour et proposés par défaut. Un lien vers la racine `/userdata/saves/windows` conserve exactement sa cible pendant le test et dans l’archive finale, sans fenêtre spéciale ni modification des références batch. Le test utilise donc directement les sauvegardes existantes dans ce cas. Vous pouvez conserver les liens ou sélectionner un autre emplacement au retour.
 

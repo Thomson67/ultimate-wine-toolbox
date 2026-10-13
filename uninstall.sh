@@ -28,6 +28,14 @@ say() {
     exit 1
 }
 
+if [ -f "$DEST/v41-savedir/state.json" ]; then
+    python3 "$DEST/toolbox/helpers/v41_savedir_patch.py" remove || {
+        say "ERREUR : restauration du lanceur v41 refusée. Toolbox et sauvegarde du script conservées." \
+            "ERROR: v41 launcher restoration refused. Toolbox and script backup preserved."
+        exit 1
+    }
+fi
+
 if [ -L "$DXVK_PATH" ]; then
     target="$(readlink -f "$DXVK_PATH" 2>/dev/null || true)"
     case "$target" in

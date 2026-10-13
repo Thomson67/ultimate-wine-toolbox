@@ -126,7 +126,7 @@ The guided workflow prepares a Wine prefix and selects the executable **before t
 
 For saves, choose a folder (`SAVEDIR`), individual files inside the game directory (`SAVEFILES`), or registry saving. Create an actual save during the test to help detection. Created/modified files are suggested but unchecked: logs and settings may appear too. One `SAVEFILES` selection uses one folder; selected files are copied to Batocera saves and removed from the prefix before compression. Batocera recreates their links at launch without moving the game directory.
 
-Compression, integrity checks and pending-operation resume are part of the workflow. After compression, run or skip the final quick check; Cancel preserves the prefix and does not replace an existing archive. `SAVEDIR` externalization requires **Batocera v42 or later**; full integrity checks require unsquashfs `-pf` support. Creation is based on **DreamerCG**’s script.
+Compression, integrity checks and pending-operation resume are part of the workflow. After compression, run or skip the final quick check; Cancel preserves the prefix and does not replace an existing archive. Native `SAVEDIR` support requires **Batocera v42 or later**; an optional experimental compatibility patch is available for v41; full integrity checks require unsquashfs `-pf` support. Creation is based on **DreamerCG**’s script.
 
 ## Update a WSquashFS
 
@@ -138,7 +138,7 @@ After compression, choose to run or skip the full integrity check before replace
 
 After successful replacement, bottles associated with the archive are cleaned so the next launch uses the updated files and settings. This prevents stale configurations such as an older MangoHud setup from surviving the update.
 
-Allow space for extraction, test saves and the new archive. `SAVEDIR=` requires Batocera v42 or newer.
+Allow space for extraction, test saves and the new archive. Native `SAVEDIR=` support requires Batocera v42 or newer. For v41 only, WSquashFS Management offers an experimental session patch with launcher backup and restoration. Enable again after reboot; v40 and .pc launches are not covered.
 
 Updates retain the launch command from `autorun.cmd`, restoring original `start.bat` scripts at the same relative locations in the replacement folder. Another executable can be selected after the test. Without `SAVEDIR=`, existing links to `/userdata/saves/windows` or its subdirectories are detected, restored in the updated game and offered by default. A link to the shared save root keeps its exact original target throughout testing and in the final archive, without an extra prompt or batch changes; this case uses existing saves directly. On return, keep the links or choose another location.
 
