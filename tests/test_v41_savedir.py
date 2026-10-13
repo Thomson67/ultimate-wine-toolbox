@@ -93,6 +93,7 @@ class PatchTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory(); self.addCleanup(temp.cleanup)
         self.base = Path(temp.name); self.target = self.base / 'batocera-wine'
         self.state = self.base / 'state'; self.release = self.base / 'os-release'
+        self.version = self.base / 'batocera.version'
         self.release.write_text('PRETTY_NAME="Batocera.linux 41"\nVERSION_ID=2024.11\n')
         self.original = '#!/bin/bash\n' + ''.join(
             name + '() {\n    WINE_ENV=$(getWine_var "${WINEPOINT}" "ENV" "")\n    echo launch\n}\n'
@@ -101,7 +102,29 @@ class PatchTests(unittest.TestCase):
         self.helper = Path(saves.__file__)
 
     def manage(self, action):
-        patcher.manage(action, self.target, self.state, self.release, self.helper)
+        patcher.manage(action, self.target, self.state, self.release, self.helper, self.version)
+
+    def test_official_version_file_works_without_version_in_pretty_name(self):
+        self.release.write_text('PRETTY_NAME="Batocera.linux"\nVERSION_ID=2024.11\n')
+        for version in ('41 2025/03/01 12:00', '41copu.1 2025/03/01', '41-dev abc', '41.1', '41'):
+            with self.subTest(version=version):
+                self.version.write_text(version)
+                self.manage('install')
+                self.assertEqual(self.target.read_text().count(patcher.MARKER), 2)
+                self.manage('remove')
+
+    def test_official_file_takes_priority_and_rejects_other_major_versions(self):
+        for version in ('40', '42', '43copuv.1', '410', '2024.11'):
+            with self.subTest(version=version):
+                self.version.write_text(version)
+                with self.assertRaisesRegex(ValueError, 'detected:'):
+                    self.manage('install')
+                self.assertEqual(self.target.read_text(), self.original)
+
+    def test_pretty_name_fallback_accepts_v41_custom_suffix(self):
+        self.release.write_text('PRETTY_NAME="Batocera.linux 41copu.1"\n')
+        self.manage('install')
+        self.assertEqual(self.target.read_text().count(patcher.MARKER), 2)
 
     def test_install_is_idempotent_and_remove_restores_exact_script(self):
         self.manage('install')

@@ -6,7 +6,6 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import tempfile
 
@@ -18,9 +17,25 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def version41(os_release):
-    text = os_release.read_text()
-    return bool(re.search(r'^PRETTY_NAME=["\']?Batocera(?:\.linux)? 41(?:[.\s"\']|$)', text, re.M))
+VERSION_FILE = Path('/usr/share/batocera/batocera.version')
+
+
+def detected_version(os_release, version_file=VERSION_FILE):
+    # This is the authoritative source used by Batocera's own version command.
+    if version_file.is_file():
+        value = version_file.read_text().strip()
+        match = re.match(r'^(\d+)(?=\D|$)', value)
+        if match:
+            return int(match[1]), value
+    text = os_release.read_text() if os_release.is_file() else ''
+    pretty = re.search(r'^PRETTY_NAME=(.*)$', text, re.M)
+    value = pretty[1].strip().strip('"\'') if pretty else ''
+    match = re.match(r'^Batocera(?:\.linux)?\s+(\d+)(?=\D|$)', value, re.I)
+    return (int(match[1]) if match else None), value or 'unknown'
+
+
+def version41(os_release, version_file=VERSION_FILE):
+    return detected_version(os_release, version_file)[0] == 41
 
 
 def patched(text, helper):
@@ -55,7 +70,7 @@ def write_atomic(path, data, mode):
         Path(tmp).unlink(missing_ok=True)
 
 
-def manage(action, target, state, os_release, source):
+def manage(action, target, state, os_release, source, version_file=VERSION_FILE):
     if target.is_symlink() or not target.is_file():
         raise ValueError('batocera-wine must be a regular file')
     data = target.read_bytes()
@@ -79,8 +94,9 @@ def manage(action, target, state, os_release, source):
             raise ValueError('batocera-wine changed since installation; automatic restore refused')
         record.unlink()
         return
-    if not version41(os_release):
-        raise ValueError('this experimental patch is limited to Batocera 41')
+    if not version41(os_release, version_file):
+        _, observed = detected_version(os_release, version_file)
+        raise ValueError(f'this experimental patch is limited to Batocera 41; detected: {observed!r}')
     if state.is_symlink():
         raise ValueError('patch state must be a real directory')
     state.mkdir(parents=True, exist_ok=True)
@@ -108,8 +124,9 @@ if __name__ == '__main__':
     parser.add_argument('--target', type=Path, default=Path('/usr/bin/batocera-wine'))
     parser.add_argument('--state', type=Path, default=HOME)
     parser.add_argument('--os-release', type=Path, default=Path('/etc/os-release'))
+    parser.add_argument('--version-file', type=Path, default=VERSION_FILE)
     args = parser.parse_args()
     try:
-        manage(args.action, args.target, args.state, args.os_release, Path(__file__).with_name('v41_savedir.py'))
+        manage(args.action, args.target, args.state, args.os_release, Path(__file__).with_name('v41_savedir.py'), args.version_file)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'Batocera 41 patch: {error}\n')
