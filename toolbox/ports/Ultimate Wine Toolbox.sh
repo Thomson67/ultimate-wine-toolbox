@@ -53,6 +53,15 @@ export LANGUAGE="$WT_UTF8_LOCALE"
     echo "launcher=$LAUNCHER"
 } >>"$BOOT_LOG" 2>&1
 
+# Configurable terminal profile. Changes apply on the next Ports launch.
+WT_DISPLAY_MODE_FILE="/userdata/system/ultimate-wine-toolbox/config/display-mode"
+WT_FONT_SIZE=11
+WT_GEOMETRY="120x36"
+if [ -r "$WT_DISPLAY_MODE_FILE" ] && [ "$(head -n 1 "$WT_DISPLAY_MODE_FILE")" = "handheld" ]; then
+    WT_FONT_SIZE=16
+    WT_GEOMETRY="88x28"
+fi
+
 if [ ! -x /usr/bin/xterm ]; then
     echo "ERROR: /usr/bin/xterm missing or not executable." >>"$BOOT_LOG"
     exit 1
@@ -81,9 +90,9 @@ else
             +lc \
             -u8 \
             -fa "DejaVu Sans Mono" \
-            -fs 11 \
+            -fs "$WT_FONT_SIZE" \
             -title "Ultimate Wine Toolbox" \
-            -geometry 120x36 \
+            -geometry "$WT_GEOMETRY" \
             -e /bin/bash "$LAUNCHER" \
             >>"$BOOT_LOG" 2>&1
     else
@@ -91,9 +100,9 @@ else
             +lc \
             -u8 \
             -fa "DejaVu Sans Mono" \
-            -fs 11 \
+            -fs "$WT_FONT_SIZE" \
             -title "Ultimate Wine Toolbox" \
-            -geometry 120x36 \
+            -geometry "$WT_GEOMETRY" \
             -e /bin/bash "$LAUNCHER" \
             >>"$BOOT_LOG" 2>&1
     fi
@@ -270,9 +279,9 @@ resume_wsquashfs_toolbox() {
         +lc \
         -u8 \
         -fa "DejaVu Sans Mono" \
-        -fs 11 \
+        -fs "$WT_FONT_SIZE" \
         -title "Ultimate Wine Toolbox" \
-        -geometry 120x36 \
+        -geometry "$WT_GEOMETRY" \
         -e /bin/bash "$LAUNCHER" \
         >>"$BOOT_LOG" 2>&1
 
