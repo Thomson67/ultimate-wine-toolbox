@@ -57,9 +57,17 @@ export LANGUAGE="$WT_UTF8_LOCALE"
 WT_DISPLAY_MODE_FILE="/userdata/system/ultimate-wine-toolbox/config/display-mode"
 WT_FONT_SIZE=11
 WT_GEOMETRY="120x36"
+WT_FULLSCREEN=0
 if [ -r "$WT_DISPLAY_MODE_FILE" ] && [ "$(head -n 1 "$WT_DISPLAY_MODE_FILE")" = "handheld" ]; then
     WT_FONT_SIZE=16
     WT_GEOMETRY="88x28"
+elif [ -r "$WT_DISPLAY_MODE_FILE" ] && [ "$(head -n 1 "$WT_DISPLAY_MODE_FILE")" = "fullscreen" ]; then
+    WT_FULLSCREEN=1
+fi
+
+WT_XTERM_DISPLAY_ARGS=(-geometry "$WT_GEOMETRY")
+if [ "$WT_FULLSCREEN" -eq 1 ]; then
+    WT_XTERM_DISPLAY_ARGS=(-fullscreen)
 fi
 
 if [ ! -x /usr/bin/xterm ]; then
@@ -92,7 +100,7 @@ else
             -fa "DejaVu Sans Mono" \
             -fs "$WT_FONT_SIZE" \
             -title "Ultimate Wine Toolbox" \
-            -geometry "$WT_GEOMETRY" \
+            "${WT_XTERM_DISPLAY_ARGS[@]}" \
             -e /bin/bash "$LAUNCHER" \
             >>"$BOOT_LOG" 2>&1
     else
@@ -102,7 +110,7 @@ else
             -fa "DejaVu Sans Mono" \
             -fs "$WT_FONT_SIZE" \
             -title "Ultimate Wine Toolbox" \
-            -geometry "$WT_GEOMETRY" \
+            "${WT_XTERM_DISPLAY_ARGS[@]}" \
             -e /bin/bash "$LAUNCHER" \
             >>"$BOOT_LOG" 2>&1
     fi
@@ -281,7 +289,7 @@ resume_wsquashfs_toolbox() {
         -fa "DejaVu Sans Mono" \
         -fs "$WT_FONT_SIZE" \
         -title "Ultimate Wine Toolbox" \
-        -geometry "$WT_GEOMETRY" \
+        "${WT_XTERM_DISPLAY_ARGS[@]}" \
         -e /bin/bash "$LAUNCHER" \
         >>"$BOOT_LOG" 2>&1
 
