@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.5.4](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.4).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS et ReShade restent en bêta.
+**Version stable : [v0.5.6](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.6).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS et ReShade restent en bêta.
 
 ## Fonctionnalités
 
@@ -31,14 +31,14 @@ Créée par **Thomsonito**.
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
 
-## Nouveautés de la v0.5.4
+## Nouveautés de la v0.5.6
 
-- Mode direct UMU par jeu accessible après l’essai dans le workflow WSquashFS ; nécessite UMU Runner Toolbox 0.13.7 ou plus.
-- Conversion facultative PlayStation HIDRAW vers XInput : Activer, Désactiver ou Hériter.
-- Variables de compatibilité regroupées dans une seule ligne `ENV=` et conservées dans l’archive finale.
-- Interface français/anglais, depuis le menu existant des options par jeu.
+- Compatibilité optionnelle Batocera v41 pour `SAVEDIR` et `SAVEFILES`, activable/désactivable depuis la Toolbox et réappliquée au démarrage par un service utilisateur.
+- Menu principal Documentation : guides hors ligne français/anglais sur la création et la mise à jour WSquashFS, les modèles de préfixes, MangoHud, DXVK/VKD3D et ReShade.
+- Guide des modèles de préfixes étoffé : emplacements des fichiers et noms d’archives attendus.
+- Conserve les choix de contrôle d’intégrité, la gestion du lien steamuser et les shaders Rétro de la v0.5.5, ainsi que les options UMU et manettes.
 
-[Notes de la v0.5.4](release-notes/v0.5.4.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
+[Notes de la v0.5.6](release-notes/v0.5.6.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 
