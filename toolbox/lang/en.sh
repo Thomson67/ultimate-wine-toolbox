@@ -1,12 +1,16 @@
 #!/bin/bash
 declare -gA I18N=(
+  [dotnet_restore]="Restore a safety copy of this prefix"
+  [dotnet_no_backup]="No safety copy found for this prefix."
+  [dotnet_restore_choose]="Copies from oldest to newest. To undo a partial installation, select a copy predating the first attempt."
+  [dotnet_restore_confirm]="Restore %s?\n\nThe prefix will return to this state. The game directory and external save link targets are preserved. Other prefix files and settings will be replaced; the current state is backed up first. Close the game."
   [dotnet_title]=".NET: Wine Mono / Microsoft"
   [dotnet_intro]="Wine Mono replaces parts of .NET Framework, not .NET 6/8. Batocera and some runners already provide shared Mono. Operations affect only this working prefix."
   [dotnet_mono]="Install / update Wine Mono (latest stable version)"
   [dotnet_microsoft]="Replace Wine Mono with Microsoft .NET Framework 4.8"
   [doc_dotnet]=".NET: Mono, Microsoft framework and modern runtimes"
   [dotnet_confirm]="%s?\n\nRunner: %s\nBackup: %s\n\nClose the game first. The backup excludes game files; it retains the rest of the prefix and save links without following their targets. Batocera system and runner files are not replaced.\n\nProton/UMU may reapply its own Mono version. Recent Mono may require recent Wine. Change only if the game needs it."
-  [dotnet_wait]="Preparing .NET: verified download, prefix backup, then installation. This can take several minutes."
+  [dotnet_wait]="Preparing .NET: verified download, installation in a local copy, then transfer on success. This can take several minutes."
   [dotnet_failed]=".NET operation failed or was refused. No automatic rollback: the backup remains available if it was created.\n\nLog: %s\n\n%s"
   [dotnet_done]="Operation completed. Check the refreshed diagnostic, then relaunch the game to validate. The backup path is recorded in the log:\n%s"
   [dotnet_manual]="Use the .NET menu to install dotnet48 with diagnostics and a safety copy."

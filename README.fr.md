@@ -212,3 +212,5 @@ Les noms de DLL ou chargeurs non standard sont listés sans contrôle automatiqu
 ## Gestion .NET (expérimentale)
 
 Le workflow de test distingue le Wine Mono partagé de Batocera/runners des installations dans le préfixe, propose le MSI Mono stable récent vérifié ou son remplacement par .NET Framework 4.8 Microsoft, et copie le préfixe de travail avant modification. Le dossier du jeu est exclu de la copie. Les états .NET mixtes ou non identifiés sont refusés. Voir le nouveau guide .NET hors ligne ; valider l’installation puis deux lancements avant de finaliser l’archive.
+
+Le test .NET utilise désormais une copie locale hors du dossier des ROMs, préserve les métadonnées de liens TKG et permet de restaurer une copie antérieure après un essai incomplet. Les installations réelles restent à valider sur Batocera.

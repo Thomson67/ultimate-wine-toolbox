@@ -1,12 +1,16 @@
 #!/bin/bash
 declare -gA I18N=(
+  [dotnet_restore]="Restaurer une copie de sécurité de ce préfixe"
+  [dotnet_no_backup]="Aucune copie de sécurité trouvée pour ce préfixe."
+  [dotnet_restore_choose]="Copies du plus ancien au plus récent. Pour annuler une installation partielle, choisissez une copie antérieure au premier essai."
+  [dotnet_restore_confirm]="Restaurer %s ?\n\nLe préfixe retrouvera cet état. Le dossier du jeu et les cibles des liens de sauvegardes externes sont conservés. Les autres fichiers et réglages du préfixe seront remplacés ; son état actuel sera copié avant restauration. Le jeu doit être fermé."
   [dotnet_title]=".NET : Wine Mono / Microsoft"
   [dotnet_intro]="Wine Mono remplace une partie de .NET Framework, pas .NET 6/8. Batocera et certains runners fournissent déjà un Mono partagé. Les opérations concernent uniquement ce préfixe de travail."
   [dotnet_mono]="Installer / mettre à jour Wine Mono (dernière version stable)"
   [dotnet_microsoft]="Remplacer Wine Mono par Microsoft .NET Framework 4.8"
   [doc_dotnet]=".NET : Mono, framework Microsoft et runtimes modernes"
   [dotnet_confirm]="%s ?\n\nRunner : %s\nCopie de sécurité : %s\n\nLe jeu doit être fermé. La copie exclut les fichiers du jeu ; elle conserve le reste du préfixe et les liens de sauvegardes sans suivre leurs cibles. Aucun fichier système Batocera ou runner n’est remplacé.\n\nAvec Proton/UMU, le runner peut réappliquer sa version Mono. Un Mono récent peut nécessiter un Wine récent. Ne changez que si le jeu en a besoin."
-  [dotnet_wait]="Préparation de .NET : téléchargement vérifié, copie du préfixe puis installation. Cela peut prendre plusieurs minutes."
+  [dotnet_wait]="Préparation de .NET : téléchargement vérifié, installation dans une copie locale puis transfert si réussi. Cela peut prendre plusieurs minutes."
   [dotnet_failed]="L’opération .NET a échoué ou a été refusée. Aucune restauration automatique : la copie de sécurité reste disponible si elle a été créée.\n\nJournal : %s\n\n%s"
   [dotnet_done]="Opération terminée. Consultez le diagnostic actualisé puis relancez le jeu pour valider. Le chemin de la copie de sécurité figure dans le journal :\n%s"
   [dotnet_manual]="Utilisez le menu .NET pour installer dotnet48 avec diagnostic et copie de sécurité."

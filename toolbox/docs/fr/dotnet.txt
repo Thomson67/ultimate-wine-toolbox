@@ -12,7 +12,7 @@ DANS LE WORKFLOW
 
 Après l’essai du jeu, ouvrir .NET dans le menu de résultat (création ou mise à jour). En création, cette option est aussi accessible dans les composants Winetricks.
 
-Installer / mettre à jour Mono télécharge le MSI stable officiel avec vérification SHA-256 et l’installe uniquement dans le préfixe de travail. Le paquet x86 couvre aussi x86-64. Cela ne met pas à jour le Mono partagé de Batocera.
+Installer / mettre à jour Mono télécharge le MSI stable officiel avec vérification SHA-256 et l’installe dans une copie locale du préfixe de travail. Le paquet x86 couvre aussi x86-64. Cela ne met pas à jour le Mono partagé de Batocera.
 
 Remplacer Mono par .NET Framework 4.8 utilise Winetricks remove_mono puis dotnet48 avec le runner choisi. Les états mixtes ou incertains sont refusés plutôt que forcés. Si Microsoft est déjà identifié, la Toolbox ne le réinstalle pas automatiquement. L’installation peut échouer selon le runner et l’architecture du préfixe ; consulter le journal.
 
@@ -23,3 +23,13 @@ COPIES DE SÉCURITÉ
 Avant installation, une copie du préfixe est conservée dans backups/dotnet sous le dossier de la Toolbox. Le dossier principal du jeu identifié via autorun est exclu ; les liens sont copiés sans suivre les cibles, notamment les sauvegardes externes. L’archive source reste intacte. Ne supprimez pas le dossier du jeu pour restaurer cette copie : elle ne le contient pas. Le journal indique le chemin exact de la copie. En cas d’échec, aucune restauration automatique n’est effectuée.
 
 La fonction reste expérimentale tant que l’installation, la relance et la conservation dans l’archive n’ont pas été validées sur Batocera.
+
+INSTALLATION LOCALE ET RESTAURATION
+
+Les installateurs travaillent dans une copie sous state/dotnet-work, hors du dossier des ROMs. Le dossier du jeu n’est pas copié. Le système de fichiers local doit permettre l’échange atomique fichier/dossier utilisé par certains Wine TKG ; cette capacité est testée avant installation. UWT_DOTNET_WORK_ROOT permet de choisir un autre emplacement local si nécessaire.
+
+Les métadonnées .REPARSE_POINT de TKG sont préservées sans être parcourues ni déréférencées. Leurs ancres ${WINEPREFIX} sont adaptées à la copie puis au préfixe final. Le runtime partagé et les DLL des runners restent intacts.
+
+Le résultat n’est transféré au préfixe de travail qu’après réussite et vérification. Une erreur d’installation laisse le préfixe initial en place et conserve la copie locale pour analyser ses journaux. Le MSI Mono écrit aussi windows/temp/uwt-mono-install.log dans cette copie. Une erreur pendant le transfert déclenche le retour des entrées déjà remplacées ; si ce retour échoue, le journal indique les fichiers de récupération conservés. Prévoir l’espace pour la sauvegarde, la copie locale et le transfert.
+
+Le bouton Restaurer une copie de sécurité permet de repartir d’un état antérieur. Les copies sont classées de la plus ancienne à la plus récente : après plusieurs installations incomplètes, choisir une copie antérieure au premier essai. Le dossier du jeu et les cibles de sauvegardes externes restent en place ; les autres fichiers du préfixe reviennent à la date choisie. L’état courant est copié avant restauration.

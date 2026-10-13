@@ -210,3 +210,5 @@ Nonstandard DLL names/loaders are listed without automatic control. WSquashFS ma
 ## .NET workflow (experimental)
 
 The test workflow distinguishes shared Batocera/runner Wine Mono from prefix installations, supports a verified latest stable Mono MSI or replacement with Microsoft .NET Framework 4.8, and backs up the working prefix before changing it. The game directory is excluded from the backup. Mixed or unidentified .NET states are refused. See the new offline .NET guide; validate installation and a second game launch before archive finalization.
+
+.NET test installations now use local staging outside the ROM directory, preserve TKG link metadata and offer snapshot recovery after incomplete attempts. Real installer compatibility still requires Batocera validation.

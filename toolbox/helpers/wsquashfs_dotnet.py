@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -11,6 +12,7 @@ import urllib.request
 
 import wsquashfs_winetricks as tricks
 from wsquashfs_update import game_directory
+from wsquashfs_dotnet_storage import stage, publish, filesystem, exchange_probe
 
 
 def inspect(prefix, shared_roots=None):
@@ -101,8 +103,25 @@ def backup(prefix, destination):
     return snapshot
 
 
-def change(prefix, action, backups, cache):
+def restore(prefix, snapshot, backups):
+    if snapshot.is_symlink() or not snapshot.resolve().is_relative_to(backups.resolve()):
+        raise ValueError('Expected a snapshot from the Toolbox backup directory')
+    data = json.loads((snapshot / 'backup.json').read_text())
+    game = game_directory(prefix)
+    if data.get('prefix') != str(prefix.resolve()) or data.get('excluded_game') != str(game.relative_to(prefix)):
+        raise ValueError('Snapshot does not belong to this working prefix/game directory')
+    source = snapshot / 'prefix'
+    if source.is_symlink() or not (source / 'system.reg').is_file():
+        raise ValueError('Snapshot prefix is missing or invalid')
+    tricks.prepare(prefix, detach=False)
+    backup(prefix, backups)  # Preserve the current state before explicit recovery.
+    publish(source, prefix, game)
+    print(f'dotnet_restored_snapshot={snapshot}', flush=True)
+
+
+def change(prefix, action, backups, cache, work_root=None):
     state = inspect(prefix)
+    print('dotnet_initial_state=' + json.dumps(state, ensure_ascii=False), flush=True)
     if state['status'] in ('mixed', 'uncertain'):
         raise ValueError('Ambiguous .NET state; inspect the prefix before changing it')
     if state['status'] == 'microsoft':
@@ -118,28 +137,46 @@ def change(prefix, action, backups, cache):
         if any(re.fullmatch(r'\d+\.\d+\.\d+', v) and tuple(map(int, v.split('.'))) >= tuple(map(int, version.split('.'))) for v in installed):
             print('Wine Mono already up to date', flush=True)
             return
-    tricks.prepare(prefix)  # Refuse running prefixes and detach shared Windows DLLs.
+    tricks.prepare(prefix, detach=False)  # Refuse running prefixes; leave source DLLs intact.
+    game = game_directory(prefix)
+    print(f'dotnet_source_filesystem={filesystem(prefix)} exchange_errno={exchange_probe(prefix)}', flush=True)
     snapshot = backup(prefix, backups)
-    if action == 'microsoft':
-        rc = tricks.install(prefix, ['remove_mono', 'dotnet48'])
-        if rc or inspect(prefix)['status'] != 'microsoft':
-            raise ValueError(f'.NET Framework installation incomplete (rc={rc}); backup={snapshot}')
-    else:
-        # Wine's Unix namespace works even when Batocera sandboxing removed Z:.
-        rc = tricks.install(prefix, ['msiexec', '/i', '//?/unix' + str(package.resolve()), '/qn', '/norestart'], wine_command=True)
-        after = inspect(prefix)
-        if rc or not any(e.get('DisplayVersion') == version for e in after['mono']):
-            raise ValueError(f'Wine Mono installation not confirmed (rc={rc}); backup={snapshot}')
+    local_root = work_root or Path(os.environ.get('UWT_DOTNET_WORK_ROOT', str(cache.parent.parent / 'state/dotnet-work')))
+    staged = stage(prefix, game, local_root)
+    try:
+        tricks.prepare(staged)
+        if action == 'microsoft':
+            rc = tricks.install(staged, ['remove_mono', 'dotnet48'])
+            after = inspect(staged)
+            print('dotnet_installed_state=' + json.dumps(after), flush=True)
+            if rc or after['status'] != 'microsoft':
+                raise ValueError(f'.NET Framework installation incomplete (rc={rc})')
+        else:
+            # Wine's Unix namespace also works when sandboxing removed Z:.
+            (staged / 'drive_c/windows/temp').mkdir(exist_ok=True)
+            rc = tricks.install(staged, ['msiexec', '/i', '//?/unix' + str(package.resolve()),
+                '/qn', '/norestart', '/l*vx', 'C:\\windows\\temp\\uwt-mono-install.log'], wine_command=True)
+            after = inspect(staged)
+            print('dotnet_installed_state=' + json.dumps(after), flush=True)
+            if rc or not any(e.get('DisplayVersion') == version for e in after['mono']):
+                raise ValueError(f'Wine Mono installation not confirmed (rc={rc})')
+        tricks.prepare(staged, detach=False)  # No installer process may remain active.
+        tricks.prepare(prefix, detach=False)  # Refuse publication if the game was started meanwhile.
+        publish(staged, prefix, game)
+    except (OSError, ValueError) as error:
+        raise ValueError(f'{error}; installer copy retained: {staged}; backup={snapshot}') from error
+    shutil.rmtree(staged.parent)
     print(json.dumps(inspect(prefix), ensure_ascii=False, indent=2), flush=True)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=('inspect', 'mono', 'microsoft'))
+    parser.add_argument('action', choices=('inspect', 'mono', 'microsoft', 'restore', 'backups'))
     parser.add_argument('prefix', type=Path)
     parser.add_argument('--backups', type=Path)
     parser.add_argument('--cache', type=Path)
     parser.add_argument('--runner-root', type=Path)
+    parser.add_argument('--snapshot', type=Path)
     args = parser.parse_args()
     try:
         if args.action == 'inspect':
@@ -147,6 +184,20 @@ def main():
             if args.runner_root:
                 roots.extend(args.runner_root / p for p in ('share/wine', 'files/share/wine', 'dist/share/wine'))
             print(json.dumps(inspect(args.prefix, roots), ensure_ascii=False, indent=2))
+        elif args.action == 'backups':
+            if args.backups is None:
+                raise ValueError('Backup directory required')
+            for snapshot in sorted(args.backups.glob('dotnet-*'), key=lambda p: p.stat().st_mtime):
+                try:
+                    data = json.loads((snapshot / 'backup.json').read_text())
+                    if data.get('prefix') == str(args.prefix.resolve()):
+                        print(snapshot.name)
+                except (OSError, ValueError):
+                    pass
+        elif args.action == 'restore':
+            if args.backups is None or args.snapshot is None:
+                raise ValueError('Backup directory and snapshot required')
+            restore(args.prefix, args.snapshot, args.backups)
         else:
             if args.backups is None or args.cache is None:
                 raise ValueError('Backup and cache directories are required')

@@ -34,9 +34,37 @@ wsq_dotnet_apply() {
         "$(i18n dotnet_confirm "$(i18n "dotnet_$action")" "$runner" "$WT_HOME/backups/dotnet")" || return 1
     wsq_set_runner_config "$(basename "$prefix")" "$runner" || return 1
     mkdir -p "$WSQ_STATE_DIR"
+    printf '\n===== .NET %s | %s | runner=%s | %s =====\n' \
+        "$(date -Is)" "$action" "$runner" "$prefix" >> "$log"
     if ! wsq_update_run "$(i18n dotnet_title)" "$(i18n dotnet_wait)" "$log" \
         python3 "$WT_ROOT/helpers/wsquashfs_dotnet.py" "$action" "$prefix" \
         --backups "$WT_HOME/backups/dotnet" --cache "$WT_HOME/cache/wine-mono"; then
+        msgbox "$(i18n dotnet_title)" "$(i18n dotnet_failed "$log" "$(wsq_update_log_detail "$log")")"
+        return 1
+    fi
+    msgbox "$(i18n dotnet_title)" "$(i18n dotnet_done "$log")"
+}
+
+wsq_dotnet_restore_menu() {
+    local choice name rows log="$WSQ_STATE_DIR/wsquashfs-dotnet.log"
+    local -a items=()
+    rows="$(python3 "$WT_ROOT/helpers/wsquashfs_dotnet.py" backups "$prefix" \
+        --backups "$WT_HOME/backups/dotnet")" || return 1
+    while IFS= read -r name; do
+        [ -n "$name" ] || continue
+        items+=("$name" "$name ($(date -r "$WT_HOME/backups/dotnet/$name/backup.json" '+%d/%m %H:%M' 2>/dev/null))")
+    done <<< "$rows"
+    [ "${#items[@]}" -gt 0 ] || {
+        msgbox "$(i18n dotnet_title)" "$(i18n dotnet_no_backup)"
+        return 1
+    }
+    choice="$(menu_select "$(i18n dotnet_restore)" "$(i18n dotnet_restore_choose)" "${items[@]}" back "$(i18n back)")" || return 1
+    case "$choice" in back|'') return 1 ;; esac
+    yesno_default_no "$(i18n dotnet_restore)" "$(i18n dotnet_restore_confirm "$choice")" || return 1
+    mkdir -p "$WSQ_STATE_DIR"
+    if ! wsq_update_run "$(i18n dotnet_restore)" "$(i18n dotnet_wait)" "$log" \
+        python3 "$WT_ROOT/helpers/wsquashfs_dotnet.py" restore "$prefix" \
+        --backups "$WT_HOME/backups/dotnet" --snapshot "$WT_HOME/backups/dotnet/$choice"; then
         msgbox "$(i18n dotnet_title)" "$(i18n dotnet_failed "$log" "$(wsq_update_log_detail "$log")")"
         return 1
     fi
@@ -49,9 +77,11 @@ wsq_dotnet_menu() {
         report="$(wsq_dotnet_report)" || return 1
         choice="$(menu_select "$(i18n dotnet_title)" "$report\n\n$(i18n dotnet_intro)" \
             mono "$(i18n dotnet_mono)" microsoft "$(i18n dotnet_microsoft)" \
+            restore "$(i18n dotnet_restore)" \
             doc "$(i18n doc_dotnet)" back "$(i18n back)")" || return 1
         case "$choice" in
             mono|microsoft) wsq_dotnet_apply "$choice" ;;
+            restore) wsq_dotnet_restore_menu ;;
             doc) documentation_show dotnet ;;
             back|'') return 0 ;;
         esac

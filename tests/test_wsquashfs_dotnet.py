@@ -30,6 +30,9 @@ class DotnetTests(unittest.TestCase):
         (self.prefix / 'system.reg').write_text('WINE REGISTRY Version 2\n')
         self.backups = self.base / 'backups'
         self.cache = self.base / 'cache'
+        self.env = patch.dict(dotnet.os.environ, UWT_DOTNET_WORK_ROOT=str(self.base / 'local'))
+        self.env.start()
+        self.addCleanup(self.env.stop)
 
     def set_registry(self, text):
         (self.prefix / 'system.reg').write_text(text)
@@ -113,7 +116,7 @@ class DotnetTests(unittest.TestCase):
         def installer(prefix, verbs):
             self.assertEqual(verbs, ['remove_mono', 'dotnet48'])
             (prefix / 'drive_c/windows/dotnet48.installed.workaround').touch()
-            self.set_registry(entry('Microsoft .NET Framework 4.8'))
+            (prefix / 'system.reg').write_text(entry('Microsoft .NET Framework 4.8'))
             return 0
         with patch.object(dotnet.tricks, 'prepare'), patch.object(dotnet.tricks, 'install', side_effect=installer):
             dotnet.change(self.prefix, 'microsoft', self.backups, self.cache)
@@ -121,10 +124,36 @@ class DotnetTests(unittest.TestCase):
 
     def test_installer_failure_keeps_snapshot(self):
         self.set_registry(entry('Wine Mono Runtime'))
-        with patch.object(dotnet.tricks, 'prepare'), patch.object(dotnet.tricks, 'install', return_value=8):
+        original = (self.prefix / 'system.reg').read_bytes()
+        def fail(staged, verbs):
+            self.assertNotEqual(staged, self.prefix)
+            (staged / 'system.reg').write_text('partial installation')
+            return 8
+        with patch.object(dotnet.tricks, 'prepare'), patch.object(dotnet.tricks, 'install', side_effect=fail):
             with self.assertRaisesRegex(ValueError, 'incomplete'):
                 dotnet.change(self.prefix, 'microsoft', self.backups, self.cache)
         self.assertEqual(len(list(self.backups.glob('dotnet-*'))), 1)
+        self.assertEqual((self.prefix / 'system.reg').read_bytes(), original)
+        self.assertEqual(len(list((self.base / 'local').glob('install-*'))), 1)
+
+    def test_restore_snapshot_reverts_failed_attempt_preserving_game(self):
+        self.set_registry(entry('Wine Mono Runtime', '9.3.0'))
+        snapshot = dotnet.backup(self.prefix, self.backups)
+        self.set_registry('partial .NET installation')
+        (self.prefix / 'drive_c/windows/partial-file').touch()
+        dotnet.restore(self.prefix, snapshot, self.backups)
+        self.assertEqual(dotnet.inspect(self.prefix)['status'], 'mono')
+        self.assertFalse((self.prefix / 'drive_c/windows/partial-file').exists())
+        self.assertEqual((self.prefix / 'drive_c/game/game.exe').read_text(), 'game')
+        self.assertEqual(len(list(self.backups.glob('dotnet-*'))), 2)
+
+    def test_snapshot_of_other_game_is_refused(self):
+        snapshot = dotnet.backup(self.prefix, self.backups)
+        data = json.loads((snapshot / 'backup.json').read_text())
+        data['prefix'] = '/other/game.wine'
+        (snapshot / 'backup.json').write_text(json.dumps(data))
+        with self.assertRaisesRegex(ValueError, 'does not belong'):
+            dotnet.restore(self.prefix, snapshot, self.backups)
 
     def test_mono_checks_real_registry_result_not_only_exit_code(self):
         msi = self.base / 'mono.msi'
@@ -146,8 +175,9 @@ class DotnetTests(unittest.TestCase):
         msi.write_text('verified package')
         def installer(prefix, args, wine_command=False):
             self.assertTrue(wine_command)
-            self.assertEqual(args, ['msiexec', '/i', '//?/unix' + str(msi), '/qn', '/norestart'])
-            self.set_registry(entry('Wine Mono Runtime', '11.3.0'))
+            self.assertEqual(args[:5], ['msiexec', '/i', '//?/unix' + str(msi), '/qn', '/norestart'])
+            self.assertEqual(args[5:], ['/l*vx', r'C:\windows\temp\uwt-mono-install.log'])
+            (prefix / 'system.reg').write_text(entry('Wine Mono Runtime', '11.3.0'))
             return 0
         with patch.object(dotnet, 'fetch_mono', return_value=('11.3.0', msi)), patch.object(dotnet.tricks, 'prepare'), patch.object(dotnet.tricks, 'install', side_effect=installer):
             dotnet.change(self.prefix, 'mono', self.backups, self.cache)

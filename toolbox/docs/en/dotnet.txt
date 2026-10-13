@@ -12,7 +12,7 @@ WORKFLOW
 
 After testing the game, open .NET from the result menu (creation or update). In creation it is also available from Winetricks components.
 
-Install / update Mono downloads the official stable MSI, verifies its SHA-256, and installs only inside the working prefix. The x86 package also supports x86-64. It does not update Batocera’s shared runtime.
+Install / update Mono downloads the official stable MSI, verifies its SHA-256, and installs inside a local copy of the working prefix. The x86 package also supports x86-64. It does not update Batocera’s shared runtime.
 
 Replace Mono with .NET Framework 4.8 uses Winetricks remove_mono followed by dotnet48 through the selected runner. Mixed or uncertain states are refused, not forced. Already identified Microsoft installations are not automatically reinstalled. Compatibility depends on the runner and prefix architecture; inspect the log on failure.
 
@@ -23,3 +23,13 @@ SAFETY COPIES
 Before installation, a prefix copy is stored under the Toolbox’s backups/dotnet directory. The main game directory identified from autorun is excluded; symlinks are copied without following targets, including external saves. The source archive remains intact. Do not delete the game directory when restoring: the copy does not contain it. The log records the exact backup path. There is no automatic rollback on failure.
 
 Experimental until installation, relaunch and archive persistence have been validated on Batocera.
+
+LOCAL INSTALLATION AND RECOVERY
+
+Installers run in a copy under state/dotnet-work, outside the ROM directory. Game files are not copied. Local storage must support the atomic file/directory exchange used by some Wine TKG builds; this is tested before installation. Set UWT_DOTNET_WORK_ROOT to use another local directory if needed.
+
+TKG .REPARSE_POINT metadata is preserved without traversal or dereferencing. Its ${WINEPREFIX} anchors are relocated for staging and final publication. Shared runtime and runner DLL files remain intact.
+
+Only a successful, verified result is transferred to the working prefix. Installer failure preserves the original prefix and retains the local copy for log inspection. Mono MSI also writes windows/temp/uwt-mono-install.log inside that copy. Transfer errors roll back previously replaced entries; if rollback fails, recovery files are retained and their location is logged. Allow space for the backup, local copy and transfer.
+
+Restore a safety copy returns to an earlier state. Copies are sorted oldest first: after multiple incomplete installations, choose one predating the first attempt. Game files and external save targets stay in place; other prefix files revert to the selected date. The current state is backed up before restoring.

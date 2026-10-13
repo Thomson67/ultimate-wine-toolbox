@@ -19,7 +19,7 @@ def private_file(path):
         Path(temporary).unlink(missing_ok=True)
 
 
-def prepare(prefix):
+def prepare(prefix, detach=True):
     if prefix.is_symlink() or not prefix.is_dir() or prefix.suffix != '.wine':
         raise ValueError('Expected the working .wine prefix')
     root = prefix.resolve()
@@ -40,11 +40,22 @@ def prepare(prefix):
                     raise ValueError('The working prefix is still in use; close the game first')
     files = []
     for directory, dirs, names in os.walk(windows, followlinks=False):
+        # Some TKG builds encode Windows links in .REPARSE_POINT trees.
+        # Their ${WINEPREFIX} link is bookkeeping, not a shared DLL directory.
+        # Preserve metadata opaquely: never traverse or dereference it.
+        def reparse(path):
+            if not path.is_symlink():
+                return False
+            target = os.readlink(path)
+            return (target.startswith(f'.REPARSE_POINT/{path.name}/')
+                    and not (path.parent / '.REPARSE_POINT').is_symlink()
+                    and (path.parent / '.REPARSE_POINT').is_dir())
         for name in dirs:
             path = Path(directory) / name
-            if path.is_symlink():
+            if path.is_symlink() and not reparse(path):
                 raise ValueError(f'Windows directory alias must be detached first: {path}')
-        files.extend(Path(directory) / name for name in names)
+        dirs[:] = [name for name in dirs if name != '.REPARSE_POINT' and not reparse(Path(directory) / name)]
+        files.extend(Path(directory) / name for name in names if not reparse(Path(directory) / name))
     files.extend(prefix / name for name in ('system.reg', 'user.reg', 'userdef.reg'))
     # Detach shared files atomically before an installer can overwrite them.
     # User profiles and save links are deliberately outside this traversal.
@@ -56,8 +67,9 @@ def prepare(prefix):
             copies.append(path)
         elif path.is_file() and path.stat().st_nlink > 1:
             copies.append(path)
-    for path in copies:
-        private_file(path)
+    if detach:
+        for path in copies:
+            private_file(path)
 
 
 def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command=False):
