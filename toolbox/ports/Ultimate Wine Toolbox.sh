@@ -80,8 +80,6 @@ else
         env "$RESUME_ENV=1" /usr/bin/xterm \
             +lc \
             -u8 \
-            -fa "DejaVu Sans Mono" \
-            -fs 10 \
             -title "Ultimate Wine Toolbox" \
             -geometry 120x36 \
             -e /bin/bash "$LAUNCHER" \
@@ -90,8 +88,6 @@ else
         /usr/bin/xterm \
             +lc \
             -u8 \
-            -fa "DejaVu Sans Mono" \
-            -fs 10 \
             -title "Ultimate Wine Toolbox" \
             -geometry 120x36 \
             -e /bin/bash "$LAUNCHER" \
@@ -269,8 +265,6 @@ resume_wsquashfs_toolbox() {
     env "$RESUME_ENV=1" /usr/bin/xterm \
         +lc \
         -u8 \
-        -fa "DejaVu Sans Mono" \
-        -fs 10 \
         -title "Ultimate Wine Toolbox" \
         -geometry 120x36 \
         -e /bin/bash "$LAUNCHER" \
