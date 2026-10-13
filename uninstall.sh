@@ -28,8 +28,9 @@ say() {
     exit 1
 }
 
-if [ -f "$DEST/v41-savedir/state.json" ]; then
-    python3 "$DEST/toolbox/helpers/v41_savedir_patch.py" remove || {
+if [ -f "$DEST/v41-savedir/state.json" ] || [ -f "$DEST/v41-savedir/enabled" ] || \
+   [ -f /userdata/system/services/uwt_v41_savedir ]; then
+    python3 "$DEST/toolbox/helpers/v41_savedir_service.py" disable || {
         say "ERREUR : restauration du lanceur v41 refusée. Toolbox et sauvegarde du script conservées." \
             "ERROR: v41 launcher restoration refused. Toolbox and script backup preserved."
         exit 1

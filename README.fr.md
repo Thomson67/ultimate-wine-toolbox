@@ -140,7 +140,7 @@ Après compression, choisissez de lancer le contrôle complet ou de l’ignorer 
 
 Après remplacement réussi, les bottles associées à cette archive sont nettoyées pour que le prochain lancement reparte des fichiers et réglages mis à jour. Cela évite notamment de conserver une ancienne configuration MangoHud.
 
-Prévoyez de la place pour l’extraction, les sauvegardes de test et la nouvelle archive. La gestion native `SAVEDIR=` nécessite Batocera v42 ou supérieur. Pour v41 uniquement, Gestion des WSquashFS propose un correctif expérimental à activer pour chaque session, avec sauvegarde et restauration du lanceur. Voir [le protocole de test v41](docs/V41_SAVEDIR_TEST_FR.md).
+Prévoyez de la place pour l’extraction, les sauvegardes de test et la nouvelle archive. La gestion native `SAVEDIR=` nécessite Batocera v42 ou supérieur. Pour v41 uniquement, Gestion des WSquashFS propose une compatibilité expérimentale activable au démarrage, avec sauvegarde et restauration du lanceur. Voir [le protocole de test v41](docs/V41_SAVEDIR_TEST_FR.md).
 
 La mise à jour propose d’abord le lancement défini dans `autorun.cmd`, y compris les `start.bat` originaux recopiés dans le nouveau dossier aux mêmes emplacements. Vous pouvez choisir un autre exécutable. Sans `SAVEDIR=`, les liens existants vers `/userdata/saves/windows` ou un de ses sous-dossiers sont détectés, restaurés dans le jeu mis à jour et proposés par défaut. Un lien vers la racine `/userdata/saves/windows` conserve exactement sa cible pendant le test et dans l’archive finale, sans fenêtre spéciale ni modification des références batch. Le test utilise donc directement les sauvegardes existantes dans ce cas. Vous pouvez conserver les liens ou sélectionner un autre emplacement au retour.
 

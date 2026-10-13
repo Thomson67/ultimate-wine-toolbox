@@ -91,7 +91,9 @@ def manage(action, target, state, os_release, source, version_file=VERSION_FILE)
         if digest(data) == previous['patched_sha256']:
             write_atomic(target, original, previous['mode'])
         elif digest(data) != previous['original_sha256']:
-            raise ValueError('batocera-wine changed since installation; automatic restore refused')
+            if MARKER.encode() in data:
+                raise ValueError('batocera-wine changed since installation; automatic restore refused')
+            # A reboot/OS upgrade may provide a new unpatched launcher. Keep it.
         record.unlink()
         return
     if not version41(os_release, version_file):

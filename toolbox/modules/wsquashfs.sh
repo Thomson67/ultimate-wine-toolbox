@@ -1772,11 +1772,11 @@ for line in sys.stdin.read().splitlines():
 }
 
 wsq_v41_savedir_menu() {
-    local helper="$WT_ROOT/helpers/v41_savedir_patch.py" choice status log
+    local helper="$WT_ROOT/helpers/v41_savedir_service.py" choice status log
     status="$(python3 "$helper" status 2>/dev/null)" || status=changed
     choice="$(menu_select "$(i18n wsq_v41_title)" "$(i18n wsq_v41_intro "$status")" \
-        install "$(i18n wsq_v41_install)" remove "$(i18n wsq_v41_remove)" cancel "$(i18n back)")" || return
-    case "$choice" in install|remove) ;; *) return ;; esac
+        enable "$(i18n wsq_v41_install)" disable "$(i18n wsq_v41_remove)" cancel "$(i18n back)")" || return
+    case "$choice" in enable|disable) ;; *) return ;; esac
     yesno_default_no "$(i18n wsq_v41_title)" "$(i18n wsq_v41_confirm)" || return
     mkdir -p "$WT_LOG_DIR" || return
     log="$(mktemp "$WT_LOG_DIR/v41-savedir-XXXXXX.log")" || return

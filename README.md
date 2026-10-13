@@ -138,7 +138,7 @@ After compression, choose to run or skip the full integrity check before replace
 
 After successful replacement, bottles associated with the archive are cleaned so the next launch uses the updated files and settings. This prevents stale configurations such as an older MangoHud setup from surviving the update.
 
-Allow space for extraction, test saves and the new archive. Native `SAVEDIR=` support requires Batocera v42 or newer. For v41 only, WSquashFS Management offers an experimental session patch with launcher backup and restoration. Enable again after reboot; v40 and .pc launches are not covered.
+Allow space for extraction, test saves and the new archive. Native `SAVEDIR=` support requires Batocera v42 or newer. For v41 only, WSquashFS Management offers an experimental boot service with launcher backup and restoration. Enable or disable it from the Toolbox; v40 and .pc launches are not covered.
 
 Updates retain the launch command from `autorun.cmd`, restoring original `start.bat` scripts at the same relative locations in the replacement folder. Another executable can be selected after the test. Without `SAVEDIR=`, existing links to `/userdata/saves/windows` or its subdirectories are detected, restored in the updated game and offered by default. A link to the shared save root keeps its exact original target throughout testing and in the final archive, without an extra prompt or batch changes; this case uses existing saves directly. On return, keep the links or choose another location.
 

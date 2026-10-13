@@ -4,10 +4,13 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+import subprocess
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'toolbox/helpers'))
 import v41_savedir as saves
 import v41_savedir_patch as patcher
+import v41_savedir_service as service
 
 
 class SavesTests(unittest.TestCase):
@@ -158,3 +161,97 @@ class PatchTests(unittest.TestCase):
     def test_native_save_support_is_not_patched(self):
         self.target.write_text(self.original + '\nsaveFilesToUserdata() { :; }\n')
         with self.assertRaises(ValueError): self.manage('install')
+
+
+class BootTests(unittest.TestCase):
+    def setUp(self):
+        PatchTests.setUp(self)
+        self.service_file = self.base / 'services/uwt_v41_savedir'
+        self.registry = {'other_service'}
+        self.fail_enable = False
+        original_run = subprocess.run
+        original_output = subprocess.check_output
+
+        def run(args, **kwargs):
+            if args[0] != 'services':
+                return original_run(args, **kwargs)
+            if args[1] == 'enable':
+                if self.fail_enable:
+                    raise subprocess.CalledProcessError(1, args)
+                self.registry.add(args[2])
+            elif args[1] == 'disable':
+                self.registry.discard(args[2])
+            return subprocess.CompletedProcess(args, 0)
+
+        def output(args, **kwargs):
+            if args[0] == 'settings':
+                return ' '.join(sorted(self.registry))
+            return original_output(args, **kwargs)
+
+        self.mock_run = patch.object(subprocess, 'run', side_effect=run)
+        self.mock_output = patch.object(subprocess, 'check_output', side_effect=output)
+        self.mock_run.start(); self.addCleanup(self.mock_run.stop)
+        self.mock_output.start(); self.addCleanup(self.mock_output.stop)
+
+    def call(self, action):
+        service.persistent(action, self.target, self.state, self.release, self.version,
+                           self.service_file, self.helper.parent, 'services', 'settings')
+
+    def test_enable_reboot_and_disable_keep_other_services(self):
+        self.call('enable')
+        self.assertEqual(self.registry, {'other_service', service.SERVICE})
+        self.assertTrue((self.state / 'enabled').is_file())
+        self.assertIn(service.SERVICE_MARKER, self.service_file.read_text())
+        self.assertTrue((self.state / 'v41_savedir_service.py').is_file())
+        self.target.write_text(self.original)  # Simulate the OS resetting /usr on reboot.
+        self.call('boot')
+        self.assertEqual(self.target.read_text().count(patcher.MARKER), 2)
+        self.call('disable')
+        self.assertEqual(self.target.read_text(), self.original)
+        self.assertEqual(self.registry, {'other_service'})
+        self.assertFalse(self.service_file.exists())
+        self.assertFalse((self.state / 'enabled').exists())
+        self.call('boot')
+        self.assertEqual(self.target.read_text(), self.original)
+
+    def test_upgrade_to_v42_is_skipped_and_disable_preserves_new_launcher(self):
+        self.call('enable')
+        self.version.write_text('42 2026/01/01')
+        self.target.write_text('#!/bin/bash\n# native v42 launcher\n')
+        self.call('boot')
+        self.assertEqual(self.target.read_text(), '#!/bin/bash\n# native v42 launcher\n')
+        self.call('disable')
+        self.assertEqual(self.target.read_text(), '#!/bin/bash\n# native v42 launcher\n')
+        self.assertFalse((self.state / 'state.json').exists())
+
+    def test_foreign_service_collision_is_preserved(self):
+        self.service_file.parent.mkdir()
+        self.service_file.write_text('another service')
+        with self.assertRaises(ValueError): self.call('enable')
+        self.assertEqual(self.target.read_text(), self.original)
+        self.assertEqual(self.service_file.read_text(), 'another service')
+
+    def test_registry_failure_rolls_back_new_activation(self):
+        self.fail_enable = True
+        with self.assertRaises(subprocess.CalledProcessError): self.call('enable')
+        self.assertEqual(self.target.read_text(), self.original)
+        self.assertEqual(self.registry, {'other_service'})
+        self.assertFalse(self.service_file.exists())
+        self.assertFalse((self.state / 'enabled').exists())
+
+    def test_changed_launcher_blocks_restore_but_disables_boot(self):
+        self.call('enable')
+        self.target.write_text(self.target.read_text() + '# other edit\n')
+        with self.assertRaises(ValueError): self.call('disable')
+        self.assertNotIn(service.SERVICE, self.registry)
+        self.assertFalse((self.state / 'enabled').exists())
+        self.assertTrue(self.target.read_text().endswith('# other edit\n'))
+        self.assertTrue((self.state / 'original.sh').exists())
+
+    def test_refresh_only_updates_previously_enabled_installations(self):
+        self.call('refresh')
+        self.assertEqual(self.target.read_text(), self.original)
+        self.call('enable')
+        self.call('refresh')
+        self.assertTrue((self.state / 'enabled').is_file())
+        self.assertIn(service.SERVICE, self.registry)
