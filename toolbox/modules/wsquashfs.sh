@@ -726,11 +726,25 @@ wsq_browse_save() {
         wsq_browse_save_terminal
         return $?
     fi
-    local selected validated rc
+    local selected validated rc screen_width="" screen_height="" resolution
+    local browser_width=1000 browser_height=700
+    # Prefer the active Wayland output; fall back to X11 screen geometry.
+    if command -v wlr-randr >/dev/null 2>&1; then
+        resolution="$(wlr-randr 2>/dev/null | awk '/current/ && match($0, /[0-9]+x[0-9]+/) { print substr($0, RSTART, RLENGTH); exit }')"
+    fi
+    if [ -z "${resolution:-}" ] && command -v xdpyinfo >/dev/null 2>&1; then
+        resolution="$(xdpyinfo 2>/dev/null | awk '/dimensions:/ {print $2; exit}')"
+    fi
+    if [[ "${resolution:-}" =~ ^([0-9]+)x([0-9]+)$ ]]; then
+        screen_width="${BASH_REMATCH[1]}"
+        screen_height="${BASH_REMATCH[2]}"
+        ((screen_width > 100)) && ((browser_width > screen_width - 80)) && browser_width=$((screen_width - 80))
+        ((screen_height > 100)) && ((browser_height > screen_height - 80)) && browser_height=$((screen_height - 80))
+    fi
     while true; do
         selected="$(DISPLAY="${DISPLAY:-:0}" LANGUAGE="$WT_LANGUAGE" yad \
             --file-selection --directory --filename="$prefix/" \
-            --title="$(i18n wsq_browser_title)" --width=1000 --height=700)"
+            --title="$(i18n wsq_browser_title)" --width="$browser_width" --height="$browser_height")"
         rc=$?
         case "$rc" in
             0) ;;
