@@ -60,8 +60,8 @@ def prepare(prefix):
         private_file(path)
 
 
-def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine')):
-    if not verbs or any(not re.fullmatch(r'[a-z][a-z0-9_]*', v) for v in verbs):
+def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command=False):
+    if not verbs or (not wine_command and any(not re.fullmatch(r'[a-z][a-z0-9_]*', v) for v in verbs)):
         raise ValueError('Use Winetricks component names, without options or shell commands')
     source = launcher.read_text()
     call = '            trick_wine "${l_PREFIX}" "$@"'
@@ -70,11 +70,14 @@ def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine')):
     # The stock CLI unsets l_PREFIX after Winetricks, losing its exit code.
     # Keep Batocera's setup and cleanup in a temporary copy and return the
     # actual installer result. Never change /usr/bin/batocera-wine.
+    action = ('            WINEPOINT="${l_PREFIX}"\n'
+              '            WINEPREFIX="${l_PREFIX}" ${CMD_PREFIX:-} "${WINE}" "$@"'
+              if wine_command else call)
     source = source.replace(call,
         '            if [ -x "${DIR}/${WINE_VERSION}/bin/wine" ]; then\n'
         '                export WINE="${DIR}/${WINE_VERSION}/bin/wine"\n'
         '                export WINESERVER="${DIR}/${WINE_VERSION}/bin/wineserver"\n'
-        '            fi\n' + call + '\n'
+        '            fi\n' + action + '\n'
         '            UWT_TRICKS_RC=$?\n'
         '            waitWineServer 0\n'
         '            cleanAndExit "$UWT_TRICKS_RC"\n'
@@ -86,8 +89,9 @@ def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine')):
         env = dict(os.environ, WINE='wine', WINESERVER='wineserver')
         # Exported Wine variables retain their export flag when init_wine()
         # replaces them with the selected runner's executable paths.
+        args = verbs if wine_command else ['-q', *verbs]
         return subprocess.run(['bash', str(wrapper), 'windows', 'tricks',
-                               str(prefix), '-q', *verbs], env=env).returncode
+                               str(prefix), *args], env=env).returncode
 
 
 def main():

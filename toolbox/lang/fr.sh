@@ -1,5 +1,15 @@
 #!/bin/bash
 declare -gA I18N=(
+  [dotnet_title]=".NET : Wine Mono / Microsoft"
+  [dotnet_intro]="Wine Mono remplace une partie de .NET Framework, pas .NET 6/8. Batocera et certains runners fournissent déjà un Mono partagé. Les opérations concernent uniquement ce préfixe de travail."
+  [dotnet_mono]="Installer / mettre à jour Wine Mono (dernière version stable)"
+  [dotnet_microsoft]="Remplacer Wine Mono par Microsoft .NET Framework 4.8"
+  [doc_dotnet]=".NET : Mono, framework Microsoft et runtimes modernes"
+  [dotnet_confirm]="%s ?\n\nRunner : %s\nCopie de sécurité : %s\n\nLe jeu doit être fermé. La copie exclut les fichiers du jeu ; elle conserve le reste du préfixe et les liens de sauvegardes sans suivre leurs cibles. Aucun fichier système Batocera ou runner n’est remplacé.\n\nAvec Proton/UMU, le runner peut réappliquer sa version Mono. Un Mono récent peut nécessiter un Wine récent. Ne changez que si le jeu en a besoin."
+  [dotnet_wait]="Préparation de .NET : téléchargement vérifié, copie du préfixe puis installation. Cela peut prendre plusieurs minutes."
+  [dotnet_failed]="L’opération .NET a échoué ou a été refusée. Aucune restauration automatique : la copie de sécurité reste disponible si elle a été créée.\n\nJournal : %s\n\n%s"
+  [dotnet_done]="Opération terminée. Consultez le diagnostic actualisé puis relancez le jeu pour valider. Le chemin de la copie de sécurité figure dans le journal :\n%s"
+  [dotnet_manual]="Utilisez le menu .NET pour installer dotnet48 avec diagnostic et copie de sécurité."
   [menu_documentation]="Documentation"
   [doc_intro]="Guides d’utilisation de la Toolbox. Sélectionnez une rubrique ; les textes peuvent être parcourus avec les touches de défilement."
   [doc_missing]="Le guide demandé est absent de cette installation. Réinstallez la Toolbox pour le récupérer."

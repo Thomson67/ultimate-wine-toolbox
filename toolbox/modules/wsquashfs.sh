@@ -8,6 +8,7 @@ WSQ_HELPER="$WT_ROOT/helpers/wsquashfs_builder.py"
 WSQ_SAVE_ROOT="/userdata/saves/windows"
 WSQ_CONF="/userdata/system/batocera.conf"
 source "$WT_ROOT/modules/wsquashfs-update.sh"
+source "$WT_ROOT/modules/wsquashfs-dotnet.sh"
 
 wsq_list_templates() {
     [ -d "$WSQ_TEMPLATES_DIR" ] || return 0
@@ -1303,11 +1304,12 @@ wsq_install_extra_winetricks() {
     fi
     choice="$(menu_select "$(i18n wsq_winetricks_title)" "$(i18n wsq_winetricks_intro)" \
         common "$(i18n wsq_winetricks_common)" manual "$(i18n wsq_winetricks_manual)" \
+        dotnet "$(i18n dotnet_title)" \
         back "$(i18n back)")" || return 1
     case "$choice" in
         common)
             for verb in vcrun2022 vcrun2019 vcrun2015 vcrun2013 vcrun2012 vcrun2010 \
-                vcrun2008 vcrun2005 d3dcompiler_47 d3dcompiler_43 d3dx9 xact corefonts dotnet48; do
+                vcrun2008 vcrun2005 d3dcompiler_47 d3dcompiler_43 d3dx9 xact corefonts; do
                 items+=("$verb" "$(i18n "wsq_winetricks_$verb")" off)
             done
             selected="$(checklist_select "$(i18n wsq_winetricks_title)" \
@@ -1315,6 +1317,7 @@ wsq_install_extra_winetricks() {
             while IFS= read -r verb; do
                 [ -z "$verb" ] || verbs+=("$verb")
             done <<< "$selected" ;;
+        dotnet) wsq_dotnet_menu; return $? ;;
         manual)
             selected="$(input_text "$(i18n wsq_winetricks_title)" \
                 "$(i18n wsq_winetricks_manual_prompt)" "")" || return 1
@@ -1329,6 +1332,14 @@ wsq_install_extra_winetricks() {
         }
     done
     pretty="${verbs[*]}"
+    # Keep .NET replacement on the diagnosed, backed-up path even when typed
+    # manually. Other manual Winetricks components retain their usual handling.
+    for verb in "${verbs[@]}"; do
+        if [ "$verb" = dotnet48 ]; then
+            msgbox "$(i18n dotnet_title)" "$(i18n dotnet_manual)"
+            return 1
+        fi
+    done
     runner_label="$runner"
     [ "$runner" != __SYSTEM__ ] || runner_label="$(i18n wsq_runner_system)"
     yesno_default_no "$(i18n wsq_winetricks_title)" \
@@ -1357,6 +1368,7 @@ wsq_launch_failure_menu() {
             "runner" "$(i18n wsq_launch_runner)" \
             "executable" "$(i18n wsq_launch_executable_review)" \
             "${extra[@]}" \
+            "dotnet" "$(i18n dotnet_title)" \
             "retry" "$(i18n wsq_launch_retry)" \
             "options" "$(i18n wsq_options_title)" \
             "cancel" "$(i18n wsq_launch_cancel)")" || return 1
@@ -1367,6 +1379,7 @@ wsq_launch_failure_menu() {
                     wsq_retry_pending
                     return 1
                 fi ;;
+            dotnet) wsq_dotnet_menu ;;
             runner)
                 new_runner="$(wsq_select_runner)" || continue
                 wsq_set_runner_config "$(basename "$prefix")" "$new_runner" || {
@@ -1411,6 +1424,7 @@ wsq_review_launch() {
             "no" "$(i18n wsq_game_no)" \
             "executable" "$(i18n wsq_launch_executable_review)" \
             "hidraw" "$(i18n wsq_hidraw_retry)" \
+            "dotnet" "$(i18n dotnet_title)" \
             "options" "$(i18n wsq_options_title)" \
             "cancel" "$(i18n wsq_launch_cancel)")" || return 1
         case "$choice" in
@@ -1424,6 +1438,7 @@ wsq_review_launch() {
                 wsq_apply_executable_selection "$new_exe" || continue
                 wsq_retry_pending
                 return 1 ;;
+            dotnet) wsq_dotnet_menu ;;
             hidraw)
                 wsq_game_option set enable_hidraw 1 || {
                     msgbox "$(i18n wsq_launch_title)" "$(i18n wsq_runner_config_failed)"

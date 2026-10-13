@@ -1,0 +1,25 @@
+.NET : WINE MONO OU MICROSOFT
+
+Wine Mono est une alternative à .NET Framework jusqu’à 4.8.1. Il ne remplace pas .NET 6, 8 et les runtimes modernes. Il peut suffire à certains launchers, configurateurs et jeux ; d’autres demandent le framework Microsoft.
+
+BATOCERA FOURNIT DÉJÀ MONO
+
+Batocera v41 fournit un runtime partagé avec Wine TKG (sources : Mono 9.3.0). Batocera v43.1 fournit un runtime partagé sous /usr/share/wine (sources : Mono 10.4.0). Les versions modifiées et les runners personnalisés peuvent différer. La présence d’un dossier partagé ne prouve pas que le préfixe l’utilise. Wine peut aussi enregistrer Mono dans le préfixe.
+
+Le diagnostic distingue Mono, indices de .NET Microsoft, état mixte, traces non identifiées et absence de composants identifiés. Une clé NDP ou un numéro Release ne suffit pas à identifier Microsoft : Mono peut créer ces mêmes clés. La détection n’est pas un test d’exécution.
+
+DANS LE WORKFLOW
+
+Après l’essai du jeu, ouvrir .NET dans le menu de résultat (création ou mise à jour). En création, cette option est aussi accessible dans les composants Winetricks.
+
+Installer / mettre à jour Mono télécharge le MSI stable officiel avec vérification SHA-256 et l’installe uniquement dans le préfixe de travail. Le paquet x86 couvre aussi x86-64. Cela ne met pas à jour le Mono partagé de Batocera.
+
+Remplacer Mono par .NET Framework 4.8 utilise Winetricks remove_mono puis dotnet48 avec le runner choisi. Les états mixtes ou incertains sont refusés plutôt que forcés. Si Microsoft est déjà identifié, la Toolbox ne le réinstalle pas automatiquement. L’installation peut échouer selon le runner et l’architecture du préfixe ; consulter le journal.
+
+Avec Proton/UMU, le runner peut réappliquer sa propre version Mono. Préférer sa version fournie sauf besoin confirmé, puis tester un deuxième lancement. La dernière version Mono n’est pas forcément adaptée à un ancien runner.
+
+COPIES DE SÉCURITÉ
+
+Avant installation, une copie du préfixe est conservée dans backups/dotnet sous le dossier de la Toolbox. Le dossier principal du jeu identifié via autorun est exclu ; les liens sont copiés sans suivre les cibles, notamment les sauvegardes externes. L’archive source reste intacte. Ne supprimez pas le dossier du jeu pour restaurer cette copie : elle ne le contient pas. Le journal indique le chemin exact de la copie. En cas d’échec, aucune restauration automatique n’est effectuée.
+
+La fonction reste expérimentale tant que l’installation, la relance et la conservation dans l’archive n’ont pas été validées sur Batocera.

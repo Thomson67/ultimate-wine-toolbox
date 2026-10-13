@@ -78,6 +78,33 @@ exit "${TEST_EXIT:-0}"
             wtr.install(self.prefix, ['vcrun2022'], launcher)
         self.assertTrue(self.dll.is_symlink())
 
+    def test_msi_uses_selected_runner_prefix_and_literal_arguments(self):
+        runner = self.base / 'runner with spaces'
+        (runner / 'bin').mkdir(parents=True)
+        wine = runner / 'bin/wine'
+        wine.write_text('''#!/bin/bash
+[ "$WINEPREFIX" = "$TEST_PREFIX" ] || exit 71
+[ "$1" = msiexec ] && [ "$2" = /i ] && [ "$3" = 'Z:\\cache path\\mono.msi' ] || exit 72
+exit 9
+''')
+        wine.chmod(0o755)
+        launcher = self.base / 'batocera-wine'
+        source = '''#!/bin/bash
+WINE="$TEST_RUNNER/bin/wine"
+WINESERVER="$TEST_RUNNER/bin/wineserver"
+waitWineServer() { [ "$WINEPOINT" = "$TEST_PREFIX" ] || exit 73; }
+cleanAndExit() { return 0; }
+l_PREFIX="$3"
+shift 3
+if [ "$#" -gt 0 ]; then
+            trick_wine "${l_PREFIX}" "$@"
+fi
+'''
+        launcher.write_text(source)
+        with patch.dict(os.environ, TEST_RUNNER=str(runner), TEST_PREFIX=str(self.prefix)):
+            self.assertEqual(wtr.install(self.prefix, ['msiexec', '/i', 'Z:\\cache path\\mono.msi'], launcher, wine_command=True), 9)
+        self.assertEqual(launcher.read_text(), source)
+
     def test_external_windows_directory_is_refused(self):
         (self.prefix / 'drive_c/windows/fonts').symlink_to(self.saves)
         with self.assertRaises(ValueError):

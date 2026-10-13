@@ -206,3 +206,7 @@ DLLs present only in `drive_c/ProgramData/ReShade` are global resources and do n
 Disabling a bundled installation journals and backs up the original proxy DLL, then prevents loading it from the game folder. WSquashFS uses an OverlayFS whiteout in the per-game bottle without changing the archive. Wine/DXVK keeps using its regular system library. Enabling restores the exact DLL or removes its whiteout. **Restore original management** releases toolbox control. Presets, shaders and autorun remain unchanged; the setting is reapplied on subsequent launches and recreated bottles.
 
 Nonstandard DLL names/loaders are listed without automatic control. WSquashFS masking requires Batocera's OverlayFS launcher and whiteout creation on the bottle filesystem; failure preserves the existing DLL. DLLs changed by another tool are never overwritten during recovery: the journal is retained and an error reported. Toolbox removal restores bundled installations it controlled.
+
+## .NET workflow (experimental)
+
+The test workflow distinguishes shared Batocera/runner Wine Mono from prefix installations, supports a verified latest stable Mono MSI or replacement with Microsoft .NET Framework 4.8, and backs up the working prefix before changing it. The game directory is excluded from the backup. Mixed or unidentified .NET states are refused. See the new offline .NET guide; validate installation and a second game launch before archive finalization.

@@ -1,0 +1,25 @@
+.NET: WINE MONO OR MICROSOFT
+
+Wine Mono is an alternative to .NET Framework up to 4.8.1. It does not replace modern .NET runtimes such as .NET 6 or 8. It may satisfy launchers, configuration tools and games; some applications need Microsoft’s framework.
+
+BATOCERA ALREADY PROVIDES MONO
+
+Batocera v41 sources package shared Mono 9.3.0 with Wine TKG. v43.1 sources package shared Mono 10.4.0 under /usr/share/wine. Custom builds and runners may differ. A shared directory does not prove that the prefix uses it. Wine may also register Mono inside the prefix.
+
+Diagnostics distinguish Mono, Microsoft .NET evidence, mixed state, unidentified traces and no identified components. An NDP Release value alone cannot identify Microsoft: Mono may create the same keys. Detection is not an execution test.
+
+WORKFLOW
+
+After testing the game, open .NET from the result menu (creation or update). In creation it is also available from Winetricks components.
+
+Install / update Mono downloads the official stable MSI, verifies its SHA-256, and installs only inside the working prefix. The x86 package also supports x86-64. It does not update Batocera’s shared runtime.
+
+Replace Mono with .NET Framework 4.8 uses Winetricks remove_mono followed by dotnet48 through the selected runner. Mixed or uncertain states are refused, not forced. Already identified Microsoft installations are not automatically reinstalled. Compatibility depends on the runner and prefix architecture; inspect the log on failure.
+
+Proton/UMU may reapply its own Mono version. Prefer bundled Mono unless a game has a confirmed need, then test a second launch. Latest Mono may not suit an older runner.
+
+SAFETY COPIES
+
+Before installation, a prefix copy is stored under the Toolbox’s backups/dotnet directory. The main game directory identified from autorun is excluded; symlinks are copied without following targets, including external saves. The source archive remains intact. Do not delete the game directory when restoring: the copy does not contain it. The log records the exact backup path. There is no automatic rollback on failure.
+
+Experimental until installation, relaunch and archive persistence have been validated on Batocera.
