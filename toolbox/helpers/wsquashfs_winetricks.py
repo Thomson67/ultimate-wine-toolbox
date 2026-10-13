@@ -72,7 +72,7 @@ def prepare(prefix, detach=True):
             private_file(path)
 
 
-def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command=False):
+def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command=False, native_runner=False):
     if not verbs or (not wine_command and any(not re.fullmatch(r'[a-z][a-z0-9_]*', v) for v in verbs)):
         raise ValueError('Use Winetricks component names, without options or shell commands')
     source = launcher.read_text()
@@ -85,11 +85,30 @@ def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command
     action = ('            WINEPOINT="${l_PREFIX}"\n'
               '            WINEPREFIX="${l_PREFIX}" ${CMD_PREFIX:-} "${WINE}" "$@"'
               if wine_command else call)
+    # A .NET setup EXE is an installer, not an UMU game. Winetricks must use
+    # one Wine engine/prefix for regedit, winecfg, setup EXEs and wineserver.
+    # Windows DLL links have already been detached by prepare() below.
+    native_setup = '''
+            UWT_NATIVE_ROOT="$(dirname "$(dirname "$WINE")")"
+            if [ -f "$UWT_NATIVE_ROOT/umu-batocera/umu-root-runner.py" ]; then
+                if [ ! -x "$UWT_NATIVE_ROOT/files/bin/wine" ] || [ ! -x "$UWT_NATIVE_ROOT/files/bin/wineserver" ]; then
+                    echo "UWT: selected UMU runner has no usable native Wine engine" >&2
+                    exit 1
+                fi
+                export WINE="$UWT_NATIVE_ROOT/files/bin/wine"
+                export WINESERVER="$UWT_NATIVE_ROOT/files/bin/wineserver"
+                export WINE64="$WINE"
+                [ ! -x "$UWT_NATIVE_ROOT/files/bin/wine64" ] || export WINE64="$UWT_NATIVE_ROOT/files/bin/wine64"
+                export WINELOADER="$WINE"
+                export PATH="$UWT_NATIVE_ROOT/files/bin:$PATH"
+                echo "dotnet_runner_mode=native wine=$WINE wine64=$WINE64 wineserver=$WINESERVER"
+            fi
+''' if native_runner else ''
     source = source.replace(call,
         '            if [ -x "${DIR}/${WINE_VERSION}/bin/wine" ]; then\n'
         '                export WINE="${DIR}/${WINE_VERSION}/bin/wine"\n'
         '                export WINESERVER="${DIR}/${WINE_VERSION}/bin/wineserver"\n'
-        '            fi\n' + action + '\n'
+        '            fi\n' + native_setup + action + '\n'
         '            UWT_TRICKS_RC=$?\n'
         '            waitWineServer 0\n'
         '            cleanAndExit "$UWT_TRICKS_RC"\n'

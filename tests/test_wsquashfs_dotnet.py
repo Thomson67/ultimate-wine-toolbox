@@ -113,7 +113,8 @@ class DotnetTests(unittest.TestCase):
 
     def test_microsoft_removes_mono_then_installs_and_checks_postcondition(self):
         self.set_registry(entry('Wine Mono Runtime'))
-        def installer(prefix, verbs):
+        def installer(prefix, verbs, native_runner=False):
+            self.assertTrue(native_runner)
             self.assertEqual(verbs, ['remove_mono', 'dotnet48'])
             (prefix / 'drive_c/windows/dotnet48.installed.workaround').touch()
             (prefix / 'system.reg').write_text(entry('Microsoft .NET Framework 4.8'))
@@ -125,7 +126,8 @@ class DotnetTests(unittest.TestCase):
     def test_installer_failure_keeps_snapshot(self):
         self.set_registry(entry('Wine Mono Runtime'))
         original = (self.prefix / 'system.reg').read_bytes()
-        def fail(staged, verbs):
+        def fail(staged, verbs, native_runner=False):
+            self.assertTrue(native_runner)
             self.assertNotEqual(staged, self.prefix)
             (staged / 'system.reg').write_text('partial installation')
             return 8
@@ -135,6 +137,17 @@ class DotnetTests(unittest.TestCase):
         self.assertEqual(len(list(self.backups.glob('dotnet-*'))), 1)
         self.assertEqual((self.prefix / 'system.reg').read_bytes(), original)
         self.assertEqual(len(list((self.base / 'local').glob('install-*'))), 1)
+
+    def test_dotnet40_alone_is_not_reported_as_successful_dotnet48(self):
+        self.set_registry(entry('Wine Mono Runtime'))
+        original = (self.prefix / 'system.reg').read_bytes()
+        def installer(staged, verbs, native_runner=False):
+            (staged / 'system.reg').write_text(entry('Microsoft .NET Framework 4 Client Profile', '4.0.30319'))
+            return 0
+        with patch.object(dotnet.tricks, 'prepare'), patch.object(dotnet.tricks, 'install', side_effect=installer):
+            with self.assertRaisesRegex(ValueError, 'incomplete'):
+                dotnet.change(self.prefix, 'microsoft', self.backups, self.cache)
+        self.assertEqual((self.prefix / 'system.reg').read_bytes(), original)
 
     def test_restore_snapshot_reverts_failed_attempt_preserving_game(self):
         self.set_registry(entry('Wine Mono Runtime', '9.3.0'))
@@ -173,7 +186,8 @@ class DotnetTests(unittest.TestCase):
         msi = self.base / 'cache with spaces/mono.msi'
         msi.parent.mkdir()
         msi.write_text('verified package')
-        def installer(prefix, args, wine_command=False):
+        def installer(prefix, args, wine_command=False, native_runner=False):
+            self.assertTrue(native_runner)
             self.assertTrue(wine_command)
             self.assertEqual(args[:5], ['msiexec', '/i', '//?/unix' + str(msi), '/qn', '/norestart'])
             self.assertEqual(args[5:], ['/l*vx', r'C:\windows\temp\uwt-mono-install.log'])

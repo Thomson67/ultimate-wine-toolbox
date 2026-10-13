@@ -60,6 +60,7 @@ exit "${TEST_EXIT:-0}"
         with patch.dict(os.environ, TEST_RUNNER=str(self.base / 'Selected-UMU'),
                         TEST_PREFIX=str(self.prefix), TEST_TRICKS=str(tricks)):
             self.assertEqual(wtr.install(self.prefix, ['vcrun2022'], launcher), 0)
+            self.assertEqual(wtr.install(self.prefix, ['vcrun2022'], launcher, native_runner=True), 0)
             with patch.dict(os.environ, TEST_EXIT='9'):
                 self.assertEqual(wtr.install(self.prefix, ['vcrun2022'], launcher), 9)
         self.assertEqual(launcher.read_text(), source)
@@ -77,6 +78,62 @@ exit "${TEST_EXIT:-0}"
         with self.assertRaises(ValueError):
             wtr.install(self.prefix, ['vcrun2022'], launcher)
         self.assertTrue(self.dll.is_symlink())
+
+    def test_dotnet_uses_one_native_engine_for_all_umu_installer_tools(self):
+        for separate_wine64 in (True, False):
+            with self.subTest(separate_wine64=separate_wine64):
+                runner = self.base / ('UMU runner ' + str(separate_wine64))
+                (runner / 'bin').mkdir(parents=True)
+                (runner / 'files/bin').mkdir(parents=True)
+                (runner / 'umu-batocera').mkdir()
+                (runner / 'umu-batocera/umu-root-runner.py').touch()
+                for name in ('wine', 'wine64', 'wineserver'):
+                    wrapper = runner / 'bin' / name
+                    wrapper.write_text('#!/bin/bash\nexit 88\n')
+                    wrapper.chmod(0o755)
+                    if name == 'wine64' and not separate_wine64:
+                        continue
+                    native = runner / 'files/bin' / name
+                    native.write_text('''#!/bin/bash
+[ "$WINEPREFIX" = "$TEST_PREFIX" ] || exit 71
+[ "$WINELOADER" = "$TEST_RUNNER/files/bin/wine" ] || exit 72
+printf '%s|%s\\n' "${0##*/}" "$*" >> "$TEST_CALLS"
+''')
+                    native.chmod(0o755)
+                launcher = self.base / 'native-launcher'
+                launcher.write_text('''#!/bin/bash
+WINE="$TEST_RUNNER/bin/wine"
+WINE64="$TEST_RUNNER/bin/wine64"
+WINESERVER="$TEST_RUNNER/bin/wineserver"
+waitWineServer() { WINEPREFIX="$TEST_PREFIX" "$WINESERVER" -w; }
+cleanAndExit() { return 0; }
+trick_wine() { local target="$1"; shift; WINEPREFIX="$target" "$TEST_TRICKS" "$@"; }
+l_PREFIX="$3"
+shift 3
+            trick_wine "${l_PREFIX}" "$@"
+''')
+                fake = self.base / 'fake-dotnet-tricks'
+                fake.write_text('''#!/bin/bash
+set -e
+"$WINE" regedit.exe /S registry.reg
+"$WINE" winecfg -v win7
+"$WINE" ndp48-x86-x64-allos-enu.exe /q
+"$WINE64" msiexec.exe /i package.msi
+"$WINESERVER" -w
+exit 9
+''')
+                fake.chmod(0o755)
+                calls = self.base / ('native-calls-' + str(separate_wine64))
+                with patch.dict(os.environ, TEST_RUNNER=str(runner), TEST_PREFIX=str(self.prefix),
+                                TEST_TRICKS=str(fake), TEST_CALLS=str(calls)):
+                    self.assertEqual(wtr.install(self.prefix, ['remove_mono', 'dotnet48'], launcher, native_runner=True), 9)
+                lines = calls.read_text().splitlines()
+                self.assertIn('wine|regedit.exe /S registry.reg', lines)
+                self.assertIn('wine|winecfg -v win7', lines)
+                self.assertIn('wine|ndp48-x86-x64-allos-enu.exe /q', lines)
+                expected64 = 'wine64' if separate_wine64 else 'wine'
+                self.assertIn(expected64 + '|msiexec.exe /i package.msi', lines)
+                self.assertEqual(lines.count('wineserver|-w'), 2)
 
     def test_msi_uses_selected_runner_prefix_and_literal_arguments(self):
         runner = self.base / 'runner with spaces'

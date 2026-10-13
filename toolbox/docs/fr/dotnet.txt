@@ -33,3 +33,7 @@ Les métadonnées .REPARSE_POINT de TKG sont préservées sans être parcourues 
 Le résultat n’est transféré au préfixe de travail qu’après réussite et vérification. Une erreur d’installation laisse le préfixe initial en place et conserve la copie locale pour analyser ses journaux. Le MSI Mono écrit aussi windows/temp/uwt-mono-install.log dans cette copie. Une erreur pendant le transfert déclenche le retour des entrées déjà remplacées ; si ce retour échoue, le journal indique les fichiers de récupération conservés. Prévoir l’espace pour la sauvegarde, la copie locale et le transfert.
 
 Le bouton Restaurer une copie de sécurité permet de repartir d’un état antérieur. Les copies sont classées de la plus ancienne à la plus récente : après plusieurs installations incomplètes, choisir une copie antérieure au premier essai. Le dossier du jeu et les cibles de sauvegardes externes restent en place ; les autres fichiers du préfixe reviennent à la date choisie. L’état courant est copié avant restauration.
+
+RUNNERS UMU
+
+Les opérations .NET utilisent directement le moteur Wine fourni par le runner sélectionné, y compris pour les installateurs EXE. Elles ne lancent pas ces installateurs comme des jeux UMU/Proton : regedit, winecfg, les EXE et wineserver doivent rester sur le même moteur et le même préfixe local. Le lancement habituel du jeu reste géré par UMU. La réussite exige aussi le marqueur Winetricks dotnet48 : la seule présence de .NET 4.0 ne suffit pas.

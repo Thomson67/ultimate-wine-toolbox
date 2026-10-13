@@ -33,3 +33,7 @@ TKG .REPARSE_POINT metadata is preserved without traversal or dereferencing. Its
 Only a successful, verified result is transferred to the working prefix. Installer failure preserves the original prefix and retains the local copy for log inspection. Mono MSI also writes windows/temp/uwt-mono-install.log inside that copy. Transfer errors roll back previously replaced entries; if rollback fails, recovery files are retained and their location is logged. Allow space for the backup, local copy and transfer.
 
 Restore a safety copy returns to an earlier state. Copies are sorted oldest first: after multiple incomplete installations, choose one predating the first attempt. Game files and external save targets stay in place; other prefix files revert to the selected date. The current state is backed up before restoring.
+
+UMU RUNNERS
+
+.NET operations use the selected runner’s underlying Wine engine directly, including setup EXEs. They do not launch these installers as UMU/Proton games: regedit, winecfg, setup EXEs and wineserver must share one engine and local prefix. Normal game launches still use UMU. Success also requires the Winetricks dotnet48 marker; .NET 4.0 alone is insufficient.
