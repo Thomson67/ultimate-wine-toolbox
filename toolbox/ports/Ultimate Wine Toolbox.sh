@@ -53,6 +53,25 @@ export LANGUAGE="$WT_UTF8_LOCALE"
     echo "launcher=$LAUNCHER"
 } >>"$BOOT_LOG" 2>&1
 
+# Configurable terminal profile. Changes apply on the next Ports launch.
+WT_DISPLAY_MODE_FILE="/userdata/system/ultimate-wine-toolbox/config/display-mode"
+WT_FONT_SIZE_FILE="/userdata/system/ultimate-wine-toolbox/config/font-size"
+WT_FONT_SIZE=11
+WT_GEOMETRY="120x36"
+WT_FULLSCREEN=0
+case "$(head -n 1 "$WT_DISPLAY_MODE_FILE" 2>/dev/null)" in
+    handheld) WT_FONT_SIZE=16; WT_GEOMETRY="88x28" ;; # Legacy preset
+    fullscreen) WT_FULLSCREEN=1 ;;
+esac
+# Independent font preference overrides legacy handheld setting.
+case "$(head -n 1 "$WT_FONT_SIZE_FILE" 2>/dev/null)" in
+    11|13|16|18|20) WT_FONT_SIZE="$(head -n 1 "$WT_FONT_SIZE_FILE")" ;;
+esac
+WT_XTERM_DISPLAY_ARGS=(-geometry "$WT_GEOMETRY")
+if [ "$WT_FULLSCREEN" -eq 1 ]; then
+    WT_XTERM_DISPLAY_ARGS=(-fullscreen)
+fi
+
 if [ ! -x /usr/bin/xterm ]; then
     echo "ERROR: /usr/bin/xterm missing or not executable." >>"$BOOT_LOG"
     exit 1
@@ -81,9 +100,9 @@ else
             +lc \
             -u8 \
             -fa "DejaVu Sans Mono" \
-            -fs 10 \
+            -fs "$WT_FONT_SIZE" \
             -title "Ultimate Wine Toolbox" \
-            -geometry 120x36 \
+            "${WT_XTERM_DISPLAY_ARGS[@]}" \
             -e /bin/bash "$LAUNCHER" \
             >>"$BOOT_LOG" 2>&1
     else
@@ -91,9 +110,9 @@ else
             +lc \
             -u8 \
             -fa "DejaVu Sans Mono" \
-            -fs 10 \
+            -fs "$WT_FONT_SIZE" \
             -title "Ultimate Wine Toolbox" \
-            -geometry 120x36 \
+            "${WT_XTERM_DISPLAY_ARGS[@]}" \
             -e /bin/bash "$LAUNCHER" \
             >>"$BOOT_LOG" 2>&1
     fi
@@ -270,9 +289,9 @@ resume_wsquashfs_toolbox() {
         +lc \
         -u8 \
         -fa "DejaVu Sans Mono" \
-        -fs 10 \
+        -fs "$WT_FONT_SIZE" \
         -title "Ultimate Wine Toolbox" \
-        -geometry 120x36 \
+        "${WT_XTERM_DISPLAY_ARGS[@]}" \
         -e /bin/bash "$LAUNCHER" \
         >>"$BOOT_LOG" 2>&1
 
