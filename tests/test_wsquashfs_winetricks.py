@@ -79,6 +79,63 @@ exit "${TEST_EXIT:-0}"
             wtr.install(self.prefix, ['vcrun2022'], launcher)
         self.assertTrue(self.dll.is_symlink())
 
+    def test_interactive_install_has_no_quiet_flag_or_inherited_unattended_mode(self):
+        launcher = self.base / 'interactive-launcher'
+        launcher.write_text('''#!/bin/bash
+waitWineServer() { :; }
+cleanAndExit() { return 0; }
+trick_wine() { shift; "$TEST_TRICKS" "$@"; }
+l_PREFIX="$3"
+shift 3
+            trick_wine "${l_PREFIX}" "$@"
+''')
+        fake = self.base / 'interactive-tricks'
+        fake.write_text('''#!/bin/bash
+[ "${W_OPT_UNATTENDED-unset}" = unset ] || exit 71
+[ "$#" = 2 ] && [ "$1" = remove_mono ] && [ "$2" = dotnet48 ] || exit 72
+''')
+        fake.chmod(0o755)
+        with patch.dict(os.environ, TEST_TRICKS=str(fake), W_OPT_UNATTENDED='1'), \
+             patch.object(wtr.shutil, 'which', return_value=None):
+            self.assertEqual(wtr.install(self.prefix, ['remove_mono', 'dotnet48'], launcher, unattended=False), 0)
+
+    def test_installer_soft_file_limit_never_lowers_or_changes_hard_limit(self):
+        for current, hard, expected in ((1024, 1048576, 65536), (1024, 4096, 4096),
+                                        (1048576, 1048576, None),
+                                        (1024, wtr.resource.RLIM_INFINITY, 65536)):
+            with self.subTest(current=current, hard=hard):
+                with patch.object(wtr.resource, 'getrlimit', return_value=(current, hard)), \
+                     patch.object(wtr.resource, 'setrlimit') as setter:
+                    wtr.installer_file_limit()
+                    if expected is None:
+                        setter.assert_not_called()
+                    else:
+                        setter.assert_called_once_with(wtr.resource.RLIMIT_NOFILE, (expected, hard))
+
+    def test_install_dialogs_temporarily_leave_fullscreen_and_restore_after_failure(self):
+        binary = self.base / 'tools'
+        binary.mkdir()
+        capture = self.base / 'window-actions'
+        for name, source in [('xprop', 'echo "_NET_WM_STATE_FULLSCREEN"'),
+                             ('wmctrl', 'printf "%s\\n" "$*" >> "$TEST_WINDOW_ACTIONS"')]:
+            script = binary / name
+            script.write_text('#!/bin/bash\n' + source + '\n')
+            script.chmod(0o755)
+        command = '''source toolbox/modules/wsquashfs-dotnet.sh
+wt_clear_tty() { :; }
+installer() { echo INSTALLER-DIAGNOSTIC; return 7; }
+wsq_dotnet_run title body "$TEST_INSTALL_LOG" installer
+'''
+        result = subprocess.run(['bash', '-c', command], cwd=ROOT, capture_output=True, text=True,
+            env=dict(os.environ, PATH=str(binary) + ':' + os.environ['PATH'],
+                     WINDOWID='0x12345', TEST_WINDOW_ACTIONS=str(capture),
+                     TEST_INSTALL_LOG=str(self.base / 'installer.log')))
+        self.assertEqual(result.returncode, 7)
+        self.assertIn('INSTALLER-DIAGNOSTIC', result.stdout)
+        self.assertIn('INSTALLER-DIAGNOSTIC', (self.base / 'installer.log').read_text())
+        self.assertEqual(capture.read_text().splitlines(), [
+            '-i -r 0x12345 -b remove,fullscreen', '-i -r 0x12345 -b add,fullscreen'])
+
     def test_dotnet_uses_one_native_engine_for_all_umu_installer_tools(self):
         for separate_wine64 in (True, False):
             with self.subTest(separate_wine64=separate_wine64):

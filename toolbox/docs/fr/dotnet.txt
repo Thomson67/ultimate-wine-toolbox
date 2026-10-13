@@ -37,3 +37,9 @@ Le bouton Restaurer une copie de sécurité permet de repartir d’un état ant�
 RUNNERS UMU
 
 Les opérations .NET utilisent directement le moteur Wine fourni par le runner sélectionné, y compris pour les installateurs EXE. Elles ne lancent pas ces installateurs comme des jeux UMU/Proton : regedit, winecfg, les EXE et wineserver doivent rester sur le même moteur et le même préfixe local. Le lancement habituel du jeu reste géré par UMU. La réussite exige aussi le marqueur Winetricks dotnet48 : la seule présence de .NET 4.0 ne suffit pas.
+
+FENÊTRES PENDANT LES TESTS
+
+Les essais .NET sont interactifs : aucun -q Winetricks ni /qn MSI. Les fenêtres Wine Mono / Microsoft apparaissent et le terminal affiche le journal en direct. Valider les écrans de l’installateur, sans demander de redémarrage immédiat de Wine. Winetricks utilise zenity/kdialog pour ses questions si disponible, sinon le terminal reste accessible. Alt+Tab permet de retrouver une fenêtre derrière la toolbox. Le plein écran du terminal est temporairement retiré puis restauré si wmctrl et xprop sont disponibles ; les préférences ne sont pas modifiées.
+
+La limite souple de fichiers ouverts est relevée à 65536 pour le processus d’installation et ses enfants, seulement si elle est inférieure et si la limite dure le permet. La limite dure et les réglages système restent inchangés. Les valeurs précédentes et effectives sont journalisées. Cela traite une limite héritée trop basse ; cela ne garantit pas la compatibilité de .NET avec le runner.

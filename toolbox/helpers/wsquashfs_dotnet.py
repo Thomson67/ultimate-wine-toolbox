@@ -146,7 +146,7 @@ def change(prefix, action, backups, cache, work_root=None):
     try:
         tricks.prepare(staged)
         if action == 'microsoft':
-            rc = tricks.install(staged, ['remove_mono', 'dotnet48'], native_runner=True)
+            rc = tricks.install(staged, ['remove_mono', 'dotnet48'], native_runner=True, unattended=False)
             after = inspect(staged)
             print('dotnet_installed_state=' + json.dumps(after), flush=True)
             if rc or after['status'] != 'microsoft' or not after['dotnet48_marker']:
@@ -155,7 +155,7 @@ def change(prefix, action, backups, cache, work_root=None):
             # Wine's Unix namespace also works when sandboxing removed Z:.
             (staged / 'drive_c/windows/temp').mkdir(exist_ok=True)
             rc = tricks.install(staged, ['msiexec', '/i', '//?/unix' + str(package.resolve()),
-                '/qn', '/norestart', '/l*vx', 'C:\\windows\\temp\\uwt-mono-install.log'], wine_command=True, native_runner=True)
+                '/norestart', '/l*vx', 'C:\\windows\\temp\\uwt-mono-install.log'], wine_command=True, native_runner=True, unattended=False)
             after = inspect(staged)
             print('dotnet_installed_state=' + json.dumps(after), flush=True)
             if rc or not any(e.get('DisplayVersion') == version for e in after['mono']):

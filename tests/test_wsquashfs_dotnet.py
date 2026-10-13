@@ -113,8 +113,9 @@ class DotnetTests(unittest.TestCase):
 
     def test_microsoft_removes_mono_then_installs_and_checks_postcondition(self):
         self.set_registry(entry('Wine Mono Runtime'))
-        def installer(prefix, verbs, native_runner=False):
+        def installer(prefix, verbs, native_runner=False, unattended=True):
             self.assertTrue(native_runner)
+            self.assertFalse(unattended)
             self.assertEqual(verbs, ['remove_mono', 'dotnet48'])
             (prefix / 'drive_c/windows/dotnet48.installed.workaround').touch()
             (prefix / 'system.reg').write_text(entry('Microsoft .NET Framework 4.8'))
@@ -126,7 +127,7 @@ class DotnetTests(unittest.TestCase):
     def test_installer_failure_keeps_snapshot(self):
         self.set_registry(entry('Wine Mono Runtime'))
         original = (self.prefix / 'system.reg').read_bytes()
-        def fail(staged, verbs, native_runner=False):
+        def fail(staged, verbs, native_runner=False, unattended=True):
             self.assertTrue(native_runner)
             self.assertNotEqual(staged, self.prefix)
             (staged / 'system.reg').write_text('partial installation')
@@ -141,7 +142,7 @@ class DotnetTests(unittest.TestCase):
     def test_dotnet40_alone_is_not_reported_as_successful_dotnet48(self):
         self.set_registry(entry('Wine Mono Runtime'))
         original = (self.prefix / 'system.reg').read_bytes()
-        def installer(staged, verbs, native_runner=False):
+        def installer(staged, verbs, native_runner=False, unattended=True):
             (staged / 'system.reg').write_text(entry('Microsoft .NET Framework 4 Client Profile', '4.0.30319'))
             return 0
         with patch.object(dotnet.tricks, 'prepare'), patch.object(dotnet.tricks, 'install', side_effect=installer):
@@ -186,11 +187,12 @@ class DotnetTests(unittest.TestCase):
         msi = self.base / 'cache with spaces/mono.msi'
         msi.parent.mkdir()
         msi.write_text('verified package')
-        def installer(prefix, args, wine_command=False, native_runner=False):
+        def installer(prefix, args, wine_command=False, native_runner=False, unattended=True):
             self.assertTrue(native_runner)
+            self.assertFalse(unattended)
             self.assertTrue(wine_command)
-            self.assertEqual(args[:5], ['msiexec', '/i', '//?/unix' + str(msi), '/qn', '/norestart'])
-            self.assertEqual(args[5:], ['/l*vx', r'C:\windows\temp\uwt-mono-install.log'])
+            self.assertEqual(args[:4], ['msiexec', '/i', '//?/unix' + str(msi), '/norestart'])
+            self.assertEqual(args[4:], ['/l*vx', r'C:\windows\temp\uwt-mono-install.log'])
             (prefix / 'system.reg').write_text(entry('Wine Mono Runtime', '11.3.0'))
             return 0
         with patch.object(dotnet, 'fetch_mono', return_value=('11.3.0', msi)), patch.object(dotnet.tricks, 'prepare'), patch.object(dotnet.tricks, 'install', side_effect=installer):

@@ -4,6 +4,7 @@ import argparse
 import os
 from pathlib import Path
 import re
+import resource
 import shutil
 import subprocess
 import tempfile
@@ -72,7 +73,20 @@ def prepare(prefix, detach=True):
             private_file(path)
 
 
-def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command=False, native_runner=False):
+def installer_file_limit():
+    """Raise this helper's inherited soft limit, never the system/hard limit."""
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    target = 65536 if hard == resource.RLIM_INFINITY else min(65536, hard)
+    if soft != resource.RLIM_INFINITY and soft < target:
+        try:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+        except (OSError, ValueError) as error:
+            print(f'dotnet_nofile_raise_failed={error}', flush=True)
+    current, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    print(f'dotnet_nofile_soft={current} hard={hard} previous_soft={soft}', flush=True)
+
+
+def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command=False, native_runner=False, unattended=True):
     if not verbs or (not wine_command and any(not re.fullmatch(r'[a-z][a-z0-9_]*', v) for v in verbs)):
         raise ValueError('Use Winetricks component names, without options or shell commands')
     source = launcher.read_text()
@@ -114,13 +128,22 @@ def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command
         '            cleanAndExit "$UWT_TRICKS_RC"\n'
         '            exit "$UWT_TRICKS_RC"', 1)
     prepare(prefix)
+    if native_runner:
+        installer_file_limit()
     with tempfile.TemporaryDirectory(prefix='uwt-winetricks-') as tmp:
         wrapper = Path(tmp) / 'batocera-wine'
         wrapper.write_text(source)
         env = dict(os.environ, WINE='wine', WINESERVER='wineserver')
+        if not unattended:
+            env.pop('W_OPT_UNATTENDED', None)
         # Exported Wine variables retain their export flag when init_wine()
         # replaces them with the selected runner's executable paths.
-        args = verbs if wine_command else ['-q', *verbs]
+        args = verbs if wine_command or not unattended else ['-q', *verbs]
+        if not unattended and not wine_command:
+            for gui in ('zenity', 'kdialog'):
+                if shutil.which(gui):
+                    args = [f'--gui={gui}', *args]
+                    break
         return subprocess.run(['bash', str(wrapper), 'windows', 'tricks',
                                str(prefix), *args], env=env).returncode
 

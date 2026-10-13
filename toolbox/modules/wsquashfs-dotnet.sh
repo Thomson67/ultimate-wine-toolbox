@@ -28,6 +28,29 @@ print('\n'.join(data['shared']) or ('Non trouvé dans les emplacements standards
 PY
 }
 
+wsq_dotnet_run() {
+    local title="$1" body="$2" log="$3" restore_fullscreen=0 rc
+    shift 3
+    # A fullscreen xterm can cover setup dialogs under XWayland. Only change
+    # this terminal's actual window state, then restore it; keep user settings.
+    if [[ "${WINDOWID:-}" =~ ^(0x[0-9a-fA-F]+|[0-9]+)$ ]] \
+        && command -v xprop >/dev/null 2>&1 && command -v wmctrl >/dev/null 2>&1; then
+        if xprop -id "$WINDOWID" _NET_WM_STATE 2>/dev/null | grep -q '_NET_WM_STATE_FULLSCREEN'; then
+            wmctrl -i -r "$WINDOWID" -b remove,fullscreen >/dev/null 2>&1 && restore_fullscreen=1
+        fi
+    fi
+    # Foreground execution preserves stdin for Winetricks confirmations, and
+    # tee keeps both console output and the diagnostic log. No silent counter.
+    wt_clear_tty
+    printf '%s\n\n%b\n\n' "$title" "$body"
+    "$@" 2>&1 | tee -a "$log"
+    rc=${PIPESTATUS[0]}
+    if [ "$restore_fullscreen" -eq 1 ]; then
+        wmctrl -i -r "$WINDOWID" -b add,fullscreen >/dev/null 2>&1 || true
+    fi
+    return "$rc"
+}
+
 wsq_dotnet_apply() {
     local action="$1" log="$WSQ_STATE_DIR/wsquashfs-dotnet.log"
     yesno_default_no "$(i18n dotnet_title)" \
@@ -36,7 +59,7 @@ wsq_dotnet_apply() {
     mkdir -p "$WSQ_STATE_DIR"
     printf '\n===== .NET %s | %s | runner=%s | %s =====\n' \
         "$(date -Is)" "$action" "$runner" "$prefix" >> "$log"
-    if ! wsq_update_run "$(i18n dotnet_title)" "$(i18n dotnet_wait)" "$log" \
+    if ! wsq_dotnet_run "$(i18n dotnet_title)" "$(i18n dotnet_wait)" "$log" \
         python3 "$WT_ROOT/helpers/wsquashfs_dotnet.py" "$action" "$prefix" \
         --backups "$WT_HOME/backups/dotnet" --cache "$WT_HOME/cache/wine-mono"; then
         msgbox "$(i18n dotnet_title)" "$(i18n dotnet_failed "$log" "$(wsq_update_log_detail "$log")")"
