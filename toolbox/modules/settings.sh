@@ -24,13 +24,13 @@ display_mode_menu() {
         case "$current" in handheld) ;; *) current=normal ;; esac
         if [ "$WT_LANGUAGE" = fr ]; then
             label="Profil actuel : $current. Redémarrer la Toolbox après modification."
-            choice="$(menu_select "Affichage" "$label" "normal" "Normal (police 11)" "handheld" "Console portable (police 16)" "0" "Retour")" || return
+            choice="$(menu_select "Affichage" "$label" "normal" "Normal (police 11)" "handheld" "Console portable (police 16)" "fullscreen" "Plein écran (police 11)" "0" "Retour")" || return
         else
             label="Current profile: $current. Restart the Toolbox after changing it."
-            choice="$(menu_select "Display" "$label" "normal" "Normal (font 11)" "handheld" "Handheld (font 16)" "0" "Back")" || return
+            choice="$(menu_select "Display" "$label" "normal" "Normal (font 11)" "handheld" "Handheld (font 16)" "fullscreen" "Fullscreen (font 11)" "0" "Back")" || return
         fi
         case "$choice" in
-            normal|handheld)
+            normal|handheld|fullscreen)
                 mkdir -p "$WT_CONFIG"
                 printf '%s\n' "$choice" > "$WT_CONFIG/display-mode"
                 if [ "$WT_LANGUAGE" = fr ]; then
