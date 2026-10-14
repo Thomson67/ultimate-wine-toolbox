@@ -1,5 +1,6 @@
 import os
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -8,6 +9,40 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class UIOutputTests(unittest.TestCase):
+    def test_nested_umu_launch_uses_own_launcher_and_keeps_exit_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            main = root / 'umu-toolbox.sh'
+            main.write_text('#!/bin/bash\nprintf legacy\n')
+            main.chmod(0o755)
+            launcher = root / 'ports' / 'UMU Runner Toolbox.sh'
+            launcher.parent.mkdir()
+            launcher.write_text('#!/bin/bash\ncat "$UMU_TOOLBOX_ROOT/config/font-size"\nexit 7\n')
+            (root / 'config').mkdir()
+            preference = root / 'config/font-size'
+            for size in ('16', '20'):
+                preference.write_text(size)
+                result = subprocess.run(['bash', '-c', '''
+source toolbox/modules/umu.sh
+UMU_TOOLBOX_ROOT="$TEST_UMU_ROOT"
+UMU_TOOLBOX_MAIN="$UMU_TOOLBOX_ROOT/umu-toolbox.sh"
+export UMU_TOOLBOX_ROOT
+launch_umu_toolbox
+'''], cwd=ROOT, capture_output=True, text=True,
+                    env=os.environ | {'TEST_UMU_ROOT': directory})
+                self.assertEqual(result.stdout, size)
+                self.assertEqual(result.returncode, 7)
+            launcher.unlink()
+            result = subprocess.run(['bash', '-c', '''
+source toolbox/modules/umu.sh
+UMU_TOOLBOX_ROOT="$TEST_UMU_ROOT"
+UMU_TOOLBOX_MAIN="$UMU_TOOLBOX_ROOT/umu-toolbox.sh"
+launch_umu_toolbox
+'''], cwd=ROOT, capture_output=True, text=True,
+                env=os.environ | {'TEST_UMU_ROOT': directory})
+            self.assertEqual(result.stdout, 'legacy')
+            self.assertEqual(result.returncode, 0)
+
     def test_confirmation_screen_is_visible_inside_captured_selector(self):
         for function in ('yesno', 'yesno_default_no'):
             for answer in (0, 1):

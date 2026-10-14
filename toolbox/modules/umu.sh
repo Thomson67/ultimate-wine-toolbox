@@ -42,7 +42,15 @@ launch_umu_toolbox() {
         msgbox "$(i18n menu_umu)" "$(i18n umu_missing)"
         return
     fi
-    "$UMU_TOOLBOX_MAIN"
+    # The Ports launcher creates UMU's terminal with its own saved font and
+    # window preferences. Running main here would reuse Ultimate's terminal.
+    local launcher="$UMU_TOOLBOX_ROOT/ports/UMU Runner Toolbox.sh"
+    if [ -s "$launcher" ]; then
+        bash "$launcher"
+    else
+        # Compatibility with older UMU installations without a bundled launcher.
+        "$UMU_TOOLBOX_MAIN"
+    fi
 }
 
 install_umu_runner() {
