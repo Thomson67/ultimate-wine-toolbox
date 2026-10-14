@@ -21,6 +21,8 @@ states = {
 print(states[data['status']][0 if fr else 1])
 for entry in data['mono'] + data['microsoft']:
     print(entry['DisplayName'] + ' ' + entry.get('DisplayVersion', ''))
+if data.get('mono_support_residue'):
+    print('Ancienne entrée Mono Support conservée ; fichiers du CLR Microsoft vérifiés.' if fr else 'Old Mono Support entry retained; Microsoft CLR files verified.')
 if data['dotnet48_marker']:
     print('Winetricks : dotnet48')
 print('\n' + ('Mono partagé Batocera (disponible, pas forcément utilisé) :' if fr else 'Batocera shared Mono (available, not necessarily used):'))

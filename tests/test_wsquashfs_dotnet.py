@@ -37,6 +37,74 @@ class DotnetTests(unittest.TestCase):
     def set_registry(self, text):
         (self.prefix / 'system.reg').write_text(text)
 
+    def microsoft_files(self, prefix):
+        for relative in ('system32/mscoree.dll', 'syswow64/mscoree.dll',
+                         'Microsoft.NET/Framework/v4.0.30319/clr.dll',
+                         'Microsoft.NET/Framework64/v4.0.30319/clr.dll'):
+            path = prefix / 'drive_c/windows' / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            data = bytearray(128)
+            data[:2] = b'MZ'
+            data[60:64] = (64).to_bytes(4, 'little')
+            data[64:68] = b'PE\0\0'
+            data.extend('Microsoft Corporation'.encode('utf-16le'))
+            path.write_bytes(data)
+        (prefix / 'drive_c/windows/dotnet48.installed.workaround').touch()
+
+    def test_old_mono_support_only_accepts_verified_microsoft_clr(self):
+        self.set_registry(entry('Microsoft .NET Framework 4.8') + entry('Wine Mono Windows Support', '9.3.1'))
+        self.assertEqual(dotnet.inspect(self.prefix)['status'], 'mixed')
+        self.microsoft_files(self.prefix)
+        state = dotnet.inspect(self.prefix)
+        self.assertEqual(state['status'], 'microsoft')
+        self.assertTrue(state['mono_support_residue'])
+        self.assertEqual(state['mono'][0]['DisplayVersion'], '9.3.1')
+        dll = self.prefix / 'drive_c/windows/syswow64/mscoree.dll'
+        dll.write_bytes(dll.read_bytes() + b'WINE_MONO_OVERRIDES')
+        self.assertEqual(dotnet.inspect(self.prefix)['status'], 'mixed')
+        self.microsoft_files(self.prefix)
+        (self.prefix / 'drive_c/windows/Microsoft.NET/Framework64/v4.0.30319/clr.dll').unlink()
+        self.assertEqual(dotnet.inspect(self.prefix)['status'], 'mixed')
+
+    def test_real_mono_runtime_remains_mixed_with_microsoft_files(self):
+        self.microsoft_files(self.prefix)
+        self.set_registry(entry('Microsoft .NET Framework 4.8') + entry('Wine Mono Runtime', '11.3.0'))
+        self.assertEqual(dotnet.inspect(self.prefix)['status'], 'mixed')
+        self.set_registry(entry('Microsoft .NET Framework 4.0') + entry('Wine Mono Windows Support', '9.3.1'))
+        self.assertEqual(dotnet.inspect(self.prefix)['status'], 'mixed')
+
+    def test_recover_completed_copy_preserves_game_and_does_not_reinstall(self):
+        self.set_registry(entry('Wine Mono Windows Support', '9.3.1'))
+        snapshot = dotnet.backup(self.prefix, self.backups)
+        staged = dotnet.stage(self.prefix, self.prefix / 'drive_c/game', self.base / 'local')
+        self.microsoft_files(staged)
+        (staged / 'system.reg').write_text(entry('Microsoft .NET Framework 4.8') + entry('Wine Mono Windows Support', '9.3.1'))
+        game = self.prefix / 'drive_c/game/game.exe'
+        inode = game.stat().st_ino
+        with patch.object(dotnet.tricks, 'install') as installer:
+            dotnet.recover(self.prefix, staged, snapshot, self.backups, self.base / 'local')
+            installer.assert_not_called()
+        self.assertEqual(dotnet.inspect(self.prefix)['status'], 'microsoft')
+        self.assertEqual(game.stat().st_ino, inode)
+        self.assertEqual(game.read_text(), 'game')
+        self.assertTrue(staged.is_dir())
+        self.assertEqual(len(list(self.backups.glob('dotnet-*'))), 2)
+
+    def test_recover_refuses_changed_prefix_or_incomplete_clr(self):
+        self.set_registry(entry('Wine Mono Windows Support', '9.3.1'))
+        snapshot = dotnet.backup(self.prefix, self.backups)
+        staged = dotnet.stage(self.prefix, self.prefix / 'drive_c/game', self.base / 'local')
+        (staged / 'system.reg').write_text(entry('Microsoft .NET Framework 4.8'))
+        with self.assertRaisesRegex(ValueError, 'confirmed'):
+            dotnet.recover(self.prefix, staged, snapshot, self.backups, self.base / 'local')
+        self.microsoft_files(staged)
+        (self.prefix / 'new-user-file').write_text('keep')
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            dotnet.recover(self.prefix, staged, snapshot, self.backups, self.base / 'local')
+        self.assertEqual((self.prefix / 'new-user-file').read_text(), 'keep')
+        self.assertEqual(dotnet.inspect(self.prefix)['status'], 'mono')
+        self.assertEqual(len(list(self.backups.glob('dotnet-*'))), 1)
+
     def test_shared_mono_is_availability_not_installed_microsoft(self):
         shared = self.base / 'share/wine'
         (shared / 'wine-mono-10.4.0').mkdir(parents=True)

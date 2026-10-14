@@ -36,6 +36,10 @@ Restore a safety copy returns to an earlier state. Copies are sorted oldest firs
 
 UMU RUNNERS
 
+A Wine Mono Windows Support uninstall entry may survive Microsoft installation. It stays visible but is no longer treated as an active Mono runtime when the .NET 4.8 identity, Winetricks marker, and Microsoft PE mscoree.dll and clr.dll files for the prefix architectures are all verified. A Wine Mono runtime, Mono DLL or missing CLR files still block validation. File checks do not replace testing the game.
+
+The recover diagnostic command can publish a retained installation without reinstalling .NET: specify the prefix, --staged, --snapshot, --backups and --cache. It requires verified Microsoft files and a working prefix unchanged since the backup, excluding game data. A new backup precedes publication; the installer copy is retained. Links and external targets are not followed during comparison.
+
 When replacing Mono with Microsoft .NET, a temporary Winetricks copy removes each Mono GUID separately and clears NDP v3.5/v4 keys in both 32-bit and 64-bit registry views when Mono is detected. This handles multiple Mono entries and GE-Proton compatibility traces that can make setup report .NET as already installed. Batocera's Winetricks remains unchanged. Unrecognized script versions are rejected.
 
 .NET operations use the selected runner’s underlying Wine engine directly, including setup EXEs. They do not launch these installers as UMU/Proton games: regedit, winecfg, setup EXEs and wineserver must share one engine and local prefix. Normal game launches still use UMU. Success also requires the Winetricks dotnet48 marker; .NET 4.0 alone is insufficient.

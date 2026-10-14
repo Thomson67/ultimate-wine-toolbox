@@ -15,6 +15,29 @@ from wsquashfs_update import game_directory
 from wsquashfs_dotnet_storage import stage, publish, filesystem, exchange_probe
 
 
+def microsoft_clr_files(prefix, win32=False):
+    """Require Microsoft PE loaders and CLR libraries, not just registry labels."""
+    paths = ['system32/mscoree.dll', 'Microsoft.NET/Framework/v4.0.30319/clr.dll']
+    if not win32:
+        paths += ['syswow64/mscoree.dll', 'Microsoft.NET/Framework64/v4.0.30319/clr.dll']
+    result = {}
+    for relative in paths:
+        path = prefix / 'drive_c/windows' / relative
+        try:
+            if not path.resolve().is_relative_to(prefix.resolve()):
+                raise ValueError('external DLL')
+            data = path.read_bytes()
+            offset = int.from_bytes(data[60:64], 'little')
+            result[relative] = (data[:2] == b'MZ' and offset >= 64
+                and data[offset:offset + 4] == b'PE\0\0'
+                and 'Microsoft Corporation'.encode('utf-16le') in data
+                and b'WINE_MONO_OVERRIDES' not in data
+                and b'Wine builtin DLL' not in data)
+        except (OSError, ValueError):
+            result[relative] = False
+    return result
+
+
 def inspect(prefix, shared_roots=None):
     if prefix.is_symlink() or not (prefix / 'drive_c/windows').is_dir():
         raise ValueError('Expected an initialized working prefix')
@@ -36,6 +59,15 @@ def inspect(prefix, shared_roots=None):
     # native .NET, but blocks blindly installing Mono when its origin is unclear.
     status = 'mixed' if mono and (native or marker) else (
         'microsoft' if native or marker else 'mono' if mono else 'uncertain' if ndp else 'absent')
+    support_only = bool(mono) and all(e['DisplayName'] == 'Wine Mono Windows Support' for e in mono)
+    clr = microsoft_clr_files(prefix, '#arch=win32' in text) if marker and native else {}
+    # Old MSI Support registrations can survive Mono removal. Keep them visible,
+    # but do not treat them as an active Mono runtime when Microsoft's loader,
+    # CLR files, 4.8 identity and Winetricks marker are all present.
+    support_residue = bool(support_only and marker and clr and all(clr.values())
+        and any(re.search(r'\.NET Framework 4\.8(?:\D|$)', e['DisplayName'], re.I) for e in native))
+    if support_residue:
+        status = 'microsoft'
     roots = shared_roots if shared_roots is not None else [
         Path('/usr/share/wine'), *Path('/usr/wine').glob('*/share/wine')]
     shared = []
@@ -43,7 +75,69 @@ def inspect(prefix, shared_roots=None):
         for pattern in ('wine-mono-*', 'mono/wine-mono-*'):
             shared.extend(str(p) for p in root.glob(pattern) if p.is_dir())
     return dict(status=status, mono=mono, microsoft=native,
-                dotnet48_marker=marker, ndp_release=ndp, shared=sorted(set(shared)))
+                dotnet48_marker=marker, ndp_release=ndp, shared=sorted(set(shared)),
+                mono_support_residue=support_residue, microsoft_clr_files=clr)
+
+
+def prefix_fingerprint(prefix, game_relative):
+    """Compare a retained install's original snapshot without reading game data."""
+    result = {}
+    for directory, dirs, files in os.walk(prefix, followlinks=False):
+        root = Path(directory)
+        dirs[:] = [name for name in dirs if (root / name).relative_to(prefix) != game_relative]
+        for name in dirs + files:
+            path = root / name
+            relative = path.relative_to(prefix).as_posix()
+            if path.is_symlink():
+                result[relative] = ('link', os.readlink(path))
+            elif path.is_dir():
+                result[relative] = ('directory',)
+            elif path.is_file():
+                with path.open('rb') as stream:
+                    result[relative] = ('file', hashlib.file_digest(stream, 'sha256').hexdigest())
+            else:
+                raise ValueError(f'Unsupported prefix entry: {path}')
+    return result
+
+
+def recover(prefix, staged, snapshot, backups, work_root):
+    """Publish an already installed .NET 4.8 copy after strict validation."""
+    if (staged.is_symlink() or staged.parent.is_symlink()
+            or staged.resolve().parent.parent != work_root.resolve()
+            or not staged.parent.name.startswith('install-') or staged.name != prefix.name):
+        raise ValueError('Expected a retained Toolbox installer copy for this prefix')
+    if snapshot.is_symlink() or not snapshot.resolve().is_relative_to(backups.resolve()):
+        raise ValueError('Expected the original Toolbox backup')
+    game = game_directory(prefix)
+    relative = game.relative_to(prefix)
+    metadata = json.loads((snapshot / 'backup.json').read_text())
+    if metadata.get('prefix') != str(prefix.resolve()) or metadata.get('excluded_game') != str(relative):
+        raise ValueError('Backup does not belong to this prefix/game')
+    original_root = snapshot / 'prefix'
+    if original_root.is_symlink() or not (original_root / 'drive_c/windows').is_dir():
+        raise ValueError('Original backup prefix is missing or invalid')
+    if (staged / relative).exists() or (staged / relative).is_symlink():
+        raise ValueError('Installer copy unexpectedly contains game data')
+    for root in (prefix, staged):
+        tricks.prepare(root, detach=False)
+    state = inspect(staged)
+    print('dotnet_recovery_state=' + json.dumps(state), flush=True)
+    if (state['status'] != 'microsoft' or not state['dotnet48_marker']
+            or not state['microsoft_clr_files'] or not all(state['microsoft_clr_files'].values())
+            or not any(re.search(r'\.NET Framework 4\.8(?:\D|$)', e['DisplayName'], re.I) for e in state['microsoft'])):
+        raise ValueError('Retained copy does not contain confirmed Microsoft .NET 4.8 files')
+    original = prefix_fingerprint(original_root, relative)
+    if prefix_fingerprint(prefix, relative) != original:
+        raise ValueError('Working prefix changed since the installation backup; recovery refused')
+    if (staged / 'autorun.cmd').read_bytes() != (prefix / 'autorun.cmd').read_bytes():
+        raise ValueError('Installer copy has a different game configuration')
+    backup(prefix, backups)
+    for root in (prefix, staged):
+        tricks.prepare(root, detach=False)
+    publish(staged, prefix, game)
+    # Keep the retained copy available for diagnosis after manual recovery.
+    print('dotnet_recovered=' + str(prefix), flush=True)
+    print(json.dumps(inspect(prefix), ensure_ascii=False, indent=2), flush=True)
 
 
 def latest_asset(data):
@@ -171,12 +265,13 @@ def change(prefix, action, backups, cache, work_root=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=('inspect', 'mono', 'microsoft', 'restore', 'backups'))
+    parser.add_argument('action', choices=('inspect', 'mono', 'microsoft', 'restore', 'backups', 'recover'))
     parser.add_argument('prefix', type=Path)
     parser.add_argument('--backups', type=Path)
     parser.add_argument('--cache', type=Path)
     parser.add_argument('--runner-root', type=Path)
     parser.add_argument('--snapshot', type=Path)
+    parser.add_argument('--staged', type=Path)
     args = parser.parse_args()
     try:
         if args.action == 'inspect':
@@ -194,6 +289,11 @@ def main():
                         print(snapshot.name)
                 except (OSError, ValueError):
                     pass
+        elif args.action == 'recover':
+            if args.backups is None or args.snapshot is None or args.staged is None or args.cache is None:
+                raise ValueError('Backup, retained copy and cache paths required')
+            work_root = Path(os.environ.get('UWT_DOTNET_WORK_ROOT', str(args.cache.parent.parent / 'state/dotnet-work')))
+            recover(args.prefix, args.staged, args.snapshot, args.backups, work_root)
         elif args.action == 'restore':
             if args.backups is None or args.snapshot is None:
                 raise ValueError('Backup directory and snapshot required')
