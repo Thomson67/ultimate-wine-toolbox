@@ -102,11 +102,10 @@ wsq_dotnet_menu() {
         report="$(wsq_dotnet_report)" || return 1
         choice="$(menu_select "$(i18n dotnet_title)" "$report\n\n$(i18n dotnet_intro)" \
             mono "$(i18n dotnet_mono)" microsoft "$(i18n dotnet_microsoft)" \
-            rundll32 "$(i18n dotnet_rundll32)" \
             restore "$(i18n dotnet_restore)" \
             doc "$(i18n doc_dotnet)" back "$(i18n back)")" || return 1
         case "$choice" in
-            mono|microsoft|rundll32) wsq_dotnet_apply "$choice" ;;
+            mono|microsoft) wsq_dotnet_apply "$choice" ;;
             restore) wsq_dotnet_restore_menu ;;
             doc) documentation_show dotnet ;;
             back|'') return 0 ;;

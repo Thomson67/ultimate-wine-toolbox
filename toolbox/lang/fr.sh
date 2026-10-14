@@ -8,7 +8,6 @@ declare -gA I18N=(
   [dotnet_intro]="Wine Mono remplace une partie de .NET Framework, pas .NET 6/8. Batocera et certains runners fournissent déjà un Mono partagé. Les opérations concernent uniquement ce préfixe de travail."
   [dotnet_mono]="Installer / mettre à jour Wine Mono (dernière version stable)"
   [dotnet_microsoft]="Remplacer Wine Mono par Microsoft .NET Framework 4.8"
-  [dotnet_rundll32]="Corriger la fenêtre .NET au changement de runner (test)"
   [doc_dotnet]=".NET : Mono, framework Microsoft et runtimes modernes"
   [dotnet_confirm]="%s ?\n\nRunner : %s\nCopie de sécurité : %s\n\nLe jeu doit être fermé. La copie exclut les fichiers du jeu ; elle conserve le reste du préfixe et les liens de sauvegardes sans suivre leurs cibles. Aucun fichier système Batocera ou runner n’est remplacé.\n\nAvec Proton/UMU, le runner peut réappliquer sa version Mono. Un Mono récent peut nécessiter un Wine récent. Ne changez que si le jeu en a besoin."
   [dotnet_wait]="Mode test interactif : suivez les fenêtres Wine Mono / Microsoft et les questions de Winetricks. Plusieurs étapes peuvent apparaître (.NET 4.0 puis 4.8). Le journal est affiché ci-dessous et enregistré. Utilisez Alt+Tab si une fenêtre est derrière la toolbox."

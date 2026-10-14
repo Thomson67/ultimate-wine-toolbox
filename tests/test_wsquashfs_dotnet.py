@@ -28,7 +28,6 @@ class DotnetTests(unittest.TestCase):
         (self.prefix / 'drive_c/game/game.exe').write_text('game')
         (self.prefix / 'autorun.cmd').write_text('DIR=drive_c/game\nCMD=game.exe\n')
         (self.prefix / 'system.reg').write_text('WINE REGISTRY Version 2\n')
-        (self.prefix / 'user.reg').write_text('WINE REGISTRY Version 2\n')
         self.backups = self.base / 'backups'
         self.cache = self.base / 'cache'
         self.env = patch.dict(dotnet.os.environ, UWT_DOTNET_WORK_ROOT=str(self.base / 'local'))
@@ -37,43 +36,6 @@ class DotnetTests(unittest.TestCase):
 
     def set_registry(self, text):
         (self.prefix / 'system.reg').write_text(text)
-
-    def test_rundll32_rules_are_scoped_preserve_other_rules_and_idempotent(self):
-        text = ('WINE REGISTRY Version 2\n\n'
-                '[Software\\\\Wine\\\\DllOverrides]\n"*mscoree"="native"\n\n'
-                '[Software\\\\Wine\\\\AppDefaults\\\\rundll32.exe\\\\DllOverrides]\n'
-                '"*mscoree"="native,builtin"\n"d3d11"="native"\n\n'
-                '[Other]\n"preserve"="yes"\n')
-        updated = dotnet.rundll32_mscoree_text(text)
-        self.assertIn('[Software\\\\Wine\\\\DllOverrides]\n"*mscoree"="native"', updated)
-        self.assertIn('"d3d11"="native"', updated)
-        self.assertIn('[Other]\n"preserve"="yes"', updated)
-        self.assertEqual(updated.count('"mscoree"="builtin"'), 1)
-        self.assertEqual(updated.count('"*mscoree"="builtin"'), 1)
-        self.assertEqual(dotnet.rundll32_mscoree_text(updated), updated)
-
-    def test_rundll32_user_registry_rejects_aliases_and_invalid_format(self):
-        path = self.prefix / 'user.reg'
-        outside = self.base / 'outside.reg'; outside.write_text('WINE REGISTRY Version 2\n')
-        path.unlink(); path.symlink_to(outside)
-        with self.assertRaises(ValueError):
-            dotnet.configure_rundll32(self.prefix)
-        self.assertEqual(outside.read_text(), 'WINE REGISTRY Version 2\n')
-        path.unlink(); path.write_text('invalid')
-        with self.assertRaises(ValueError):
-            dotnet.configure_rundll32(self.prefix)
-
-    def test_existing_microsoft_prefix_can_apply_rundll32_without_reinstall(self):
-        self.set_registry(entry('Microsoft .NET Framework 4.8'))
-        original = (self.prefix / 'user.reg').read_bytes()
-        with patch.object(sys, 'argv', ['dotnet', 'rundll32', str(self.prefix), '--backups', str(self.backups)]), \
-             patch.object(dotnet.tricks, 'install') as installer:
-            self.assertEqual(dotnet.main(), 0)
-            installer.assert_not_called()
-        snapshots = list(self.backups.glob('dotnet-*'))
-        self.assertEqual(len(snapshots), 1)
-        self.assertEqual((snapshots[0] / 'prefix/user.reg').read_bytes(), original)
-        self.assertIn('"*mscoree"="builtin"', (self.prefix / 'user.reg').read_text())
 
     def microsoft_files(self, prefix):
         for relative in ('system32/mscoree.dll', 'syswow64/mscoree.dll',
@@ -123,7 +85,6 @@ class DotnetTests(unittest.TestCase):
             dotnet.recover(self.prefix, staged, snapshot, self.backups, self.base / 'local')
             installer.assert_not_called()
         self.assertEqual(dotnet.inspect(self.prefix)['status'], 'microsoft')
-        self.assertIn('"*mscoree"="builtin"', (self.prefix / 'user.reg').read_text())
         self.assertEqual(game.stat().st_ino, inode)
         self.assertEqual(game.read_text(), 'game')
         self.assertTrue(staged.is_dir())
@@ -231,7 +192,6 @@ class DotnetTests(unittest.TestCase):
         with patch.object(dotnet.tricks, 'prepare'), patch.object(dotnet.tricks, 'install', side_effect=installer):
             dotnet.change(self.prefix, 'microsoft', self.backups, self.cache)
         self.assertEqual(len(list(self.backups.glob('dotnet-*'))), 1)
-        self.assertIn('"*mscoree"="builtin"', (self.prefix / 'user.reg').read_text())
 
     def test_installer_failure_keeps_snapshot(self):
         self.set_registry(entry('Wine Mono Runtime'))
@@ -306,7 +266,6 @@ class DotnetTests(unittest.TestCase):
             return 0
         with patch.object(dotnet, 'fetch_mono', return_value=('11.3.0', msi)), patch.object(dotnet.tricks, 'prepare'), patch.object(dotnet.tricks, 'install', side_effect=installer):
             dotnet.change(self.prefix, 'mono', self.backups, self.cache)
-        self.assertNotIn('rundll32.exe', (self.prefix / 'user.reg').read_text())
 
     def test_external_program_files_refused_before_installer(self):
         (self.prefix / 'drive_c/Program Files').symlink_to(self.base, target_is_directory=True)

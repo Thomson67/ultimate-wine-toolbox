@@ -15,42 +15,6 @@ from wsquashfs_update import game_directory
 from wsquashfs_dotnet_storage import stage, publish, filesystem, exchange_probe
 
 
-def rundll32_mscoree_text(text):
-    """Scope Wine's mscoree to its INF registration host; keep game overrides."""
-    key = r'Software\\Wine\\AppDefaults\\rundll32.exe\\DllOverrides'
-    pattern = re.compile(r'(?ms)^\[' + re.escape(key) + r'\][^\n]*\n(.*?)(?=^\[|\Z)')
-    matches = list(pattern.finditer(text))
-    if len(matches) > 1:
-        raise ValueError('Duplicate rundll32 AppDefaults sections; inspect user.reg first')
-    values = '"mscoree"="builtin"\n"*mscoree"="builtin"\n\n'
-    if matches:
-        match = matches[0]
-        body = re.sub(r'(?mi)^"\*?mscoree"=.*\n?', '', match.group(1)).rstrip()
-        replacement = f'[{key}]\n' + (body + '\n' if body else '') + values
-        return text[:match.start()] + replacement + text[match.end():]
-    return text.rstrip() + f'\n\n[{key}]\n' + values
-
-
-def configure_rundll32(prefix):
-    path = prefix / 'user.reg'
-    if path.is_symlink():
-        raise ValueError('user.reg must be an internal regular file')
-    text = path.read_text()
-    if not text.startswith('WINE REGISTRY Version 2'):
-        raise ValueError('Unsupported user.reg format')
-    updated = rundll32_mscoree_text(text)
-    if updated != text:
-        fd, temporary = tempfile.mkstemp(prefix='.uwt-rundll32-', dir=prefix)
-        try:
-            with os.fdopen(fd, 'w') as stream:
-                os.fchmod(stream.fileno(), path.stat().st_mode & 0o777)
-                stream.write(updated)
-            os.replace(temporary, path)
-        finally:
-            Path(temporary).unlink(missing_ok=True)
-    print('dotnet_rundll32_mscoree=builtin scope=rundll32.exe rules=mscoree,*mscoree', flush=True)
-
-
 def microsoft_clr_files(prefix, win32=False):
     """Require Microsoft PE loaders and CLR libraries, not just registry labels."""
     paths = ['system32/mscoree.dll', 'Microsoft.NET/Framework/v4.0.30319/clr.dll']
@@ -170,7 +134,6 @@ def recover(prefix, staged, snapshot, backups, work_root):
     backup(prefix, backups)
     for root in (prefix, staged):
         tricks.prepare(root, detach=False)
-    configure_rundll32(staged)
     publish(staged, prefix, game)
     # Keep the retained copy available for diagnosis after manual recovery.
     print('dotnet_recovered=' + str(prefix), flush=True)
@@ -292,8 +255,6 @@ def change(prefix, action, backups, cache, work_root=None):
             if rc or not any(e.get('DisplayVersion') == version for e in after['mono']):
                 raise ValueError(f'Wine Mono installation not confirmed (rc={rc})')
         tricks.prepare(staged, detach=False)  # No installer process may remain active.
-        if action == 'microsoft':
-            configure_rundll32(staged)
         tricks.prepare(prefix, detach=False)  # Refuse publication if the game was started meanwhile.
         publish(staged, prefix, game)
     except (OSError, ValueError) as error:
@@ -304,7 +265,7 @@ def change(prefix, action, backups, cache, work_root=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=('inspect', 'mono', 'microsoft', 'restore', 'backups', 'recover', 'rundll32'))
+    parser.add_argument('action', choices=('inspect', 'mono', 'microsoft', 'restore', 'backups', 'recover'))
     parser.add_argument('prefix', type=Path)
     parser.add_argument('--backups', type=Path)
     parser.add_argument('--cache', type=Path)
@@ -328,14 +289,6 @@ def main():
                         print(snapshot.name)
                 except (OSError, ValueError):
                     pass
-        elif args.action == 'rundll32':
-            if args.backups is None:
-                raise ValueError('Backup directory required')
-            tricks.prepare(args.prefix, detach=False)
-            if inspect(args.prefix)['status'] != 'microsoft':
-                raise ValueError('Microsoft .NET must be identified before applying this workaround')
-            backup(args.prefix, args.backups)
-            configure_rundll32(args.prefix)
         elif args.action == 'recover':
             if args.backups is None or args.snapshot is None or args.staged is None or args.cache is None:
                 raise ValueError('Backup, retained copy and cache paths required')
