@@ -1438,7 +1438,6 @@ wsq_review_launch() {
             "no" "$(i18n wsq_game_no)" \
             "executable" "$(i18n wsq_launch_executable_review)" \
             "hidraw" "$(i18n wsq_hidraw_retry)" \
-            "dotnet" "$(i18n dotnet_title)" \
             "options" "$(i18n wsq_options_title)" \
             "cancel" "$(i18n wsq_launch_cancel)")" || return 1
         case "$choice" in
@@ -1452,7 +1451,6 @@ wsq_review_launch() {
                 wsq_apply_executable_selection "$new_exe" || continue
                 wsq_retry_pending
                 return 1 ;;
-            dotnet) wsq_dotnet_menu ;;
             hidraw)
                 wsq_game_option set enable_hidraw 1 || {
                     msgbox "$(i18n wsq_launch_title)" "$(i18n wsq_runner_config_failed)"
