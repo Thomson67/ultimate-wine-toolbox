@@ -86,10 +86,19 @@ def installer_file_limit():
     print(f'dotnet_nofile_soft={current} hard={hard} previous_soft={soft}', flush=True)
 
 
-def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command=False, native_runner=False, unattended=True):
+def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command=False, native_runner=False, unattended=True, mono_cleanup=False):
     if not verbs or (not wine_command and any(not re.fullmatch(r'[a-z][a-z0-9_]*', v) for v in verbs)):
         raise ValueError('Use Winetricks component names, without options or shell commands')
     source = launcher.read_text()
+    if mono_cleanup:
+        if wine_command or not native_runner or verbs != ['remove_mono', 'dotnet48']:
+            raise ValueError('Mono cleanup is restricted to the Microsoft .NET workflow')
+        invocation = '    WINEPREFIX=${WINEPOINT} ${CMD_PREFIX} "${WINETRICKS}" "${TRICK[@]}"'
+        if source.count(invocation) != 1:
+            raise ValueError('Unsupported Batocera Winetricks invocation for Mono cleanup')
+        source = source.replace(invocation,
+            '    python3 "$UWT_MONO_PATCHER" "$WINETRICKS" "$UWT_MONO_TRICKS" || return 1\n'
+            '    WINEPREFIX=${WINEPOINT} ${CMD_PREFIX} "$UWT_MONO_TRICKS" "${TRICK[@]}"', 1)
     call = '            trick_wine "${l_PREFIX}" "$@"'
     if source.count(call) != 1:
         raise ValueError('This Batocera Winetricks launcher is not supported')
@@ -134,6 +143,9 @@ def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command
         wrapper = Path(tmp) / 'batocera-wine'
         wrapper.write_text(source)
         env = dict(os.environ, WINE='wine', WINESERVER='wineserver')
+        if mono_cleanup:
+            env.update(UWT_MONO_PATCHER=str(Path(__file__).with_name('wsquashfs_mono_cleanup.py').resolve()),
+                       UWT_MONO_TRICKS=str(Path(tmp) / 'winetricks'))
         if not unattended:
             env.pop('W_OPT_UNATTENDED', None)
         # Exported Wine variables retain their export flag when init_wine()

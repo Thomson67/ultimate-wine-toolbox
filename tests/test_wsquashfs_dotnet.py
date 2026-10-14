@@ -113,10 +113,11 @@ class DotnetTests(unittest.TestCase):
 
     def test_microsoft_removes_mono_then_installs_and_checks_postcondition(self):
         self.set_registry(entry('Wine Mono Runtime'))
-        def installer(prefix, verbs, native_runner=False, unattended=True):
+        def installer(prefix, verbs, native_runner=False, unattended=True, mono_cleanup=False):
             self.assertTrue(native_runner)
             self.assertFalse(unattended)
             self.assertEqual(verbs, ['remove_mono', 'dotnet48'])
+            self.assertTrue(mono_cleanup)
             (prefix / 'drive_c/windows/dotnet48.installed.workaround').touch()
             (prefix / 'system.reg').write_text(entry('Microsoft .NET Framework 4.8'))
             return 0
@@ -127,7 +128,7 @@ class DotnetTests(unittest.TestCase):
     def test_installer_failure_keeps_snapshot(self):
         self.set_registry(entry('Wine Mono Runtime'))
         original = (self.prefix / 'system.reg').read_bytes()
-        def fail(staged, verbs, native_runner=False, unattended=True):
+        def fail(staged, verbs, native_runner=False, unattended=True, mono_cleanup=False):
             self.assertTrue(native_runner)
             self.assertNotEqual(staged, self.prefix)
             (staged / 'system.reg').write_text('partial installation')
@@ -142,7 +143,7 @@ class DotnetTests(unittest.TestCase):
     def test_dotnet40_alone_is_not_reported_as_successful_dotnet48(self):
         self.set_registry(entry('Wine Mono Runtime'))
         original = (self.prefix / 'system.reg').read_bytes()
-        def installer(staged, verbs, native_runner=False, unattended=True):
+        def installer(staged, verbs, native_runner=False, unattended=True, mono_cleanup=False):
             (staged / 'system.reg').write_text(entry('Microsoft .NET Framework 4 Client Profile', '4.0.30319'))
             return 0
         with patch.object(dotnet.tricks, 'prepare'), patch.object(dotnet.tricks, 'install', side_effect=installer):

@@ -146,7 +146,7 @@ def change(prefix, action, backups, cache, work_root=None):
     try:
         tricks.prepare(staged)
         if action == 'microsoft':
-            rc = tricks.install(staged, ['remove_mono', 'dotnet48'], native_runner=True, unattended=False)
+            rc = tricks.install(staged, ['remove_mono', 'dotnet48'], native_runner=True, unattended=False, mono_cleanup=True)
             after = inspect(staged)
             print('dotnet_installed_state=' + json.dumps(after), flush=True)
             if rc or after['status'] != 'microsoft' or not after['dotnet48_marker']:

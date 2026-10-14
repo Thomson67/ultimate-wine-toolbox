@@ -36,6 +36,8 @@ Le bouton Restaurer une copie de sécurité permet de repartir d’un état ant�
 
 RUNNERS UMU
 
+Pour remplacer Mono par Microsoft .NET, une copie temporaire de Winetricks désinstalle chaque GUID Mono séparément et nettoie les clés NDP v3.5/v4 des vues 32 et 64 bits lorsque Mono est détecté. Cela traite les entrées Mono multiples et les traces de compatibilité de GE-Proton qui peuvent faire croire à l’installateur que .NET est déjà présent. Le Winetricks de Batocera n’est pas modifié. Une version de script non reconnue est refusée.
+
 Les opérations .NET utilisent directement le moteur Wine fourni par le runner sélectionné, y compris pour les installateurs EXE. Elles ne lancent pas ces installateurs comme des jeux UMU/Proton : regedit, winecfg, les EXE et wineserver doivent rester sur le même moteur et le même préfixe local. Le lancement habituel du jeu reste géré par UMU. La réussite exige aussi le marqueur Winetricks dotnet48 : la seule présence de .NET 4.0 ne suffit pas.
 
 FENÊTRES PENDANT LES TESTS
