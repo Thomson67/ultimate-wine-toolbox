@@ -36,6 +36,12 @@ Le bouton Restaurer une copie de sécurité permet de repartir d’un état ant�
 
 RUNNERS UMU
 
+TEST : FENÊTRE .NET AU CHANGEMENT DE RUNNER
+
+Après une installation Microsoft réussie ou une récupération, la version de test ajoute dans user.reg les règles mscoree=builtin et *mscoree=builtin uniquement sous Software/Wine/AppDefaults/rundll32.exe/DllOverrides. Le joker est nécessaire pour les chargements par chemin complet pendant la mise à jour du préfixe. Les règles globales du jeu restent inchangées. La mise à jour de Mono seule n’applique pas ce contournement.
+
+Pour un préfixe contenant déjà Microsoft .NET, l’option « Corriger la fenêtre .NET au changement de runner (test) » applique le même réglage après sauvegarde du préfixe, sans réinstaller .NET. Le fichier user.reg est remplacé atomiquement, jeu fermé. Cette correction a supprimé la fenêtre sur notre test CastleStorm ; son usage avec un jeu dépendant réellement du framework reste à valider, notamment Zeit². Un composant .NET lancé lui-même par rundll32.exe pourrait être affecté. La restauration de la copie de sécurité permet de revenir à l’état précédent.
+
 Une entrée de désinstallation « Wine Mono Windows Support » peut subsister après l’installation Microsoft. Elle reste affichée, mais n’est plus assimilée à un runtime Mono actif si l’identité .NET 4.8, le marqueur Winetricks et les fichiers PE Microsoft mscoree.dll et clr.dll des architectures du préfixe sont tous vérifiés. La présence d’un runtime Wine Mono, d’une DLL Mono ou de fichiers CLR manquants continue à bloquer la validation. Ces contrôles de fichiers ne remplacent pas un essai du jeu.
 
 La commande de diagnostic recover permet de transférer une copie d’installation conservée, sans réinstaller .NET : préciser le préfixe, --staged, --snapshot, --backups et --cache. Elle exige les fichiers Microsoft vérifiés et un préfixe inchangé depuis la sauvegarde (hors dossier du jeu). Une nouvelle sauvegarde précède le transfert ; la copie d’installation reste conservée. Les liens et leurs cibles externes ne sont pas suivis pendant la comparaison.

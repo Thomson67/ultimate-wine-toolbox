@@ -36,6 +36,12 @@ Restore a safety copy returns to an earlier state. Copies are sorted oldest firs
 
 UMU RUNNERS
 
+TEST: .NET DIALOG WHEN CHANGING RUNNERS
+
+After successful Microsoft installation or recovery, the test version adds mscoree=builtin and *mscoree=builtin in user.reg only under Software/Wine/AppDefaults/rundll32.exe/DllOverrides. The wildcard covers full-path loads during prefix updates. Global game overrides remain unchanged. Updating Mono alone does not apply this workaround.
+
+For prefixes already containing Microsoft .NET, "Fix .NET dialog when changing runners (test)" applies the same setting after a prefix backup without reinstalling .NET. user.reg is replaced atomically while the game is closed. This removed the dialog in our CastleStorm test; validation with a game that actually needs the framework, such as Zeit², remains pending. A .NET component hosted by rundll32.exe itself could be affected. Restore the backup to return to the previous state.
+
 A Wine Mono Windows Support uninstall entry may survive Microsoft installation. It stays visible but is no longer treated as an active Mono runtime when the .NET 4.8 identity, Winetricks marker, and Microsoft PE mscoree.dll and clr.dll files for the prefix architectures are all verified. A Wine Mono runtime, Mono DLL or missing CLR files still block validation. File checks do not replace testing the game.
 
 The recover diagnostic command can publish a retained installation without reinstalling .NET: specify the prefix, --staged, --snapshot, --backups and --cache. It requires verified Microsoft files and a working prefix unchanged since the backup, excluding game data. A new backup precedes publication; the installer copy is retained. Links and external targets are not followed during comparison.
