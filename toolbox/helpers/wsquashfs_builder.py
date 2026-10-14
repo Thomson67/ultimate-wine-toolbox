@@ -194,12 +194,15 @@ def find_exes(prefix: Path, game_relative="drive_c/game"):
     if not game_dir.is_dir():
         return rows
     for root, dirs, files in os.walk(game_dir):
+        root_p = Path(root)
         dirs[:] = [
             d for d in dirs
             if d.casefold() not in EXCLUDED_DIRS
+            and not d.startswith('.')
+            and not (root_p / d).is_symlink()
+            and not (root_p == prefix / 'drive_c' and d.casefold() == 'users')
             and not d.casefold().endswith((".wine", ".pc"))
         ]
-        root_p = Path(root)
         rel_root = root_p.relative_to(prefix)
         for filename in files:
             low = filename.casefold()
@@ -208,6 +211,9 @@ def find_exes(prefix: Path, game_relative="drive_c/game"):
             if not low.endswith((".exe", ".bat", ".cmd")):
                 continue
             if any(x in low for x in EXCLUDED_EXE_NAMES):
+                continue
+            candidate = root_p / filename
+            if not candidate.is_file() or not candidate.resolve().is_relative_to(prefix.resolve()):
                 continue
             rel = (rel_root / filename).as_posix()
             score = 0

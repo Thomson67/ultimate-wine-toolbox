@@ -332,7 +332,7 @@ wsq_prepare_prefix() {
 }
 
 wsq_select_executable() {
-    local prefix="$1" game_dir="${2:-drive_c/game}"
+    local prefix="$1" game_dir="${2:-drive_c}"
     local -a items=()
     local rows="" line score rel idx=1 choice
     while IFS=$'\t' read -r score rel; do
@@ -343,7 +343,7 @@ wsq_select_executable() {
     done < <(python3 "$WSQ_HELPER" exes "$prefix" --game-dir "$game_dir")
 
     if [ "${#items[@]}" -eq 0 ]; then
-        msgbox "$(i18n wsq_create_title)" "$(i18n wsq_no_executable)"
+        msgbox "$(i18n wsq_create_title)" "$(i18n wsq_no_executable "$game_dir")"
         return 1
     fi
 

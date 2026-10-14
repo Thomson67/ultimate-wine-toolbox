@@ -95,6 +95,23 @@ class ReleaseTests(unittest.TestCase):
         rows = builder.diff_snapshots(prefix, before, builder.snapshot(prefix))
         self.assertEqual(rows[0][1], save.relative_to(prefix).as_posix())
 
+    def test_existing_prefix_game_outside_default_game_directory(self):
+        prefix = self.base / 'CastleStorm.wine'
+        for relative in ('CastleStorm/CastleStorm.exe',
+                         'CastleStorm/_CommonRedist/DirectX/dxwebsetup.exe',
+                         'CastleStorm/unins000.exe', 'windows/regedit.exe',
+                         'Program Files/Internet Explorer/iexplore.exe',
+                         'users/root/AppData/Helper.exe', '.hidden/Other.exe'):
+            path = prefix / 'drive_c' / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+        (prefix / 'autorun.cmd').write_text('#DIR=drive_c/Program Files/myprogram\n#CMD=start.exe\n')
+        outside = self.base / 'outside.exe'; outside.touch()
+        (prefix / 'drive_c/CastleStorm/external.exe').symlink_to(outside)
+        self.assertEqual([row[1] for row in builder.find_exes(prefix, 'drive_c')],
+                         ['drive_c/CastleStorm/CastleStorm.exe'])
+        self.assertEqual(builder.find_exes(prefix), [])
+
     def test_runner_names(self):
         cases = {'wine-11.5-amd64-wow64': 'Vanilla-11.5',
                  'wine-9.17-staging-tkg-amd64': 'TKG-9.17',
