@@ -46,10 +46,23 @@ antimicrox_menu() {
       2 "$(amx_txt 'Désactiver pour un jeu' 'Disable for a game')" \
       3 "$(amx_txt 'Ouvrir l’éditeur de profils' 'Open profile editor')" \
       4 "$(amx_txt 'Lister les manettes détectées' 'List detected controllers')" \
+      5 "$(amx_txt "Installer / mettre à jour AntiMicroX" "Install / update AntiMicroX")" \
+      6 "$(amx_txt "Diagnostic" "Diagnostics")" \
       0 "$(i18n back)")" || return
     case "$choice" in
+      5)
+        if yesno "AntiMicroX" "$(amx_txt "Télécharger AntiMicroX 3.6.1 depuis GitHub et installer dans /userdata ?" "Download AntiMicroX 3.6.1 from GitHub and install under /userdata?")"; then
+          if "$WT_ROOT/helpers/install-antimicrox.sh" > /tmp/uwt-amx-install.log 2>&1; then
+            msgbox "AntiMicroX" "$(amx_txt "Installation terminée. Vérifiez la détection des manettes." "Installation finished. Verify gamepad detection.")"
+          else
+            msgbox "AntiMicroX" "$(amx_txt "Échec de l’installation. Consultez /tmp/uwt-amx-install.log" "Installation failed. Check /tmp/uwt-amx-install.log")"
+          fi
+        fi
+        ;;
+      6)
+        msgbox "AntiMicroX" "$(amx_txt "Binaire : ${bin:-absent}\n/dev/uinput : $([ -w /dev/uinput ] && echo OK || echo indisponible)\nSession : $([ -e "$WT_HOME/state/antimicrox/session" ] && echo active || echo inactive)" "Binary: ${bin:-missing}\n/dev/uinput: $([ -w /dev/uinput ] && echo OK || echo unavailable)\nSession: $([ -e "$WT_HOME/state/antimicrox/session" ] && echo active || echo inactive)")"
+        ;;
       1)
-        [ -n "$bin" ] || { msgbox "AntiMicroX" "$(amx_txt 'Binaire Linux absent. Installation automatique à intégrer avant les tests.' 'Linux binary missing. Automatic installation is not yet implemented.')"; continue; }
         rom="$(amx_choose_game)" || continue
         current="$(awk -F '\t' -v p="$rom" '$1==p {v=$2} END{print v}' "$AMX_OVERRIDES" 2>/dev/null)"
         new_profile="$(input_text "AntiMicroX" "$(amx_txt 'Chemin absolu du profil .amgp dans /userdata :' 'Absolute .amgp profile path under /userdata:')" "$current")" || continue
