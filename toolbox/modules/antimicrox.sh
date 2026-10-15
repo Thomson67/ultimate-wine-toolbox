@@ -13,17 +13,19 @@ amx_running() {
 amx_txt() {
   if [ "$WT_LANGUAGE" = fr ]; then printf '%s' "$1"; else printf '%s' "$2"; fi
 }
-amx_set_profile() {
+amx_set_profile() (
   local rom="$1" profile="$2" tmp
   case "$rom$profile" in *$'\t'*|*$'\n'*) return 1 ;; esac
   mkdir -p "$(dirname "$AMX_OVERRIDES")"
+  exec 8>"$(dirname "$AMX_OVERRIDES")/antimicrox-games.lock"
+  flock -x 8 || return 1
   tmp="$(mktemp "$(dirname "$AMX_OVERRIDES")/.amx.XXXXXX")" || return 1
   if [ -f "$AMX_OVERRIDES" ]; then
     awk -F '\t' -v r="$rom" '$1!=r' "$AMX_OVERRIDES" > "$tmp"
   fi
   [ -z "$profile" ] || printf '%s\t%s\n' "$rom" "$profile" >> "$tmp"
   mv -f -- "$tmp" "$AMX_OVERRIDES"
-}
+)
 amx_choose_game() {
   local -a options=()
   local -a games=()
@@ -78,13 +80,75 @@ amx_editor() {
   return "$rc"
 }
 amx_profile_file() {
-  local current="$1"
+  local current="${1:-}" directory="$WT_HOME/config/antimicrox-profiles" start
+  mkdir -p "$directory"
+  start="$directory/"
+  case "$current" in "$directory/"*) [ ! -f "$current" ] || start="$current" ;; esac
   if command -v yad >/dev/null 2>&1; then
     DISPLAY="${DISPLAY:-:0}" yad --file-selection --title="AntiMicroX — .amgp" \
-      --filename="${current:-/userdata/}" --file-filter='AntiMicroX | *.amgp' 2>/dev/null
+      --filename="$start" --file-filter='AntiMicroX | *.amgp' 2>/dev/null
   else
-    input_text AntiMicroX "$(amx_txt 'Chemin absolu du profil .amgp sous /userdata :' 'Absolute .amgp profile path under /userdata:')" "$current"
+    input_text AntiMicroX "$(amx_txt 'Chemin absolu du profil .amgp sous /userdata :' 'Absolute .amgp profile path under /userdata:')" "$start"
   fi
+}
+amx_profiles_cmd() { python3 "$WT_ROOT/helpers/antimicrox_profiles.py" --home "$WT_HOME" --language "$WT_LANGUAGE" "$@"; }
+amx_profile_info() (
+  local report
+  report="$(mktemp /tmp/uwt-amx-profile.XXXXXX)" || return 1
+  trap 'rm -f -- "$report"' EXIT
+  amx_profiles_cmd report "$1" > "$report" 2>&1 || true
+  if have_dialog; then
+    wt_clear_tty
+    dialog --clear --no-shadow --exit-label "$(i18n back)" --title AntiMicroX --textbox "$report" 24 100
+    wt_clear_tty
+  else
+    cat "$report" >&2
+    read -r -p "$(i18n press_enter)" _
+  fi
+)
+amx_delete_profile_for() {
+  local profile="$1" plan token output
+  if amx_running; then
+    msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX avant de supprimer un profil.' 'Close the game and AntiMicroX before deleting a profile.')"
+    return 1
+  fi
+  plan="$(amx_profiles_cmd plan "$profile" 2>&1)" || {
+    msgbox AntiMicroX "$(amx_txt 'Suppression impossible :' 'Cannot delete profile:')\n$plan"; return 1;
+  }
+  token="${plan%%$'\n'*}"
+  if ! yesno AntiMicroX "$(amx_txt "Supprimer définitivement ce fichier profil ?\n\n${plan#*$'\n'}\n\nToutes ses associations seront également retirées." "Permanently delete this profile file?\n\n${plan#*$'\n'}\n\nAll its game assignments will also be removed.")"; then
+    return 0
+  fi
+  if output="$(amx_profiles_cmd delete "$profile" "$token" 2>&1)"; then
+    msgbox AntiMicroX "$(amx_txt 'Profil supprimé et associations retirées.' 'Profile deleted and assignments removed.')"
+  else
+    msgbox AntiMicroX "$(amx_txt 'Suppression impossible :' 'Could not delete profile:')\n$output"
+    return 1
+  fi
+}
+amx_delete_profiles() {
+  local profile selected output
+  local -a profiles=() options=()
+  while true; do
+    profiles=(); options=()
+    output="$(amx_profiles_cmd list 2>&1)" || { msgbox AntiMicroX "$output"; return 1; }
+    while IFS= read -r profile; do
+      [ -n "$profile" ] || continue
+      profiles+=("$profile")
+      options+=("${#profiles[@]}" "$(basename "$profile") — $(dirname "$profile")")
+    done <<< "$output"
+    selected="$(menu_select AntiMicroX "$(amx_txt 'Supprimer un fichier profil et ses associations' 'Delete a profile file and its assignments')" \
+      "${options[@]}" other "$(amx_txt 'Choisir un autre fichier .amgp' 'Choose another .amgp file')" back "$(i18n back)")" || return 0
+    case "$selected" in
+      other) profile="$(amx_profile_file '')" || continue ;;
+      back|'') return 0 ;;
+      *)
+        [[ "$selected" =~ ^[0-9]+$ ]] || return 0
+        [ "$selected" -ge 1 ] && [ "$selected" -le "${#profiles[@]}" ] || return 0
+        profile="${profiles[$((selected-1))]}" ;;
+    esac
+    amx_delete_profile_for "$profile"
+  done
 }
 amx_validate_profile() {
   local profile="$1"
@@ -111,7 +175,7 @@ amx_associations() {
   awk -F '\t' 'NF==2 && $1!="" {p[$1]=$2} END {for(r in p) if(p[r]!="") print r "\t" p[r]}' "$AMX_OVERRIDES" | LC_ALL=C sort
 }
 amx_manage_game() {
-  local rom="$1" profile choice status shared info
+  local rom="$1" profile choice status shared
   while true; do
     profile="$(amx_current_profile "$rom")"
     [ -n "$profile" ] || return 0
@@ -126,24 +190,11 @@ amx_manage_game() {
       live "$(amx_txt 'Modifier et tester en jeu' 'Edit and test in game')" \
       replace "$(amx_txt 'Remplacer le profil associé' 'Replace the assigned profile')" \
       remove "$(amx_txt 'Retirer l’association (conserver le profil)' 'Remove assignment (keep profile file)')" \
+      delete "$(amx_txt 'Supprimer le fichier profil et ses associations' 'Delete profile file and its assignments')" \
       back "$(i18n back)")" || return
     case "$choice" in
-      info)
-        info="$(python3 - "$profile" "$WT_LANGUAGE" <<'PY'
-from pathlib import Path
-import sys
-import xml.etree.ElementTree as ET
-try:
-    path = Path(sys.argv[1])
-    root = ET.parse(path).getroot()
-    labels = ('Type XML', 'Actions enregistrées', 'Taille (octets)') if sys.argv[2] == 'fr' else ('XML type', 'Recorded actions', 'Size (bytes)')
-    for label, value in zip(labels, (root.tag, len(root.findall('.//slot')), path.stat().st_size)):
-        print(f'{label} : {value}')
-except (OSError, ET.ParseError) as error:
-    print(str(error))
-PY
-)"
-        msgbox AntiMicroX "$profile\n\n$info" ;;
+      info) amx_profile_info "$profile" ;;
+      delete) amx_delete_profile_for "$profile" ;;
       edit) amx_editor "$profile" ;;
       live)
         if [ ! -e "$rom" ]; then
@@ -296,6 +347,7 @@ antimicrox_menu() {
       2 "$(amx_txt 'Gérer les jeux avec un profil associé' 'Manage games with assigned profiles')" \
       1 "$(amx_txt 'Associer un profil à un jeu' 'Assign a game profile')" \
       3 "$(amx_txt 'Ouvrir l’éditeur de profils' 'Open profile editor')" \
+      8 "$(amx_txt 'Supprimer un profil' 'Delete a profile')" \
       4 "$(amx_txt 'Lister les manettes détectées' 'List detected controllers')" \
       5 "$(amx_txt "Installer / mettre à jour AntiMicroX" "Install / update AntiMicroX")" \
       6 "$(amx_txt "Diagnostic" "Diagnostics")" \
@@ -318,6 +370,7 @@ antimicrox_menu() {
         ;;
       2) amx_manage_associations ;;
       3) amx_editor ;;
+      8) amx_delete_profiles ;;
       4)
         [ -n "$bin" ] || { msgbox "AntiMicroX" "$(amx_txt 'Binaire absent.' 'Binary missing.')"; continue; }
         output="$(timeout 15 "$bin" --list 2>&1)"; rc=$?

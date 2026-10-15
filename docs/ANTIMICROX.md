@@ -56,11 +56,28 @@ the same managed runtime, not a different system binary.
 **Gérer les jeux avec un profil associé / Manage games with assigned profiles**
 lists only assigned games, including stale associations whose ROM or profile is
 missing. Each game shows full ROM/profile paths and offers profile details
-(XML type, saved action count and file size), editing the assigned profile,
+(all sets and mappings, keyboard combinations, mouse movement/clicks,
+timed sequences, set changes and advanced slot fields), editing the assigned profile,
 editing/testing it in game, replacing it and removing its assignment. Shared
 profiles are identified before editing. Removal keeps the `.amgp` file and
 other games' assignments, and takes effect on the next game launch. Missing
 games remain removable, but cannot be launched from this menu.
+
+Profile information uses a vertically scrollable, wrapped text viewer. Common
+Qt key codes are decoded to names; unfamiliar/native codes remain visible
+instead of being omitted. Reporting never executes profile commands.
+
+**Supprimer un profil / Delete a profile** is available both in the main
+AntiMicroX menu and for an assigned game. It lists managed profiles, including
+unassigned ones, plus associated external profiles under `/userdata`; a file
+picker can select another `.amgp`. Confirmation shows the selected file and its
+assigned games. Deletion removes the file and all its assignments, preserving
+other profiles. A running mapper blocks deletion. The file is staged on its
+own filesystem and restored if the configuration write fails. Associations are
+locked during updates; a changed file or TSV invalidates an earlier confirmation.
+
+Yad starts in `config/antimicrox-profiles/`, preselecting the current profile
+when it is in that folder. Manual path entry uses the same starting directory.
 
 Associations remain in `config/antimicrox-games.tsv`. Profiles stay at their
 chosen locations under `/userdata`, outside the Wine prefix. This configuration
