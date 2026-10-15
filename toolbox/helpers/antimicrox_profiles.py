@@ -75,6 +75,26 @@ def slot_text(slot, fr):
     return mode + ' [' + ', '.join(f'{e.tag}={e.text or ""}' for e in slot if e.tag != 'mode') + ']'
 
 
+def controller_button(index, fr):
+    # GameControllerSet indexes SDL_GameControllerButton + 1 in profile XML.
+    names = {
+        '1': 'A / Croix' if fr else 'A / Cross',
+        '2': 'B / Rond' if fr else 'B / Circle',
+        '3': 'X / Carré' if fr else 'X / Square',
+        '4': 'Y / Triangle',
+        '5': 'View / Share ou Create' if fr else 'View / Share or Create',
+        '6': 'Xbox / PS', '7': 'Menu / Options',
+        '8': 'Clic LS / L3' if fr else 'LS click / L3',
+        '9': 'Clic RS / R3' if fr else 'RS click / R3',
+        '10': 'LB / L1', '11': 'RB / R1',
+        '12': 'D-pad ↑', '13': 'D-pad ↓', '14': 'D-pad ←', '15': 'D-pad →',
+        '16': 'Share (Xbox) / Micro (PS5)' if fr else 'Share (Xbox) / Mic (PS5)',
+        '21': 'Pavé tactile (clic, PS)' if fr else 'Touchpad click (PS)',
+    }
+    original = ('Bouton ' if fr else 'Button ')+index
+    return names[index]+f' [{original.lower()}]' if index in names else original
+
+
 def report(profile, language='fr'):
     path = Path(profile)
     if path.stat().st_size > 8*1024*1024:
@@ -83,11 +103,17 @@ def report(profile, language='fr'):
     if root.tag not in ('gamecontroller', 'joystick'):
         raise ValueError('Not an AntiMicroX profile')
     fr = language == 'fr'
+    standard = root.tag == 'gamecontroller'
     lines = [str(path), f'{root.tag} — {len(root.findall(".//slot"))} '+('actions enregistrées' if fr else 'recorded actions'),
              ('Taille (octets) : ' if fr else 'Size (bytes): ')+str(path.stat().st_size)]
     if root.findtext('profilename'):
         lines.append(root.findtext('profilename'))
+    if standard:
+        lines.append('Libellés : Xbox / PlayStation ; numéros AntiMicroX entre crochets.' if fr
+                     else 'Labels: Xbox / PlayStation; AntiMicroX numbers in brackets.')
     directions = {'1': '↑', '2': '→', '3': '↗', '4': '↓', '6': '↘', '8': '←', '9': '↖', '12': '↙'}
+    # JoyStickDirections is a clockwise 1..8 enum, NOT SDL's D-pad bitmask.
+    stick_directions = {'1': '↑', '2': '↗', '3': '→', '4': '↘', '5': '↓', '6': '↙', '7': '←', '8': '↖'}
     labels = {'button': ('Bouton', 'Button'), 'stick': ('Stick', 'Stick'),
               'axis': ('Axe', 'Axis'), 'trigger': ('Gâchette', 'Trigger'),
               'dpad': ('Croix', 'D-pad'), 'vdpad': ('Croix virtuelle', 'Virtual D-pad'),
@@ -110,13 +136,21 @@ def report(profile, language='fr'):
             index = button.get('index', '?')
             parent = parents.get(button)
             if button.tag == 'button':
-                label = ('Bouton ' if fr else 'Button ')+index
+                label = controller_button(index, fr) if standard else ('Bouton ' if fr else 'Button ')+index
                 custom = next((e.text for e in root.findall('./names/buttonname') if e.get('index') == index), None)
                 if custom:
                     label += f' ({custom})'
             else:
                 kind = parent.tag if parent is not None else button.tag
-                label = labels.get(kind, (kind, kind))[0 if fr else 1]+' '+(parent.get('index', '?') if parent is not None else '?')
+                parent_index = parent.get('index', '?') if parent is not None else '?'
+                label = labels.get(kind, (kind, kind))[0 if fr else 1]+' '+parent_index
+                if standard and kind == 'stick' and parent_index in ('1', '2'):
+                    label = ({'1': 'Stick gauche (LS)', '2': 'Stick droit (RS)'} if fr else
+                             {'1': 'Left stick (LS)', '2': 'Right stick (RS)'})[parent_index]
+                elif standard and kind == 'trigger' and parent_index in ('1', '2', '5', '6'):
+                    label = 'LT / L2' if parent_index in ('1', '5') else 'RT / R2'
+                elif standard and kind == 'dpad' and parent_index == '1':
+                    label = 'Croix directionnelle' if fr else 'D-pad'
                 if button.tag in ('axisbutton', 'triggerbutton'):
                     label += ' '+{'1': '−', '2': '+'}.get(index, index)
                 elif button.tag == 'stickmodifierbutton':
@@ -124,7 +158,8 @@ def report(profile, language='fr'):
                 elif button.tag == 'sensorbutton':
                     label += ' '+index
                 else:
-                    label += ' '+directions.get(index, index)
+                    direction_names = stick_directions if button.tag == 'stickbutton' else directions
+                    label += ' '+direction_names.get(index, index)
             separator = ' + ' if all(s.findtext('mode', 'keyboard') in ('keyboard', 'mousebutton', 'mousemovement', 'mix') for s in slots) else ' → '
             lines.append(label+' → '+(separator.join(slot_text(s, fr) for s in slots) if slots else ('sans touche' if fr else 'no key')))
             if settings:

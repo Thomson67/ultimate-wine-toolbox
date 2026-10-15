@@ -67,6 +67,14 @@ Profile information uses a vertically scrollable, wrapped text viewer. Common
 Qt key codes are decoded to names; unfamiliar/native codes remain visible
 instead of being omitted. Reporting never executes profile commands.
 
+Standard `gamecontroller` profiles display Xbox / PlayStation labels (A / Cross,
+LB / L1, LS click / L3, LT / L2, etc.) with the AntiMicroX button number retained
+in brackets. Left/right sticks and the D-pad are named explicitly. Generic raw
+`joystick` profiles keep numeric button labels because their physical order is
+device-specific. Stick directions use AntiMicroX's clockwise 1–8 enum; D-pad
+directions use SDL hat bitmasks. Trigger labels support modern indices 5/6 and
+legacy indices 1/2. Custom button names remain visible.
+
 **Supprimer un profil / Delete a profile** is available both in the main
 AntiMicroX menu and for an assigned game. It lists managed profiles, including
 unassigned ones, plus associated external profiles under `/userdata`; a file
