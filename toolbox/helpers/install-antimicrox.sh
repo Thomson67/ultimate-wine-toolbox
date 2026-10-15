@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT=/userdata/system/ultimate-wine-toolbox
 DEST="$ROOT/tools/antimicrox"
-TAG=AntiMicroX-3.6.1
+TAG=3.6.1
 API="https://api.github.com/repos/AntiMicroX/antimicrox/releases/tags/$TAG"
 TMP="$(mktemp -d /userdata/system/.amx-install.XXXXXX)"
 trap 'rm -rf -- "$TMP"' EXIT
@@ -15,6 +15,8 @@ import json,sys
 with open(sys.argv[1]) as f: release=json.load(f)
 assets=release.get("assets",[])
 found=[a for a in assets if a["name"].lower().endswith(".appimage") and any(v in a["name"].lower() for v in ("x86_64","amd64"))]
+# Exclude diagnostic builds; the release ships regular and debug AppImages.
+found=[a for a in found if "debug" not in a["name"].lower()]
 # Official releases can ship both Qt5 and Qt6 builds. Prefer Qt6 on
 # Batocera 43 while rejecting genuinely ambiguous asset selections.
 qt6=[a for a in found if "qt6" in a["name"].lower().replace("-", "").replace("_", "")]
