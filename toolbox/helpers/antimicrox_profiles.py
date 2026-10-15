@@ -160,8 +160,8 @@ def report(profile, language='fr'):
                 else:
                     direction_names = stick_directions if button.tag == 'stickbutton' else directions
                     label += ' '+direction_names.get(index, index)
-            separator = ' + ' if all(s.findtext('mode', 'keyboard') in ('keyboard', 'mousebutton', 'mousemovement', 'mix') for s in slots) else ' → '
-            lines.append(label+' → '+(separator.join(slot_text(s, fr) for s in slots) if slots else ('sans touche' if fr else 'no key')))
+            separator = ' + ' if all(s.findtext('mode', 'keyboard') in ('keyboard', 'mousebutton', 'mousemovement', 'mix') for s in slots) else ' ; '
+            lines.append(label+' : '+(separator.join(slot_text(s, fr) for s in slots) if slots else ('sans touche' if fr else 'no key')))
             if settings:
                 lines.append('    '+', '.join(settings))
         if not found:

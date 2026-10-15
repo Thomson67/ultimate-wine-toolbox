@@ -37,13 +37,13 @@ class ProfileTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             _, profile, _ = self.fixture(folder)
             result = report(profile)
-            for expected in ['A / Croix [bouton 1] (Saut) → Espace', 'B / Rond [bouton 2] → Ctrl + C',
-                             'Stick gauche (LS) ↑ → W', 'Axe 3 + → clic droit', 'Croix directionnelle ← → Souris ←',
+            for expected in ['A / Croix [bouton 1] (Saut) : Espace', 'B / Rond [bouton 2] : Ctrl + C',
+                             'Stick gauche (LS) ↑ : W', 'Axe 3 + : clic droit', 'Croix directionnelle ← : Souris ←',
                              '(Alt + F1)', 'Ensemble 2', 'setselect=3', 'Pause 300 ms',
                              'Texte : "hello"', 'future [code=17]']:
                 self.assertIn(expected, result)
             self.assertTrue(all(len(line) <= 88 for line in result.splitlines()))
-            self.assertIn('A / Cross [button 1] (Saut) → Space', report(profile, 'en'))
+            self.assertIn('A / Cross [button 1] (Saut) : Space', report(profile, 'en'))
             self.assertEqual(key_name('0x60000100'), 'Key code 0x60000100')
 
     def test_delete_removes_shared_references_but_keeps_other_profiles(self):
@@ -129,8 +129,8 @@ class ProfileTests(unittest.TestCase):
                                 ('Clic LS / L3', 8), ('Clic RS / R3', 9),
                                 ('LB / L1', 10), ('RB / R1', 11), ('D-pad ↑', 12),
                                 ('Pavé tactile (clic, PS)', 21)]:
-                self.assertIn(f'{name} [bouton {index}] → A', text)
-            self.assertIn('Bouton 22 → A', text)
+                self.assertIn(f'{name} [bouton {index}] : A', text)
+            self.assertIn('Bouton 22 : A', text)
 
     def test_stick_direction_numbers_differ_from_dpad_and_triggers_have_aliases(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -145,20 +145,20 @@ class ProfileTests(unittest.TestCase):
                 '</set></sets></gamecontroller>')
             text = report(profile)
             for arrow in ('↑', '→', '↓', '←'):
-                self.assertIn(f'Stick gauche (LS) {arrow} → A', text)
-            self.assertIn('Stick droit (RS) ↗ → A', text)
-            self.assertIn('Croix directionnelle ↗ → A', text)
-            self.assertEqual(text.count('LT / L2 + → A'), 2)
-            self.assertEqual(text.count('RT / R2 + → A'), 2)
+                self.assertIn(f'Stick gauche (LS) {arrow} : A', text)
+            self.assertIn('Stick droit (RS) ↗ : A', text)
+            self.assertIn('Croix directionnelle ↗ : A', text)
+            self.assertEqual(text.count('LT / L2 + : A'), 2)
+            self.assertEqual(text.count('RT / R2 + : A'), 2)
 
     def test_raw_joystick_profiles_keep_numbers_without_guessing_console_layout(self):
         with tempfile.TemporaryDirectory() as folder:
             _, profile, _ = self.fixture(folder)
             profile.write_text(PROFILE.replace('gamecontroller', 'joystick'))
             text = report(profile)
-            self.assertIn('Bouton 1 (Saut) → Espace', text)
+            self.assertIn('Bouton 1 (Saut) : Espace', text)
             self.assertNotIn('A / Croix', text)
-            self.assertIn('Stick 1 ↑ → W', text)
+            self.assertIn('Stick 1 ↑ : W', text)
 
     def test_profile_list_includes_unassigned_and_external_assigned_files(self):
         with tempfile.TemporaryDirectory() as folder:
