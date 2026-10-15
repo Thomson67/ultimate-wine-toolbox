@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT=/userdata/system/ultimate-wine-toolbox
 DEST="$ROOT/tools/antimicrox"
-TAG=3.6.1
+TAG=AntiMicroX-3.6.1
 API="https://api.github.com/repos/AntiMicroX/antimicrox/releases/tags/$TAG"
 TMP="$(mktemp -d /userdata/system/.amx-install.XXXXXX)"
 trap 'rm -rf -- "$TMP"' EXIT
