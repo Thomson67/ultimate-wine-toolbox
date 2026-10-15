@@ -155,6 +155,18 @@ cat "$AMX_OVERRIDES"
             base = Path(folder); hook, rom = self.hook_fixture(base)
             helpers = base/'toolbox/helpers'; helpers.mkdir(parents=True)
             (helpers/'antimicrox_live.py').write_text((ROOT/'toolbox/helpers/antimicrox_live.py').read_text())
+            (helpers/'antimicrox_focus.py').write_text('''import os, sys, json
+from pathlib import Path
+try:
+    os.fstat(9)
+    raise RuntimeError('hook lock inherited by focus observer')
+except OSError:
+    pass
+(Path(os.environ['WT_HOME'])/'focus-args').write_text(json.dumps(sys.argv[1:]))
+''')
+            commands = base/'bin'; commands.mkdir()
+            popup = commands/'batocera-flash-screen'
+            popup.write_text('#!/bin/sh\nexit 0\n'); popup.chmod(0o755)
             state = base/'state'; state.mkdir()
             profile = str(base/'My Profile.amgp')
             (state/'antimicrox-live.json').write_text(json.dumps({'rom': rom, 'profile': profile, 'phase': 'prepared'}))
@@ -162,7 +174,7 @@ cat "$AMX_OVERRIDES"
             text = binary.read_text().replace('import os, signal, time', 'import os, signal, time, sys, json')
             text = text.replace("base.mkdir(parents=True)", "base.mkdir(parents=True)\n(base.parent.parent/'args').write_text(json.dumps(sys.argv[1:]))")
             binary.write_text(text)
-            env = dict(os.environ, WT_HOME=folder)
+            env = dict(os.environ, WT_HOME=folder, PATH=str(commands)+os.pathsep+os.environ['PATH'])
             session = state/'antimicrox/session'; pid = None
             try:
                 result = subprocess.run(['bash', str(hook), 'gameStart', 'windows', '', '', rom],
@@ -175,6 +187,8 @@ cat "$AMX_OVERRIDES"
                 self.assertNotIn('--no-tray', args)
                 self.assertEqual(args[args.index('--profile')+1], profile)
                 self.assertEqual(json.loads((state/'antimicrox-live.json').read_text())['phase'], 'running')
+                focus_args = json.loads((base/'focus-args').read_text())
+                self.assertEqual(focus_args[:4], ['spawn', rom, str(pid), '12345'])
                 stop = subprocess.run(['bash', str(hook), 'gameStop', 'windows', '', '', rom],
                                       env=env, capture_output=True, timeout=8)
                 self.assertEqual(stop.returncode, 0)

@@ -124,6 +124,19 @@ sessions use the regular `antimicrox.log`.
 
 Automated tests exercise transactions, restoration, existing/concurrent rules,
 compressed and directory ROMs, visible hook arguments and return dispatch.
+On the reported Batocera session, Wine required a second round trip before
+accepting input after Alt+Tab. Opening and closing Batocera's GTK information
+popup restored input. Live sessions now launch a detached XWayland activation
+observer: after a stable transition from the managed editor to a Wine X11
+window, it confirms ES still runs the same ROM and invokes the tested
+`batocera-flash-screen` popup for 0.3 seconds (small “Retour au jeu” banner).
+It never sends F2 or gameplay keys. Other applications, initial game launch,
+normal profile playback and the popup's own return do not trigger a refresh.
+The observer exits when the mapping PID, start time or live session changes.
+This covers XWayland Wine windows; native winewayland windows are not detected
+by this observer. The manual popup has been confirmed on Batocera; automated
+return detection still requires validation there.
+
 Real Alt+Tab focus, player 1 hotkey handling, full-screen Wine/UMU and possible
 simultaneous button actions remain to be validated on Batocera. Alt+Tab cycles
 compositor windows; games with additional launcher windows may expose those too.

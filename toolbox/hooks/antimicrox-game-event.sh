@@ -109,6 +109,9 @@ stamp="$(proc_start "$pid")"
 printf '%s\t%s\t%s\n' "$rom" "$pid" "$stamp" > "$session"
 if [ "$live" -eq 1 ]; then
   python3 "$LIVE_HELPER" --home "$ROOT" mark "$rom" --phase running >> "$LOG" 2>&1 || true
+  if [ -f "$ROOT/toolbox/helpers/antimicrox_focus.py" ] && command -v batocera-flash-screen >/dev/null 2>&1; then
+    python3 "$ROOT/toolbox/helpers/antimicrox_focus.py" spawn "$rom" "$pid" "$stamp" --home "$ROOT" >> "$LOG" 2>&1 9>&- || true
+  fi
 fi
 log "started $rom pid=$pid profile=$real live=$live"
 exit 0
