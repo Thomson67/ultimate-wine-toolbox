@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import stat
 import tempfile
+import uuid
 import xml.etree.ElementTree as ET
 
 MARKER = 'UWT AntiMicroX live Alt-Tab'
@@ -105,7 +106,7 @@ class LiveSession:
             if not valid_profile(profile):
                 raise ValueError('Invalid AntiMicroX XML profile.')
             mode = stat.S_IMODE(keys.stat().st_mode) if keys.exists() else 0o644
-            data = {'rom': str(rom), 'profile': str(profile), 'phase': 'preparing',
+            data = {'session_id': uuid.uuid4().hex, 'rom': str(rom), 'profile': str(profile), 'phase': 'preparing',
                     'keys': str(keys), 'original': base64.b64encode(original).decode() if original is not None else None,
                     'mode': mode, 'injected_sha256': digest(injected), 'displaced': displaced,
                     'result': '', 'error': ''}

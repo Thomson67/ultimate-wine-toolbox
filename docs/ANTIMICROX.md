@@ -72,7 +72,15 @@ profile, or a new one. New profiles are stored in `config/antimicrox-profiles`
 with a game name and path hash, outside the prefix. An existing unassociated
 profile at that path is reused, never overwritten with an empty profile.
 
-The Toolbox closes its terminal and launches the game through EmulationStation.
+The Toolbox closes its terminal and starts a detached observer with inherited
+file descriptors closed. Its Ports launcher exits before the observer requests
+the game through EmulationStation. The observer waits for the Ports session to
+be released and confirms the exact ROM `path` returned by `/runningGame`;
+HTTP 200 alone is not a successful launch. An already-active requested game is
+observed without a duplicate launch. Another active game is not interrupted.
+This fixes the reported black screen where ES still ran the Toolbox port and
+the old monitor mistook that port for the game while waiting for itself to exit.
+The actual display/input handoff remains to be retested on Batocera.
 Its Windows game hook starts one visible AntiMicroX editing instance with that
 profile, uinput, isolated settings and the enlarged window. The editor does not
 use `--no-tray`, avoiding the Settings OK crash.
@@ -117,6 +125,7 @@ compositor windows; games with additional launcher windows may expose those too.
 - Installation: `/tmp/uwt-amx-install.log`
 - Editor: `/userdata/system/logs/ultimate-wine-toolbox/antimicrox-editor.log`
 - Game lifecycle: `/userdata/system/logs/ultimate-wine-toolbox/antimicrox.log`
+- Detached launch: `/userdata/system/logs/ultimate-wine-toolbox/antimicrox-handoff.log`
 
 Automated checks cover asset selection, inherited Qt settings, extraction of an
 old download, editor failure reporting, associations, and start/stop locking

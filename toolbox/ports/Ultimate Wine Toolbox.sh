@@ -335,6 +335,17 @@ if [ -f "$LAUNCH_REQUEST" ]; then
     echo "es_launch_requested=1" >>"$BOOT_LOG"
 fi
 
+# A Ports process must exit before ES can honor another /launch request.
+# Keep the AMX observer outside configgen's process group and close inherited FDs.
+if [ -n "$launch_rom" ] && [ -f "$AMX_REQUEST" ]; then
+    if ! python3 /userdata/system/ultimate-wine-toolbox/toolbox/helpers/antimicrox_handoff.py \
+        spawn "$launch_rom" >> "$BOOT_LOG" 2>&1; then
+        finish_amx_live launch_failed || true
+        echo 'ERROR: failed to detach AntiMicroX launch; reopen Toolbox to recover.' >> "$BOOT_LOG"
+    fi
+    exit "$rc"
+fi
+
 if [ -f "$RESTART_REQUEST" ]; then
     rm -f -- "$RESTART_REQUEST"
     {
