@@ -98,7 +98,7 @@ else
   export XDG_CONFIG_HOME="$STATE/runtime-config"
   rm -rf -- "$XDG_CONFIG_HOME"
   mkdir -p "$XDG_CONFIG_HOME"
-  args=(--hidden --no-tray --eventgen uinput --profile "$real")
+  args=(--hidden --no-tray --eventgen uinput --log-level info --profile "$real")
 fi
 "$binary" "${args[@]}" >> "$LOG" 2>&1 9>&- &
 pid=$!

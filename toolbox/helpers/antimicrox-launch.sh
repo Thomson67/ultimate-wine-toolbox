@@ -28,4 +28,13 @@ export QT_PLUGIN_PATH="$DIR/squashfs-root/usr/plugins"
 export QT_QPA_PLATFORM_PLUGIN_PATH="$QT_PLUGIN_PATH/platforms"
 export DISPLAY="${DISPLAY:-:0}"
 export SDL_VIDEODRIVER=x11
+# Upstream 3.6.1 never registers QXmlStreamReader*, so queued profile loads
+# silently time out. Register that one type before main(), using bundled Qt6.
+if [ -f "$DIR/squashfs-root/usr/lib/libQt6Core.so.6" ]; then
+  compat="$DIR/register-xml-reader.so"
+  python3 "$ROOT/toolbox/helpers/antimicrox_compat.py" "$compat"
+  echo 'Qt6 XML profile reader compatibility enabled' >&2
+  # Resolve AppRun's symlink before exec: its RUNPATH is relative to usr/bin.
+  exec env LD_PRELOAD="$compat" "$(readlink -f -- "$APP")" "$@"
+fi
 exec "$APP" "$@"

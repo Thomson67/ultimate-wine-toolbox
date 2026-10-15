@@ -21,6 +21,14 @@ plugin directory, preserves DISPLAY and defaults to `:0` when unset. A different
 X server or a missing dependency can still prevent startup; menus now expose
 errors instead of reporting an unverified successful launch.
 
+The wrapper also registers the missing `QXmlStreamReader*` Qt6 type before
+AntiMicroX starts. Without this upstream 3.6.1 workaround, profile loading can
+report `Cannot queue arguments` and `Could not open mutex_read_config`, leaving
+a running mapper with no loaded actions. The checked, process-local library
+and its rebuildable source are in `toolbox/compat/antimicrox`. A native queued
+XML regression test passes against the official bundled Qt libraries; actual
+mapping on Batocera remains to be confirmed. Existing profiles are preserved.
+
 1. Open **Outils et compatibilité / Tools and compatibility → AntiMicroX**.
 2. Install AntiMicroX if not already downloaded.
 3. Open the profile editor, save an `.amgp` under `/userdata`, then close it.
