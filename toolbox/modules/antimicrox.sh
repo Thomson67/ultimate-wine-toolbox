@@ -58,7 +58,9 @@ amx_editor() {
    if [ -f "${WT_ROOT:-}/helpers/antimicrox_editor.py" ]; then
      python3 "$WT_ROOT/helpers/antimicrox_editor.py" "$XDG_CONFIG_HOME" || echo 'WARNING: editor geometry preparation failed'
    fi
-   "$bin" --show --no-tray --eventgen uinput --log-level debug) > "$log" 2>&1
+   # 3.6.1 unconditionally rebuilds trayIconMenu when Settings is accepted.
+   # --no-tray leaves it null and causes a reproducible QMenu::clear SIGSEGV.
+   "$bin" --show --eventgen uinput --log-level info) > "$log" 2>&1
   rc=$?
   if [ "$rc" -ne 0 ]; then
     msgbox AntiMicroX "$(amx_txt "Échec de l’éditeur (code $rc). Journal : $log" "Editor failed (code $rc). Log: $log")\n$(tail -n 12 "$log")"

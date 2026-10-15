@@ -79,6 +79,25 @@ amx_editor
             self.assertIn('code 42', result.stdout)
             self.assertIn('Qt failed to load', result.stdout)
 
+    def test_editor_initializes_tray_menu_needed_by_settings_ok(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder); binary = base/'tools/antimicrox/antimicrox'
+            binary.parent.mkdir(parents=True)
+            binary.write_text('#!/bin/bash\nprintf "%s\\n" "$@" > "$WT_HOME/args"\n')
+            binary.chmod(0o755)
+            env = dict(os.environ, WT_HOME=folder, WT_LANGUAGE='fr', MODULE=str(ROOT/'toolbox/modules/antimicrox.sh'))
+            result = self.run_bash('''source "$MODULE"
+pgrep() { return 1; }
+amx_log_path() { printf '%s/editor.log' "$WT_HOME"; }
+msgbox() { return 0; }
+amx_editor
+''', env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            args = (base/'args').read_text().splitlines()
+            self.assertIn('--show', args)
+            self.assertNotIn('--no-tray', args)
+            self.assertEqual(args[args.index('--eventgen')+1], 'uinput')
+
     def test_associations_handle_spaces_brackets_replacement_and_disable(self):
         with tempfile.TemporaryDirectory() as folder:
             env = dict(os.environ, WT_HOME=folder, WT_LANGUAGE='fr', MODULE=str(ROOT/'toolbox/modules/antimicrox.sh'))
