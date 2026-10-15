@@ -1,5 +1,5 @@
 #!/bin/bash
-# Native AntiMicroX game-event hook (never modifies Wine prefixes).
+# AntiMicroX lifecycle: one managed mapping at a time, never kill unrelated instances.
 set -u
 ROOT=/userdata/system/ultimate-wine-toolbox
 CFG="$ROOT/config/antimicrox-games.tsv"
@@ -11,39 +11,45 @@ rom="${5:-}"
 [ -n "$rom" ] || exit 0
 mkdir -p "$STATE" "$(dirname "$LOG")"
 log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
-# Derive file key from full ROM path, avoiding collisions between game names.
-key="$(printf '%s' "$rom" | sha256sum | awk '{print $1}')"
-pidfile="$STATE/$key.pid"
+exec 9>"$STATE/lock"
+flock -x 9 || exit 0
+# A single running profile prevents conflicting mappings and joystick drift.
+session="$STATE/session"
+proc_start() { [ -r "/proc/$1/stat" ] && awk '{print $22}' "/proc/$1/stat" || true; }
 stop_owned() {
-  [ -f "$pidfile" ] || return 0
-  local pid
-  pid="$(cat "$pidfile" 2>/dev/null || true)"
-  rm -f -- "$pidfile"
+  [ -f "$session" ] || return 0
+  local oldrom pid stamp actual cmd
+  IFS=$'\t' read -r oldrom pid stamp < "$session" || true
+  rm -f -- "$session"
   case "$pid" in ''|*[!0-9]*) return 0 ;; esac
-  # Only stop a process launched by us, and never kill an arbitrary reused PID.
-  if [ -r "/proc/$pid/cmdline" ] && tr '\0' ' ' < "/proc/$pid/cmdline" | grep -qi 'antimicrox'; then
-    kill "$pid" 2>/dev/null || true
-    log "stopped $rom pid=$pid"
+  actual="$(proc_start "$pid")"
+  if [ -n "$actual" ] && [ "$actual" = "$stamp" ]; then
+    cmd="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+    case "${cmd,,}" in *antimicrox*) kill "$pid" 2>/dev/null || true; log "stopped $oldrom pid=$pid" ;; esac
   fi
 }
-if [ "$1" = gameStop ]; then stop_owned; exit 0; fi
+if [ "$1" = gameStop ]; then
+  [ -f "$session" ] || exit 0
+  IFS=$'\t' read -r oldrom _ < "$session" || true
+  [ "$oldrom" = "$rom" ] && stop_owned
+  exit 0
+fi
 [ -f "$CFG" ] || exit 0
 profile="$(awk -F '\t' -v p="$rom" '$1==p {v=$2} END {print v}' "$CFG")"
 [ -n "$profile" ] || exit 0
-[ -f "$profile" ] || { log "missing profile for $rom: $profile"; exit 0; }
-case "$profile" in /userdata/*) ;; *) log "refused profile outside /userdata"; exit 0 ;; esac
-if command -v antimicrox >/dev/null 2>&1; then
-  binary="$(command -v antimicrox)"
-elif [ -x "$ROOT/tools/antimicrox/antimicrox" ]; then
-  binary="$ROOT/tools/antimicrox/antimicrox"
-else
-  log "AntiMicroX binary missing for $rom"
-  exit 0
-fi
-if [ ! -e /dev/uinput ]; then log "uinput unavailable, refusing Wayland start for $rom"; exit 0; fi
+[ -f "$profile" ] || { log "profile missing $rom"; exit 0; }
+real="$(readlink -f -- "$profile" 2>/dev/null || true)"
+case "$real" in /userdata/*) ;; *) log "profile refused (outside /userdata)"; exit 0 ;; esac
+binary="$ROOT/tools/antimicrox/antimicrox"
+[ -x "$binary" ] || { log "AntiMicroX not installed"; exit 0; }
+[ -w /dev/uinput ] || { log "uinput unavailable or not writable"; exit 0; }
 stop_owned
-"$binary" --hidden --no-tray --eventgen uinput --profile "$profile" >> "$LOG" 2>&1 &
+"$binary" --hidden --no-tray --eventgen uinput --profile "$real" >> "$LOG" 2>&1 &
 pid=$!
-printf '%s\n' "$pid" > "$pidfile"
-log "started $rom pid=$pid profile=$profile"
+sleep 0.2
+kill -0 "$pid" 2>/dev/null || { log "AntiMicroX exited early"; exit 0; }
+stamp="$(proc_start "$pid")"
+[ -n "$stamp" ] || exit 0
+printf '%s\t%s\t%s\n' "$rom" "$pid" "$stamp" > "$session"
+log "started $rom pid=$pid profile=$real"
 exit 0
