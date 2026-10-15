@@ -29,7 +29,12 @@ errors instead of reporting an unverified successful launch.
 5. Launch that game from EmulationStation, then close it and check the log.
 
 The editor runs in the foreground, with no tray and no success popup obscuring
-its window. Editor failures include the exit code and log excerpt. Controller
+its window. Editor failures include the exit code and log excerpt. The editor window is enlarged
+to 1600×900 where the monitor permits it, with a margin on smaller displays;
+larger saved sizes are retained if they fit. Only Qt geometry keys are changed.
+Debug logging is enabled for the experimental editor and the previous editor
+log is preserved as `antimicrox-editor.previous.log`. A SIGSEGV during editing
+has been reported on Batocera; its cause is not yet established. Controller
 listing and the version diagnostic have timeouts. Editor and game hooks use
 the same managed runtime, not a different system binary.
 

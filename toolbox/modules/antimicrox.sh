@@ -50,9 +50,15 @@ amx_editor() {
     return 1
   fi
   msgbox AntiMicroX "$(amx_txt 'L’éditeur va s’ouvrir. Enregistrez votre profil .amgp sous /userdata, puis fermez l’éditeur pour revenir à la Toolbox.' 'The editor will open. Save your .amgp profile under /userdata, then close the editor to return to the Toolbox.')"
+  [ ! -f "$log" ] || cp -f -- "$log" "${log%.log}.previous.log"
   # Foreground: no success popup hiding the Qt window; no orphaned editor.
   (export XDG_CONFIG_HOME="$WT_HOME/config/antimicrox-editor"
-   "$bin" --show --no-tray --eventgen uinput) > "$log" 2>&1
+   printf '===== AntiMicroX editor %s =====\nDISPLAY=%s WAYLAND_DISPLAY=%s\n' "$(date -Iseconds)" "${DISPLAY:-:0}" "${WAYLAND_DISPLAY:-unset}"
+   # Source-tree tests may only load this module; installed packages include it.
+   if [ -f "${WT_ROOT:-}/helpers/antimicrox_editor.py" ]; then
+     python3 "$WT_ROOT/helpers/antimicrox_editor.py" "$XDG_CONFIG_HOME" || echo 'WARNING: editor geometry preparation failed'
+   fi
+   "$bin" --show --no-tray --eventgen uinput --log-level debug) > "$log" 2>&1
   rc=$?
   if [ "$rc" -ne 0 ]; then
     msgbox AntiMicroX "$(amx_txt "Échec de l’éditeur (code $rc). Journal : $log" "Editor failed (code $rc). Log: $log")\n$(tail -n 12 "$log")"
