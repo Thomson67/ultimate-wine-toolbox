@@ -218,8 +218,8 @@ declare -gA I18N=(
   [runner_uninstall_done]="Les runners sélectionnés ont été supprimés."
   [runner_uninstall_partial]="La suppression est terminée avec une ou plusieurs erreurs."
 
-  [graphics_title]="Graphismes & performances"
-  [graphics_intro]="Choisissez la fonctionnalité graphique ou de performance à configurer."
+  [graphics_title]="Outils et compatibilité"
+  [graphics_intro]="Outils graphiques, compatibilité et manettes."
   [enabled]="Activé"
   [disabled]="Désactivé"
   [mangohud_profile_title]="Profil d’affichage"
