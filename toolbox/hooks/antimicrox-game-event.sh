@@ -55,29 +55,60 @@ if [ "$1" = gameStop ]; then
   exit 0
 fi
 stop_owned
-[ -f "$CFG" ] || exit 0
-profile="$(awk -F '\t' -v p="$rom" '$1==p {v=$2} END {print v}' "$CFG")"
+LIVE_HELPER="$ROOT/toolbox/helpers/antimicrox_live.py"
+live=0
+profile=""
+if [ -f "$ROOT/state/antimicrox-live.json" ] && [ -f "$LIVE_HELPER" ]; then
+  profile="$(python3 "$LIVE_HELPER" --home "$ROOT" profile "$rom" 2>> "$LOG")"
+  if [ -n "$profile" ]; then
+    live=1
+  else
+    python3 "$LIVE_HELPER" --home "$ROOT" finish --result interrupted >> "$LOG" 2>&1 || true
+  fi
+fi
+if [ "$live" -eq 0 ]; then
+  [ -f "$CFG" ] || exit 0
+  profile="$(awk -F '\t' -v p="$rom" '$1==p {v=$2} END {print v}' "$CFG")"
+fi
+live_error() {
+  log "$*"
+  [ "$live" -eq 0 ] || python3 "$LIVE_HELPER" --home "$ROOT" mark "$rom" --error "$*" >> "$LOG" 2>&1 || true
+}
 [ -n "$profile" ] || exit 0
-[ -f "$profile" ] || { log "profile missing $rom"; exit 0; }
+[ -f "$profile" ] || { live_error "profile missing $rom"; exit 0; }
 real="$(readlink -f -- "$profile" 2>/dev/null || true)"
 case "$real" in /userdata/*) ;; *) log "profile refused (outside /userdata)"; exit 0 ;; esac
 binary="$ROOT/tools/antimicrox/antimicrox"
-[ -x "$binary" ] || { log "AntiMicroX not installed"; exit 0; }
-[ -w /dev/uinput ] || { log "uinput unavailable or not writable"; exit 0; }
+[ -x "$binary" ] || { live_error "AntiMicroX not installed"; exit 0; }
+[ -w /dev/uinput ] || { live_error "uinput unavailable or not writable"; exit 0; }
 # AntiMicroX uses single-instance IPC; never change another user's mapping.
-if pgrep -x antimicrox >/dev/null 2>&1; then
-  log "AntiMicroX already running outside this game session; launch refused"; exit 0
+if pgrep -x antimicrox >/dev/null 2>&1 ||
+   pgrep -f "^$ROOT/tools/antimicrox/squashfs-root/(AppRun|usr/bin/antimicrox)([[:space:]]|$)" >/dev/null 2>&1; then
+  live_error "AntiMicroX already running outside this game session; launch refused"; exit 0
 fi
-# Never auto-load a previous game's saved mappings or auto-profile settings.
-export XDG_CONFIG_HOME="$STATE/runtime-config"
-rm -rf -- "$XDG_CONFIG_HOME"
-mkdir -p "$XDG_CONFIG_HOME"
-"$binary" --hidden --no-tray --eventgen uinput --profile "$real" >> "$LOG" 2>&1 9>&- &
+if [ "$live" -eq 1 ]; then
+  # One visible editing instance for this game, with an isolated settings home.
+  export XDG_CONFIG_HOME="$STATE/live-config"
+  rm -rf -- "$XDG_CONFIG_HOME"
+  mkdir -p "$XDG_CONFIG_HOME"
+  python3 "$ROOT/toolbox/helpers/antimicrox_editor.py" "$XDG_CONFIG_HOME" >> "$LOG" 2>&1 || true
+  args=(--show --eventgen uinput --log-level info --profile "$real")
+else
+  # Never auto-load a previous game's saved mappings or auto-profile settings.
+  export XDG_CONFIG_HOME="$STATE/runtime-config"
+  rm -rf -- "$XDG_CONFIG_HOME"
+  mkdir -p "$XDG_CONFIG_HOME"
+  args=(--hidden --no-tray --eventgen uinput --profile "$real")
+fi
+"$binary" "${args[@]}" >> "$LOG" 2>&1 9>&- &
 pid=$!
 sleep 1
-kill -0 "$pid" 2>/dev/null || { log "AntiMicroX exited early"; exit 0; }
+kill -0 "$pid" 2>/dev/null || { live_error "AntiMicroX exited early"; exit 0; }
 stamp="$(proc_start "$pid")"
 [ -n "$stamp" ] || exit 0
 printf '%s\t%s\t%s\n' "$rom" "$pid" "$stamp" > "$session"
-log "started $rom pid=$pid profile=$real"
+if [ "$live" -eq 1 ]; then
+  python3 "$LIVE_HELPER" --home "$ROOT" mark "$rom" --phase running >> "$LOG" 2>&1 || true
+fi
+log "started $rom pid=$pid profile=$real live=$live"
 exit 0

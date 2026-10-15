@@ -150,6 +150,40 @@ cat "$AMX_OVERRIDES"
                     try: os.kill(pid, 9)
                     except ProcessLookupError: pass
 
+    def test_live_hook_opens_one_visible_instance_without_no_tray(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder); hook, rom = self.hook_fixture(base)
+            helpers = base/'toolbox/helpers'; helpers.mkdir(parents=True)
+            (helpers/'antimicrox_live.py').write_text((ROOT/'toolbox/helpers/antimicrox_live.py').read_text())
+            state = base/'state'; state.mkdir()
+            profile = str(base/'My Profile.amgp')
+            (state/'antimicrox-live.json').write_text(json.dumps({'rom': rom, 'profile': profile, 'phase': 'prepared'}))
+            binary = base/'tools/antimicrox/antimicrox'
+            text = binary.read_text().replace('import os, signal, time', 'import os, signal, time, sys, json')
+            text = text.replace("base.mkdir(parents=True)", "base.mkdir(parents=True)\n(base.parent.parent/'args').write_text(json.dumps(sys.argv[1:]))")
+            binary.write_text(text)
+            env = dict(os.environ, WT_HOME=folder)
+            session = state/'antimicrox/session'; pid = None
+            try:
+                result = subprocess.run(['bash', str(hook), 'gameStart', 'windows', '', '', rom],
+                                        env=env, text=True, capture_output=True, timeout=8)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                pid = int(session.read_text().split('\t')[1])
+                args = json.loads((base/'args').read_text())
+                self.assertIn('--show', args)
+                self.assertNotIn('--hidden', args)
+                self.assertNotIn('--no-tray', args)
+                self.assertEqual(args[args.index('--profile')+1], profile)
+                self.assertEqual(json.loads((state/'antimicrox-live.json').read_text())['phase'], 'running')
+                stop = subprocess.run(['bash', str(hook), 'gameStop', 'windows', '', '', rom],
+                                      env=env, capture_output=True, timeout=8)
+                self.assertEqual(stop.returncode, 0)
+                self.assertFalse(session.exists())
+            finally:
+                if pid:
+                    try: os.kill(pid, 9)
+                    except ProcessLookupError: pass
+
     def test_unconfigured_next_game_cleans_stale_mapping(self):
         with tempfile.TemporaryDirectory() as folder:
             base = Path(folder); hook, rom = self.hook_fixture(base)

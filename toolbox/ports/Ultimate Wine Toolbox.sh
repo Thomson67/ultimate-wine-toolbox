@@ -11,6 +11,8 @@ RESUME_REQUEST="$STATE_DIR/resume-wsq.request"
 RESULT_FILE="$STATE_DIR/wsq-launch-result"
 DIAG_REQUEST="$STATE_DIR/reshade-diagnostic.json"
 RESUME_ENV=WT_AUTO_RESUME_WSQ
+AMX_REQUEST="$STATE_DIR/antimicrox-live.json"
+AMX_HELPER=/userdata/system/ultimate-wine-toolbox/toolbox/helpers/antimicrox_live.py
 
 mkdir -p "$LOG_DIR" "$STATE_DIR"
 export DISPLAY="${DISPLAY:-:0}"
@@ -84,7 +86,10 @@ fi
 
 resume_requested=0
 if [ -f "$RESUME_REQUEST" ]; then
-    [ "$(cat "$RESUME_REQUEST")" != reshade ] || RESUME_ENV=WT_AUTO_RESUME_RESH
+    case "$(cat "$RESUME_REQUEST")" in
+        reshade) RESUME_ENV=WT_AUTO_RESUME_RESH ;;
+        antimicrox) RESUME_ENV=WT_AUTO_RESUME_AMX ;;
+    esac
     rm -f -- "$RESUME_REQUEST"
     resume_requested=1
     echo "wsq_resume_request_consumed=1" >>"$BOOT_LOG"
@@ -230,9 +235,15 @@ wait_for_game_stop() {
     done
 }
 
+finish_amx_live() {
+    /bin/bash /userdata/system/ultimate-wine-toolbox/toolbox/hooks/antimicrox-game-event.sh \
+        amxStop windows '' '' "${launch_rom:-live}" >> "$BOOT_LOG" 2>&1
+    python3 "$AMX_HELPER" finish --result "$1" >> "$BOOT_LOG" 2>&1
+}
+
 monitor_wsq_launch() {
     local result diagnostic_pid=""
-    if [ -f "$DIAG_REQUEST" ]; then
+    if [ ! -f "$AMX_REQUEST" ] && [ -f "$DIAG_REQUEST" ]; then
         python3 /userdata/system/ultimate-wine-toolbox/toolbox/helpers/reshade_diagnostic.py \
             --home /userdata/system/ultimate-wine-toolbox observe "$launch_rom" >> "$BOOT_LOG" 2>&1 &
         diagnostic_pid=$!
@@ -253,14 +264,22 @@ monitor_wsq_launch() {
         : > "$STATE_DIR/reshade-diagnostic.stop"
         wait "$diagnostic_pid" || true
     fi
-    printf '%s\n' "$result" > "$RESULT_FILE.tmp"
-    mv -f -- "$RESULT_FILE.tmp" "$RESULT_FILE"
+    if [ -f "$AMX_REQUEST" ]; then
+        finish_amx_live "$result" || echo 'ERROR: AntiMicroX shortcut restoration failed; recover from its menu.' >> "$BOOT_LOG"
+    else
+        printf '%s\n' "$result" > "$RESULT_FILE.tmp"
+        mv -f -- "$RESULT_FILE.tmp" "$RESULT_FILE"
+    fi
     echo "wsq_launch_result=$result" >>"$BOOT_LOG"
     resume_wsquashfs_toolbox || true
 }
 
 resume_wsq_unavailable() {
-    printf '%s\n' "es_unavailable" > "$RESULT_FILE"
+    if [ -f "$AMX_REQUEST" ]; then
+        finish_amx_live es_unavailable || true
+    else
+        printf '%s\n' "es_unavailable" > "$RESULT_FILE"
+    fi
     resume_wsquashfs_toolbox || true
 }
 
@@ -270,7 +289,10 @@ resume_wsquashfs_toolbox() {
     # Relaunch the Toolbox through EmulationStation rather than spawning a
     # naked xterm. This restores Batocera's normal Ports lifecycle, including
     # evmapy/Pad2Key and Wayland compositor focus handling.
-    if [ -f "$DIAG_REQUEST" ]; then
+    if [ -f "$AMX_REQUEST" ]; then
+        RESUME_ENV=WT_AUTO_RESUME_AMX
+        printf '%s\n' antimicrox > "$RESUME_REQUEST"
+    elif [ -f "$DIAG_REQUEST" ]; then
         RESUME_ENV=WT_AUTO_RESUME_RESH
         printf '%s\n' reshade > "$RESUME_REQUEST"
     else

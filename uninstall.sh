@@ -55,6 +55,9 @@ fi
 if [ -x "$DEST/toolbox/hooks/antimicrox-game-event.sh" ]; then
     "$DEST/toolbox/hooks/antimicrox-game-event.sh" amxStop windows '' '' uninstall
 fi
+if [ -f "$DEST/state/antimicrox-live.json" ]; then
+    python3 "$DEST/toolbox/helpers/antimicrox_live.py" --home "$DEST" finish --result uninstalled || exit 1
+fi
 rm -f /userdata/system/scripts/ultimate-wine-toolbox-antimicrox.sh
 rm -rf "$DEST" "$OLD_DEST"
 rm -f "$PORT" "$KEYS" "$MANGOHUD_HOOK" "$DXVK_HOOK" "$RESHADE_HOOK"

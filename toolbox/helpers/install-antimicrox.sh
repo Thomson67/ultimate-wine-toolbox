@@ -52,7 +52,8 @@ mkdir -p "$DEST"
 # Serialize installation and refuse replacement while AntiMicroX is running.
 exec 8>"$DEST/install.lock"
 flock -x 8
-if pgrep -x antimicrox >/dev/null 2>&1; then
+if pgrep -x antimicrox >/dev/null 2>&1 ||
+   pgrep -f "^$ROOT/tools/antimicrox/squashfs-root/(AppRun|usr/bin/antimicrox)([[:space:]]|$)" >/dev/null 2>&1; then
   echo "Close AntiMicroX and any mapped game before reinstalling."; exit 1
 fi
 rm -rf -- "$DEST/squashfs-root.previous"

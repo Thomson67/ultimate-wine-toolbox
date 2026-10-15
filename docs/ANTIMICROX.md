@@ -38,8 +38,8 @@ preference hides the editor instead of exiting. Editor failures include the exit
 to 1600×900 where the monitor permits it, with a margin on smaller displays;
 larger saved sizes are retained if they fit. Only Qt geometry keys are changed.
 Info logging is enabled for the editor and the previous editor
-log is preserved as `antimicrox-editor.previous.log`. The Settings OK crash
-workaround still requires confirmation on Batocera. Controller
+log is preserved as `antimicrox-editor.previous.log`. The window sizing and
+Settings OK workaround have been confirmed on the user’s Batocera session. Controller
 listing and the version diagnostic have timeouts. Editor and game hooks use
 the same managed runtime, not a different system binary.
 
@@ -63,6 +63,54 @@ A missed `gameStop` may leave the mapping running until the next Windows game
 or uninstallation; there is no independent crash watchdog yet. Launcher-only
 mode, title-based profile switching and the WSquashFS post-launch configuration
 shortcut are not implemented in this branch.
+
+## Configure and test in game (experimental)
+
+Choose **Configurer et tester en jeu / Configure and test in game**, select a
+`.wine`, `.pc` or `.wsquashfs`, then choose the assigned profile, an existing
+profile, or a new one. New profiles are stored in `config/antimicrox-profiles`
+with a game name and path hash, outside the prefix. An existing unassociated
+profile at that path is reused, never overwritten with an empty profile.
+
+The Toolbox closes its terminal and launches the game through EmulationStation.
+Its Windows game hook starts one visible AntiMicroX editing instance with that
+profile, uinput, isolated settings and the enlarged window. The editor does not
+use `--no-tray`, avoiding the Settings OK crash.
+
+Use **Alt+Tab** on the keyboard or **Hotkey + bottom face button** (DualSense
+Cross / Xbox A) on Batocera player 1's controller. Release the combination after
+each switch. A temporary per-ROM evmapy rule sends Alt+Tab independently of the
+profile being edited. The physical bottom button is `b` in Batocera's internal
+mapping. Existing per-ROM actions for the same combination are saved and
+replaced for this test. Global actions and other games are not modified.
+
+The shortcut lives in `.wine/padto.keys` or `.pc/padto.keys` for directory games,
+and `<game>.wsquashfs.keys` alongside compressed games. No archive is rewritten.
+Original file contents and mode are saved before insertion. Normal completion
+or a failed launch restores them. Concurrent edits are preserved by removing
+only the owned action and restoring a displaced action if no newer rule has
+replaced it. Malformed concurrent edits stop cleanup and retain the original
+in `state/antimicrox-live.json` for recovery. An interrupted session is recovered
+when the Toolbox or AntiMicroX menu is next opened; do not manually delete that state file.
+Uninstallation also restores the temporary keys before removing the Toolbox.
+
+Edits apply in memory while AntiMicroX runs. **Click Save in AntiMicroX before
+quitting the game**, using the loaded profile path. The game-stop hook ends the
+managed editor. The Toolbox then restores the shortcut and returns to the
+AntiMicroX menu, where the user can associate the profile for normal launches,
+retry the editing session or return without enabling it. Closing the editor
+early does not close the game; quit the game normally to complete the session.
+
+A launched editing session does not automatically change the normal game
+association. WSquashFS creation/update and ReShade diagnostic return paths are
+kept separate. The `port-launch.log` records launch/resume activity; editing
+sessions use the regular `antimicrox.log`.
+
+Automated tests exercise transactions, restoration, existing/concurrent rules,
+compressed and directory ROMs, visible hook arguments and return dispatch.
+Real Alt+Tab focus, player 1 hotkey handling, full-screen Wine/UMU and possible
+simultaneous button actions remain to be validated on Batocera. Alt+Tab cycles
+compositor windows; games with additional launcher windows may expose those too.
 
 ## Logs and validation
 
