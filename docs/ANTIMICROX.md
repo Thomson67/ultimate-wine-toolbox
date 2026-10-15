@@ -53,6 +53,15 @@ the same managed runtime, not a different system binary.
 
 ## Profiles and lifecycle
 
+**Gérer les jeux avec un profil associé / Manage games with assigned profiles**
+lists only assigned games, including stale associations whose ROM or profile is
+missing. Each game shows full ROM/profile paths and offers profile details
+(XML type, saved action count and file size), editing the assigned profile,
+editing/testing it in game, replacing it and removing its assignment. Shared
+profiles are identified before editing. Removal keeps the `.amgp` file and
+other games' assignments, and takes effect on the next game launch. Missing
+games remain removable, but cannot be launched from this menu.
+
 Associations remain in `config/antimicrox-games.tsv`. Profiles stay at their
 chosen locations under `/userdata`, outside the Wine prefix. This configuration
 is local: sharing a WSquashFS does **not** yet include its mapping. Reassign the
@@ -134,8 +143,8 @@ It never sends F2 or gameplay keys. Other applications, initial game launch,
 normal profile playback and the popup's own return do not trigger a refresh.
 The observer exits when the mapping PID, start time or live session changes.
 This covers XWayland Wine windows; native winewayland windows are not detected
-by this observer. The manual popup has been confirmed on Batocera; automated
-return detection still requires validation there.
+by this observer. The user has confirmed automatic return recovery and the
+creation/editing workflow on the Batocera test session.
 
 Real Alt+Tab focus, player 1 hotkey handling, full-screen Wine/UMU and possible
 simultaneous button actions remain to be validated on Batocera. Alt+Tab cycles
