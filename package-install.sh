@@ -94,6 +94,12 @@ chmod +x "$DEST/toolbox/ultimate-wine-toolbox.sh"
 chmod +x "$DEST/toolbox/launch-in-terminal.sh"
 chmod +x "$DEST/toolbox/modules/"*.sh "$DEST/toolbox/lib/"*.sh "$DEST/toolbox/hooks/"*.sh "$DEST/toolbox/helpers/"*.sh 2>/dev/null || true
 
+# Refresh the AntiMicroX launcher without re-downloading its opt-in AppImage.
+if [ -f "$DEST/tools/antimicrox/AntiMicroX.AppImage" ]; then
+    cp -f "$DEST/toolbox/helpers/antimicrox-launch.sh" "$DEST/tools/antimicrox/antimicrox"
+    chmod +x "$DEST/tools/antimicrox/antimicrox"
+fi
+
 # Install the official MangoHud runtime bundled by the Toolbox for both
 # 32-bit and 64-bit Wine/Proton/UMU games. Failure is non-fatal so the
 # Toolbox itself remains usable even if GitHub is temporarily unavailable.

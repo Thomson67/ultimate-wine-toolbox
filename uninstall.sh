@@ -52,6 +52,10 @@ if [ -d "$DEST/reshade" ]; then
     }
 fi
 
+if [ -x "$DEST/toolbox/hooks/antimicrox-game-event.sh" ]; then
+    "$DEST/toolbox/hooks/antimicrox-game-event.sh" amxStop windows '' '' uninstall
+fi
+rm -f /userdata/system/scripts/ultimate-wine-toolbox-antimicrox.sh
 rm -rf "$DEST" "$OLD_DEST"
 rm -f "$PORT" "$KEYS" "$MANGOHUD_HOOK" "$DXVK_HOOK" "$RESHADE_HOOK"
 rm -f "$MANGOHUD_LEGACY_LAYER" "$MANGOHUD_X86_LAYER"
