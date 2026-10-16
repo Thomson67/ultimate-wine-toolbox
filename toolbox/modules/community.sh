@@ -37,7 +37,12 @@ Check the Hotkey in the editor before enabling. The game’s Pad2Key will be bac
         edit) amx_editor "$path" ;;
         assign|live)
           if amx_running; then msgbox "$title" "$(community_txt 'Fermez AntiMicroX et le jeu avant l’association.' 'Close AntiMicroX and the game before assigning.')"; continue; fi
-          [ -n "$rom" ] || rom="$(amx_choose_game)" || continue
+          if [ -z "$rom" ]; then
+            local preferred
+            preferred="$(community_cmd suggest-game antimicrox "$path" 2>/dev/null)" || preferred=""
+            selected="$(community_pick_game "$title" "$preferred")" || continue
+            rom="${selected%%$'\t'*}"
+          fi
           yesno "$title" "$(community_txt "Associer ce profil à $(basename "$rom") ?
 Vérifiez ses prérequis et sa Hotkey. Le Pad2Key sera sauvegardé et suspendu." "Assign this profile to $(basename "$rom")?
 Check its requirements and Hotkey. Pad2Key will be backed up and suspended.")" || continue
@@ -62,7 +67,9 @@ Choose the target game. If necessary, the wizard will offer to configure ReShade
         *) return 0 ;;
       esac
       if [ -z "$rom" ]; then
-        selected="$(community_pick_game "$title")" || continue
+        local preferred
+        preferred="$(community_cmd suggest-game reshade "$path" 2>/dev/null)" || preferred=""
+        selected="$(community_pick_game "$title" "$preferred")" || continue
         rom="${selected%%$'\t'*}"
       fi
       details="$(resh_cmd status "$rom")" || continue
@@ -170,10 +177,10 @@ community_choose_reshade_preset() {
 }
 
 community_pick_game() {
-  local title="$1" query="" rows path name choice
+  local title="$1" preferred="${2:-}" query="" rows path name choice
   local -a games=() items=()
   while true; do
-    if ! rows="$(community_cmd games --query "$query" 2>&1)"; then
+    if ! rows="$(community_cmd games --query "$query" --prefer "$preferred" 2>&1)"; then
       msgbox "$title" "$(community_txt 'Impossible de lire la liste des jeux Windows d’ES. Vérifiez que le jeu est référencé dans ES.' 'Unable to read the ES Windows game list. Check that ES has indexed the game.')
 $rows"; return 1
     fi
@@ -476,6 +483,12 @@ $output"; fi
     [ "$selected" != back ] || continue
     details="$(community_cmd show "$kind" "$selected" 2>&1)" || { msgbox "$title" "$details"; continue; }
     community_report "$title" "$details"
+    path="$(community_cmd local "$kind" "$selected" 2>/dev/null)" || path=""
+    if [ -n "$path" ]; then
+      yesno "$title" "$(community_txt 'Ce fichier est déjà téléchargé. Utiliser votre copie locale ?' 'This file is already downloaded. Use your local copy?')" || continue
+      community_import_actions "$kind" "$path" "$title" "$rom"
+      continue
+    fi
     yesno "$title" "$(community_txt 'Télécharger ce fichier ? Vous pourrez ensuite l’utiliser pour un jeu.' 'Download this file? You can then use it for a game.')" || continue
     if path="$(community_cmd fetch "$kind" "$selected" 2>&1)"; then community_import_actions "$kind" "$path" "$title" "$rom"; else msgbox "$title" "$path"; fi
   done

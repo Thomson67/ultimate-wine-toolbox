@@ -1,4 +1,6 @@
 import base64
+import contextlib
+import io
 import hashlib
 import json
 import os
@@ -40,6 +42,34 @@ class CommunityTests(unittest.TestCase):
         self.community.download = lambda url: (root/url.removeprefix(self.community.base)).read_bytes()
         self.community.refresh()
         return value['entries'][0], path
+
+    def test_downloaded_copies_are_detected_for_both_kinds_and_missing_files_ignored(self):
+        for kind in ('antimicrox', 'reshade'):
+            with self.subTest(kind=kind):
+                self.catalogue(kind)
+                item = next(item for item in self.community.load()['entries'] if item['kind'] == kind)
+                path = self.community.fetch(kind, item['id'])
+                self.assertEqual(self.community.local_profile(item), (path, False))
+                output = io.StringIO()
+                with patch.object(sys, 'argv', ['community', '--home', str(self.home), 'list', kind]), contextlib.redirect_stdout(output):
+                    community.main()
+                self.assertIn('[Téléchargé]', output.getvalue())
+                with patch.object(community, 'es_games', return_value=[]):
+                    self.assertEqual(community.suggest_game(self.home, kind, path), 'My Game')
+                data = path.read_bytes()
+                path.write_bytes(data + b'\n')
+                self.assertEqual(self.community.local_profile(item), (path, True))
+                path.unlink()
+                self.assertIsNone(self.community.local_profile(item))
+
+    def test_related_games_are_ranked_first_without_hiding_other_games(self):
+        games = [('other', 'Unrelated'), ('mp3', 'Max Payne 3'), ('mp1', 'Max Payne'),
+                 ('mp2', 'MAX PAYNE 2'), ('partial', 'Payne')]
+        ranked = community.prioritize_games(games, 'Max Payne')
+        self.assertEqual({path for path, _ in ranked[:3]}, {'mp1', 'mp2', 'mp3'})
+        self.assertEqual(ranked[0][0], 'mp1')
+        self.assertEqual(set(ranked), set(games))
+        self.assertEqual(community.prioritize_games(games, ''), games)
 
     def test_export_strips_controller_identity_and_never_modifies_original(self):
         source, package, url = self.pack()

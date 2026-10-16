@@ -215,6 +215,10 @@ def suggest_game(home, kind, source, rom=''):
                 known_roms = [str(path.parent) if path.name == 'padto.keys' else str(path).removesuffix('.keys')]
         if not candidate:
             candidate = ET.parse(source).getroot().findtext('profilename', '')
+    if kind == 'reshade' and not rom:
+        imports = home/'state/community/imports.json'
+        if imports.exists():
+            candidate = json.loads(imports.read_text()).get(str(source.resolve()), {}).get('game', '')
     if known_roms:
         candidate = game_title(Path(known_roms[0]).name)
     if not candidate:
@@ -231,6 +235,17 @@ def suggest_game(home, kind, source, rom=''):
         if matched: return matched[0]
     matched = [name for _, name in games if game_key(name) == game_key(candidate)]
     return matched[0] if len(set(matched)) == 1 else candidate
+
+
+def prioritize_games(games, preferred):
+    """Rank related titles first, retaining every game and stable ordering."""
+    words = lambda text: set(re.findall(r'[^\W_]+', unicodedata.normalize('NFKC', text).casefold()))
+    wanted = words(preferred)
+    def score(row):
+        found = words(row[1])
+        common = wanted & found
+        return (bool(wanted) and wanted <= found, len(common) / max(1, len(wanted | found)))
+    return sorted(games, key=score, reverse=True)
 
 
 class Community:
@@ -271,6 +286,20 @@ class Community:
 
     def find(self, kind, identifier):
         return next((item for item in self.load()['entries'] if item['kind'] == kind and item['id'] == identifier), None)
+
+    def local_profile(self, item):
+        imports = self.home/'state/community/imports.json'
+        values = json.loads(imports.read_text()) if imports.exists() else {}
+        for filename, saved in values.items():
+            if (saved.get('id'), saved.get('kind'), saved.get('sha256')) != (item['id'], item['kind'], item['sha256']): continue
+            path = Path(filename)
+            try:
+                if path.is_symlink() or not path.is_file() or path.stat().st_size > LIMIT: continue
+                data = path.read_bytes()
+                profile_bytes(item['kind'], data)
+            except (OSError, ValueError, ET.ParseError, configparser.Error): continue
+            return path, hashlib.sha256(data).hexdigest() != item['sha256']
+        return None
 
     def fetch(self, kind, identifier):
         item = self.find(kind, identifier)
@@ -368,7 +397,7 @@ def main():
     parser.add_argument('--language', default='fr')
     sub = parser.add_subparsers(dest='command', required=True)
     arg = sub.add_parser('refresh'); arg.add_argument('--kind', choices=KINDS)
-    arg = sub.add_parser('games'); arg.add_argument('--query', default='')
+    arg = sub.add_parser('games'); arg.add_argument('--query', default=''); arg.add_argument('--prefer', default='')
     arg = sub.add_parser('reshade-games'); arg.add_argument('--query', default=''); arg.add_argument('--managed-only', action='store_true')
     sub.add_parser('reshade-scan')
     arg = sub.add_parser('reshade-presets'); arg.add_argument('rom')
@@ -376,7 +405,7 @@ def main():
     arg = sub.add_parser('preset-info'); arg.add_argument('source')
     arg = sub.add_parser('preset-packs'); arg.add_argument('source')
     arg = sub.add_parser('suggest-game'); arg.add_argument('kind', choices=KINDS); arg.add_argument('source'); arg.add_argument('--rom', default='')
-    for command in ('list', 'show', 'fetch'):
+    for command in ('list', 'show', 'fetch', 'local'):
         arg = sub.add_parser(command); arg.add_argument('kind', choices=KINDS)
         if command == 'list': arg.add_argument('--query', default='')
         else: arg.add_argument('identifier')
@@ -408,7 +437,7 @@ def main():
             if args.query.casefold() in name.casefold(): print(path+'\t'+name+'\t'+state)
         return
     if args.command == 'games':
-        for path, name in es_games():
+        for path, name in prioritize_games(es_games(), args.prefer):
             if args.query.casefold() in name.casefold(): print(path+'\t'+name)
         return
     if args.command == 'suggest-game': print(suggest_game(args.home, args.kind, args.source, args.rom)); return
@@ -419,8 +448,16 @@ def main():
     elif args.command == 'list':
         for item in community.load()['entries']:
             if item['kind'] == args.kind and args.query.casefold() in (item['game']+' '+item['title']+' '+item['author']).casefold():
-                print(item['id']+'\t'+entry_label(item))
+                local = community.local_profile(item)
+                label = entry_label(item)
+                if local:
+                    label += (' [Téléchargé' if args.language == 'fr' else ' [Downloaded') + ((' — modifié' if args.language == 'fr' else ' — modified') if local[1] else '') + ']'
+                print(item['id']+'\t'+label)
     elif args.command == 'show': print(details(community.find(args.kind, args.identifier), args.language == 'fr'))
+    elif args.command == 'local':
+        item = community.find(args.kind, args.identifier)
+        local = community.local_profile(item) if item else None
+        if local: print(local[0])
     elif args.command == 'fetch': print(community.fetch(args.kind, args.identifier))
     elif args.command == 'share':
         path, url = community.share(args.kind, args.source, args.game, args.title, args.author,
