@@ -57,15 +57,8 @@ community_import_actions() {
         integrated="$(resh_cmd external-info "$rom" 2>&1)" || { msgbox "$title" "$integrated"; continue; }
         case "${integrated%%$'\n'*}" in
           external-*)
-            yesno "$title" "$(community_txt "$(basename "$rom") possède un ReShade intégré.
-
-Pour appliquer ce preset via la Toolbox, il faut configurer une installation gérée par la Toolbox (version, injecteur et packs d’effets). Les fichiers remplacés sont sauvegardés par le gestionnaire ReShade ; une archive .wsquashfs reste inchangée.
-
-Ouvrir l’assistant de configuration ?" "$(basename "$rom") contains bundled ReShade.
-
-Applying this preset through the Toolbox requires a Toolbox-managed setup (version, injector and shader packs). Replaced files are backed up by the ReShade manager; a .wsquashfs archive remains unchanged.
-
-Open the configuration wizard?")" || continue ;;
+            community_apply_existing_reshade "$path" "$title" "$rom" "$integrated" && return 0
+            continue ;;
           *)
             yesno "$title" "$(community_txt "ReShade n’est pas encore configuré par la Toolbox pour $(basename "$rom"). Un preset contient les réglages des effets, sans leur injecteur ni leurs shaders.
 
@@ -93,6 +86,48 @@ Install/configure ReShade and the required packs now, then apply the downloaded 
         msgbox "$title" "$(community_txt "Échec de l’application. Sauvegarde conservée :\n$backup\n$output" "Apply failed. Backup retained:\n$backup\n$output")"
       fi
     fi
+  done
+}
+
+community_apply_existing_reshade() {
+  local path="$1" title="$2" rom="$3" details="$4" folders folder choice output
+  local -a items=()
+  folders="$(resh_cmd existing-targets "$rom" 2>&1)" || { msgbox "$title" "$folders"; return 1; }
+  while IFS= read -r folder; do [ -z "$folder" ] || items+=("$folder" "$folder"); done <<< "$folders"
+  [ "${#items[@]}" -gt 0 ] || return 1
+  if [ "${#items[@]}" -eq 2 ]; then folder="${items[0]}";
+  else folder="$(menu_select "$title" "$(community_txt 'Choisir le dossier de l’injecteur ReShade existant' 'Choose the existing ReShade injector folder')" "${items[@]}" back "$(i18n back)")" || return 1; fi
+  [ "$folder" != back ] || return 1
+  yesno "$title" "$(community_txt "Appliquer le preset à $(basename "$rom") en conservant son ReShade existant ?\n\nSeuls le preset et son chemin dans ReShade.ini seront gérés par la Toolbox, avec sauvegarde des fichiers remplacés. Les DLL et packs d’effets sont conservés. Les effets requis doivent être présents.\nUne archive .wsquashfs reste inchangée ; les réglages sont appliqués dans ses préfixes Wine." "Apply the preset to $(basename "$rom") using its existing ReShade?\n\nThe Toolbox will manage only the preset and its path in ReShade.ini, backing up replaced files. DLLs and shader packs are retained. Required effects must already be present.\nA .wsquashfs archive is unchanged; settings are applied in its Wine prefixes.")" || return 1
+  output="$(resh_cmd existing-import "$rom" "$folder" "$path" 2>&1)" || { msgbox "$title" "$output"; return 1; }
+  case "${details%%$'\n'*}" in
+    external-disabled)
+      if ! resh_cmd external-enable "$rom"; then msgbox "$title" "$(community_txt 'Preset importé ; réactivez ReShade depuis le menu du jeu.' 'Preset imported; re-enable ReShade from the game menu.')"; return 0; fi ;;
+  esac
+  msgbox "$title" "$(community_txt "Preset appliqué au ReShade existant.\nSauvegardes : $output\n\nLe menu ReShade du jeu permet de restaurer les réglages précédents." "Preset applied to existing ReShade.\nBackups: $output\n\nUse the game’s ReShade menu to restore previous settings.")"
+}
+
+# Return a validated downloaded INI path for use by the standard installation wizard.
+community_choose_reshade_preset() {
+  local title="$1" query="" rows id label choice info path
+  local -a items=()
+  while true; do
+    rows="$(community_cmd list reshade --query "$query" 2>&1)" || { msgbox "$title" "$rows"; return 1; }
+    items=()
+    while IFS=$'\t' read -r id label; do [ -z "$id" ] || items+=("$id" "$label"); done <<< "$rows"
+    choice="$(menu_select "$title" "$(community_txt 'Choisir un preset communautaire ReShade' 'Choose a community ReShade preset')" \
+      search "$(community_txt 'Rechercher un jeu / auteur' 'Search for a game / author')" \
+      refresh "$(community_txt 'Actualiser le catalogue' 'Refresh catalogue')" "${items[@]}" back "$(i18n back)")" || return 1
+    case "$choice" in
+      back|'') return 1 ;;
+      search) query="$(input_text "$title" "$(community_txt 'Jeu, nom du preset ou auteur' 'Game, preset title or author')" "$query")" || return 1; continue ;;
+      refresh) info="$(community_cmd refresh --kind reshade 2>&1)" || msgbox "$title" "$info"; continue ;;
+    esac
+    info="$(community_cmd show reshade "$choice" 2>&1)" || { msgbox "$title" "$info"; continue; }
+    community_report "$title" "$info"
+    yesno "$title" "$(community_txt 'Utiliser ce preset pour cette installation ? Les packs d’effets requis seront à sélectionner ensuite.' 'Use this preset for this installation? You will select the required shader packs next.')" || continue
+    path="$(community_cmd fetch reshade "$choice" 2>&1)" || { msgbox "$title" "$path"; continue; }
+    printf '%s' "$path"; return 0
   done
 }
 

@@ -37,17 +37,36 @@ and restoration mechanism, with a working runtime/uinput required. A modified
 suspended Pad2Key is still protected; community downloads do not bypass its
 recovery checks.
 
-Applying a ReShade preset offers all Windows games in the ES gamelist. If a
-game has no Toolbox-managed ReShade setup, the user can open the existing
-installation wizard and select the injector, version and required shader packs,
-then continue with the downloaded preset. A graphics-API diagnostic launch retains
-the selected community preset and offers application after setup resumes. Bundled ReShade is explicitly identified
-before offering this managed setup; this configures a managed installation rather
-than silently replacing an arbitrary integrated preset. Cancelling or failing
-configuration does not import the preset. Disabled managed setups are enabled
-after a confirmed import. Applying an imported preset first exports the previous preset to `exports/community-backups/`, then uses
-the existing ReShade import mechanism. Shader packs are not installed
-automatically by this menu. Dependencies are displayed before download.
+Applying a ReShade preset offers all Windows games in the ES gamelist. A game
+without an injector can run the existing installation wizard and continue with
+the downloaded preset. The model screen is skipped when a preset is already
+selected. The standard model screen also offers a searchable community preset
+chooser (with refresh, full details, validation and hash-verified download).
+
+Shader packs are inferred offline from effect sections and `Technique@File.fx`
+references, using the pinned official EffectPackages index mapped to the backend's
+pack IDs and Toolbox retro extras (`toolbox/data/reshade-effect-index.json`).
+TechniqueSorting alone does not pull in inactive effects. Known packs are selected
+automatically; unknown effects and ambiguous pack matches require review of a
+preselected checklist. No URL from a preset controls a shader download. A preset
+contains settings; the backend installs the selected packs and their dependencies.
+A graphics-API diagnostic launch retains the selected community preset on resume.
+
+An existing integrated ReShade does not need reinstallation. The Toolbox changes
+only ReShade.ini's preset path and a separate UWTCommunityPreset INI next to the
+selected existing injector. Its DLLs, shader/texture paths and shader files remain
+unchanged. Required shaders must already be present in this case. For wsquashfs,
+only Wine OverlayFS upperdirs receive those two INI files; the archive is not
+modified. A launch hook reapplies the saved preset when using a new/recreated
+runner prefix and saves in-game preset edits at gameStop. Journals/backups precede
+writes. The integrated game's menu offers restoration of the previous settings,
+refusing to overwrite files subsequently edited by the user. Running games and
+unsafe file links are refused.
+
+Managed ReShade imports first export the previous preset to
+`exports/community-backups/`, then use the existing importer. Disabled managed
+setups are enabled after confirmed import. Cancelling or failing configuration
+does not import the preset. Shader requirements are displayed before download.
 
 ## Export and review
 
@@ -71,8 +90,7 @@ chooser distinguishes presets in the original game/archive from saved presets in
 existing Wine runner prefixes and marks the configured active preset when its path
 can be resolved inside that source. Archives are listed/read using `unsquashfs`,
 without extracting or rewriting the game. Unsupported loader variants can still
-share a detected preset. A manual `.ini` choice remains available. Downloaded presets are applied through
-the managed ReShade installation workflow described above.
+share a detected preset. A manual `.ini` choice remains available. Downloaded presets use the existing or new installation workflow described above.
 
 Sharing creates a local ZIP in `exports/community/<kind>/`, removes controller identities
 from the exported copy, then sends the profile and public metadata over HTTPS after

@@ -509,6 +509,8 @@ def event(home, rom, action, runner='', bottles=Path('/userdata/system/wine-bott
         if action == 'gameStart':
             import reshade_external
             reshade_external.apply(home, rom, runner, bottles, legacy)
+        import reshade_existing_preset
+        reshade_existing_preset.event(home, rom, action, runner, bottles, legacy)
         return
     if action == 'gameStop':
         for jp in (home / 'reshade/installations' / key(rom)).glob('*.json'):
@@ -633,7 +635,7 @@ def main():
     parser.add_argument('--runner', default='')
     parser.add_argument('--legacy', action='store_true')
     parser.add_argument('command', choices=['backend-packs', 'exes', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'external-scan', 'external-info', 'external-enable', 'external-disable', 'external-release', 'wiki-title', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
-                                           'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details'])
+                                           'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore'])
     parser.add_argument('rom', nargs='?', type=Path)
     parser.add_argument('args', nargs='*')
     args = parser.parse_args()
@@ -664,6 +666,13 @@ def main():
                 sys.stdout.buffer.write(os.fsencode(path) + b'\0' + state.encode() + b'\0')
         elif args.command == 'export':
             export_preset(home, rom, args.args[0], args.args[1:] == ['overwrite'])
+        elif args.command.startswith('existing-'):
+            import reshade_existing_preset
+            if args.command == 'existing-targets':
+                for folder in reshade_existing_preset.targets(home, rom): print(folder)
+            elif args.command == 'existing-import':
+                print(reshade_existing_preset.configure(home, rom, args.args[0], args.args[1], args.runner, args.bottles, args.legacy))
+            else: reshade_existing_preset.restore(home, rom)
         elif args.command == 'wiki-title':
             import reshade_api
             print(reshade_api.game_title(str(args.rom)))

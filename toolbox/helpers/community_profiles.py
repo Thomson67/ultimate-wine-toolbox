@@ -365,6 +365,7 @@ def main():
     arg = sub.add_parser('reshade-presets'); arg.add_argument('rom')
     arg = sub.add_parser('reshade-export'); arg.add_argument('rom'); arg.add_argument('identifier'); arg.add_argument('destination')
     arg = sub.add_parser('preset-info'); arg.add_argument('source')
+    arg = sub.add_parser('preset-packs'); arg.add_argument('source')
     arg = sub.add_parser('suggest-game'); arg.add_argument('kind', choices=KINDS); arg.add_argument('source'); arg.add_argument('--rom', default='')
     for command in ('list', 'show', 'fetch'):
         arg = sub.add_parser(command); arg.add_argument('kind', choices=KINDS)
@@ -378,6 +379,11 @@ def main():
     args = parser.parse_args()
     if args.command == 'approve': print(approve(args.package, args.catalog_root)); return
     if args.command == 'preset-info': print(preset_info(args.source, args.language == 'fr')); return
+    if args.command == 'preset-packs':
+        from reshade_preset_effects import analyze, report
+        value = analyze(args.source)
+        print(','.join(value['packs'])); print('review' if value['unknown'] or value['ambiguous'] else 'complete')
+        print(report(value, args.language == 'fr')); return
     if args.command == 'reshade-scan':
         from reshade_manager import scan_external_games
         print(' / '.join(map(str, scan_external_games(Path(args.home), [path for path, _ in es_games()])))); return

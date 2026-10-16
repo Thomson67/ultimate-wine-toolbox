@@ -146,7 +146,7 @@ community_import_actions reshade "$TEST_INI" 'ReShade — Presets communautaires
         self.assertEqual(len(backups), 1); self.assertEqual(backups[0].read_bytes(), OLD)
 
     def test_game_without_managed_reshade_runs_wizard_then_applies_download(self):
-        for external in ('missing', 'external-enabled'):
+        for external in ('missing',):
             with self.subTest(external=external):
                 for filename in ('ui', 'configured', 'current.ini', 'calls'):
                     (self.home/filename).unlink(missing_ok=True)
@@ -170,6 +170,47 @@ community_import_actions reshade "$TEST_INI" ReShade "$TEST_ROM"
                 self.assertEqual(calls, ['status', 'external-info', 'wizard', 'status', 'export', 'preset'])
                 self.assertNotIn('AntiMicroX', ui)
                 self.assertIn('ReShade intégré' if external.startswith('external') else 'Installer/configurer ReShade', ui)
+
+    def test_existing_reshade_applies_ini_without_installer_or_managed_import(self):
+        ui = self.shell(r'''
+menu_select() { echo apply; }
+resh_install_game() { echo UNEXPECTED-INSTALL >> "$WT_HOME/ui"; return 1; }
+resh_cmd() {
+ printf '%s\n' "$1" >> "$WT_HOME/calls"
+ case "$1" in
+ status) echo missing;; external-info) echo external-enabled;;
+ existing-targets) echo drive_c/game;;
+ existing-import) [ "$3" = drive_c/game ] && [ "$4" = "$TEST_INI" ] || return 1; echo backup-folder;;
+ *) echo UNEXPECTED-MANAGED-IMPORT >> "$WT_HOME/ui"; return 1;; esac
+}
+community_import_actions reshade "$TEST_INI" ReShade "$TEST_ROM"
+''')
+        self.assertNotIn('UNEXPECTED', ui)
+        self.assertIn('conservant son ReShade existant', ui)
+        self.assertEqual((self.home/'calls').read_text().splitlines(),
+                         ['status','external-info','existing-targets','existing-import'])
+
+    def test_installation_community_chooser_searches_reshade_and_returns_downloaded_ini(self):
+        ui=self.shell(r'''
+menu_select() {
+ printf '%s\n' "$@" >> "$WT_HOME/ui"
+ if [ ! -f "$WT_HOME/searched" ]; then touch "$WT_HOME/searched"; echo search; else echo preset-id; fi
+}
+input_text() { echo Lighthouse; }
+community_cmd() {
+ printf '%s\n' "$*" >> "$WT_HOME/calls"
+ case "$1" in list) [ "$2" = reshade ] || return 1; printf 'preset-id\tLighthouse — Thomson\n';;
+ show) [ "$2" = reshade ] || return 1; printf 'Lighthouse\nRequired packs: SweetFX\n';;
+ fetch) [ "$2" = reshade ] || return 1; printf '%s' "$TEST_INI";;
+ *) return 1;; esac
+}
+community_choose_reshade_preset ReShade > "$WT_HOME/chosen"
+''')
+        self.assertEqual((self.home/'chosen').read_text(),str(self.preset))
+        calls=(self.home/'calls').read_text().splitlines()
+        self.assertIn('list reshade --query Lighthouse',calls)
+        self.assertIn('show reshade preset-id',calls);self.assertIn('fetch reshade preset-id',calls)
+        self.assertIn('Required packs: SweetFX',ui);self.assertNotIn('AntiMicroX',ui)
 
     def test_cancelling_setup_never_imports_or_overwrites_preset(self):
         for outcome in ('decline', 'cancel', 'incomplete'):

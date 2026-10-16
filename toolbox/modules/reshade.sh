@@ -172,7 +172,7 @@ resh_api_select() {
 
 resh_install_game() {
     local rom="$1" exe selected dll version packs backend_packs state workspace name label model defaults current
-    local resume_exe="${2:-}" community_preset="${3:-}" resumed=0 index
+    local resume_exe="${2:-}" community_preset="${3:-}" resumed=0 index apply_community=0
     local -a exes=() items=() shaders=()
     local listing
     listing="$(resh_cmd exes "$rom" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
@@ -223,15 +223,29 @@ PY_PENDING
         return 1
     }
     resh_backend_ready || return 1
-    items=(standard "$(i18n resh_model_standard)" retro "$(i18n resh_model_retro)" thomson "$(i18n resh_model_thomson)" manual "$(i18n resh_model_manual)")
-    current="$(resh_cmd details "$rom")"
-    [ -z "$current" ] || items+=(current "$(i18n resh_model_current)")
-    model="$(menu_select "$(i18n resh_title)" "$(i18n resh_model_prompt)" "${items[@]}")" || return 1
-    case "$model" in
-        standard|retro|thomson|manual) defaults="$(resh_model_packs "$model")" ;;
-        current) defaults="${current##*$'\t'}" ;;
-        *) return 1 ;;
-    esac
+    if [ -n "$community_preset" ]; then
+        model=community-preset; defaults=""
+    else
+        items=(standard "$(i18n resh_model_standard)" retro "$(i18n resh_model_retro)" thomson "$(i18n resh_model_thomson)" manual "$(i18n resh_model_manual)")
+        current="$(resh_cmd details "$rom")"
+        [ -z "$current" ] || items+=(current "$(i18n resh_model_current)")
+        items+=(community "$(community_txt 'Rechercher un preset dans la base communautaire' 'Find a preset in the community catalogue')")
+        model="$(menu_select "$(i18n resh_title)" "$(i18n resh_model_prompt)" "${items[@]}")" || return 1
+        case "$model" in
+            standard|retro|thomson|manual) defaults="$(resh_model_packs "$model")" ;;
+            community) community_preset="$(community_choose_reshade_preset "$(i18n resh_title)")" || return 1; model=community-preset; defaults=""; apply_community=1 ;;
+            current) defaults="${current##*$'\t'}" ;;
+            *) return 1 ;;
+        esac
+    fi
+    if [ "$model" = community-preset ]; then
+        local analysis review
+        analysis="$(community_cmd preset-packs "$community_preset" 2>&1)" || { msgbox "$(i18n resh_title)" "$analysis"; return 1; }
+        defaults="${analysis%%$'\n'*}"; analysis="${analysis#*$'\n'}"
+        review="${analysis%%$'\n'*}"; analysis="${analysis#*$'\n'}"
+        msgbox "$(i18n resh_title)" "$analysis" || return 1
+        if [ "$review" = review ]; then model=manual; fi
+    fi
     if [ "$model" = manual ]; then
         items=()
         while IFS=$'\t' read -r name label; do
@@ -298,6 +312,9 @@ PY_PENDING
         return 1
     fi
     msgbox "$(i18n resh_title)" "$(i18n resh_installed "$log")"
+    if [ "$apply_community" -eq 1 ]; then
+        community_import_actions reshade "$community_preset" "$(i18n resh_title)" "$rom"
+    fi
 }
 
 resh_external_menu() {
@@ -311,8 +328,14 @@ resh_external_menu() {
         choice="$(menu_select "$(i18n resh_title) — ${rom##*/}" "$(i18n resh_external_info "$label"$'\n'"${details#*$'\n'}")" \
             enable "$(i18n resh_enable)" disable "$(i18n resh_disable)" \
             release "$(i18n resh_external_release)" diagnostic "$(i18n resh_diag_title)" \
-            community "$(i18n resh_community)" back "$(i18n back)")" || return
+            community "$(i18n resh_community)" \
+            restore-preset "$(community_txt 'Restaurer les réglages précédant le preset communautaire' 'Restore settings before the community preset')" back "$(i18n back)")" || return
         case "$choice" in
+            restore-preset)
+                yesno_default_no "$(i18n resh_title)" "$(community_txt 'Restaurer les réglages ReShade précédents ?' 'Restore the previous ReShade settings?')" || continue
+                local output
+                if output="$(resh_cmd existing-restore "$rom" 2>&1)"; then msgbox "$(i18n resh_title)" "$(community_txt 'Réglages précédents restaurés.' 'Previous settings restored.')";
+                else msgbox "$(i18n resh_title)" "$output"; fi ;;
             community) community_menu reshade "$rom"; continue ;;
             enable|disable)
                 if [ "$state" = external-unsupported ]; then
@@ -322,6 +345,8 @@ resh_external_menu() {
                     msgbox "$(i18n resh_title)" "$(i18n resh_external_done)"
                 } || msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")" ;;
             release)
+                local output
+                output="$(resh_cmd existing-restore "$rom" 2>&1)" || { msgbox "$(i18n resh_title)" "$output"; continue; }
                 resh_cmd external-release "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
                     msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"; continue;
                 }
