@@ -84,6 +84,30 @@ class ServiceTests(unittest.TestCase):
         self.responses.append(dict(payload, profile='modified'))
         with self.assertRaisesRegex(ValueError, 'payload'): self.service.review('antimicrox', metadata['id'])
 
+    def test_published_review_and_removal_use_the_authenticated_service_and_review_token(self):
+        self.login(); _, payload=self.pack();metadata=payload['metadata']
+        self.responses.append({'entries':[metadata]})
+        self.assertEqual(self.service.published('antimicrox'),[metadata])
+        self.assertEqual(self.requests[-1].get_header('Authorization'),'Bearer '+'ab'*32)
+        self.responses.append({'metadata':metadata,'review_hash':'cd'*32,'file_missing':True})
+        reviewed,token=self.service.published_review('antimicrox',metadata['id'])
+        self.assertEqual(reviewed,metadata);self.assertEqual(token,'cd'*32)
+        self.responses.append({'status':'removed','commit':'a'*40})
+        self.assertEqual(self.service.remove_published('antimicrox',metadata['id'],token)['status'],'removed')
+        self.assertEqual(self.requests[-1].full_url,service.API+'/v1/published/antimicrox/'+metadata['id']+'/remove')
+        self.assertEqual(json.loads(self.requests[-1].data),{'expected_hash':token})
+        before=len(self.requests)
+        for kind,identifier,checksum in [('reshade','../escape',token),('other',metadata['id'],token),('antimicrox',metadata['id'],'bad')]:
+            with self.assertRaises(ValueError):self.service.remove_published(kind,identifier,checksum)
+        self.assertEqual(len(self.requests),before)
+
+    def test_published_list_rejects_wrong_kind_and_explains_an_outdated_worker(self):
+        self.login();_,payload=self.pack('reshade')
+        self.responses.append({'entries':[payload['metadata']]})
+        with self.assertRaisesRegex(ValueError,'Unexpected'):self.service.published('antimicrox')
+        self.responses.append(service.ServiceError('Unknown endpoint',404))
+        with self.assertRaisesRegex(ValueError,'Worker Cloudflare'):self.service.published('antimicrox')
+
     def test_decision_rechecks_review_checksum_before_post(self):
         self.login(); _, payload = self.pack(); m = payload['metadata']
         self.responses.append(payload)
@@ -180,7 +204,8 @@ community_service_cmd() {
  printf '%s\n' "$1" >> "$WT_HOME/calls"
  case "$1" in connect|pending) :;; esac
 }
-msgbox() { :; }
+msgbox() { :; }; i18n() { echo Back; }
+menu_select() { if [ -f "$WT_HOME/menu-once" ]; then echo back; else touch "$WT_HOME/menu-once"; echo pending; fi; }
 community_validate antimicrox Community
 '''
         self.home.mkdir(parents=True); key = 'cd'*32

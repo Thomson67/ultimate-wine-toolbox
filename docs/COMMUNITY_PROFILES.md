@@ -119,6 +119,26 @@ publishes both profile and manifest in one non-forced Git commit; rejection publ
 nothing. Authors' nicknames are self-declared. The service forbids `execute` and
 `loadprofile`, but keyboard macros still require human review.
 
+The catalogue list displays `Game — Author` when the profile title equals the game
+name (case and whitespace ignored); a distinct profile title remains visible.
+Deleting a file alone on GitHub does not remove its entry in `catalog.json`.
+
+The validator menu separates pending review from removal of already-published
+profiles. Published moderation reads the current GitHub main commit through the
+service, not the local catalogue cache or the D1 submission queue. After viewing
+the entry, the validator explicitly confirms removal (default No). A review token
+covers canonical metadata and the current Git blob identity, including a missing
+file marker. A changed target requires another review. The service removes the
+file and catalogue entry in one non-forced commit, retries unrelated Git races,
+and supports repairing a stale entry whose file was already manually deleted.
+Removal is idempotent and old approved D1 rows are marked rejected. Previously
+installed local profiles are never deleted. The local catalogue is refreshed after
+successful removal; other readers see it after refreshing their own lists.
+
+This requires Worker revision `published-removal-1` (health capability
+`published-removal`). Deploy the updated `service/dist/worker.js`; existing D1
+schema, keys, pairings and Worker secrets do not change.
+
 Validators pair from their PC or phone instead of typing the generated 256-bit key
 on Batocera. `/pair` authenticates the validator using that existing key, then requires
 inspection and explicit approval of an eight-character, five-minute code displayed by

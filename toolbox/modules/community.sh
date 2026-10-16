@@ -298,16 +298,9 @@ community_send_package() {
   done
 }
 
-# Subshell confines secrets and the EXIT trap; do not enable tracing here.
-community_validate() (
-  set +x
-  local kind="$1" title="$2" output rows selected review checksum choice
+community_review_pending() {
+  local kind="$1" title="$2" rows selected output review checksum choice
   local -a items=()
-  output="$(community_service_cmd connect 2>&1)"
-  local result=$?
-  wt_clear_tty
-  [ "$result" -eq 0 ] || { msgbox "$title" "$output"; return 0; }
-  trap 'community_service_cmd logout >/dev/null 2>&1 || true' EXIT
   while true; do
     if ! rows="$(community_service_cmd pending "$kind" 2>&1)"; then msgbox "$title" "$rows"; return 0; fi
     [ -n "$rows" ] || { msgbox "$title" "$(community_txt 'Aucune proposition en attente.' 'No pending contributions.')"; return 0; }
@@ -322,10 +315,56 @@ community_validate() (
       approve "$(community_txt 'Accepter et publier' 'Approve and publish')" \
       reject "$(community_txt 'Refuser' 'Reject')" back "$(i18n back)")" || continue
     case "$choice" in approve|reject) : ;; *) continue ;; esac
-    yesno "$title" "$(community_txt "Confirmer : $choice — $selected ?\nL’acceptation publie le profil et ses métadonnées sur GitHub." "Confirm: $choice — $selected?\nApproval publishes the profile and metadata on GitHub.")" || continue
+    if [ "$choice" = approve ]; then
+      yesno "$title" "$(community_txt 'Publier ce partage dans la liste communautaire ? Il deviendra accessible à tous les joueurs.' 'Publish this submission in the community catalogue? It will become available to all players.')" || continue
+    else yesno "$title" "$(community_txt 'Refuser ce partage ? Il ne sera pas publié.' 'Reject this submission? It will not be published.')" || continue; fi
     if output="$(community_service_cmd "$choice" "$kind" "$selected" "$checksum" 2>&1)"; then
       msgbox "$title" "$(community_txt "Décision enregistrée : $output" "Decision saved: $output")"
     else msgbox "$title" "$output"; fi
+  done
+}
+
+community_remove_published() {
+  local kind="$1" title="$2" rows selected label output review checksum
+  local -a items=()
+  while true; do
+    rows="$(community_service_cmd published "$kind" 2>&1)" || { msgbox "$title" "$rows"; return 0; }
+    [ -n "$rows" ] || { msgbox "$title" "$(community_txt 'Aucun partage publié pour cet outil.' 'No published submissions for this tool.')"; return 0; }
+    items=()
+    while IFS=$'\t' read -r selected label; do items+=("$selected" "$label"); done <<< "$rows"
+    selected="$(menu_select "$title" "$(community_txt 'Choisir le partage à retirer de la liste communautaire' 'Choose a submission to remove from the community catalogue')" "${items[@]}" back "$(i18n back)")" || return 0
+    case "$selected" in ''|back) return 0 ;; esac
+    review="$(community_service_cmd published-review "$kind" "$selected" 2>&1)" || { msgbox "$title" "$review"; continue; }
+    checksum="${review%%$'\n'*}"
+    community_report "$title" "${review#*$'\n'}"
+    if ! yesno_default_no "$title" "$(community_txt 'Retirer ce partage du catalogue ?\n\nSon fichier et sa fiche seront supprimés du dépôt communautaire. Les profils déjà installés chez les joueurs restent conservés.' 'Remove this submission from the catalogue?\n\nIts file and catalogue entry will be deleted from the community repository. Profiles already installed by players are retained.')"; then continue; fi
+    if output="$(community_service_cmd remove-published "$kind" "$selected" "$checksum" 2>&1)"; then
+      # Refresh this machine immediately; other users see removal on their next refresh.
+      if community_cmd refresh --kind "$kind" >/dev/null 2>&1; then
+        msgbox "$title" "$(community_txt 'Partage retiré. La liste communautaire est à jour.' 'Submission removed. The community list is up to date.')"
+      else msgbox "$title" "$(community_txt 'Partage retiré. Mettez la liste à jour quand la connexion sera rétablie.' 'Submission removed. Refresh the list when the connection is restored.')"; fi
+    else msgbox "$title" "$(community_txt 'Suppression non confirmée. Actualisez la liste avant de réessayer.' 'Removal not confirmed. Refresh the list before retrying.')\n$output"; fi
+  done
+}
+
+# Subshell confines secrets and the EXIT trap; do not enable tracing here.
+community_validate() (
+  set +x
+  local kind="$1" title="$2" output choice
+  output="$(community_service_cmd connect 2>&1)"
+  local result=$?
+  wt_clear_tty
+  [ "$result" -eq 0 ] || { msgbox "$title" "$output"; return 0; }
+  trap 'community_service_cmd logout >/dev/null 2>&1 || true' EXIT
+  while true; do
+    choice="$(menu_select "$title" "$(community_txt 'Gestion des partages communautaires' 'Manage community submissions')" \
+      pending "$(community_txt 'Examiner les partages en attente' 'Review pending submissions')" \
+      published "$(community_txt 'Retirer un partage déjà publié' 'Remove a published submission')" back "$(i18n back)")" || return 0
+    case "$choice" in
+      pending) community_review_pending "$kind" "$title" ;;
+      published) community_remove_published "$kind" "$title" ;;
+      *) return 0 ;;
+    esac
   done
 )
 

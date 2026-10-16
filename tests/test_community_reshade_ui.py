@@ -285,9 +285,43 @@ community_menu reshade
                 community.main()
         self.assertEqual(output.getvalue().strip(), '1')
 
+    def test_published_removal_requires_confirmation_for_each_tool_and_retains_local_profile(self):
+        for kind in ('antimicrox','reshade'):
+            for allow in ('yes','no'):
+                with self.subTest(kind=kind,confirmed=allow):
+                    for filename in ('ui','decided','removed','refreshed','moderation-calls'):(self.home/filename).unlink(missing_ok=True)
+                    code=r'''menu_select() {
+ printf '%s\n' "$@" >> "$WT_HOME/ui"
+ if [ "$3" = pending ]; then
+  if [ -f "$WT_HOME/decided" ]; then echo back; else echo published; fi
+ elif [ -f "$WT_HOME/decided" ]; then echo back; else echo published-id; fi
+}
+yesno_default_no() { touch "$WT_HOME/decided"; [ ALLOW = yes ]; }
+community_cmd() { [ "$1" = refresh ] && [ "$2" = --kind ] && [ "$3" = KIND ] || return 1; touch "$WT_HOME/refreshed"; }
+community_service_cmd() {
+ printf '%s\n' "$*" >> "$WT_HOME/moderation-calls"
+ case "$1" in
+ connect|logout) :;;
+ published) [ "$2" = KIND ] || return 1; if [ ! -f "$WT_HOME/removed" ]; then printf 'published-id\tGame — Tester\n'; fi;;
+ published-review) [ "$2" = KIND ] && [ "$3" = published-id ] || return 1; printf '%064d\nGame — Tester\n' 0;;
+ remove-published) [ "$2" = KIND ] && [ "$3" = published-id ] && [ "$4" = "$(printf '%064d' 0)" ] || return 1; touch "$WT_HOME/removed"; echo removed;;
+ *) return 1;; esac
+}
+community_validate KIND Community
+'''.replace('KIND',kind).replace('ALLOW',allow)
+                    self.shell(code)
+                    self.assertEqual((self.home/'removed').exists(),allow=='yes')
+                    self.assertEqual((self.home/'refreshed').exists(),allow=='yes')
+                    calls=(self.home/'moderation-calls').read_text().splitlines()
+                    self.assertEqual(calls[0],'connect');self.assertEqual(calls[-1],'logout')
+                    self.assertEqual(self.preset.read_bytes(),PRESET)
+
     def test_reshade_validator_sends_reshade_type_for_every_review_action(self):
         ui = self.shell(r'''
-menu_select() { printf '%s\n' "$@" >> "$WT_HOME/ui"; if [ "$3" = approve ]; then echo approve; else echo preset-id; fi; }
+menu_select() {
+ printf '%s\n' "$@" >> "$WT_HOME/ui"
+ case "$3" in pending) if [ -f "$WT_HOME/reviewed" ]; then echo back; else echo pending; fi;; approve) echo approve;; *) echo preset-id;; esac
+}
 community_service_cmd() {
  printf '%s\n' "$*" >> "$WT_HOME/service-calls"
  case "$1" in

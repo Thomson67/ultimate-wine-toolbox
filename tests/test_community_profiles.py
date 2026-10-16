@@ -93,6 +93,12 @@ class CommunityTests(unittest.TestCase):
             self.community.network(self.community.base+item['file'])
             self.assertNotIn('uwt_refresh', requested[-1].full_url)
 
+    def test_list_labels_omit_repeated_game_name_but_keep_distinct_profile_titles(self):
+        item={'game':'Max Payne','title':'Max Payne','author':'Thomson'}
+        self.assertEqual(community.entry_label(item),'Max Payne — Thomson')
+        self.assertEqual(community.entry_label(dict(item,title=' max  PAYNE ')),'Max Payne — Thomson')
+        self.assertEqual(community.entry_label(dict(item,title='Clavier AZERTY')),'Max Payne — Clavier AZERTY — Thomson')
+
     def test_failed_refresh_preserves_offline_cache(self):
         item, _ = self.catalogue()
         before = self.community.cache.read_bytes()

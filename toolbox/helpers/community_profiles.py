@@ -68,6 +68,15 @@ def entry(value):
     return result
 
 
+def entry_label(item):
+    # A title may equal the game name, but distinct variants must stay visible.
+    normalize = lambda value: ' '.join(unicodedata.normalize('NFKC', value).casefold().split())
+    parts = [item['game']]
+    if normalize(item['title']) != normalize(item['game']): parts.append(item['title'])
+    parts.append(item['author'])
+    return ' — '.join(parts)
+
+
 def catalogue(value):
     if not isinstance(value, dict) or value.get('schema') != 1 or not isinstance(value.get('entries'), list):
         raise ValueError('Unsupported catalogue format')
@@ -410,7 +419,7 @@ def main():
     elif args.command == 'list':
         for item in community.load()['entries']:
             if item['kind'] == args.kind and args.query.casefold() in (item['game']+' '+item['title']+' '+item['author']).casefold():
-                print(item['id']+'\t'+item['game']+' — '+item['title']+' — '+item['author'])
+                print(item['id']+'\t'+entry_label(item))
     elif args.command == 'show': print(details(community.find(args.kind, args.identifier), args.language == 'fr'))
     elif args.command == 'fetch': print(community.fetch(args.kind, args.identifier))
     elif args.command == 'share':

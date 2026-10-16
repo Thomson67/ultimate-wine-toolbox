@@ -17,7 +17,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-from community_profiles import Community, KINDS, LIMIT, atomic, details, dump, entry, profile_bytes
+from community_profiles import Community, KINDS, LIMIT, atomic, details, dump, entry, entry_label, profile_bytes
 
 API = 'https://uwt-community-api.thomson67.workers.dev'
 PROFILE_LIMIT = 64*1024
@@ -191,6 +191,33 @@ class Service:
         if any(value['kind'] != kind for value in values): raise ValueError('Unexpected profile type')
         return values
 
+    def published(self, kind):
+        try:
+            result = self.request('/v1/published?'+urllib.parse.urlencode({'kind': kind}), authenticated=True)
+        except ServiceError as error:
+            if error.status == 404: raise ValueError('Mettez à jour le Worker Cloudflare pour gérer les publications / Update the Cloudflare Worker to manage published profiles') from None
+            raise
+        values = result.get('entries')
+        if not isinstance(values, list) or len(values) > 3000: raise ValueError('Invalid published catalogue')
+        values = [entry(value) for value in values]
+        if any(value['kind'] != kind for value in values): raise ValueError('Unexpected profile type')
+        return values
+
+    def published_review(self, kind, identifier):
+        if kind not in KINDS or not re.fullmatch('[a-z0-9][a-z0-9-]{0,79}', identifier): raise ValueError('Invalid published identifier')
+        value = self.request('/v1/published/'+kind+'/'+identifier, authenticated=True)
+        metadata, token = entry(value['metadata']), value.get('review_hash', '')
+        if metadata['id'] != identifier or metadata['kind'] != kind or not re.fullmatch('[a-f0-9]{64}', token):
+            raise ValueError('Unexpected published profile')
+        return metadata, token
+
+    def remove_published(self, kind, identifier, expected):
+        if kind not in KINDS or not re.fullmatch('[a-z0-9][a-z0-9-]{0,79}', identifier) or not re.fullmatch('[a-f0-9]{64}', expected):
+            raise ValueError('Review the published profile before removing it')
+        result = self.request('/v1/published/'+kind+'/'+identifier+'/remove', {'expected_hash': expected}, authenticated=True)
+        if result.get('status') != 'removed': raise ValueError('Removal was not confirmed')
+        return result
+
     def review(self, kind, identifier):
         if not re.fullmatch('[a-z0-9][a-z0-9-]{0,79}', identifier): raise ValueError('Invalid contribution identifier')
         value = self.request('/v1/submissions/'+identifier, authenticated=True)
@@ -249,10 +276,10 @@ def main():
     sub = parser.add_subparsers(dest='command', required=True)
     sub.add_parser('login'); sub.add_parser('logout'); sub.add_parser('connect'); sub.add_parser('forget')
     arg = sub.add_parser('submit'); arg.add_argument('package'); arg.add_argument('--kind', choices=KINDS)
-    for action in ('pending', 'review', 'approve', 'reject'):
+    for action in ('pending', 'review', 'approve', 'reject', 'published', 'published-review', 'remove-published'):
         arg = sub.add_parser(action); arg.add_argument('kind', choices=KINDS)
-        if action != 'pending': arg.add_argument('identifier')
-        if action in ('approve', 'reject'): arg.add_argument('checksum')
+        if action not in ('pending', 'published'): arg.add_argument('identifier')
+        if action in ('approve', 'reject', 'remove-published'): arg.add_argument('checksum')
     args = parser.parse_args(); service = Service(args.home)
     if args.command == 'login': service.login(sys.stdin.readline(256).strip())
     elif args.command == 'logout': service.logout()
@@ -260,8 +287,14 @@ def main():
     elif args.command == 'forget': service.forget()
     elif args.command == 'submit':
         result = service.submit(args.package, args.kind); print(result['id']+'\n'+result['status'])
-    elif args.command == 'pending':
-        for item in service.pending(args.kind): print(item['id']+'\t'+item['game']+' — '+item['title']+' — '+item['author'])
+    elif args.command in ('pending', 'published'):
+        values = service.pending(args.kind) if args.command == 'pending' else service.published(args.kind)
+        for item in values: print(item['id']+'\t'+entry_label(item))
+    elif args.command == 'published-review':
+        metadata, token = service.published_review(args.kind, args.identifier)
+        print(token); print(details(metadata, args.language == 'fr'))
+    elif args.command == 'remove-published':
+        print(service.remove_published(args.kind, args.identifier, args.checksum)['status'])
     elif args.command == 'review':
         metadata, data = service.review(args.kind, args.identifier)
         print(metadata['sha256']); print(details(metadata, args.language == 'fr'))
