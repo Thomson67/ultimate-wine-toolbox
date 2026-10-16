@@ -87,6 +87,54 @@ locked during updates; a changed file or TSV invalidates an earlier confirmation
 Yad starts in `config/antimicrox-profiles/`, preselecting the current profile
 when it is in that folder. Manual path entry uses the same starting directory.
 
+## Pad2Key conversion
+
+**Convertir un Pad2Key en profil AntiMicroX / Convert Pad2Key to an AntiMicroX
+profile** accepts a selected Windows game's `.wsquashfs.keys` or `.wine/padto.keys`
+(`.pc` also supported), or a manually selected `.keys` file. A preview reports
+converted actions and everything requiring manual editing before creating a new
+profile under `config/antimicrox-profiles/`. Existing profiles are never overwritten.
+The original file stays unchanged during conversion. Converted mappings can be
+viewed, edited, enabled or enabled and tested with the existing live workflow.
+
+This first version converts player-one keyboard targets (including simultaneous
+key combinations), mouse clicks, sticks used as a mouse, D-pad directions, stick
+directions and triggers. `mode: any` trigger alternatives are supported. Physical
+button naming follows Batocera's SNES convention: `b` becomes Xbox A / PS Cross,
+`a` becomes B / Circle, `y` becomes X / Square and `x` becomes Y / Triangle.
+`pageup` and `pagedown` become LB/L1 and RB/R1. Supported native Linux key codes
+preserve right-side modifiers and keypad identity with AntiMicroX's native-key
+prefix; these profiles use the managed uinput event generator.
+
+Held/delayed triggers, trigger chords and sequences, shell commands, unknown
+inputs/targets and other players are explicitly reported rather than guessed.
+Commands from a `.keys` file are never executed. Unsupported actions are not
+added partially. Mouse sensitivity and deadzones may need adjustment in the
+editor because evmapy and AntiMicroX have different motion handling. Only the
+selected file is analyzed; global Pad2Key files are not silently imported.
+
+Enabling a converted profile backs up the game's original `.keys` contents and
+mode in `state/antimicrox-pad2key-backups.json`. Player-one actions are replaced
+with empty-target overrides, which emit no input and shadow identical triggers
+in Batocera's merged global mappings. Other players' original Pad2Key actions
+remain intact; this does not introduce separate AntiMicroX profile routing for
+multiple controllers. The conversion menu explicitly targets player one.
+
+Removing the AntiMicroX assignment or deleting the assigned converted profile
+restores the original Pad2Key bytes and mode (or removes the temporary override
+if no original existed). Switching AntiMicroX profiles keeps the original backup
+until the association is removed. Live configuration temporarily adds its shortcut
+to the suspended file and restores that file when the session ends. Uninstall
+restores Pad2Key backups before deleting Toolbox state. External edits to a
+suspended file are never overwritten: the operation fails and retains its backup.
+Source changes after preview/creation are detected before conversion/activation.
+
+Automated fixtures reproduce the two supplied examples: Max Payne converts
+21/21 actions and Gobliins 6 converts 6/6. Tests cover button conventions, function
+keys, mouse directions/clicks, unsupported actions, round-trip restoration,
+profile deletion, failure rollback, global trigger shadowing and live-launch
+handoff. Converted mappings and mouse feel still require Batocera gameplay tests.
+
 Associations remain in `config/antimicrox-games.tsv`. Profiles stay at their
 chosen locations under `/userdata`, outside the Wine prefix. This configuration
 is local: sharing a WSquashFS does **not** yet include its mapping. Reassign the

@@ -13,6 +13,7 @@ import textwrap
 import xml.etree.ElementTree as ET
 
 from antimicrox_live import atomic
+from antimicrox_pad2key_state import Pad2KeyStore
 
 
 def number(text):
@@ -248,27 +249,33 @@ class Profiles:
             path, games, remaining, original, actual = self.plan(selected)
             if actual != token:
                 raise ValueError('Profile or assignments changed. Select the profile again.')
-            # Stage on the same filesystem; restore file and TSV if deletion fails.
-            folder = Path(tempfile.mkdtemp(prefix='.uwt-amx-delete-', dir=path.parent))
-            backup = folder/path.name
-            try:
-                os.replace(path, backup)
+            store = Pad2KeyStore(self.home, self.userdata)
+            with store.transaction(games):
+                # Stage on the same filesystem; restore file and TSV if deletion fails.
+                folder = Path(tempfile.mkdtemp(prefix='.uwt-amx-delete-', dir=path.parent))
+                backup = folder/path.name
                 try:
-                    if remaining != original:
-                        atomic(self.cfg, remaining)
-                    backup.unlink()
-                except BaseException:
-                    # Never automatically remove a backup if restoration fails.
-                    if backup.exists():
-                        os.replace(backup, path)
-                    if remaining != original:
-                        atomic(self.cfg, original)
-                    raise
-            finally:
-                try:
-                    folder.rmdir()
-                except OSError:
-                    pass  # Keep a recoverable staged file after a failed restore.
+                    os.replace(path, backup)
+                    try:
+                        store.restore(games)
+                        registry = store.read(store.registry)
+                        if registry.pop(str(path), None) is not None:
+                            atomic(store.registry, json.dumps(registry, ensure_ascii=False, indent=2).encode())
+                        if remaining != original:
+                            atomic(self.cfg, remaining)
+                        backup.unlink()
+                    except BaseException:
+                        # Never automatically remove a backup if restoration fails.
+                        if backup.exists():
+                            os.replace(backup, path)
+                        if remaining != original:
+                            atomic(self.cfg, original)
+                        raise
+                finally:
+                    try:
+                        folder.rmdir()
+                    except OSError:
+                        pass  # Keep a recoverable staged file after a failed restore.
             return games
 
 

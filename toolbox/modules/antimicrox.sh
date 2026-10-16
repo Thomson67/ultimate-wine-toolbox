@@ -14,8 +14,15 @@ amx_txt() {
   if [ "$WT_LANGUAGE" = fr ]; then printf '%s' "$1"; else printf '%s' "$2"; fi
 }
 amx_set_profile() (
-  local rom="$1" profile="$2" tmp
+  local rom="$1" profile="$2" tmp output
   case "$rom$profile" in *$'\t'*|*$'\n'*) return 1 ;; esac
+  if [ -f "${WT_ROOT:-}/helpers/antimicrox_pad2key.py" ]; then
+    if ! output="$(amx_pad2key_cmd assign "$rom" "$profile" 2>&1)"; then
+      msgbox AntiMicroX "$(amx_txt 'Association impossible :' 'Could not change assignment:')\n$output"
+      return 1
+    fi
+    return 0
+  fi
   mkdir -p "$(dirname "$AMX_OVERRIDES")"
   exec 8>"$(dirname "$AMX_OVERRIDES")/antimicrox-games.lock"
   flock -x 8 || return 1
@@ -92,6 +99,70 @@ amx_profile_file() {
   fi
 }
 amx_profiles_cmd() { python3 "$WT_ROOT/helpers/antimicrox_profiles.py" --home "$WT_HOME" --language "$WT_LANGUAGE" "$@"; }
+amx_pad2key_cmd() { python3 "$WT_ROOT/helpers/antimicrox_pad2key.py" --home "$WT_HOME" --language "$WT_LANGUAGE" "$@"; }
+amx_pad2key_source() {
+  local current="${1:-/userdata/roms/windows/}"
+  if command -v yad >/dev/null 2>&1; then
+    DISPLAY="${DISPLAY:-:0}" yad --file-selection --title="Pad2Key — .keys" --filename="$current" --file-filter='Pad2Key | *.keys' 2>/dev/null
+  else
+    input_text AntiMicroX "$(amx_txt 'Chemin du fichier Pad2Key .keys :' 'Pad2Key .keys file path:')" "$current"
+  fi
+}
+amx_convert_pad2key() {
+  local choice rom="" source preview report token profile
+  choice="$(menu_select AntiMicroX "$(amx_txt 'Convertir un Pad2Key vers AntiMicroX (joueur 1)' 'Convert Pad2Key to AntiMicroX (player 1)')" \
+    game "$(amx_txt 'Choisir un jeu Windows' 'Choose a Windows game')" \
+    file "$(amx_txt 'Choisir un fichier .keys' 'Choose a .keys file')" back "$(i18n back)")" || return 0
+  case "$choice" in
+    game)
+      rom="$(amx_choose_game)" || return 0
+      case "$rom" in *.wine|*.pc) source="$rom/padto.keys" ;; *) source="$rom.keys" ;; esac
+      [ -f "$source" ] || source="$(amx_pad2key_source "$(dirname "$rom")/")" || return 0 ;;
+    file) source="$(amx_pad2key_source)" || return 0 ;;
+    *) return 0 ;;
+  esac
+  preview="$(amx_pad2key_cmd preview "$source" 2>&1)" || { msgbox AntiMicroX "$preview"; return 1; }
+  token="${preview%%$'\n'*}"
+  report="$(mktemp /tmp/uwt-amx-conversion.XXXXXX)" || return 1
+  printf '%s\n' "${preview#*$'\n'}" > "$report"
+  if have_dialog; then
+    wt_clear_tty
+    dialog --clear --no-shadow --exit-label "$(i18n back)" --title AntiMicroX --textbox "$report" 24 100
+    wt_clear_tty
+  else
+    cat "$report" >&2
+  fi
+  rm -f -- "$report"
+  yesno AntiMicroX "$(amx_txt 'Créer le profil AntiMicroX avec les actions convertibles ?\n\nLes éventuelles actions non converties sont indiquées dans le bilan. Le Pad2Key original reste intact à cette étape.' 'Create an AntiMicroX profile with the supported actions?\n\nUnsupported actions are listed in the report. The original Pad2Key stays intact at this step.')" || return 0
+  profile="$(amx_pad2key_cmd convert "$source" --expected "$token" 2>&1)" || { msgbox AntiMicroX "$profile"; return 1; }
+  while true; do
+    choice="$(menu_select AntiMicroX "$(amx_txt "Profil créé :\n$profile" "Profile created:\n$profile")" \
+      info "$(amx_txt 'Afficher les mappages convertis' 'Show converted mappings')" \
+      edit "$(amx_txt 'Modifier le profil' 'Edit the profile')" \
+      activate "$(amx_txt 'Activer pour un jeu' 'Enable for a game')" \
+      live "$(amx_txt 'Activer et tester en jeu' 'Enable and test in game')" \
+      back "$(amx_txt 'Conserver le profil sans l’activer' 'Keep profile without enabling it')")" || return 0
+    case "$choice" in
+      info) amx_profile_info "$profile" ;;
+      edit) amx_editor "$profile" ;;
+      activate|live)
+        [ -n "$rom" ] || rom="$(amx_choose_game)" || continue
+        if amx_running; then
+          msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX avant d’activer la conversion.' 'Close the game and AntiMicroX before enabling the conversion.')"
+          continue
+        fi
+        yesno AntiMicroX "$(amx_txt "Activer pour $(basename "$rom") ?\n\nLe Pad2Key du joueur 1 sera suspendu pour éviter le double mapping. Son contenu original sera sauvegardé et restauré si vous retirez l’association AntiMicroX.\n\nVérifiez les éventuelles actions non converties et les réglages de souris avant de jouer." "Enable for $(basename "$rom")?\n\nPlayer-one Pad2Key mapping will be suspended to avoid duplicate input. Its original content will be backed up and restored when the AntiMicroX assignment is removed.\n\nReview unsupported actions and mouse settings before playing.")" || continue
+        amx_set_profile "$rom" "$profile" || continue
+        if [ "$choice" = live ]; then
+          amx_live_start_for "$rom" "$profile"
+        else
+          msgbox AntiMicroX "$(amx_txt 'Profil activé. Il sera chargé au prochain lancement du jeu.' 'Profile enabled. It will load on the next game launch.')"
+        fi
+        return 0 ;;
+      *) return 0 ;;
+    esac
+  done
+}
 amx_profile_info() (
   local report
   report="$(mktemp /tmp/uwt-amx-profile.XXXXXX)" || return 1
@@ -345,6 +416,7 @@ antimicrox_menu() {
     choice="$(menu_select "AntiMicroX" "$(amx_txt 'Configuration native par jeu. Profils hors des préfixes Wine. Le binaire Linux doit être disponible et /dev/uinput fonctionnel.' 'Native per-game configuration. Profiles outside Wine prefixes. Linux binary and /dev/uinput required.')" \
       7 "$(amx_txt 'Configurer et tester en jeu (bêta)' 'Configure and test in game (beta)')" \
       2 "$(amx_txt 'Gérer les jeux avec un profil associé' 'Manage games with assigned profiles')" \
+      9 "$(amx_txt 'Convertir un Pad2Key en profil AntiMicroX' 'Convert Pad2Key to an AntiMicroX profile')" \
       1 "$(amx_txt 'Associer un profil à un jeu' 'Assign a game profile')" \
       3 "$(amx_txt 'Ouvrir l’éditeur de profils' 'Open profile editor')" \
       8 "$(amx_txt 'Supprimer un profil' 'Delete a profile')" \
@@ -354,6 +426,7 @@ antimicrox_menu() {
       0 "$(i18n back)")" || return
     case "$choice" in
       7) amx_live_choose ;;
+      9) amx_convert_pad2key ;;
       5)
         if yesno "AntiMicroX" "$(amx_txt "Télécharger AntiMicroX 3.6.1 depuis GitHub et installer dans /userdata ?" "Download AntiMicroX 3.6.1 from GitHub and install under /userdata?")"; then
           if "$WT_ROOT/helpers/install-antimicrox.sh" > /tmp/uwt-amx-install.log 2>&1; then

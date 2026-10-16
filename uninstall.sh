@@ -58,6 +58,13 @@ fi
 if [ -f "$DEST/state/antimicrox-live.json" ]; then
     python3 "$DEST/toolbox/helpers/antimicrox_live.py" --home "$DEST" finish --result uninstalled || exit 1
 fi
+if [ -f "$DEST/state/antimicrox-pad2key-backups.json" ]; then
+    python3 "$DEST/toolbox/helpers/antimicrox_pad2key.py" --home "$DEST" restore-all || {
+        say "ERREUR : restauration Pad2Key incomplète. Toolbox et sauvegardes conservées." \
+            "ERROR: incomplete Pad2Key restoration. Toolbox and backups preserved."
+        exit 1
+    }
+fi
 rm -f /userdata/system/scripts/ultimate-wine-toolbox-antimicrox.sh
 rm -rf "$DEST" "$OLD_DEST"
 rm -f "$PORT" "$KEYS" "$MANGOHUD_HOOK" "$DXVK_HOOK" "$RESHADE_HOOK"
