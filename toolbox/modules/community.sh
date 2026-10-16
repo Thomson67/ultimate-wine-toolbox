@@ -184,7 +184,8 @@ community_pick_reshade_game() {
     case "$choice" in
       scan)
         log="$(mktemp /tmp/uwt-reshade-discovery.XXXXXX)" || return 1
-        if have_dialog; then wt_clear_tty; dialog --no-shadow --title "$title" --infobox "$(community_txt 'Détection des ReShade intégrés… La première analyse peut prendre du temps.' 'Detecting bundled ReShade… The first scan may take some time.')" 12 96 || true; fi
+        # This selector is captured: keep terminal rendering out of its returned path.
+        if have_dialog; then wt_clear_tty; dialog --no-shadow --title "$title" --infobox "$(community_txt 'Détection des ReShade intégrés… La première analyse peut prendre du temps.' 'Detecting bundled ReShade… The first scan may take some time.')" 12 96 >&2 || true; fi
         if output="$(community_cmd reshade-scan 2>"$log")"; then
           msgbox "$title" "$(community_txt "Analyse terminée (total / traités / erreurs) : $output" "Scan complete (total / processed / errors): $output")"
         else msgbox "$title" "$(cat "$log")"; fi

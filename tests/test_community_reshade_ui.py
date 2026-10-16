@@ -56,6 +56,33 @@ amx_profiles_cmd() { echo AMX-CALLED >> "$WT_HOME/ui"; return 1; }
         self.assertNotIn('AMX-CALLED', ui)
         return ui
 
+    def test_reshade_detection_keeps_terminal_output_out_of_selected_game(self):
+        for language in ('fr', 'en'):
+            for cancel in (False, True):
+                with self.subTest(language=language, cancel=cancel):
+                    (self.home/'scanned').unlink(missing_ok=True)
+                    self.shell(r'''
+have_dialog() { return 0; }
+wt_clear_tty() { :; }
+dialog() { printf '\033[2J\033[HDetecting bundled ReShade'; }
+community_cmd() {
+ case "$1" in
+  reshade-games) printf '%s\tReShade Game\texternal-enabled\n' "$TEST_ROM";;
+  reshade-scan) touch "$WT_HOME/scanned"; printf '1\t1\t0\n';;
+  *) return 1;;
+ esac
+}
+menu_select() {
+ if [ ! -f "$WT_HOME/scanned" ]; then echo scan;
+ elif CANCEL; then echo back; else echo 1; fi
+}
+if selected="$(community_pick_reshade_game Community)"; then
+ [ CANCEL = false ] && [ "$selected" = "$TEST_ROM"$'\tReShade Game' ] || exit 1
+else
+ [ CANCEL = true ] && [ -z "$selected" ] || exit 1
+fi
+'''.replace('CANCEL', 'true' if cancel else 'false'), language=language)
+
     def test_configured_game_list_uses_reshade_config_and_omits_amx_only_games(self):
         self.assertEqual(community.reshade_games(self.home), [(str(self.rom), 'ReShade Game', 'enabled')])
         (self.home/'reshade/games'/(reshade_manager.key(self.rom)+'.json')).write_text(json.dumps({'rom': str(self.rom), 'enabled': False}))
