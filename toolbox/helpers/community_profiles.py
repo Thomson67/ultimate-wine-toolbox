@@ -237,7 +237,13 @@ class Community:
         self.download = download or self.network
 
     def network(self, url):
-        with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'Ultimate-Wine-Toolbox'}), timeout=15) as response:
+        headers = {'User-Agent': 'Ultimate-Wine-Toolbox'}
+        if url == self.base+'catalog.json':
+            # Raw GitHub branch URLs can serve a pre-publication copy for five minutes.
+            # A new cache key makes an explicit refresh fetch the current catalogue.
+            url += '?uwt_refresh='+uuid.uuid4().hex
+            headers.update({'Cache-Control': 'no-cache', 'Pragma': 'no-cache'})
+        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=15) as response:
             if not response.geturl().startswith(self.base): raise ValueError('Unexpected download redirect')
             data = response.read(LIMIT+1)
         if len(data) > LIMIT: raise ValueError('Download exceeds 2 MiB')

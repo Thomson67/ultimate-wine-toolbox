@@ -15,7 +15,9 @@ https://github.com/Thomson67/ultimate-wine-toolbox-community/blob/main/service/I
 ## Read and import
 
 First browsing downloads the catalogue; subsequent browsing/search uses the
-local cache in `state/community/catalog.json`. Refresh is explicit. A failed or
+local cache in `state/community/catalog.json`. Refresh is explicit and requests a
+fresh copy with a unique URL and no-cache headers, bypassing GitHub’s five-minute
+cache of branch URLs after publication. Profile URLs remain unchanged. A failed or
 invalid refresh does not replace a valid cached catalogue. Profile downloads
 require network access and verify the manifest SHA-256 before validation and
 installation. Text/control characters, file paths, content types and sizes are

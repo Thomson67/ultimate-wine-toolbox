@@ -67,6 +67,32 @@ class CommunityTests(unittest.TestCase):
                 self.assertIn(item['game'], community.details(item))
                 if kind == 'antimicrox': self.assertTrue(Pad2KeyStore(self.home, self.base/'userdata').is_community(str(fetched)))
 
+    def test_explicit_refresh_bypasses_stale_github_cache_and_lists_new_reshade(self):
+        _, package, _ = self.pack('reshade')
+        root = self.base/'published'; community.approve(package, root)
+        published = (root/'catalog.json').read_bytes()
+        requested = []
+
+        def serve(request, **kwargs):
+            requested.append(request)
+            response = MagicMock()
+            response.__enter__.return_value = response
+            response.geturl.return_value = request.full_url
+            # Model an edge cache still serving the empty catalogue at the branch URL.
+            response.read.return_value = published if '?uwt_refresh=' in request.full_url else b'{"schema":1,"entries":[]}'
+            return response
+
+        with patch.object(community.urllib.request, 'urlopen', side_effect=serve):
+            self.community.refresh()
+            item = self.community.load()['entries'][0]
+            self.assertEqual(item['kind'], 'reshade')
+            self.community.refresh()
+            self.assertNotEqual(requested[0].full_url, requested[1].full_url)
+            self.assertTrue(all(r.get_header('Cache-control') == 'no-cache' for r in requested))
+            self.assertEqual(json.loads(self.community.cache.read_text())['source'], self.community.base)
+            self.community.network(self.community.base+item['file'])
+            self.assertNotIn('uwt_refresh', requested[-1].full_url)
+
     def test_failed_refresh_preserves_offline_cache(self):
         item, _ = self.catalogue()
         before = self.community.cache.read_bytes()
