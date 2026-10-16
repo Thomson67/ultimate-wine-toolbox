@@ -13,8 +13,54 @@ import uuid
 import xml.etree.ElementTree as ET
 
 MARKER = 'UWT AntiMicroX live Alt-Tab'
-ACTION = {'trigger': ['hotkey', 'b'], 'type': 'key',
+ACTION = {'trigger': ['hotkey', 'pagedown'], 'type': 'key',
           'target': ['KEY_LEFTALT', 'KEY_TAB'], 'description': MARKER}
+LEGACY_ACTION = dict(ACTION, trigger=['hotkey', 'b'])
+SWITCHES = [('pagedown', 11, 'Hotkey + R1 / RB', 'Hotkey + R1 / RB'),
+            ('select', 5, 'Hotkey + Select (View Xbox / Share-Create PlayStation)',
+             'Hotkey + Select (Xbox View / PlayStation Share-Create)')]
+
+
+def hotkey_choices():
+    from antimicrox_hotkey import choices
+    return choices()
+
+
+def switch_for(profile, home, actions=()):
+    root = ET.parse(profile).getroot()
+    blocked, indices = {button for button, _ in hotkey_choices()}, set()
+    for action in actions:
+        value = action.get('trigger')
+        if isinstance(value, list) and 'hotkey' in value and action.get('target'):
+            blocked.update(t for t in value if t != 'hotkey')
+    # Include source chords even when deduplication makes their slots identical
+    # to the ordinary action; inspect edited profiles independently as well.
+    registry = Path(home)/'state/antimicrox-pad2key-conversions.json'
+    if registry.exists():
+        metadata = json.loads(registry.read_text()).get(str(Path(profile).resolve()), {})
+        for value in metadata.get('triggers', []):
+            if isinstance(value, list) and 'hotkey' in value:
+                blocked.update(t for t in value if t != 'hotkey')
+    for group in root.findall('./sets/set'):
+        for modifier in group.findall('button'):
+            if modifier.findtext('setselectcondition') not in ('while-held', 'one-way', 'two-way'):
+                continue
+            indices.add(modifier.get('index'))
+            target = next((s for s in root.findall('./sets/set')
+                           if s.get('index') == modifier.findtext('setselect')), None)
+            if target is None:
+                continue
+            for _, index, _, _ in SWITCHES:
+                def slots(parent):
+                    node = parent.find(f'button[@index="{index}"]/slots')
+                    return [ET.tostring(s) for s in node] if node is not None else []
+                if slots(target) != slots(group):
+                    indices.add(str(index))
+    if root.tag == 'gamecontroller':
+        for name, index, fr, en in SWITCHES:
+            if name not in blocked and str(index) not in indices:
+                return dict(ACTION, trigger=['hotkey', name]), fr, en
+    return None, 'Alt+Tab au clavier uniquement (combinaisons occupées)', 'Keyboard Alt+Tab only (controller chords occupied)'
 
 
 def digest(data):
@@ -89,9 +135,6 @@ class LiveSession:
             actions = config.get('actions_player1', [])
             if any(not isinstance(action, dict) for action in actions):
                 raise ValueError('Invalid player 1 actions; preserved.')
-            displaced = [action for action in actions if trigger(action) == trigger(ACTION)]
-            config['actions_player1'] = [ACTION] + [action for action in actions if trigger(action) != trigger(ACTION)]
-            injected = (json.dumps(config, ensure_ascii=False, indent=2)+'\n').encode()
             new = profile is None
             if new:
                 label = ''.join(c if c.isalnum() or c in ' -_[]' else '_' for c in rom.stem)[:100]
@@ -105,11 +148,16 @@ class LiveSession:
                     raise ValueError('Profiles must remain under /userdata.')
             if not valid_profile(profile):
                 raise ValueError('Invalid AntiMicroX XML profile.')
+            action, switch_fr, switch_en = switch_for(profile, self.home, actions)
+            displaced = [item for item in actions if action and trigger(item) == trigger(action)]
+            config['actions_player1'] = ([action] if action else []) + [item for item in actions if not action or trigger(item) != trigger(action)]
+            injected = (json.dumps(config, ensure_ascii=False, indent=2)+'\n').encode()
             mode = stat.S_IMODE(keys.stat().st_mode) if keys.exists() else 0o644
             data = {'session_id': uuid.uuid4().hex, 'rom': str(rom), 'profile': str(profile), 'phase': 'preparing',
                     'keys': str(keys), 'original': base64.b64encode(original).decode() if original is not None else None,
                     'mode': mode, 'injected_sha256': digest(injected), 'displaced': displaced,
-                    'result': '', 'error': ''}
+                    'result': '', 'error': '', 'action': action,
+                    'switch_fr': switch_fr, 'switch_en': switch_en}
             # Persist the original before any change, including power-loss recovery.
             self.write(data)
             try:
@@ -163,9 +211,10 @@ class LiveSession:
                 # Preserve edits made during the session; remove only our marked rule.
                 config = json.loads(current)
                 actions = config.get('actions_player1', [])
-                ours = [a for a in actions if a == ACTION]
+                action = data.get('action', LEGACY_ACTION)
+                ours = [a for a in actions if action is not None and a == action]
                 if ours:
-                    actions = [a for a in actions if a != ACTION]
+                    actions = [a for a in actions if a != action]
                     for action in data['displaced']:
                         if not any(trigger(a) == trigger(action) for a in actions):
                             actions.append(action)

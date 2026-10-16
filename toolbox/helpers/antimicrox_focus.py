@@ -189,10 +189,11 @@ def introduction(owner, windows, api, clock=time.monotonic, sleep=time.sleep,
                         language = (owner.home/'config/language').read_text().strip()
                     except OSError:
                         language = 'fr' if os.environ.get('LANG', '').startswith('fr') else 'en'
-                    message = ('Configurer avec AntiMicroX : Alt+Tab ou Hotkey + A (Xbox) / Croix (PlayStation)'
+                    shortcut = owner.read().get('switch_fr' if language == 'fr' else 'switch_en', 'Alt+Tab')
+                    message = (f'Configurer avec AntiMicroX : Alt+Tab — {shortcut}'
                                '\nRelâchez les boutons après la bascule. Enregistrez le profil avant de quitter.'
                                if language == 'fr' else
-                               'Configure with AntiMicroX: Alt+Tab or Hotkey + A (Xbox) / Cross (PlayStation)'
+                               f'Configure with AntiMicroX: Alt+Tab — {shortcut}'
                                '\nRelease the buttons after switching. Save the profile before quitting.')
                     try:
                         result = run([sys.executable, str(Path(__file__).with_name('antimicrox_notice.py')), message],

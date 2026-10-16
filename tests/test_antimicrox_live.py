@@ -4,10 +4,12 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT/'toolbox/helpers'))
 spec = importlib.util.spec_from_file_location('amx_live', ROOT/'toolbox/helpers/antimicrox_live.py')
 live = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(live)
@@ -45,7 +47,7 @@ class LiveSessionTests(unittest.TestCase):
         self.assertEqual(self.keys.stat().st_mode & 0o777, 0o640)
 
     def test_same_chord_is_overridden_without_duplicates_and_restored(self):
-        old = {'trigger': ['b', 'hotkey'], 'type': 'key', 'target': 'KEY_ESC'}
+        old = {'trigger': ['pagedown', 'hotkey'], 'type': 'key', 'target': []}
         self.keys.write_text(json.dumps({'actions_player1': [old]}))
         self.session.prepare(self.rom)
         self.assertEqual(json.loads(self.keys.read_text())['actions_player1'], [live.ACTION])
@@ -53,7 +55,7 @@ class LiveSessionTests(unittest.TestCase):
         self.assertEqual(json.loads(self.keys.read_text())['actions_player1'], [old])
 
     def test_concurrent_unrelated_edits_survive_restoration(self):
-        old = {'trigger': ['hotkey', 'b'], 'type': 'key', 'target': 'KEY_ESC'}
+        old = {'trigger': ['hotkey', 'pagedown'], 'type': 'key', 'target': []}
         new = {'trigger': 'x', 'type': 'key', 'target': 'KEY_SPACE'}
         self.keys.write_text(json.dumps({'actions_player1': [old]}))
         self.session.prepare(self.rom)

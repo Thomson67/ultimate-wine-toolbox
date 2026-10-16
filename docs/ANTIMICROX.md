@@ -106,7 +106,20 @@ button naming follows Batocera's SNES convention: `b` becomes Xbox A / PS Cross,
 preserve right-side modifiers and keypad identity with AntiMicroX's native-key
 prefix; these profiles use the managed uinput event generator.
 
-Held/delayed triggers, trigger chords and sequences, shell commands, unknown
+Hotkey + one button chords (`mode: all`) use a second set while Hotkey is held,
+with a reverse while-held association back to the normal set. The conversion
+reads Batocera's user/system `es_input.cfg`: a shared Hotkey uses its configured
+logical button, while a standalone Hotkey maps to SDL Guide. If configurations
+use different Hotkey buttons, the menu asks which controller configuration to
+use. Missing, ambiguous, axis/hat Hotkeys and Start-as-Hotkey are not guessed.
+Like evmapy, the shifted set retains the button's ordinary output in addition
+to its chord output. Other ordinary mappings are copied, except plain Start:
+**Hotkey + Start gets no mapping unless that exact chord is explicitly defined
+in the source file.** Batocera's own quit shortcut remains available otherwise.
+The preview reports the selected modifier and set behavior. Reconvert if the
+controller's Hotkey assignment changes.
+
+Held/delayed triggers, other multi-button chords and sequences, shell commands, unknown
 inputs/targets and other players are explicitly reported rather than guessed.
 Commands from a `.keys` file are never executed. Unsupported actions are not
 added partially. Mouse sensitivity and deadzones may need adjustment in the
@@ -178,8 +191,8 @@ use `--no-tray`, avoiding the Settings OK crash.
 At startup, the live focus observer waits for a stable Wine XWayland window,
 checks that ES runs the requested ROM, and asks the window manager to bring
 that window forward once. AntiMicroX remains open for Alt+Tab. After game focus
-is confirmed, a six-second passive banner explains Alt+Tab and Hotkey + Xbox A /
-PlayStation Cross, in the Toolbox's language. No confirmation is needed.
+is confirmed, a six-second passive banner explains Alt+Tab and the selected
+controller shortcut, in the Toolbox's language. No confirmation is needed.
 The initial wait is bounded to 120 seconds and activation is requested only
 once; unrelated foreground applications are not raised over. If activation is
 ignored, no banner is shown over the editor. Later switches remain manual.
@@ -188,16 +201,24 @@ The startup banner uses a non-interactive GTK layer-shell overlay on Wayland
 uses an override-redirect popup that does not accept focus. If the safe Wayland
 overlay is unavailable, the banner is skipped instead of using a normal window.
 The earlier `batocera-flash-screen` startup banner could activate a GTK window;
-Max Payne reported `DIERR_NOTACQUIRED` at that point. The passive replacement
-still needs a hardware test on Batocera/labwc. The previously validated short
+Max Payne reported `DIERR_NOTACQUIRED` at that point. The user confirmed the passive replacement resolves this startup crash on
+Batocera/labwc. The previously validated short
 focus-recovery banner on later editor-to-game returns is unchanged.
 
-Use **Alt+Tab** on the keyboard or **Hotkey + bottom face button** (DualSense
-Cross / Xbox A) on Batocera player 1's controller. Release the combination after
-each switch. A temporary per-ROM evmapy rule sends Alt+Tab independently of the
-profile being edited. The physical bottom button is `b` in Batocera's internal
-mapping. Existing per-ROM actions for the same combination are saved and
-replaced for this test. Global actions and other games are not modified.
+Use **Alt+Tab** on the keyboard or **Hotkey + R1/RB** on Batocera player 1's
+controller. If this chord is used by the profile, the session tries Hotkey +
+Select instead. A button that itself acts as Hotkey is excluded. If both are
+occupied, the session uses keyboard Alt+Tab only; it never chooses Hotkey +
+Start. The pre-launch notice and in-game banner show the chosen shortcut.
+Release the combination after each switch. A temporary per-ROM evmapy rule sends
+Alt+Tab independently of AntiMicroX. Source conversion metadata, profile set
+mappings and existing per-ROM actions are checked for conflicts before preparing
+the session. Profiles are not rewritten. Ordinary button outputs may still fire
+alongside the temporary shortcut, as they do with evmapy. Do not assign the
+reserved shortcut while editing; restart the session after such a change.
+Older sessions retain their recorded action for recovery; the original
+Hotkey + bottom-button rule is also recognized for backward-compatible cleanup.
+Global actions and other games are not modified.
 
 The shortcut lives in `.wine/padto.keys` or `.pc/padto.keys` for directory games,
 and `<game>.wsquashfs.keys` alongside compressed games. No archive is rewritten.

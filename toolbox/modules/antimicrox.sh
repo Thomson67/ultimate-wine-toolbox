@@ -109,7 +109,8 @@ amx_pad2key_source() {
   fi
 }
 amx_convert_pad2key() {
-  local choice rom="" source preview report token profile
+  local choice rom="" source preview report token profile candidates key label hotkey
+  local -a hotkey_options=() hotkey_menu=()
   choice="$(menu_select AntiMicroX "$(amx_txt 'Convertir un Pad2Key vers AntiMicroX (joueur 1)' 'Convert Pad2Key to AntiMicroX (player 1)')" \
     game "$(amx_txt 'Choisir un jeu Windows' 'Choose a Windows game')" \
     file "$(amx_txt 'Choisir un fichier .keys' 'Choose a .keys file')" back "$(i18n back)")" || return 0
@@ -121,7 +122,19 @@ amx_convert_pad2key() {
     file) source="$(amx_pad2key_source)" || return 0 ;;
     *) return 0 ;;
   esac
-  preview="$(amx_pad2key_cmd preview "$source" 2>&1)" || { msgbox AntiMicroX "$preview"; return 1; }
+  candidates="$(amx_pad2key_cmd hotkeys "$source" 2>&1)" || { msgbox AntiMicroX "$candidates"; return 1; }
+  if [ -n "$candidates" ]; then
+    while IFS=$'\t' read -r key label; do hotkey_menu+=("$key" "$label"); done <<< "$candidates"
+    if [ "${#hotkey_menu[@]}" -eq 2 ]; then
+      hotkey="${hotkey_menu[0]}"
+    else
+      hotkey="$(menu_select AntiMicroX "$(amx_txt 'Configuration Hotkey de la manette utilisée pour ce profil' 'Hotkey configuration of the controller used for this profile')" \
+        "${hotkey_menu[@]}" skip "$(amx_txt 'Ne pas convertir les combinaisons Hotkey' 'Skip Hotkey chords')" back "$(i18n back)")" || return 0
+      [ "$hotkey" != back ] || return 0
+    fi
+    [ "$hotkey" = skip ] || hotkey_options=(--hotkey "$hotkey")
+  fi
+  preview="$(amx_pad2key_cmd preview "$source" "${hotkey_options[@]}" 2>&1)" || { msgbox AntiMicroX "$preview"; return 1; }
   token="${preview%%$'\n'*}"
   report="$(mktemp /tmp/uwt-amx-conversion.XXXXXX)" || return 1
   printf '%s\n' "${preview#*$'\n'}" > "$report"
@@ -134,7 +147,7 @@ amx_convert_pad2key() {
   fi
   rm -f -- "$report"
   yesno AntiMicroX "$(amx_txt 'Créer le profil AntiMicroX avec les actions convertibles ?\n\nLes éventuelles actions non converties sont indiquées dans le bilan. Le Pad2Key original reste intact à cette étape.' 'Create an AntiMicroX profile with the supported actions?\n\nUnsupported actions are listed in the report. The original Pad2Key stays intact at this step.')" || return 0
-  profile="$(amx_pad2key_cmd convert "$source" --expected "$token" 2>&1)" || { msgbox AntiMicroX "$profile"; return 1; }
+  profile="$(amx_pad2key_cmd convert "$source" --expected "$token" "${hotkey_options[@]}" 2>&1)" || { msgbox AntiMicroX "$profile"; return 1; }
   while true; do
     choice="$(menu_select AntiMicroX "$(amx_txt "Profil créé :\n$profile" "Profile created:\n$profile")" \
       info "$(amx_txt 'Afficher les mappages convertis' 'Show converted mappings')" \
@@ -319,7 +332,7 @@ amx_diagnostic() {
 }
 amx_live_cmd() { python3 "$WT_ROOT/helpers/antimicrox_live.py" --home "$WT_HOME" "$@"; }
 amx_live_start_for() {
-  local rom="$1" profile="${2:-}" selected
+  local rom="$1" profile="${2:-}" selected switch_label
   local -a options=()
   [ -n "$(amx_binary 2>/dev/null)" ] && [ -w /dev/uinput ] || {
     msgbox AntiMicroX "$(amx_txt 'Installez AntiMicroX et vérifiez /dev/uinput avec le diagnostic.' 'Install AntiMicroX and check /dev/uinput in diagnostics.')"; return 1;
@@ -335,7 +348,8 @@ amx_live_start_for() {
     msgbox AntiMicroX "$(amx_txt 'Préparation impossible :' 'Preparation failed:')\n$(cat /tmp/uwt-amx-live.log)"
     return 1
   fi
-  msgbox AntiMicroX "$(amx_txt "Le jeu va démarrer avec l’éditeur ouvert.\n\nBasculer : Alt+Tab ou Hotkey + bouton du BAS (Croix DualSense / A Xbox). Relâchez les boutons après chaque bascule.\n\nModifiez puis testez vos affectations. Cliquez sur Enregistrer dans AntiMicroX AVANT de quitter le jeu.\n\nProfil : $selected\n\nLa combinaison est temporaire. Le menu AntiMicroX reviendra à la fin du jeu." "The game will start with the editor open.\n\nSwitch: Alt+Tab or Hotkey + BOTTOM button (DualSense Cross / Xbox A). Release the buttons after each switch.\n\nEdit and test your mappings. Click Save in AntiMicroX BEFORE quitting the game.\n\nProfile: $selected\n\nThe shortcut is temporary. The AntiMicroX menu will return when the game closes.")" || {
+  switch_label="$(amx_live_cmd field "switch_$WT_LANGUAGE")"
+  msgbox AntiMicroX "$(amx_txt "Le jeu va démarrer avec l’éditeur ouvert.\n\nBasculer : Alt+Tab — $switch_label. Relâchez les boutons après chaque bascule.\n\nModifiez puis testez vos affectations. Cliquez sur Enregistrer dans AntiMicroX AVANT de quitter le jeu.\n\nProfil : $selected\n\nLa combinaison est temporaire. Le menu AntiMicroX reviendra à la fin du jeu." "The game will start with the editor open.\n\nSwitch: Alt+Tab — $switch_label. Release the buttons after each switch.\n\nEdit and test your mappings. Click Save in AntiMicroX BEFORE quitting the game.\n\nProfile: $selected\n\nThe shortcut is temporary. The AntiMicroX menu will return when the game closes.")" || {
     if amx_live_cmd finish --result cancelled; then amx_live_cmd clear; fi
     return 1
   }

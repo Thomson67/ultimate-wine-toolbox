@@ -1,5 +1,6 @@
 """Convert Batocera player-one Pad2Key mappings to Linux AntiMicroX profiles."""
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -9,6 +10,7 @@ import xml.etree.ElementTree as ET
 
 from antimicrox_live import atomic
 from antimicrox_pad2key_state import Pad2KeyStore
+from antimicrox_hotkey import choices as hotkey_choices
 
 BUTTONS = {'b': 1, 'a': 2, 'y': 3, 'x': 4, 'select': 5, 'start': 7,
            'l3': 8, 'r3': 9, 'pageup': 10, 'pagedown': 11}
@@ -68,7 +70,12 @@ def control(trigger):
     raise ValueError(f'Unsupported trigger: {trigger}')
 
 
-def analyze(source):
+def analyze(source, hotkey=None):
+    if hotkey is not None and hotkey not in (*BUTTONS, 'guide'):
+        raise ValueError('Unsupported Hotkey button')
+    if hotkey == 'start':
+        raise ValueError('Start cannot be used as the Hotkey modifier')
+    modifier = ('button', 6) if hotkey == 'guide' else control(hotkey) if hotkey else None
     source = Path(source)
     if source.stat().st_size > 8*1024*1024:
         raise ValueError('Pad2Key file exceeds 8 MiB')
@@ -80,6 +87,7 @@ def analyze(source):
     ET.SubElement(root, 'profilename').text = source.name.removesuffix('.keys')+' (Pad2Key)'
     group = ET.SubElement(ET.SubElement(root, 'sets'), 'set', {'index': '1'})
     bindings, descriptions, warnings, converted = {}, {}, [], 0
+    shifted, shifted_descriptions, chord_count = {}, {}, 0
     actions = data['actions_player1']
     for position, action in enumerate(actions, 1):
         try:
@@ -94,10 +102,17 @@ def analyze(source):
                 raise ValueError('Trigger sequences require manual editing')
             trigger = action.get('trigger')
             triggers = trigger if isinstance(trigger, list) else [trigger]
-            if len(triggers) > 1 and action.get('mode', 'all') != 'any':
-                raise ValueError('Button chords require manual editing')
             if not triggers or not all(isinstance(t, str) for t in triggers):
                 raise ValueError('Invalid trigger')
+            chord = len(triggers) > 1 and action.get('mode', 'all') == 'all'
+            if chord:
+                if len(triggers) != 2 or triggers.count('hotkey') != 1:
+                    raise ValueError('Only Hotkey + one button chords are supported')
+                if modifier is None:
+                    raise ValueError('Select the Batocera Hotkey controller mapping first')
+                triggers = [t for t in triggers if t != 'hotkey']
+                if control(triggers[0]) == modifier:
+                    raise ValueError('Hotkey and chord button are the same physical control')
             additions = []
             if action.get('type') == 'mouse':
                 if (not isinstance(trigger, str) or 'target' in action
@@ -118,40 +133,68 @@ def analyze(source):
                 additions = [(control(trigger), slots) for trigger in triggers]
             else:
                 raise ValueError('Only key and mouse actions are converted; shell commands are never executed')
+            target_bindings = shifted if chord else bindings
+            target_descriptions = shifted_descriptions if chord else descriptions
             for destination, slots in additions:
-                result = bindings.setdefault(destination, [])
+                result = target_bindings.setdefault(destination, [])
                 for slot in slots:
                     if slot not in result:
                         result.append(slot)
                 if isinstance(action.get('description'), str) and action['description']:
-                    descriptions.setdefault(destination, []).append(action['description'])
+                    target_descriptions.setdefault(destination, []).append(action['description'])
             converted += 1
+            chord_count += int(chord)
         except (ValueError, TypeError) as error:
             warnings.append(f'actions_player1 #{position}: {error}')
     for player, values in data.items():
         if player != 'actions_player1' and values:
             warnings.append(f'{player}: not converted (player-one profiles only)')
-    containers = {}
-    for destination, slots in bindings.items():
-        if len(destination) == 2:
-            button = ET.SubElement(group, destination[0], {'index': str(destination[1])})
-        else:
-            parent_key = destination[:2]
-            if parent_key not in containers:
-                containers[parent_key] = ET.SubElement(group, destination[0], {'index': str(destination[1])})
-            button = ET.SubElement(containers[parent_key], destination[2], {'index': str(destination[3])})
-        if destination in descriptions:
-            ET.SubElement(button, 'actionname').text = ' ; '.join(dict.fromkeys(descriptions[destination]))
-        slot_group = ET.SubElement(button, 'slots')
-        for mode, code in slots:
-            slot = ET.SubElement(slot_group, 'slot')
-            ET.SubElement(slot, 'code').text = hex(code) if mode == 'keyboard' else str(code)
-            ET.SubElement(slot, 'mode').text = mode
+    def render(group, mappings, names):
+        containers = {}
+        for destination, slots in mappings.items():
+            if len(destination) == 2:
+                button = ET.SubElement(group, destination[0], {'index': str(destination[1])})
+            else:
+                parent_key = destination[:2]
+                if parent_key not in containers:
+                    containers[parent_key] = ET.SubElement(group, destination[0], {'index': str(destination[1])})
+                button = ET.SubElement(containers[parent_key], destination[2], {'index': str(destination[3])})
+            if destination in names:
+                ET.SubElement(button, 'actionname').text = ' ; '.join(dict.fromkeys(names[destination]))
+            slot_group = ET.SubElement(button, 'slots')
+            for mode, code in slots:
+                slot = ET.SubElement(slot_group, 'slot')
+                ET.SubElement(slot, 'code').text = hex(code) if mode == 'keyboard' else str(code)
+                ET.SubElement(slot, 'mode').text = mode
+    if chord_count:
+        # evmapy fires the ordinary action as well as a matching chord. Keep
+        # that behavior; never invent a Hotkey+Start mapping from plain Start.
+        layer = copy.deepcopy(bindings)
+        layer.pop(control('start'), None)
+        if control('start') in shifted and control('start') in bindings:
+            layer[control('start')] = list(bindings[control('start')])
+        for destination, slots in shifted.items():
+            target = layer.setdefault(destination, [])
+            target.extend(slot for slot in slots if slot not in target)
+        render(group, bindings, descriptions)
+        second = ET.SubElement(root.find('sets'), 'set', {'index': '2'})
+        ET.SubElement(group, 'name').text = 'Normal'
+        ET.SubElement(second, 'name').text = 'Hotkey'
+        render(second, layer, {**descriptions, **shifted_descriptions})
+        for current, target in ((group, 2), (second, 1)):
+            button = current.find(f'button[@index="{modifier[1]}"]')
+            if button is None:
+                button = ET.SubElement(current, 'button', {'index': str(modifier[1])})
+            ET.SubElement(button, 'setselect').text = str(target)
+            ET.SubElement(button, 'setselectcondition').text = 'while-held'
+    else:
+        render(group, bindings, descriptions)
     ET.indent(root, space='  ')
     xml = ET.tostring(root, encoding='utf-8', xml_declaration=True)+b'\n'
     return {'source': str(source.resolve()), 'sha256': hashlib.sha256(raw).hexdigest(),
             'converted': converted, 'total': len(actions), 'warnings': warnings, 'xml': xml,
-            'triggers': [a['trigger'] for a in actions if isinstance(a, dict) and 'trigger' in a]}
+            'triggers': [a['trigger'] for a in actions if isinstance(a, dict) and 'trigger' in a],
+            'hotkey': hotkey, 'chords': chord_count}
 
 
 def summary(result, fr=True):
@@ -165,6 +208,9 @@ def summary(result, fr=True):
         'Delayed/held trigger (hold) requires manual editing': 'Déclenchement temporisé (hold) : à reprendre manuellement',
         'Trigger sequences require manual editing': 'Séquence de boutons : à reprendre manuellement',
         'Button chords require manual editing': 'Combinaison de boutons : à reprendre manuellement',
+        'Only Hotkey + one button chords are supported': 'Seules les combinaisons Hotkey + un bouton sont prises en charge',
+        'Select the Batocera Hotkey controller mapping first': 'Sélectionnez d’abord la configuration Hotkey de la manette Batocera',
+        'Hotkey and chord button are the same physical control': 'Hotkey et bouton de la combinaison correspondent au même bouton physique',
         'Only key and mouse actions are converted; shell commands are never executed': 'Commande externe non convertie et jamais exécutée',
         'not converted (player-one profiles only)': 'non converti (seul le joueur 1 est pris en charge)',
         'Mouse action needs one joystick trigger, no target, and default/any mode': 'Action souris non standard : à reprendre manuellement',
@@ -174,6 +220,17 @@ def summary(result, fr=True):
             for original, translated in translations.items():
                 warning = warning.replace(original, translated)
         lines.append('  - '+warning)
+    if result.get('chords'):
+        lines += ['', (f"Combinaisons Hotkey converties : {result['chords']} — Hotkey = {result['hotkey']}" if fr else
+                       f"Converted Hotkey chords: {result['chords']} — Hotkey = {result['hotkey']}"),
+                  'Ensemble 1 normal ; ensemble 2 pendant le maintien de Hotkey, puis retour automatique.' if fr else
+                  'Set 1 normally; set 2 while holding Hotkey, with automatic return.',
+                  'Comme Pad2Key, une combinaison conserve aussi l’action simple du bouton si elle existe.' if fr else
+                  'Like Pad2Key, a chord also keeps the button’s ordinary action if present.',
+                  'Hotkey + Start : aucune affectation ajoutée sauf définition explicite dans le Pad2Key.' if fr else
+                  'Hotkey + Start: no mapping added unless explicitly defined in Pad2Key.',
+                  'Ce profil dépend du bouton Hotkey choisi : reconvertissez si sa configuration change.' if fr else
+                  'This profile depends on the selected Hotkey button: reconvert if its configuration changes.']
     lines += ['', 'La vitesse de souris et la zone morte peuvent nécessiter un ajustement dans AntiMicroX.' if fr else
               'Mouse speed and deadzone may need adjustment in AntiMicroX.',
               'Le fichier Pad2Key original reste inchangé pendant la conversion.' if fr else
@@ -181,8 +238,8 @@ def summary(result, fr=True):
     return '\n'.join(lines)
 
 
-def convert(source, home, expected=None, userdata='/userdata'):
-    result = analyze(source)
+def convert(source, home, expected=None, userdata='/userdata', hotkey=None):
+    result = analyze(source, hotkey)
     if expected and result['sha256'] != expected:
         raise ValueError('Pad2Key changed since preview. Analyze it again.')
     if not result['converted']:
@@ -207,7 +264,7 @@ def convert(source, home, expected=None, userdata='/userdata'):
                     created = os.fstat(stream.fileno()).st_ino
                     stream.write(result['xml'])
                 registry = store.read(store.registry)
-                registry[str(destination.resolve())] = {k: result[k] for k in ('source', 'sha256', 'converted', 'total', 'warnings', 'triggers')}
+                registry[str(destination.resolve())] = {k: result[k] for k in ('source', 'sha256', 'converted', 'total', 'warnings', 'triggers', 'hotkey', 'chords')}
                 atomic(store.registry, json.dumps(registry, ensure_ascii=False, indent=2).encode())
         except BaseException:
             if created is not None and destination.exists() and destination.stat().st_ino == created and destination.read_bytes() == result['xml']:
@@ -223,15 +280,25 @@ def main():
     sub = parser.add_subparsers(dest='action', required=True)
     for name in ('preview', 'convert'):
         command = sub.add_parser(name); command.add_argument('source')
+        command.add_argument('--hotkey')
         if name == 'convert': command.add_argument('--expected')
+    sub.add_parser('hotkeys').add_argument('source')
     assign = sub.add_parser('assign'); assign.add_argument('rom'); assign.add_argument('profile')
     sub.add_parser('restore-all')
     args = parser.parse_args()
-    if args.action == 'preview':
-        result = analyze(args.source)
+    if args.action == 'hotkeys':
+        analyze(args.source)  # Validate shape and size before reading controller settings.
+        data = json.loads(Path(args.source).read_bytes())
+        if any(isinstance(action, dict) and isinstance(action.get('trigger'), list)
+               and 'hotkey' in action['trigger'] and len(action['trigger']) == 2
+               and action.get('mode', 'all') == 'all' for action in data.get('actions_player1', [])):
+            for button, name in hotkey_choices():
+                print(button+'\t'+name+' — Hotkey = '+button)
+    elif args.action == 'preview':
+        result = analyze(args.source, args.hotkey)
         print(result['sha256']); print(summary(result, args.language == 'fr'))
     elif args.action == 'convert':
-        print(convert(args.source, args.home, args.expected))
+        print(convert(args.source, args.home, args.expected, hotkey=args.hotkey))
     elif args.action == 'assign':
         store = Pad2KeyStore(args.home)
         if args.profile and str(Path(args.profile).resolve()) in store.read(store.registry):
@@ -245,5 +312,5 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (OSError, ValueError, RuntimeError) as error:
+    except (OSError, ValueError, RuntimeError, ET.ParseError) as error:
         print(str(error), file=sys.stderr); sys.exit(1)
