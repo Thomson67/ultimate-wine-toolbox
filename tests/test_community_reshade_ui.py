@@ -289,14 +289,15 @@ community_menu reshade
         for kind in ('antimicrox','reshade'):
             for allow in ('yes','no'):
                 with self.subTest(kind=kind,confirmed=allow):
-                    for filename in ('ui','decided','removed','refreshed','moderation-calls'):(self.home/filename).unlink(missing_ok=True)
+                    for filename in ('ui','decided','removed','refreshed','moderation-calls','confirmation','separate-summary'):(self.home/filename).unlink(missing_ok=True)
                     code=r'''menu_select() {
  printf '%s\n' "$@" >> "$WT_HOME/ui"
  if [ "$3" = pending ]; then
   if [ -f "$WT_HOME/decided" ]; then echo back; else echo published; fi
  elif [ -f "$WT_HOME/decided" ]; then echo back; else echo published-id; fi
 }
-yesno_default_no() { touch "$WT_HOME/decided"; [ ALLOW = yes ]; }
+yesno_default_no() { printf '%s\n' "$2" > "$WT_HOME/confirmation"; touch "$WT_HOME/decided"; [ ALLOW = yes ]; }
+community_report() { touch "$WT_HOME/separate-summary"; }
 community_cmd() { [ "$1" = refresh ] && [ "$2" = --kind ] && [ "$3" = KIND ] || return 1; touch "$WT_HOME/refreshed"; }
 community_service_cmd() {
  printf '%s\n' "$*" >> "$WT_HOME/moderation-calls"
@@ -310,6 +311,10 @@ community_service_cmd() {
 community_validate KIND Community
 '''.replace('KIND',kind).replace('ALLOW',allow)
                     self.shell(code)
+                    confirmation=(self.home/'confirmation').read_text()
+                    self.assertFalse((self.home/'separate-summary').exists())
+                    self.assertIn('Game — Tester',confirmation)
+                    self.assertIn('Retirer ce partage du catalogue ?',confirmation)
                     self.assertEqual((self.home/'removed').exists(),allow=='yes')
                     self.assertEqual((self.home/'refreshed').exists(),allow=='yes')
                     calls=(self.home/'moderation-calls').read_text().splitlines()

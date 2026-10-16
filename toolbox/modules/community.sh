@@ -336,8 +336,7 @@ community_remove_published() {
     case "$selected" in ''|back) return 0 ;; esac
     review="$(community_service_cmd published-review "$kind" "$selected" 2>&1)" || { msgbox "$title" "$review"; continue; }
     checksum="${review%%$'\n'*}"
-    community_report "$title" "${review#*$'\n'}"
-    if ! yesno_default_no "$title" "$(community_txt 'Retirer ce partage du catalogue ?\n\nSon fichier et sa fiche seront supprimés du dépôt communautaire. Les profils déjà installés chez les joueurs restent conservés.' 'Remove this submission from the catalogue?\n\nIts file and catalogue entry will be deleted from the community repository. Profiles already installed by players are retained.')"; then continue; fi
+    if ! yesno_default_no "$title" "${review#*$'\n'}"$'\n\n'"$(community_txt 'Retirer ce partage du catalogue ?\n\nSon fichier et sa fiche seront supprimés du dépôt communautaire. Les profils déjà installés chez les joueurs restent conservés.' 'Remove this submission from the catalogue?\n\nIts file and catalogue entry will be deleted from the community repository. Profiles already installed by players are retained.')"; then continue; fi
     if output="$(community_service_cmd remove-published "$kind" "$selected" "$checksum" 2>&1)"; then
       # Refresh this machine immediately; other users see removal on their next refresh.
       if community_cmd refresh --kind "$kind" >/dev/null 2>&1; then
