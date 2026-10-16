@@ -381,24 +381,13 @@ amx_manage_associations() {
     amx_manage_game "${games[$((selected-1))]}"
   done
 }
-amx_diagnostic() {
-  local bin output rc log
-  bin="$(amx_binary 2>/dev/null || true)"
-  log="$(amx_log_path)"
-  if [ -n "$bin" ]; then
-    output="$(timeout 15 "$bin" --version 2>&1)"; rc=$?
-  else
-    output="$(amx_txt 'Binaire absent' 'Binary missing')"; rc=127
-  fi
-  msgbox AntiMicroX "$(amx_txt "Binaire : ${bin:-absent}" "Binary: ${bin:-missing}")\nQt : xcb / XWayland\nDISPLAY : ${DISPLAY:-:0}\n/dev/uinput : $([ -w /dev/uinput ] && echo OK || echo indisponible/unavailable)\nVersion (code $rc) : $output\nJournal : $log\n$(tail -n 8 "$log" 2>/dev/null)"
-}
 amx_live_cmd() { python3 "$WT_ROOT/helpers/antimicrox_live.py" --home "$WT_HOME" "$@"; }
 amx_live_start_for() {
   local rom="$1" profile="${2:-}" selected switch_label
   local -a options=()
   amx_ensure_installed || return 1
   [ -w /dev/uinput ] || {
-    msgbox AntiMicroX "$(amx_txt 'Accès à /dev/uinput indisponible. Consultez le diagnostic AntiMicroX.' 'Access to /dev/uinput is unavailable. Check AntiMicroX diagnostics.')"; return 1;
+    msgbox AntiMicroX "$(amx_txt 'Accès à /dev/uinput indisponible : AntiMicroX ne peut pas envoyer les commandes clavier/souris.' 'Access to /dev/uinput is unavailable: AntiMicroX cannot send keyboard/mouse input.')"; return 1;
   }
   command -v batocera-evmapy >/dev/null 2>&1 || {
     msgbox AntiMicroX "$(amx_txt 'batocera-evmapy est indisponible : session annulée.' 'batocera-evmapy is unavailable: session cancelled.')"; return 1;
@@ -503,7 +492,6 @@ antimicrox_menu() {
       7 "$(amx_txt 'Voir les manettes détectées' 'View detected controllers')" \
       8 "$(amx_txt 'Supprimer un profil enregistré' 'Delete a saved profile')" \
       9 "$(amx_txt 'Installer ou mettre à jour AntiMicroX' 'Install or update AntiMicroX')" \
-      10 "$(amx_txt 'Dépannage : vérifier AntiMicroX' 'Troubleshooting: check AntiMicroX')" \
       0 "$(i18n back)")" || return
     case "$choice" in
       1) amx_live_choose ;;
@@ -519,7 +507,6 @@ antimicrox_menu() {
         msgbox "AntiMicroX" "$(amx_txt "Manettes détectées (code $rc) :" "Detected controllers (code $rc):")\n$output" ;;
       8) amx_delete_profiles ;;
       9) amx_install && msgbox AntiMicroX "$(amx_txt 'AntiMicroX est installé.' 'AntiMicroX is installed.')" ;;
-      10) amx_diagnostic ;;
       0|'') return ;;
     esac
   done
