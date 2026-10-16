@@ -41,6 +41,14 @@ class ServiceTests(unittest.TestCase):
         self.responses.append({'token': 'ab'*32, 'expires': 9999999999})
         self.service.login('cd'*32)
 
+    def test_default_endpoint_uses_renamed_worker_and_old_origin_grants_are_not_forwarded(self):
+        self.assertEqual(self.service.api, 'https://uwt-community-api.thomson67.workers.dev')
+        self.service.device.parent.mkdir(parents=True)
+        self.service.device.write_text(json.dumps({'api':'https://retired.example','token':'ab'*32,'expires':9999999999}))
+        self.assertFalse(self.service.remembered_login())
+        self.assertFalse(self.service.device.exists())
+        self.assertFalse(self.requests)
+
     def test_key_only_goes_in_https_body_and_session_is_private(self):
         self.login(); request = self.requests[-1]
         self.assertEqual(request.full_url, service.API+'/v1/login')

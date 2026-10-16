@@ -19,7 +19,7 @@ import zipfile
 
 from community_profiles import Community, KINDS, LIMIT, atomic, details, dump, entry, profile_bytes
 
-API = 'https://uwt-community-api.roeckel.workers.dev'
+API = 'https://uwt-community-api.thomson67.workers.dev'
 PROFILE_LIMIT = 64*1024
 
 

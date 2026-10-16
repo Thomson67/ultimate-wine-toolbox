@@ -9,6 +9,12 @@ A single schema-1 JSON catalogue in `Thomson67/ultimate-wine-toolbox-community`
 no account or API key is required for readers. The Cloudflare Worker only handles
 submissions and moderation. Each tool keeps its own community menu.
 
+The default submission service is `https://uwt-community-api.thomson67.workers.dev`.
+After an endpoint rename, a local `config/community-source.json` with an explicit
+`api` override must also be updated. Remembered validator access is tied to the
+API origin and requires fresh pairing; the master validator key and D1 records
+are unchanged. Catalogue downloads continue to use GitHub.
+
 Service deployment instructions, schema, sources and a ready-to-paste bundle:
 https://github.com/Thomson67/ultimate-wine-toolbox-community/blob/main/service/INSTALLATION_FR.md
 
