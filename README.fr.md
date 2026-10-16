@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.5.8](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.8).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS et ReShade restent en bêta.
+**Version stable : [v0.6.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.6.0).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS reste en bêta.
 
 ## Fonctionnalités
 
@@ -14,11 +14,13 @@ Créée par **Thomsonito**.
 - intégration avec UMU Runner Toolbox
 - Starter Pack de runners Wine, avec liste des runners installés et manquants
 - gestion individuelle des runners Wine classiques
-- prise en charge des anciens GE-Proton adaptés à Batocera
+- GE-Proton classiques adaptés à Batocera, y compris 11.x (Batocera v44 conseillée)
 - gestion globale et par jeu de MangoHud
 - bundles DXVK / VKD3D-Proton / DXVK-NVAPI, modèles Batocera 40 à 43 / 43.1 et choix global ou par jeu
 - filtrage des versions NVAPI selon la compatibilité connue avec DXVK
-- ReShade par jeu : installation, activation/désactivation, presets, modèles d’effets et aide au choix de l’API (bêta)
+- ReShade par jeu : installation, activation/désactivation, presets, modèles d’effets et aide au choix de l’API
+- AntiMicroX : profils manette, édition en jeu, conversion Pad2Key et gestion des associations
+- catalogue communautaire : téléchargement, partage et validation de profils AntiMicroX et presets ReShade
 - maintenance des Wine bottles et détection des bottles orphelines
 - diagnostics des runners et de DXVK / VKD3D
 - outils de squash / unsquash `.wine` / `.wsquashfs`
@@ -31,14 +33,15 @@ Créée par **Thomsonito**.
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
 
-## Nouveautés de la v0.5.8
+## Nouveautés de la v0.6.0
 
-- Gestion Wine Mono / Microsoft .NET : diagnostic du préfixe, mise à jour de Mono, remplacement par Microsoft .NET 4.8 et restauration d’une sauvegarde.
-- Installateurs interactifs corrigés pour TKG et GE-Proton-UMU ; aide .NET proposée après un échec de lancement du jeu.
-- Création WSquashFS : détection des jeux hors de `drive_c/game`, y compris avec un autorun modèle.
-- Ouverture de la toolbox UMU depuis l’Ultimate avec les réglages de police et de fenêtre propres à UMU.
+- AntiMicroX intégré : création et modification des profils en jeu, bascule clavier/manette et conversion des Pad2Key, y compris les combinaisons Hotkey identifiables.
+- Profils AntiMicroX et presets ReShade communautaires : recherche, téléchargement, partage direct et validation par appairage dans un navigateur.
+- ReShade : réutilisation des installations intégrées, application des presets à de nouveaux jeux et sélection des packs d’après les effets actifs de `Techniques=`.
+- GE-Proton 11.x réintégrés aux téléchargements classiques avec la mention « Batocera v44 conseillée ».
+- Parcours simplifiés, menu Outils et compatibilité et documentation intégrée française/anglaise actualisée.
 
-[Notes de la v0.5.8](release-notes/v0.5.8.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
+[Notes de la v0.6.0](release-notes/v0.6.0.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 
@@ -166,9 +169,9 @@ Dans le gestionnaire DXVK / VKD3D, **Installer un modèle Batocera** propose les
 
 Après installation, choisissez le modèle globalement ou par jeu. NVAPI reste contrôlé par les options du jeu. Le modèle ne remplace pas le runner, les pilotes ou la configuration de Batocera : notamment, un VKD3D récent peut provoquer des crashes DirectX 12 avec Vanilla-Proton-9.0-4. Les modèles 40 à 42 permettent de tester des composants plus anciens.
 
-## ReShade par jeu (bêta)
+## ReShade par jeu
 
-Dans **Réglages graphiques → ReShade (bêta)**, choisir le jeu puis **Installer / modifier version et shaders**. Sélectionner le véritable `.exe` (par exemple `Binaries/Win64/...exe` pour certains jeux Unreal), l’API du jeu **avant** traduction par DXVK/VKD3D, la version de ReShade et les packs de shaders. L’architecture 32/64 bits est détectée dans l’exécutable. Le téléchargement se fait à la demande ; le Starter Pack ne change pas.
+Dans **Outils et compatibilité → ReShade**, choisir le jeu puis **Installer / modifier version et shaders**. Sélectionner le véritable `.exe` (par exemple `Binaries/Win64/...exe` pour certains jeux Unreal), l’API du jeu **avant** traduction par DXVK/VKD3D, la version de ReShade et les packs de shaders. L’architecture 32/64 bits est détectée dans l’exécutable. Le téléchargement se fait à la demande ; le Starter Pack ne change pas.
 
 Lancer ensuite le jeu depuis EmulationStation et appuyer sur **Home** pour ouvrir ReShade. Les nouveaux profils passent le tutoriel et utilisent **Fin** pour activer/désactiver les effets ; les profils déjà personnalisés sont conservés. Aucun effet n’est imposé au premier démarrage : activer les effets souhaités dans l’interface ReShade. On peut importer un preset `.ini` depuis la toolbox ; ses shaders doivent être présents dans les packs choisis. ReShade utilise le runtime Windows officiel dans Wine/Proton.
 

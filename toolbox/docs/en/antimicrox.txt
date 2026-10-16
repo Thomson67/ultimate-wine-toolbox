@@ -1,0 +1,31 @@
+ANTIMICROX: CONTROLLER, KEYBOARD AND MOUSE
+
+Open Tools and compatibility → AntiMicroX. An .amgp profile turns controller buttons and sticks into keyboard/mouse input. Profiles are assigned to each game separately. If AntiMicroX is missing, installation is offered when an action needs it.
+
+CREATE OR EDIT IN GAME
+1. Choose Create or edit a profile in game, then select the game. Create a profile, use the game's current one or select a saved profile.
+2. The game starts in the foreground. Use Alt+Tab or the displayed controller shortcut to switch to AntiMicroX and back. The usual shortcut is Hotkey+R1; follow the announced shortcut if the profile requires a different one. Release the buttons after each switch.
+3. Edit mappings and test them in the game. Save the profile in AntiMicroX BEFORE quitting the game.
+4. Afterwards, choose Use this profile whenever this game starts to enable it, or continue adjusting controls.
+
+USE AN EXISTING PROFILE
+Select a profile from the list or Browse .amgp files, then choose the game. Games with names similar to the profile appear first; all other games remain available. The profile will load the next time the game starts from EmulationStation.
+
+Profiles are normally stored in /userdata/system/ultimate-wine-toolbox/config/antimicrox-profiles. Other locations under /userdata are supported. Open the editor without starting a game also lets you create a profile separately.
+
+MANAGE YOUR PROFILES
+My games and their profiles lets you view mappings, edit, test in game, change an assignment or remove it. Profile information includes Xbox and PlayStation button names for easier reading.
+
+Removing an assignment keeps the profile file. Delete a saved profile removes its file and assignments after confirmation. Editing a profile shared by multiple games affects all of them. Close the game and AntiMicroX before changing assignments or deleting profiles.
+
+CONVERT PAD2KEY
+Convert a Pad2Key (.keys) file to a profile lets you choose a game or a .keys file. The report lists supported mappings and limitations. Hotkey combinations are supported when their configuration can be identified; Hotkey+Start is not added unless explicitly defined in the source file.
+
+Conversion leaves the original .keys file intact. Enabling the profile backs up and suspends player-one Pad2Key mapping to avoid duplicate input. Removing the AntiMicroX assignment restores it. If the .keys file has since changed, follow the reconversion message to preserve your edits.
+
+COMMUNITY PROFILES
+Download or share profiles opens the catalogue. Downloaded marks local copies that are still present; modified marks an edited copy. Local copies can be reused without downloading again. Check mappings and the Hotkey before assigning a profile to a game.
+
+To share, select a profile and confirm the detected game, or choose it from the ES game list. Enter the profile title, public nickname and description. Submissions need moderation before publication; submitting a profile does not require a GitHub account.
+
+The validator area uses a pairing code and a browser page. Validators can review submissions and remove published entries. Removing a community entry does not delete profiles already installed by players.

@@ -21,6 +21,8 @@ source "$WT_ROOT/modules/batocera-conf.sh"
 source "$WT_ROOT/modules/batocera-conf-extra.sh"
 source "$WT_ROOT/modules/batocera-conf-transfer.sh"
 source "$WT_ROOT/modules/graphics.sh"
+source "$WT_ROOT/modules/community.sh"
+source "$WT_ROOT/modules/antimicrox.sh"
 source "$WT_ROOT/modules/reshade.sh"
 source "$WT_ROOT/modules/dxvk-manager.sh"
 source "$WT_ROOT/modules/settings.sh"
@@ -28,7 +30,7 @@ source "$WT_ROOT/modules/documentation.sh"
 
 ensure_batocera_paths
 runner_offer_normalization_at_startup
-startup_update_check
+[ -f "$WT_HOME/state/antimicrox-live.json" ] || startup_update_check
 
 main_menu() {
     while true; do
@@ -60,6 +62,11 @@ $(i18n menu_umu): $(umu_toolbox_status)" \
         esac
     done
 }
+
+if [ "${WT_AUTO_RESUME_AMX:-0}" = "1" ] || [ -f "$WT_HOME/state/antimicrox-live.json" ]; then
+    unset WT_AUTO_RESUME_AMX
+    amx_live_resume && antimicrox_menu
+fi
 
 if [ "${WT_AUTO_RESUME_WSQ:-0}" = "1" ]; then
     unset WT_AUTO_RESUME_WSQ

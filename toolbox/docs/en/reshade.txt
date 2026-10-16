@@ -1,9 +1,9 @@
-PER-GAME RESHADE — BETA
+PER-GAME RESHADE
 
 ReShade applies effects to the game image: colors, sharpening, CRT rendering or retro filters. Effects have a performance cost; start with a few effects and compare the result.
 
 INSTALL
-In Graphics settings → ReShade, select the game, then Install / change version and shaders. Choose the actual game executable, API, ReShade version and shader packs.
+In Tools and compatibility → ReShade, select the game, then Install / change version and shaders. Choose the actual game executable, API, ReShade version and shader packs.
 
 Select the game’s API before DXVK/VKD3D translation: a DirectX 11 game using DXVK remains DirectX 11 for this selection. Launch diagnostics and PCGamingWiki lookups provide hints to confirm. Native Vulkan is not covered by this integration.
 
@@ -21,3 +21,20 @@ Home opens ReShade. New profiles use End to toggle effects; existing custom shor
 Settings and presets are kept per game and retrieved when the game closes. Exporting a preset does not include shader packs. Close the game before modifying, disabling or uninstalling ReShade.
 
 WSquashFS games are supported without recompressing the archive. ReShade installations already bundled with a game are detected and managed separately; nonstandard loaders may require their original manager.
+
+COMMUNITY PRESETS
+Open the catalogue from the ReShade menu. Search by game or author and use Refresh the list to retrieve new submissions. Downloaded marks a local copy that is still present; modified marks an edited copy. Local copies can be reused without downloading again.
+
+After downloading, choose Apply this preset to a game. Games with similar names appear first, while all ES games remain available. If ReShade is missing, the wizard offers installation using this preset: it skips the model selection and identifies packs from active effects on the Techniques= line. Saved settings sections and TechniqueSorting= may contain inactive effects and do not select packs. Unknown or ambiguous effects require manual review. Downloads still include complete packs and their dependencies, rather than individual effects.
+
+The same community search is available in the model selection during a standard installation.
+
+RESHADE ALREADY BUNDLED WITH A GAME
+A community preset can be applied without reinstalling a supported existing ReShade installation. The Toolbox backs up replaced settings, adds the preset and updates its path. Existing DLLs, effects and textures are retained: required effects must already be present. For WSquashFS games, changes are applied to Wine prefixes without modifying the archive. The game's menu offers to restore the previous settings.
+
+SHARE AND VALIDATE
+Share my ReShade preset lets you choose a game with ReShade, whether Toolbox-managed or already bundled in a .wine, .pc or .wsquashfs game. Run bundled ReShade detection if necessary. Select a detected preset, or choose an .ini file directly. Submissions contain preset settings, not DLLs, shaders or textures.
+
+Confirm the detected game or choose it from the ES game list, then enter the preset title, public nickname and description. Submissions need moderation before publication and do not require a GitHub account. Catalogue updates can take a little time; refresh the list.
+
+The validator area uses a pairing code and a browser page. Validators can approve submissions or remove a published entry, with its summary and confirmation in the same window. Presets already installed by players are retained.

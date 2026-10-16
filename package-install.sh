@@ -15,6 +15,7 @@ SCRIPTS="/userdata/system/scripts"
 MANGOHUD_HOOK="$SCRIPTS/ultimate-wine-toolbox-mangohud.sh"
 DXVK_HOOK="$SCRIPTS/ultimate-wine-toolbox-dxvk.sh"
 RESHADE_HOOK="$SCRIPTS/ultimate-wine-toolbox-reshade.sh"
+ANTIMICROX_HOOK="$SCRIPTS/ultimate-wine-toolbox-antimicrox.sh"
 OLD_MANGOHUD_HOOK="$SCRIPTS/thomsonito-wine-toolbox-mangohud.sh"
 OLD_DXVK_HOOK="$SCRIPTS/thomsonito-wine-toolbox-dxvk.sh"
 
@@ -93,6 +94,12 @@ chmod +x "$DEST/toolbox/ultimate-wine-toolbox.sh"
 chmod +x "$DEST/toolbox/launch-in-terminal.sh"
 chmod +x "$DEST/toolbox/modules/"*.sh "$DEST/toolbox/lib/"*.sh "$DEST/toolbox/hooks/"*.sh "$DEST/toolbox/helpers/"*.sh 2>/dev/null || true
 
+# Refresh the AntiMicroX launcher without re-downloading its opt-in AppImage.
+if [ -f "$DEST/tools/antimicrox/AntiMicroX.AppImage" ]; then
+    cp -f "$DEST/toolbox/helpers/antimicrox-launch.sh" "$DEST/tools/antimicrox/antimicrox"
+    chmod +x "$DEST/tools/antimicrox/antimicrox"
+fi
+
 # Install the official MangoHud runtime bundled by the Toolbox for both
 # 32-bit and 64-bit Wine/Proton/UMU games. Failure is non-fatal so the
 # Toolbox itself remains usable even if GitHub is temporarily unavailable.
@@ -129,6 +136,11 @@ fi
 if [ -s "$DEST/toolbox/hooks/reshade-game-event.sh" ]; then
     cp -f "$DEST/toolbox/hooks/reshade-game-event.sh" "$RESHADE_HOOK"
     chmod +x "$RESHADE_HOOK"
+fi
+
+if [ -s "$DEST/toolbox/hooks/antimicrox-game-event.sh" ]; then
+    cp -f "$DEST/toolbox/hooks/antimicrox-game-event.sh" "$ANTIMICROX_HOOK"
+    chmod +x "$ANTIMICROX_HOOK"
 fi
 
 if [ -n "$OLD_DXVK_BUNDLE" ] && [ -d "$DEST/dxvk/bundles/$OLD_DXVK_BUNDLE" ]; then

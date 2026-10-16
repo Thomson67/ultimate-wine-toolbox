@@ -1,0 +1,31 @@
+ANTIMICROX : MANETTE, CLAVIER ET SOURIS
+
+Dans Outils et compatibilité → AntiMicroX, un profil .amgp transforme les boutons et sticks de la manette en commandes clavier/souris. Il est associé séparément à chaque jeu. Si AntiMicroX manque, son installation est proposée dès qu’une action en a besoin.
+
+CRÉER OU MODIFIER EN JEU
+1. Choisir Créer ou modifier un profil en jeu, puis le jeu. Créer un profil, reprendre celui du jeu ou choisir un profil enregistré.
+2. Le jeu démarre au premier plan. Utiliser Alt+Tab ou la combinaison manette indiquée à l’écran pour passer à AntiMicroX et revenir au jeu. La combinaison habituelle est Hotkey+R1 ; suivre celle annoncée si le profil impose une autre combinaison. Relâcher les boutons après chaque bascule.
+3. Modifier les commandes et les tester dans le jeu. Enregistrer le profil dans AntiMicroX AVANT de quitter le jeu.
+4. À la fin, choisir Utiliser ce profil aux prochains lancements pour l’activer, ou continuer les réglages.
+
+UTILISER UN PROFIL EXISTANT
+Choisir le profil dans la liste ou Parcourir les fichiers .amgp, puis choisir le jeu. Les jeux dont le nom ressemble au profil sont proposés en priorité ; les autres restent accessibles. Le profil sera chargé au prochain lancement du jeu depuis EmulationStation.
+
+Les profils sont généralement enregistrés dans /userdata/system/ultimate-wine-toolbox/config/antimicrox-profiles. Un autre emplacement sous /userdata est possible. Ouvrir l’éditeur sans lancer de jeu permet aussi de créer un profil séparément.
+
+GÉRER SES PROFILS
+Mes jeux et leurs profils permet de consulter les commandes, modifier le profil, tester en jeu, changer l’association ou la retirer. Les informations utilisent des noms de boutons Xbox et PlayStation pour faciliter la lecture.
+
+Retirer une association conserve le fichier profil. Supprimer un profil enregistré supprime son fichier et ses associations après confirmation. Si plusieurs jeux utilisent le même fichier, toute modification de ce profil les concerne tous. Fermer le jeu et AntiMicroX avant de changer une association ou de supprimer un profil.
+
+CONVERTIR UN PAD2KEY
+Convertir un Pad2Key (.keys) en profil permet de choisir le jeu ou un fichier .keys. Le bilan indique les commandes convertibles et les limites. Les combinaisons Hotkey sont prises en charge quand elles peuvent être identifiées ; Hotkey+Start n’est pas ajouté sans définition explicite dans le fichier source.
+
+Le .keys original reste intact pendant la conversion. À l’activation, le mapping Pad2Key du joueur 1 est sauvegardé et suspendu pour éviter le double mapping. Il est restauré quand l’association AntiMicroX est retirée. Si le .keys a été modifié entre-temps, suivre le message de reconversion pour conserver les changements.
+
+PROFILS COMMUNAUTAIRES
+Télécharger ou partager des profils donne accès au catalogue. Une mention Téléchargé repère les copies locales encore présentes ; modifié indique une copie retouchée. Une copie locale peut être réutilisée sans nouveau téléchargement. Vérifier les commandes et la Hotkey avant de l’associer à un jeu.
+
+Pour partager, choisir le profil et confirmer le jeu identifié, ou le sélectionner dans la liste ES. Renseigner le nom du profil, le pseudo public et une description. Le partage attend une validation avant publication ; aucun compte GitHub n’est nécessaire pour proposer un profil.
+
+L’espace validateur utilise un code d’appairage à ouvrir dans un navigateur. Il permet d’examiner les propositions et de retirer un partage publié. Retirer un partage communautaire ne supprime pas les profils déjà installés chez les joueurs.

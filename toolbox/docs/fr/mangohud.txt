@@ -3,7 +3,7 @@ MANGOHUD : AFFICHER LES PERFORMANCES
 MangoHud affiche des informations pendant le jeu : FPS et, selon le profil, fluidité, charge, températures et mémoire. Il sert à observer les performances ; l’activer ne constitue pas une optimisation du jeu.
 
 UTILISATION
-Ouvrir Réglages graphiques, puis le menu MangoHud. Choisir l’activation globale ou un réglage propre à un jeu. Un jeu peut hériter du réglage global, être forcé sur Activé ou être forcé sur Désactivé.
+Ouvrir Outils et compatibilité, puis le menu MangoHud. Choisir l’activation globale ou un réglage propre à un jeu. Un jeu peut hériter du réglage global, être forcé sur Activé ou être forcé sur Désactivé.
 
 Choisir un profil :
 - Minimaliste : uniquement les FPS.
