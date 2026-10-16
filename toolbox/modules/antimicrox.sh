@@ -116,7 +116,7 @@ amx_pad2key_source() {
 amx_convert_pad2key() {
   local choice rom="" source preview report token profile candidates key label hotkey
   local -a hotkey_options=() hotkey_menu=()
-  choice="$(menu_select AntiMicroX "$(amx_txt 'Convertir un Pad2Key vers AntiMicroX (joueur 1)' 'Convert Pad2Key to AntiMicroX (player 1)')" \
+  choice="$(menu_select AntiMicroX "$(amx_txt 'Récupérer les commandes Batocera (.keys) dans un profil AntiMicroX — joueur 1' 'Import Batocera controls (.keys) into an AntiMicroX profile — player 1')" \
     game "$(amx_txt 'Choisir un jeu Windows' 'Choose a Windows game')" \
     file "$(amx_txt 'Choisir un fichier .keys' 'Choose a .keys file')" back "$(i18n back)")" || return 0
   case "$choice" in
@@ -155,10 +155,10 @@ amx_convert_pad2key() {
   profile="$(amx_pad2key_cmd convert "$source" --expected "$token" "${hotkey_options[@]}" 2>&1)" || { msgbox AntiMicroX "$profile"; return 1; }
   while true; do
     choice="$(menu_select AntiMicroX "$(amx_txt "Profil créé :\n$profile" "Profile created:\n$profile")" \
-      info "$(amx_txt 'Afficher les mappages convertis' 'Show converted mappings')" \
+      info "$(amx_txt 'Voir les commandes récupérées' 'View imported controls')" \
       edit "$(amx_txt 'Modifier le profil' 'Edit the profile')" \
-      activate "$(amx_txt 'Activer pour un jeu' 'Enable for a game')" \
-      live "$(amx_txt 'Activer et tester en jeu' 'Enable and test in game')" \
+      activate "$(amx_txt 'Utiliser ce profil pour un jeu' 'Use this profile for a game')" \
+      live "$(amx_txt 'Utiliser et tester ce profil en jeu' 'Use and test this profile in game')" \
       back "$(amx_txt 'Conserver le profil sans l’activer' 'Keep profile without enabling it')")" || return 0
     case "$choice" in
       info) amx_profile_info "$profile" ;;
@@ -226,7 +226,7 @@ amx_delete_profiles() {
       profiles+=("$profile")
       options+=("${#profiles[@]}" "$(basename "$profile") — $(dirname "$profile")")
     done <<< "$output"
-    selected="$(menu_select AntiMicroX "$(amx_txt 'Supprimer un fichier profil et ses associations' 'Delete a profile file and its assignments')" \
+    selected="$(menu_select AntiMicroX "$(amx_txt 'Choisissez le profil à supprimer. Il sera aussi retiré des jeux qui l’utilisent.' 'Choose a profile to delete. It will also be removed from games that use it.')" \
       "${options[@]}" other "$(amx_txt 'Choisir un autre fichier .amgp' 'Choose another .amgp file')" back "$(i18n back)")" || return 0
     case "$selected" in
       other) profile="$(amx_profile_file '')" || continue ;;
@@ -274,12 +274,12 @@ amx_manage_game() {
     shared="$(amx_associations | awk -F '\t' -v p="$profile" '$2==p {n++} END{print n+0}')"
     [ "$shared" -le 1 ] || status+="$(amx_txt "Profil partagé par $shared jeux : le modifier affecte tous ces jeux." "Profile shared by $shared games: editing affects all of them.")\n"
     choice="$(menu_select AntiMicroX "$(basename "$rom")\n\n$(amx_txt 'Jeu :' 'Game:') $rom\n$(amx_txt 'Profil :' 'Profile:') $profile\n\n$status" \
-      info "$(amx_txt 'Afficher les détails du profil' 'Show profile details')" \
-      edit "$(amx_txt 'Modifier le profil dans l’éditeur' 'Edit profile in the editor')" \
-      live "$(amx_txt 'Modifier et tester en jeu' 'Edit and test in game')" \
-      replace "$(amx_txt 'Remplacer le profil associé' 'Replace the assigned profile')" \
-      remove "$(amx_txt 'Retirer l’association (conserver le profil)' 'Remove assignment (keep profile file)')" \
-      delete "$(amx_txt 'Supprimer le fichier profil et ses associations' 'Delete profile file and its assignments')" \
+      live "$(amx_txt 'Modifier les commandes et tester en jeu' 'Edit controls and test in game')" \
+      edit "$(amx_txt 'Modifier le profil sans lancer le jeu' 'Edit the profile without starting the game')" \
+      info "$(amx_txt 'Voir les commandes et les informations du profil' 'View profile controls and information')" \
+      replace "$(amx_txt 'Choisir un autre profil pour ce jeu' 'Choose another profile for this game')" \
+      remove "$(amx_txt 'Désactiver pour ce jeu (garder le profil)' 'Disable for this game (keep the profile)')" \
+      delete "$(amx_txt 'Supprimer ce profil pour tous les jeux' 'Delete this profile for all games')" \
       back "$(i18n back)")" || return
     case "$choice" in
       info) amx_profile_info "$profile" ;;
@@ -371,10 +371,10 @@ amx_live_choose() {
   local -a options=()
   rom="$(amx_choose_game)" || return
   current="$(awk -F '\t' -v p="$rom" '$1==p {v=$2} END{print v}' "$AMX_OVERRIDES" 2>/dev/null)"
-  [ ! -f "$current" ] || options=(current "$(amx_txt 'Modifier le profil déjà associé' 'Edit the assigned profile')")
-  choice="$(menu_select AntiMicroX "$(amx_txt 'Profil à configurer en jeu' 'Profile to configure in game')" \
-    "${options[@]}" new "$(amx_txt 'Créer un profil pour ce jeu' 'Create a profile for this game')" \
-    existing "$(amx_txt 'Choisir un profil existant' 'Choose an existing profile')" \
+  [ ! -f "$current" ] || options=(current "$(amx_txt 'Modifier le profil actuel de ce jeu' 'Edit this game’s current profile')")
+  choice="$(menu_select AntiMicroX "$(amx_txt 'Choisissez un profil, puis ajustez ses commandes en jouant. Vous pourrez passer du jeu à l’éditeur.' 'Choose a profile, then adjust its controls while playing. You can switch between the game and editor.')" \
+    "${options[@]}" new "$(amx_txt 'Créer un nouveau profil pour ce jeu' 'Create a new profile for this game')" \
+    existing "$(amx_txt 'Choisir un autre profil enregistré' 'Choose another saved profile')" \
     back "$(i18n back)")" || return
   case "$choice" in
     current) profile="$current" ;;
@@ -407,8 +407,8 @@ amx_live_resume() {
   error="$(amx_live_cmd field error)"
   while true; do
     choice="$(menu_select AntiMicroX "$(amx_txt "Session terminée : $(basename "$rom")\nProfil : $profile\nRésultat : $result\n$error\nRaccourci temporaire retiré.\nJournal : /userdata/system/logs/ultimate-wine-toolbox/antimicrox.log" "Session finished: $(basename "$rom")\nProfile: $profile\nResult: $result\n$error\nTemporary shortcut removed.\nLog: /userdata/system/logs/ultimate-wine-toolbox/antimicrox.log")" \
-      activate "$(amx_txt 'Activer ce profil pour ce jeu' 'Enable this profile for the game')" \
-      retry "$(amx_txt 'Relancer la configuration en jeu' 'Retry in-game configuration')" \
+      activate "$(amx_txt 'Utiliser ce profil aux prochains lancements' 'Use this profile whenever this game starts')" \
+      retry "$(amx_txt 'Continuer les réglages en jeu' 'Continue adjusting controls in game')" \
       back "$(i18n back)")" || choice=back
     case "$choice" in
       activate)
@@ -426,50 +426,49 @@ amx_live_resume() {
   done
 }
 antimicrox_menu() {
-  local choice rom bin output rc
+  local choice rom bin output rc intro
   if [ -f "$WT_HOME/state/antimicrox-live.json" ]; then
     amx_live_resume || return
   fi
   while true; do
     bin="$(amx_binary 2>/dev/null || true)"
-    choice="$(menu_select "AntiMicroX" "$(amx_txt 'Configuration native par jeu. Profils hors des préfixes Wine. Le binaire Linux doit être disponible et /dev/uinput fonctionnel.' 'Native per-game configuration. Profiles outside Wine prefixes. Linux binary and /dev/uinput required.')" \
-      7 "$(amx_txt 'Configurer et tester en jeu (bêta)' 'Configure and test in game (beta)')" \
-      2 "$(amx_txt 'Gérer les jeux avec un profil associé' 'Manage games with assigned profiles')" \
-      9 "$(amx_txt 'Convertir un Pad2Key en profil AntiMicroX' 'Convert Pad2Key to an AntiMicroX profile')" \
-      community "$(amx_txt 'Profils communautaires' 'Community profiles')" \
-      1 "$(amx_txt 'Associer un profil à un jeu' 'Assign a game profile')" \
-      3 "$(amx_txt 'Ouvrir l’éditeur de profils' 'Open profile editor')" \
-      8 "$(amx_txt 'Supprimer un profil' 'Delete a profile')" \
-      4 "$(amx_txt 'Lister les manettes détectées' 'List detected controllers')" \
-      5 "$(amx_txt "Installer / mettre à jour AntiMicroX" "Install / update AntiMicroX")" \
-      6 "$(amx_txt "Diagnostic" "Diagnostics")" \
+    intro="$(amx_txt 'Utilisez la manette dans les jeux prévus pour le clavier et la souris. Un profil enregistre les commandes de votre manette pour un jeu.\n\nCommencez par créer un profil en jeu, ou utilisez un profil déjà prêt.' 'Use your controller in games designed for keyboard and mouse. A profile stores your controller mappings for a game.\n\nStart by creating a profile in game, or use a ready-made profile.')"
+    [ -n "$bin" ] || intro+="\n\n$(amx_txt 'AntiMicroX n’est pas installé : choisissez « Installer ou mettre à jour AntiMicroX ».' 'AntiMicroX is not installed: choose “Install or update AntiMicroX”.')"
+    choice="$(menu_select "AntiMicroX" "$intro" \
+      1 "$(amx_txt 'Créer ou modifier un profil en jeu (bêta)' 'Create or edit a profile in game (beta)')" \
+      2 "$(amx_txt 'Mes jeux et leurs profils' 'My games and their profiles')" \
+      3 "$(amx_txt 'Utiliser un profil existant pour un jeu' 'Use an existing profile for a game')" \
+      4 "$(amx_txt 'Télécharger ou partager des profils' 'Download or share profiles')" \
+      5 "$(amx_txt 'Convertir un Pad2Key (.keys) en profil' 'Convert a Pad2Key (.keys) file to a profile')" \
+      6 "$(amx_txt 'Ouvrir l’éditeur sans lancer de jeu' 'Open the editor without starting a game')" \
+      7 "$(amx_txt 'Voir les manettes détectées' 'View detected controllers')" \
+      8 "$(amx_txt 'Supprimer un profil enregistré' 'Delete a saved profile')" \
+      9 "$(amx_txt 'Installer ou mettre à jour AntiMicroX' 'Install or update AntiMicroX')" \
+      10 "$(amx_txt 'Dépannage : vérifier AntiMicroX' 'Troubleshooting: check AntiMicroX')" \
       0 "$(i18n back)")" || return
     case "$choice" in
-      community) community_menu antimicrox ;;
-      7) amx_live_choose ;;
-      9) amx_convert_pad2key ;;
-      5)
-        if yesno "AntiMicroX" "$(amx_txt "Télécharger AntiMicroX 3.6.1 depuis GitHub et installer dans /userdata ?" "Download AntiMicroX 3.6.1 from GitHub and install under /userdata?")"; then
-          if "$WT_ROOT/helpers/install-antimicrox.sh" > /tmp/uwt-amx-install.log 2>&1; then
-            msgbox "AntiMicroX" "$(amx_txt "Runtime extrait et installé. Testez maintenant l’éditeur et la détection des manettes." "Runtime extracted and installed. Now test the editor and gamepad detection.")"
-          else
-            msgbox "AntiMicroX" "$(amx_txt "Échec de l’installation. Consultez /tmp/uwt-amx-install.log" "Installation failed. Check /tmp/uwt-amx-install.log")"
-          fi
-        fi
-        ;;
-      6) amx_diagnostic ;;
-      1)
-        rom="$(amx_choose_game)" || continue
-        amx_assign_profile_for "$rom"
-        ;;
+      1) amx_live_choose ;;
       2) amx_manage_associations ;;
-      3) amx_editor ;;
-      8) amx_delete_profiles ;;
-      4)
-        [ -n "$bin" ] || { msgbox "AntiMicroX" "$(amx_txt 'Binaire absent.' 'Binary missing.')"; continue; }
+      3)
+        rom="$(amx_choose_game)" || continue
+        amx_assign_profile_for "$rom" ;;
+      4|community) community_menu antimicrox ;;
+      5) amx_convert_pad2key ;;
+      6) amx_editor ;;
+      7)
+        [ -n "$bin" ] || { msgbox "AntiMicroX" "$(amx_txt 'Installez d’abord AntiMicroX depuis ce menu.' 'Install AntiMicroX from this menu first.')"; continue; }
         output="$(timeout 15 "$bin" --list 2>&1)"; rc=$?
-        msgbox "AntiMicroX" "$(amx_txt "Détection (code $rc) :" "Detection (code $rc):")\n$output"
-        ;;
+        msgbox "AntiMicroX" "$(amx_txt "Manettes détectées (code $rc) :" "Detected controllers (code $rc):")\n$output" ;;
+      8) amx_delete_profiles ;;
+      9)
+        if yesno "AntiMicroX" "$(amx_txt 'Télécharger la version officielle AntiMicroX 3.6.1 et l’installer sur ce Batocera ?' 'Download official AntiMicroX 3.6.1 and install it on this Batocera?')"; then
+          if "$WT_ROOT/helpers/install-antimicrox.sh" > /tmp/uwt-amx-install.log 2>&1; then
+            msgbox "AntiMicroX" "$(amx_txt 'AntiMicroX est installé. Vous pouvez maintenant créer un profil ou ouvrir l’éditeur.' 'AntiMicroX is installed. You can now create a profile or open the editor.')"
+          else
+            msgbox "AntiMicroX" "$(amx_txt 'Échec de l’installation. Consultez /tmp/uwt-amx-install.log' 'Installation failed. Check /tmp/uwt-amx-install.log')"
+          fi
+        fi ;;
+      10) amx_diagnostic ;;
       0|'') return ;;
     esac
   done

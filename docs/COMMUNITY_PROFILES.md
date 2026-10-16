@@ -98,13 +98,20 @@ can be resolved inside that source. Archives are listed/read using `unsquashfs`,
 without extracting or rewriting the game. Unsupported loader variants can still
 share a detected preset. A manual `.ini` choice remains available. Downloaded presets use the existing or new installation workflow described above.
 
+After identifying the game, sharing asks for only three fields: profile/preset
+name, public author nickname and description. Versions, compatibility notes and
+requirements are not additional form questions; the existing metadata schema
+remains compatible, with those optional values empty for new submissions. Mapping
+hotkeys and shader pack inference continue to use the profile/preset content.
+
 Sharing creates a local ZIP in `exports/community/<kind>/`, removes controller identities
 from the exported copy, then sends the profile and public metadata over HTTPS after
 explicit confirmation. No GitHub account is needed. Managed ReShade presets use the existing
 manager to synchronize and export first; integrated presets are copied read-only. Direct sharing accepts 64 KiB
-profiles. The original file is unchanged. Failed or uncertain sends keep the ZIP;
-“Retry a saved package” resubmits its same identifier and checksum. A successful
-response writes a local `.receipt.json`. No automatic resend happens at startup.
+profiles. The original file is unchanged. Failed or uncertain sends keep the ZIP and offer
+an immediate retry with the same identifier/checksum. The community menus no longer
+include a saved-package resend option. A successful response writes a local
+`.receipt.json`. No automatic resend happens at startup.
 
 The private D1 queue is visible only after validator login. Each tool's validator
 menu shows only its own type and displays all mappings or the full preset. Approval

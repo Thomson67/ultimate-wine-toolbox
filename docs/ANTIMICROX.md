@@ -180,7 +180,7 @@ shortcut are not implemented in this branch.
 
 ## Configure and test in game (experimental)
 
-Choose **Configurer et tester en jeu / Configure and test in game**, select a
+Choose **Créer ou modifier un profil en jeu / Create or edit a profile in game**, select a
 `.wine`, `.pc` or `.wsquashfs`, then choose the assigned profile, an existing
 profile, or a new one. New profiles are stored in `config/antimicrox-profiles`
 with a game name and path hash, outside the prefix. An existing unassociated
@@ -300,3 +300,12 @@ profile save/reopen, keyboard/mouse events and dead zones, then game start/stop
 for both `.wine` and `.wsquashfs` (including UMU). Confirm that mapping stops
 at exit and does not carry over to a game without a profile. Also check startup
 failure logs and an already-running independent AntiMicroX instance.
+
+## Menu order
+
+The main menu numbers follow their displayed order: create/edit in game, manage
+games and profiles, use an existing profile, download/share community profiles,
+convert Batocera Pad2Key settings, use the standalone editor, view controllers,
+delete a profile, install/update AntiMicroX, then troubleshoot. The introduction
+explains what a controller profile does and points to installation if needed.
+Diagnostics retain the technical runtime and input-device information.

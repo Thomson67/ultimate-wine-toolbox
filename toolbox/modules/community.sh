@@ -22,10 +22,10 @@ community_import_actions() {
   while true; do
     if [ "$kind" = antimicrox ]; then
       choice="$(menu_select "$title" "$(community_txt "Profil téléchargé :\n$path\n\nVérifiez la Hotkey dans l’éditeur avant activation. Le Pad2Key du jeu sera sauvegardé et suspendu lors de l’association." "Profile downloaded:\n$path\n\nCheck the Hotkey in the editor before enabling. The game’s Pad2Key will be backed up and suspended on assignment.")" \
-        info "$(community_txt 'Afficher tous les mappages' 'Show all mappings')" \
-        edit "$(community_txt 'Ouvrir dans l’éditeur' 'Open in editor')" \
-        assign "$(community_txt 'Associer à un jeu' 'Assign to a game')" \
-        live "$(community_txt 'Configurer et tester en jeu' 'Configure and test in game')" back "$(i18n back)")" || return 0
+        info "$(community_txt 'Voir les commandes de la manette' 'View controller mappings')" \
+        edit "$(community_txt 'Modifier le profil sans lancer de jeu' 'Edit the profile without starting a game')" \
+        assign "$(community_txt 'Utiliser ce profil pour un jeu' 'Use this profile for a game')" \
+        live "$(community_txt 'Modifier les commandes et tester en jeu' 'Edit controls and test in game')" back "$(i18n back)")" || return 0
       case "$choice" in
         info) amx_profile_info "$path" ;;
         edit) amx_editor "$path" ;;
@@ -40,8 +40,8 @@ community_import_actions() {
       esac
     else
       choice="$(menu_select "$title" "$(community_txt "Preset téléchargé :\n$path\n\nChoisissez le jeu cible. Si nécessaire, l’assistant proposera de configurer ReShade et ses effets avant l’application." "Preset downloaded:\n$path\n\nChoose the target game. If necessary, the wizard will offer to configure ReShade and its effects before applying the preset.")" \
-        info "$(community_txt 'Afficher les effets et réglages du preset' 'Show preset effects and settings')" \
-        apply "$(community_txt 'Appliquer à un jeu (configurer ReShade si nécessaire)' 'Apply to a game (configure ReShade if needed)')" back "$(i18n back)")" || return 0
+        info "$(community_txt 'Voir les effets et les réglages' 'View effects and settings')" \
+        apply "$(community_txt 'Appliquer ce preset à un jeu' 'Apply this preset to a game')" back "$(i18n back)")" || return 0
       case "$choice" in
         info) output="$(community_cmd preset-info "$path" 2>&1)"; community_report "$title" "$output"; continue ;;
         apply) : ;;
@@ -116,8 +116,8 @@ community_choose_reshade_preset() {
     items=()
     while IFS=$'\t' read -r id label; do [ -z "$id" ] || items+=("$id" "$label"); done <<< "$rows"
     choice="$(menu_select "$title" "$(community_txt 'Choisir un preset communautaire ReShade' 'Choose a community ReShade preset')" \
-      search "$(community_txt 'Rechercher un jeu / auteur' 'Search for a game / author')" \
-      refresh "$(community_txt 'Actualiser le catalogue' 'Refresh catalogue')" "${items[@]}" back "$(i18n back)")" || return 1
+      search "$(community_txt 'Rechercher un jeu ou un auteur' 'Search for a game or author')" \
+      refresh "$(community_txt 'Mettre à jour la liste' 'Refresh the list')" "${items[@]}" back "$(i18n back)")" || return 1
     case "$choice" in
       back|'') return 1 ;;
       search) query="$(input_text "$title" "$(community_txt 'Jeu, nom du preset ou auteur' 'Game, preset title or author')" "$query")" || return 1; continue ;;
@@ -227,7 +227,7 @@ community_share_game() {
 }
 
 community_share() {
-  local kind="$1" title="$2" rom="${3:-}" source game="" author name description tested notes requirement output selected temporary=""
+  local kind="$1" title="$2" rom="${3:-}" source game="" author name description output selected temporary=""
   if [ "$kind" = antimicrox ]; then
     source="$(amx_profile_file '')" || return 0
   else
@@ -255,31 +255,22 @@ community_share() {
   if [ -z "$game" ]; then
     game="$(community_share_game "$kind" "$source" "$title" "$rom")" || { [ -z "$temporary" ] || rm -f -- "$temporary"; return 0; }
   fi
-  local name_prompt tested_prompt requirement_prompt asset_fr asset_en
+  local name_prompt asset_fr asset_en
   if [ "$kind" = reshade ]; then
     asset_fr="preset ReShade"; asset_en="ReShade preset"
     name_prompt="$(community_txt 'Nom du preset ReShade' 'ReShade preset title')"
-    tested_prompt="$(community_txt 'Versions testées : jeu, Batocera, runner et ReShade' 'Tested versions: game, Batocera, runner and ReShade')"
-    requirement_prompt="$(community_txt 'Packs de shaders, effets et textures nécessaires' 'Required shader packs, effects and textures')"
   else
     asset_fr="profil AntiMicroX"; asset_en="AntiMicroX profile"
     name_prompt="$(community_txt 'Nom du profil AntiMicroX' 'AntiMicroX profile title')"
-    tested_prompt="$(community_txt 'Versions testées : jeu, Batocera, runner et AntiMicroX' 'Tested versions: game, Batocera, runner and AntiMicroX')"
-    requirement_prompt="$(community_txt 'Prérequis : manette et configuration Hotkey' 'Requirements: controller and Hotkey configuration')"
   fi
   name="$(input_text "$title" "$name_prompt" "$game")" || { rm -f -- "$temporary"; return 0; }
   author="$(input_text "$title" "$(community_txt 'Votre pseudo public' 'Your public nickname')" '')" || { rm -f -- "$temporary"; return 0; }
-  description="$(input_text "$title" "$(community_txt 'Description courte' 'Short description')" '')" || { rm -f -- "$temporary"; return 0; }
-  tested="$(input_text "$title" "$tested_prompt" '')" || { rm -f -- "$temporary"; return 0; }
-  requirement="$(input_text "$title" "$requirement_prompt" '')" || { rm -f -- "$temporary"; return 0; }
-  notes="$(input_text "$title" "$(community_txt 'Remarques de compatibilité (facultatif)' 'Compatibility notes (optional)')" '')" || { rm -f -- "$temporary"; return 0; }
-  if ! yesno "$title" "$(community_txt "Préparer le partage public de « $name » pour $game, sous le pseudo $author ?\n\nLe $asset_fr et ces informations seront envoyés au service communautaire pour validation. Ils deviendront publics après acceptation. Un paquet local sera conservé pour réessayer en cas de problème. Aucun compte GitHub nécessaire." "Prepare public sharing of '$name' for $game, credited to $author?\n\nThe $asset_en and these details will be sent to the community service for review. They become public after approval. A local package is kept for retries. No GitHub account is required.")"; then
+  description="$(input_text "$title" "$(community_txt 'Description (commandes ou effets, conseils utiles)' 'Description (controls or effects, useful tips)')" '')" || { rm -f -- "$temporary"; return 0; }
+  if ! yesno "$title" "$(community_txt "Partager « $name » pour $game, sous le pseudo $author ?\n\nLe $asset_fr et ces informations seront envoyés au service communautaire pour validation. Ils deviendront publics après acceptation. Aucun compte GitHub nécessaire." "Share '$name' for $game, credited to $author?\n\nThe $asset_en and these details will be sent to the community service for review. They become public after approval. No GitHub account is required.")"; then
     rm -f -- "$temporary"; return 0
   fi
-  local -a requirements=()
-  [ -z "$requirement" ] || requirements=(--requirement "$requirement")
   output="$(community_cmd share "$kind" "$source" --game "$game" --title "$name" --author "$author" \
-    --description "$description" --tested-on "$tested" --notes "$notes" "${requirements[@]}" 2>&1)"
+    --description "$description" 2>&1)"
   local status=$?
   [ -z "$temporary" ] || rm -f -- "$temporary"
   if [ "$status" -ne 0 ]; then msgbox "$title" "$output"; return 1; fi
@@ -293,24 +284,18 @@ community_send_package() {
   while true; do
     if output="$(community_service_cmd submit "$package" "${filter[@]}" 2>&1)"; then
       status="${output##*$'\n'}"
-      community_report "$title" "$(community_txt "Réponse du service : $status\n$output\n\nLa contribution est en attente de validation si son état est pending. Elle apparaîtra au catalogue après acceptation et actualisation.\nPaquet local : $package" "Service response: $status\n$output\n\nA pending contribution awaits review. It appears in the catalogue after approval and refresh.\nLocal package: $package")"
+      case "$status" in
+        rejected) output="$(community_txt 'Ce partage a été refusé. Vous pouvez le corriger et proposer un nouveau partage.' 'This submission was rejected. You can make changes and submit it again.')" ;;
+        publishing) output="$(community_txt 'Ce partage est validé ; sa publication est en cours. Mettez la liste à jour dans quelques instants.' 'This submission is approved and being published. Refresh the list shortly.')" ;;
+        approved) output="$(community_txt 'Ce partage est déjà publié. Mettez à jour la liste pour le retrouver.' 'This submission is already published. Refresh the list to find it.')" ;;
+        *) output="$(community_txt 'Partage envoyé ! Un modérateur doit maintenant le valider. Il apparaîtra ensuite dans la liste après actualisation.' 'Submission sent! A moderator will review it. Once approved, it will appear when you refresh the list.')" ;;
+      esac
+      community_report "$title" "$output"
       return 0
     fi
     msgbox "$title" "$(community_txt "Envoi non confirmé. Le paquet est conservé :\n$package\n\n$output" "Submission not confirmed. The package is retained:\n$package\n\n$output")"
     yesno "$title" "$(community_txt 'Réessayer le même envoi maintenant ?' 'Retry the same submission now?')" || return 0
   done
-}
-
-community_retry_package() {
-  local title="$1" kind="$2" package
-  mkdir -p "$WT_HOME/exports/community/$kind"
-  if command -v yad >/dev/null 2>&1; then
-    package="$(DISPLAY="${DISPLAY:-:0}" yad --file-selection --title="$title" --filename="$WT_HOME/exports/community/$kind/" --file-filter='ZIP | *.zip' 2>/dev/null)" || return 0
-  else
-    package="$(input_text "$title" "$(community_txt 'Chemin du paquet ZIP conservé' 'Saved ZIP package path')" "$WT_HOME/exports/community/$kind/")" || return 0
-  fi
-  [ -f "$package" ] || return 0
-  community_send_package "$title" "$package" "$kind"
 }
 
 # Subshell confines secrets and the EXIT trap; do not enable tracing here.
@@ -347,33 +332,36 @@ community_validate() (
 community_menu() {
   local kind="$1" rom="${2:-}" title choice query="" rows id label selected details path output share_label empty_label count_label search_prompt
   local -a items=()
+  local browse_label intro
   if [ "$kind" = antimicrox ]; then title="AntiMicroX — $(community_txt 'Profils communautaires' 'Community profiles')"; else title="ReShade — $(community_txt 'Presets communautaires' 'Community presets')"; fi
   if [ "$kind" = reshade ]; then
-    share_label="$(community_txt 'Partager un preset ReShade' 'Share a ReShade preset')"
+    share_label="$(community_txt 'Partager mon preset ReShade' 'Share my ReShade preset')"
+    browse_label="$(community_txt 'Voir les presets disponibles' 'Browse available presets')"
+    intro="$(community_txt 'Un preset contient les réglages visuels de ReShade. Téléchargez ceux d’autres joueurs ou partagez les vôtres. Un modérateur valide les partages avant publication.' 'A preset contains ReShade visual settings. Download presets from other players or share yours. A moderator reviews submissions before publication.')"
     empty_label="$(community_txt 'Aucun preset ReShade trouvé. Actualisez le catalogue ou partagez votre preset.' 'No ReShade preset found. Refresh the catalogue or share your preset.')"
     count_label="$(community_txt 'presets ReShade' 'ReShade presets')"
     search_prompt="$(community_txt 'Jeu, nom du preset ReShade ou auteur' 'Game, ReShade preset title or author')"
   else
-    share_label="$(community_txt 'Partager un profil AntiMicroX' 'Share an AntiMicroX profile')"
+    share_label="$(community_txt 'Partager mon profil de manette' 'Share my controller profile')"
+    browse_label="$(community_txt 'Voir les profils disponibles' 'Browse available profiles')"
+    intro="$(community_txt 'Un profil contient les commandes de la manette pour un jeu. Téléchargez ceux d’autres joueurs ou partagez les vôtres. Un modérateur valide les partages avant publication.' 'A profile contains controller mappings for a game. Download profiles from other players or share yours. A moderator reviews submissions before publication.')"
     empty_label="$(community_txt 'Aucun profil AntiMicroX trouvé. Actualisez le catalogue ou partagez votre profil.' 'No AntiMicroX profile found. Refresh the catalogue or share your profile.')"
     count_label="$(community_txt 'profils AntiMicroX' 'AntiMicroX profiles')"
     search_prompt="$(community_txt 'Jeu, nom du profil AntiMicroX ou auteur' 'Game, AntiMicroX profile title or author')"
   fi
   while true; do
-    choice="$(menu_select "$title" "$(community_txt 'Catalogue partagé sur GitHub. Téléchargement sans compte ; contributions proposées puis validées.' 'Shared GitHub catalogue. Downloads require no account; contributions are submitted for review.')" \
-      browse "$(community_txt 'Parcourir le catalogue en cache' 'Browse cached catalogue')" \
-      search "$(community_txt 'Rechercher un jeu / auteur' 'Search for a game / author')" \
-      refresh "$(community_txt 'Actualiser le catalogue' 'Refresh catalogue')" \
+    choice="$(menu_select "$title" "$intro" \
+      browse "$browse_label" \
+      search "$(community_txt 'Rechercher un jeu ou un auteur' 'Search for a game or author')" \
+      refresh "$(community_txt 'Mettre à jour la liste' 'Refresh the list')" \
       share "$share_label" \
-      retry "$(community_txt 'Renvoyer un paquet conservé' 'Retry a saved package')" \
-      validate "$(community_txt 'Espace validateur' 'Validator area')" \
-      forget "$(community_txt 'Oublier l’accès validateur de ce Batocera' 'Forget validator access on this Batocera')" back "$(i18n back)")" || return 0
+      validate "$(community_txt 'Valider les partages (modérateurs)' 'Review submissions (moderators)')" \
+      forget "$(community_txt 'Retirer l’accès modérateur de ce PC' 'Remove moderator access from this PC')" back "$(i18n back)")" || return 0
     case "$choice" in
       refresh)
         if output="$(community_cmd refresh --kind "$kind" 2>&1)"; then msgbox "$title" "$(community_txt "Catalogue actualisé : $output $count_label." "Catalogue refreshed: $output $count_label.")"; else msgbox "$title" "$(community_txt 'Actualisation impossible ; le cache précédent reste disponible.' 'Refresh failed; the previous cache remains available.')\n$output"; fi
         continue ;;
       share) community_share "$kind" "$title" "$rom"; continue ;;
-      retry) community_retry_package "$title" "$kind"; continue ;;
       validate) community_validate "$kind" "$title"; continue ;;
       forget)
         if yesno "$title" "$(community_txt 'Révoquer l’autorisation mémorisée et déconnecter ce Batocera ?' 'Revoke the remembered authorization and sign this Batocera out?')"; then
@@ -389,11 +377,11 @@ community_menu() {
     if [ -z "$rows" ]; then msgbox "$title" "$empty_label"; continue; fi
     items=()
     while IFS=$'\t' read -r id label; do items+=("$id" "$label"); done <<< "$rows"
-    selected="$(menu_select "$title" "$(community_txt 'Choisir une contribution' 'Choose a contribution')" "${items[@]}" back "$(i18n back)")" || continue
+    selected="$(menu_select "$title" "$(community_txt 'Choisir un profil ou un preset' 'Choose a profile or preset')" "${items[@]}" back "$(i18n back)")" || continue
     [ "$selected" != back ] || continue
     details="$(community_cmd show "$kind" "$selected" 2>&1)" || { msgbox "$title" "$details"; continue; }
     community_report "$title" "$details"
-    yesno "$title" "$(community_txt 'Télécharger cette contribution ? Elle sera conservée dans un nouveau fichier local.' 'Download this contribution? It will be stored in a new local file.')" || continue
+    yesno "$title" "$(community_txt 'Télécharger ce fichier ? Vous pourrez ensuite l’utiliser pour un jeu.' 'Download this file? You can then use it for a game.')" || continue
     if path="$(community_cmd fetch "$kind" "$selected" 2>&1)"; then community_import_actions "$kind" "$path" "$title" "$rom"; else msgbox "$title" "$path"; fi
   done
 }

@@ -74,6 +74,7 @@ menu_select() {
  esac
 }
 input_text() {
+ printf '%s\n' "$2" >> "$WT_HOME/questions"
  printf '%s\n' "$@" >> "$WT_HOME/ui"
  case "$2" in
   'Votre pseudo public'|'Your public nickname') echo Tester;;
@@ -98,12 +99,17 @@ resh_menu
 '''
         for language in ('fr', 'en'):
             with self.subTest(language=language):
-                for marker in ('main-once', 'community-once', 'ui'): (self.home/marker).unlink(missing_ok=True)
+                for marker in ('main-once', 'community-once', 'ui', 'questions'): (self.home/marker).unlink(missing_ok=True)
                 ui = self.shell(script, language)
                 self.assertNotIn('AntiMicroX', ui); self.assertNotIn('Hotkey', ui); self.assertNotIn('AMX_ONLY', ui)
+                self.assertEqual(len((self.home/'questions').read_text().splitlines()), 3)
                 payload = json.loads((self.home/'payload.json').read_text())
                 self.assertEqual(payload['metadata']['game'], 'ReShade Game')
-                self.assertEqual(payload['metadata']['requirements'], ['Standard: CAS.fx'])
+                self.assertEqual(payload['metadata']['requirements'], [])
+                self.assertEqual(payload['metadata']['tested_on'], '')
+                self.assertEqual(payload['metadata']['notes'], '')
+                self.assertNotIn('Versions testées', ui)
+                self.assertNotIn('Remarques de compatibilité', ui)
                 self.assertEqual(payload['profile'].encode(), PRESET)
                 self.assertTrue(list((self.home/'exports/community/reshade').glob('*.zip')))
                 self.assertEqual(self.preset.read_bytes(), PRESET)

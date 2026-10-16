@@ -113,6 +113,44 @@ class ServiceTests(unittest.TestCase):
             config.write_text(json.dumps(value))
             with self.assertRaises(ValueError): service.Service(self.home)
 
+    def test_antimicrox_sharing_asks_only_three_fields_and_sends_a_valid_package(self):
+        source=Path(self.temp.name)/'profile.amgp';source.write_text('<gamecontroller><sets/></gamecontroller>')
+        for language in ('fr','en'):
+            with self.subTest(language=language):
+                home=self.home/language;home.mkdir(parents=True)
+                code=r'''WT_ROOT="$ROOT/toolbox"
+source "$WT_ROOT/modules/community.sh"
+: > "$WT_HOME/questions"
+amx_profile_file() { printf '%s' "$SOURCE"; }
+community_share_game() { echo 'Detected Game'; }
+input_text() {
+ printf '%s\n' "$2" >> "$WT_HOME/questions"
+ case "$(wc -l < "$WT_HOME/questions")" in 1) echo 'My profile';;2) echo Tester;;3) echo 'Keyboard and mouse controls';;*) return 99;; esac
+}
+yesno() { return 0; }; community_report() { :; }
+msgbox() { printf '%s\n' "$@" >> "$WT_HOME/errors"; }
+community_service_cmd() {
+ [ "$1" = submit ] && [ "$3" = --kind ] && [ "$4" = antimicrox ] || return 1
+ python3 - "$ROOT" "$2" "$WT_HOME/payload.json" <<'PAYLOAD'
+import json,sys
+sys.path.insert(0,sys.argv[1]+'/toolbox/helpers')
+from community_service import package_data
+open(sys.argv[3],'w').write(json.dumps(package_data(sys.argv[2])))
+print('pending')
+PAYLOAD
+}
+community_share antimicrox Community
+'''
+                result=subprocess.run(['bash','-c',code],capture_output=True,text=True,timeout=8,
+                    env=dict(os.environ,ROOT=str(ROOT),WT_HOME=str(home),WT_LANGUAGE=language,SOURCE=str(source)))
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertEqual(len((home/'questions').read_text().splitlines()),3)
+                payload=json.loads((home/'payload.json').read_text())['metadata']
+                self.assertEqual((payload['game'],payload['title'],payload['author'],payload['description']),
+                                 ('Detected Game','My profile','Tester','Keyboard and mouse controls'))
+                self.assertEqual(payload['requirements'],[])
+                self.assertEqual(payload['tested_on'],'');self.assertEqual(payload['notes'],'')
+
     def test_sharing_ui_submits_created_package_and_retains_detected_game(self):
         script = r'''
 set -u
