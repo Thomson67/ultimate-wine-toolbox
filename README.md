@@ -6,7 +6,7 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.5.8](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.8).** WSquashFS updates are validated; WSquashFS creation remains in beta.
+**Stable version: [v0.6.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.6.0).** WSquashFS updates are validated; WSquashFS creation remains in beta.
 
 ## Features
 
@@ -14,11 +14,13 @@ Created by **Thomsonito**.
 - UMU Runner Toolbox integration
 - Wine Runner Starter Pack, with a list of installed and missing runners
 - classic Wine runner management
-- GE-Proton legacy support for Batocera
+- classic GE-Proton support, including 11.x (Batocera v44 recommended)
 - MangoHud global and per-game management
 - DXVK / VKD3D-Proton / DXVK-NVAPI bundles, Batocera 40–43 / 43.1 models and global or per-game selection
 - NVAPI version filtering based on known DXVK requirements
 - per-game ReShade: installation, toggling, presets, effect templates and API hints
+- AntiMicroX: controller profiles, in-game editing, Pad2Key conversion and game assignments
+- community catalogue: download, share and moderate AntiMicroX profiles and ReShade presets
 - Wine bottle maintenance and orphan detection
 - runner and DXVK / VKD3D diagnostics
 - `.wine` / `.wsquashfs` squash and unsquash tools
@@ -31,14 +33,15 @@ Created by **Thomsonito**.
 - native Batocera Ports launcher and Pad2Key support
 - update checks at startup and from the toolbox menu
 
-## New in v0.5.8
+## New in v0.6.0
 
-- Wine Mono / Microsoft .NET management: inspect a prefix, update Mono, replace it with Microsoft .NET 4.8, and restore a backup.
-- Interactive installers with fixes for TKG and GE-Proton-UMU; .NET assistance is offered after a failed game launch.
-- WSquashFS creation detects games installed outside `drive_c/game`, including placeholder autorun files.
-- Opening UMU Toolbox from Ultimate now applies UMU’s own font and window preferences.
+- Native AntiMicroX: create and edit profiles in game, switch using the keyboard or controller, and convert Pad2Key mappings including identifiable Hotkey combinations.
+- Community AntiMicroX profiles and ReShade presets: search, download, submit directly and moderate through browser pairing.
+- ReShade: reuse bundled installations, apply presets to new games and select packs from active effects in `Techniques=`.
+- Classic GE-Proton 11.x downloads restored with a “Batocera v44 recommended” label.
+- Streamlined workflows, Tools and compatibility menu and updated French/English offline guides.
 
-[v0.5.8 release notes](release-notes/v0.5.8.md) · [Release history](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
+[v0.6.0 release notes](release-notes/v0.6.0.md) · [Release history](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 
