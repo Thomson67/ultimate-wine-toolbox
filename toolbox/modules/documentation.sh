@@ -2,7 +2,7 @@
 
 documentation_show() {
     local topic="$1" language="${WT_LANGUAGE:-fr}" columns lines width height document source_file
-    case "$topic" in creation|templates|update|mangohud|dxvk|reshade|dotnet) ;; *) return 1 ;; esac
+    case "$topic" in creation|templates|update|mangohud|dxvk|reshade|dotnet|antimicrox) ;; *) return 1 ;; esac
     case "$language" in fr|en) ;; *) language=en ;; esac
     source_file="$WT_ROOT/docs/$language/$topic.txt"
     [ -r "$source_file" ] || {
@@ -48,7 +48,7 @@ documentation_menu() {
             1 "$(i18n doc_creation)" 2 "$(i18n doc_templates)" \
             3 "$(i18n doc_update)" 4 "$(i18n doc_mangohud)" \
             5 "$(i18n doc_dxvk)" 6 "$(i18n doc_reshade)" \
-            7 "$(i18n doc_dotnet)" 0 "$(i18n back)")" || return
+            7 "$(i18n doc_dotnet)" 8 "$(i18n doc_antimicrox)" 0 "$(i18n back)")" || return
         case "$choice" in
             1) documentation_show creation ;;
             2) documentation_show templates ;;
@@ -57,6 +57,7 @@ documentation_menu() {
             5) documentation_show dxvk ;;
             6) documentation_show reshade ;;
             7) documentation_show dotnet ;;
+            8) documentation_show antimicrox ;;
             0|'') return ;;
         esac
     done

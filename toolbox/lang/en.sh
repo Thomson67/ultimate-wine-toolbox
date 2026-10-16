@@ -22,6 +22,7 @@ declare -gA I18N=(
   [doc_update]="Update a WSquashFS"
   [doc_mangohud]="MangoHud: display performance"
   [doc_dxvk]="DXVK / VKD3D: choose components"
+  [doc_antimicrox]="AntiMicroX: controller profiles and Pad2Key"
   [doc_reshade]="ReShade: shaders and presets"
   [resh_wiki_first]="suggested match"
   [resh_external_scan]="Find / refresh ReShade bundled with games"

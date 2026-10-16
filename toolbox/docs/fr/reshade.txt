@@ -21,3 +21,20 @@ Home ouvre ReShade. Pour les nouveaux profils, Fin active/désactive les effets 
 Les réglages et presets sont conservés par jeu et récupérés à sa fermeture. Un export de preset ne contient pas les packs de shaders. Fermer le jeu avant de modifier, désactiver ou désinstaller ReShade.
 
 Les WSquashFS sont pris en charge sans recompression de l’archive. Les installations ReShade déjà intégrées au jeu sont détectées et disposent d’une gestion distincte ; un chargeur non standard peut nécessiter son gestionnaire d’origine.
+
+PRESETS COMMUNAUTAIRES
+Le catalogue est accessible depuis le menu ReShade. Rechercher par jeu ou auteur et utiliser Mettre à jour la liste pour récupérer les nouveaux partages. Téléchargé repère une copie locale encore présente ; modifié indique une copie retouchée. Elle peut être réutilisée sans nouveau téléchargement.
+
+Après le téléchargement, choisir Appliquer ce preset à un jeu. Les jeux au nom proche sont proposés en priorité, mais tous les jeux ES restent accessibles. Si ReShade est absent, l’assistant propose de l’installer avec ce preset : le choix d’un modèle est sauté et les packs sont déduits des effets actifs de la ligne Techniques=. Les sections de réglages et TechniqueSorting= peuvent contenir des effets désactivés et ne servent pas à sélectionner les packs. Un effet inconnu ou ambigu demande une vérification manuelle. Le téléchargement reste effectué par packs complets avec leurs dépendances, pas effet par effet.
+
+La même recherche communautaire est disponible dans le choix du modèle lors d’une installation standard.
+
+RESHADE DÉJÀ INTÉGRÉ AU JEU
+Un preset communautaire peut être appliqué sans réinstaller un ReShade existant pris en charge. La Toolbox sauvegarde les réglages remplacés, ajoute le preset et adapte son chemin. Les DLL, effets et textures existants sont conservés : les effets nécessaires doivent déjà être présents. Pour un WSquashFS, les changements sont appliqués dans les préfixes Wine, sans modifier l’archive. Le menu du jeu propose de restaurer les réglages précédents.
+
+PARTAGER ET VALIDER
+Partager mon preset ReShade permet de choisir un jeu avec ReShade, qu’il soit géré par la Toolbox ou déjà intégré à un .wine, .pc ou .wsquashfs. Si nécessaire, lancer la détection des ReShade intégrés. Choisir le preset proposé, ou sélectionner directement un fichier .ini. Le partage contient les réglages du preset, pas les DLL, shaders ou textures.
+
+Confirmer le jeu identifié ou le choisir dans la liste ES, puis renseigner le nom du preset, le pseudo public et une description. Le partage attend une validation avant publication, sans compte GitHub nécessaire. L’affichage dans le catalogue peut prendre un peu de temps ; actualiser la liste.
+
+L’espace validateur s’ouvre par appairage avec un code dans un navigateur. Il permet de valider les propositions ou de retirer un partage publié, avec résumé et confirmation dans la même fenêtre. Les presets déjà installés chez les joueurs restent conservés.
