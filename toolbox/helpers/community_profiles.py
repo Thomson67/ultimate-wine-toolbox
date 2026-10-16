@@ -11,6 +11,7 @@ import tempfile
 import time
 import urllib.parse
 import urllib.request
+import unicodedata
 import uuid
 import xml.etree.ElementTree as ET
 import zipfile
@@ -18,6 +19,7 @@ import zipfile
 REPOSITORY = 'Thomson67/ultimate-wine-toolbox'
 REF = 'community-presets'
 LIMIT = 2*1024*1024
+ES_LIMIT = 32*1024*1024
 KINDS = {'antimicrox': '.amgp', 'reshade': '.ini'}
 MODES = {'keyboard', 'mousebutton', 'mousemovement', 'pause', 'hold', 'cycle', 'distance',
          'release', 'mousespeedmod', 'keypress', 'delay', 'setchange', 'textentry', 'mix'}
@@ -119,6 +121,88 @@ def hotkey_name(data):
              '4': 'Y Xbox / Triangle PS', '5': 'Select / View / Share-Create', '6': 'Guide Xbox / PS',
              '7': 'Start / Menu / Options', '8': 'L3', '9': 'R3', '10': 'L1 / LB', '11': 'R1 / RB'}
     return ', '.join(names.get(index, index or '?') for index in sorted(indices))
+
+
+def game_title(value):
+    """Remove UWT file suffixes, retaining real title/edition information."""
+    value = clean(value, 1000)
+    if value.startswith('/') or re.match(r'^[A-Za-z]:[\\/]', value):
+        value = value.replace('\\', '/').rsplit('/', 1)[-1]
+    value = re.sub(r'\s*\(Pad2Key\)\s*$', '', value, flags=re.I)
+    value = re.sub(r'\.(amgp|ini|keys)$', '', value, flags=re.I)
+    value = re.sub(r'\s*\(Pad2Key\)\s*$', '', value, flags=re.I)
+    value = re.sub(r'-pad2key-[a-f0-9]{8}(?:-\d+)?$', '', value, flags=re.I)
+    value = re.sub(r'-[a-f0-9]{8,10}(?:-\d+)?$', '', value, flags=re.I)
+    value = re.sub(r'\.(wsquashfs|wine|pc)$', '', value, flags=re.I)
+    value = re.sub(r'\[(?:L|FR|EN|MULTI\d*|GE[- ]?Proton[^\]]*|Wine[^\]]*|TKG[^\]]*|UMU[^\]]*|Proton[^\]]*)\]', '', value, flags=re.I)
+    return ' '.join(value.split()).strip(' -_')[:160]
+
+
+def game_key(value):
+    return ''.join(char.casefold() for char in unicodedata.normalize('NFKD', game_title(value)) if char.isalnum())
+
+
+def es_games():
+    # Read ES's actual in-memory gamelist, not a scan of the ROM directory.
+    with urllib.request.urlopen('http://127.0.0.1:1234/systems/windows/games', timeout=3) as response:
+        if response.status != 200: raise ValueError('ES game list is unavailable')
+        data = response.read(ES_LIMIT+1)
+    if len(data) > ES_LIMIT: raise ValueError('ES game list exceeds 32 MiB')
+    values = json.loads(data)
+    if not isinstance(values, list): raise ValueError('Invalid ES game list')
+    result = {}
+    for value in values:
+        if not isinstance(value, dict): continue
+        path = value.get('path', '')
+        if not isinstance(path, str) or any(ord(char) < 32 or ord(char) == 127 for char in path): continue
+        if not path.startswith('/userdata/roms/windows/') or Path(path).suffix.lower() not in ('.wine', '.pc', '.wsquashfs'): continue
+        name = game_title(value.get('name') or Path(path).name)
+        if name: result[path] = name
+    return sorted(result.items(), key=lambda item: item[1].casefold())
+
+
+def suggest_game(home, kind, source, rom=''):
+    home, source = Path(home), Path(source)
+    known_roms, candidate = [], ''
+    if rom:
+        known_roms = [rom]
+    elif kind == 'antimicrox':
+        associations = home/'config/antimicrox-games.tsv'
+        if associations.exists():
+            for line in associations.read_text().splitlines():
+                fields = line.split('\t')
+                if len(fields) == 2 and Path(fields[1]).resolve() == source.resolve():
+                    known_roms.append(fields[0])
+        known_roms = list(dict.fromkeys(known_roms))
+        if len(known_roms) > 1:
+            return ''  # A shared profile needs an explicit game selection.
+        imports = home/'state/community/imports.json'
+        if imports.exists():
+            candidate = json.loads(imports.read_text()).get(str(source.resolve()), {}).get('game', '')
+        registry = home/'state/antimicrox-pad2key-conversions.json'
+        if not known_roms and registry.exists():
+            original = json.loads(registry.read_text()).get(str(source.resolve()), {}).get('source', '')
+            if original:
+                path = Path(original)
+                known_roms = [str(path.parent) if path.name == 'padto.keys' else str(path).removesuffix('.keys')]
+        if not candidate:
+            candidate = ET.parse(source).getroot().findtext('profilename', '')
+    if known_roms:
+        candidate = game_title(Path(known_roms[0]).name)
+    if not candidate:
+        candidate = source.stem
+    candidate = game_title(candidate)
+    if game_key(candidate) in ('default', 'defaultprofile', 'profile', 'profil', 'reshadepreset', 'gamecontroller'):
+        return ''
+    try:
+        games = es_games()
+    except (OSError, ValueError):
+        return candidate
+    if known_roms:
+        matched = [name for path, name in games if path == known_roms[0]]
+        if matched: return matched[0]
+    matched = [name for _, name in games if game_key(name) == game_key(candidate)]
+    return matched[0] if len(set(matched)) == 1 else candidate
 
 
 class Community:
@@ -250,6 +334,8 @@ def main():
     parser.add_argument('--language', default='fr')
     sub = parser.add_subparsers(dest='command', required=True)
     sub.add_parser('refresh')
+    arg = sub.add_parser('games'); arg.add_argument('--query', default='')
+    arg = sub.add_parser('suggest-game'); arg.add_argument('kind', choices=KINDS); arg.add_argument('source'); arg.add_argument('--rom', default='')
     for command in ('list', 'show', 'fetch'):
         arg = sub.add_parser(command); arg.add_argument('kind', choices=KINDS)
         if command == 'list': arg.add_argument('--query', default='')
@@ -261,6 +347,11 @@ def main():
     arg = sub.add_parser('approve'); arg.add_argument('package'); arg.add_argument('--catalog-root', required=True)
     args = parser.parse_args()
     if args.command == 'approve': print(approve(args.package, args.catalog_root)); return
+    if args.command == 'games':
+        for path, name in es_games():
+            if args.query.casefold() in name.casefold(): print(path+'\t'+name)
+        return
+    if args.command == 'suggest-game': print(suggest_game(args.home, args.kind, args.source, args.rom)); return
     community = Community(args.home)
     if args.command == 'refresh': print(len(community.refresh()['entries']))
     elif args.command == 'list':

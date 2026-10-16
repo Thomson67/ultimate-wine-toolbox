@@ -60,19 +60,64 @@ community_import_actions() {
   done
 }
 
+community_pick_game() {
+  local title="$1" query="" rows path name choice
+  local -a games=() items=()
+  while true; do
+    if ! rows="$(community_cmd games --query "$query" 2>&1)"; then
+      msgbox "$title" "$(community_txt 'Impossible de lire la liste des jeux Windows d’ES. Vérifiez que le jeu est référencé dans ES.' 'Unable to read the ES Windows game list. Check that ES has indexed the game.')\n$rows"; return 1
+    fi
+    games=(); items=()
+    while IFS=$'\t' read -r path name; do
+      [ -n "$path" ] || continue
+      games+=("$path"$'\t'"$name")
+      items+=("${#games[@]}" "$name — ${path##*/}")
+    done <<< "$rows"
+    choice="$(menu_select "$title" "$(community_txt 'Choisir le jeu dans la liste d’EmulationStation' 'Choose the game from the EmulationStation list')" \
+      search "$(community_txt 'Rechercher un jeu' 'Search for a game')" "${items[@]}" back "$(i18n back)")" || return 1
+    case "$choice" in
+      search) query="$(input_text "$title" "$(community_txt 'Nom du jeu à rechercher' 'Game name to search for')" "$query")" || return 1 ;;
+      ''|back) return 1 ;;
+      *[!0-9]*) return 1 ;;
+      *) [ "$choice" -ge 1 ] && [ "$choice" -le "${#games[@]}" ] || return 1
+         printf '%s' "${games[$((choice-1))]}"; return 0 ;;
+    esac
+  done
+}
+
+community_share_game() {
+  local kind="$1" source="$2" title="$3" rom="${4:-}" suggested choice selected
+  local -a context=()
+  [ -z "$rom" ] || context=(--rom "$rom")
+  suggested="$(community_cmd suggest-game "$kind" "$source" "${context[@]}" 2>/dev/null)" || suggested=""
+  if [ -n "$suggested" ]; then
+    choice="$(menu_select "$title" "$(community_txt "Jeu identifié : $suggested" "Detected game: $suggested")" \
+      use "$(community_txt 'Utiliser ce nom de jeu' 'Use this game name')" \
+      select "$(community_txt 'Choisir dans la liste des jeux ES' 'Choose from the ES game list')" back "$(i18n back)")" || return 1
+    case "$choice" in use) printf '%s' "$suggested"; return 0 ;; select) : ;; *) return 1 ;; esac
+  fi
+  selected="$(community_pick_game "$title")" || return 1
+  printf '%s' "${selected#*$'\t'}"
+}
+
 community_share() {
-  local kind="$1" title="$2" rom="${3:-}" source game author name description tested notes requirement output temporary=""
+  local kind="$1" title="$2" rom="${3:-}" source game="" author name description tested notes requirement output selected temporary=""
   if [ "$kind" = antimicrox ]; then
     source="$(amx_profile_file '')" || return 0
   else
-    [ -n "$rom" ] || rom="$(amx_choose_game)" || return 0
+    if [ -z "$rom" ]; then
+      selected="$(community_pick_game "$title")" || return 0
+      rom="${selected%%$'\t'*}"; game="${selected#*$'\t'}"
+    fi
     temporary="$(mktemp /tmp/uwt-community-preset.XXXXXX.ini)" || return 1
     if ! output="$(resh_cmd export "$rom" "$temporary" overwrite 2>&1)"; then
       rm -f -- "$temporary"; msgbox "$title" "$output"; return 1
     fi
     source="$temporary"
   fi
-  game="$(input_text "$title" "$(community_txt 'Nom du jeu (sans chemin ni nom de runner)' 'Game name (without path or runner name)')" '')" || { rm -f -- "$temporary"; return 0; }
+  if [ -z "$game" ]; then
+    game="$(community_share_game "$kind" "$source" "$title" "$rom")" || { [ -z "$temporary" ] || rm -f -- "$temporary"; return 0; }
+  fi
   name="$(input_text "$title" "$(community_txt 'Nom du profil / preset' 'Profile / preset title')" "$game")" || { rm -f -- "$temporary"; return 0; }
   author="$(input_text "$title" "$(community_txt 'Votre pseudo public' 'Your public nickname')" '')" || { rm -f -- "$temporary"; return 0; }
   description="$(input_text "$title" "$(community_txt 'Description courte' 'Short description')" '')" || { rm -f -- "$temporary"; return 0; }

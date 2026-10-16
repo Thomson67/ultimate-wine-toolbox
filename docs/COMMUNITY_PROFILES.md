@@ -39,6 +39,19 @@ automatically by this menu. Dependencies are displayed before download.
 
 ## Export and review
 
+Sharing proposes the game name from the profile's association, import/conversion
+metadata, internal profile title or filename. Generated hashes, file extensions,
+Pad2Key suffixes and known runner/language tags are removed. When available,
+the title is matched to ES's current Windows game list. A profile shared by
+multiple games requires explicit selection. ReShade uses the selected game,
+not the temporary preset export filename.
+
+The user can accept the proposed name or choose another game from the ES
+gamelist, with a search option. There is no free-text game-name field in this
+sharing step. Manual selection reads `GET /systems/windows/games`; it does
+not scan ROM folders. If ES is unavailable, a locally derived proposal can
+still be accepted, while manual selection reports the unavailable list.
+
 Sharing prepares a ZIP and a companion text file in `exports/community/`, with
 a GitHub issue URL and no automatic upload. Authors enter public metadata and
 review it before creating the package. AntiMicroX controller identities are

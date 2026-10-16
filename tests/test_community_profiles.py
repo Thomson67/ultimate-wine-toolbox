@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -229,6 +229,105 @@ echo must-not-continue
              patch.object(converter.os, 'access', return_value=False):
             with self.assertRaisesRegex(ValueError, 'Install AntiMicroX'): converter.main()
         self.assertFalse(Pad2KeyStore(self.home).state.exists())
+
+    def test_game_name_is_derived_from_profile_title_or_generated_filename(self):
+        source = self.base/'Gobliins 6[L]-pad2key-abcdef12-2.amgp'
+        source.write_bytes(AMX)
+        with patch.object(community, 'es_games', side_effect=OSError('offline')):
+            self.assertEqual(community.suggest_game(self.home, 'antimicrox', source), 'Gobliins 6')
+            source.write_text('<gamecontroller><profilename>Max Payne.wsquashfs (Pad2Key)</profilename></gamecontroller>')
+            self.assertEqual(community.suggest_game(self.home, 'antimicrox', source), 'Max Payne')
+        self.assertEqual(community.game_title('Oddworld Strangers Wrath HD[L]-a373c62f.amgp'), 'Oddworld Strangers Wrath HD')
+        self.assertEqual(community.game_title('Game [GE-Proton11-7-UMU].wsquashfs.keys'), 'Game')
+        self.assertEqual(community.game_title('[PROTOTYPE].amgp'), '[PROTOTYPE]')
+
+    def test_association_uses_scraped_es_name_and_shared_profile_requires_selection(self):
+        source = self.base/'profile.amgp'; source.write_bytes(AMX)
+        config = self.home/'config'; config.mkdir(parents=True)
+        rom = '/userdata/roms/windows/Game[L].wsquashfs'
+        associations = config/'antimicrox-games.tsv'; associations.write_text(f'{rom}\t{source}\n')
+        with patch.object(community, 'es_games', return_value=[(rom, 'The scraped game title')]):
+            self.assertEqual(community.suggest_game(self.home, 'antimicrox', source), 'The scraped game title')
+        associations.write_text(associations.read_text()+f'/userdata/roms/windows/Other.wine\t{source}\n')
+        with patch.object(community, 'es_games') as games:
+            self.assertEqual(community.suggest_game(self.home, 'antimicrox', source), '')
+            games.assert_not_called()
+
+    def test_reshade_suggestion_uses_selected_game_not_temporary_export_filename(self):
+        rom = '/userdata/roms/windows/Game [L].wine'
+        source = self.base/'uwt-community-preset.ABC123.ini'; source.write_bytes(PRESET)
+        with patch.object(community, 'es_games', return_value=[(rom, 'Game title from ES')]):
+            self.assertEqual(community.suggest_game(self.home, 'reshade', source, rom), 'Game title from ES')
+        with patch.object(community, 'es_games', side_effect=OSError):
+            self.assertEqual(community.suggest_game(self.home, 'reshade', source, rom), 'Game')
+
+    def test_suggestion_uses_download_metadata_and_conversion_source(self):
+        item, _ = self.catalogue(); source = self.community.fetch('antimicrox', item['id'])
+        with patch.object(community, 'es_games', return_value=[]):
+            self.assertEqual(community.suggest_game(self.home, 'antimicrox', source), 'My Game')
+        imported = self.home/'state/community/imports.json'; imported.unlink()
+        registry = self.home/'state/antimicrox-pad2key-conversions.json'
+        registry.write_text(json.dumps({str(source.resolve()): {'source': '/userdata/roms/windows/Converted Game.wine/padto.keys'}}))
+        with patch.object(community, 'es_games', return_value=[]):
+            self.assertEqual(community.suggest_game(self.home, 'antimicrox', source), 'Converted Game')
+
+    def test_manual_game_list_reads_es_and_ignores_non_windows_game_items(self):
+        values = [{'path': '/userdata/roms/windows/A[L].wsquashfs', 'name': 'A [L]'},
+                  {'path': '/userdata/roms/windows/B.pc', 'name': 'B'},
+                  {'path': '/userdata/roms/windows/folder', 'name': 'Folder'},
+                  {'path': '/userdata/roms/ports/Toolbox.sh', 'name': 'Toolbox'}]
+        response = MagicMock(); response.__enter__.return_value.status = 200
+        response.__enter__.return_value.read.return_value = json.dumps(values).encode()
+        with patch.object(community.urllib.request, 'urlopen', return_value=response) as request:
+            self.assertEqual(community.es_games(), [('/userdata/roms/windows/A[L].wsquashfs', 'A'),
+                                                   ('/userdata/roms/windows/B.pc', 'B')])
+            self.assertEqual(request.call_args.args[0], 'http://127.0.0.1:1234/systems/windows/games')
+
+    def test_share_game_choice_accepts_suggestion_or_selects_gamelist_without_typing_name(self):
+        for choice, expected in [('use', 'Detected Game'), ('select', 'Game from ES')]:
+            script = r'''
+set -u
+WT_HOME="$TEST_HOME"; WT_LANGUAGE=fr
+source "$ROOT/toolbox/modules/community.sh"
+i18n() { echo Back; }
+msgbox() { :; }
+input_text() { echo unexpected-free-text; return 1; }
+community_cmd() { case "$1" in suggest-game) echo 'Detected Game';; games) printf '/userdata/roms/windows/Game.wsquashfs\tGame from ES\n';; esac; }
+menu_select() { if [ "$3" = use ]; then echo "$CHOICE"; else echo 1; fi; }
+community_share_game antimicrox /userdata/profile.amgp Community
+'''
+            result = subprocess.run(['bash', '-c', script], capture_output=True, text=True,
+                env=dict(os.environ, ROOT=str(ROOT), TEST_HOME=str(self.home), CHOICE=choice), timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, expected)
+
+    def test_game_name_selected_for_share_is_passed_to_package_metadata(self):
+        script = r'''
+set -u
+WT_HOME="$TEST_HOME"; WT_LANGUAGE=fr
+source "$ROOT/toolbox/modules/community.sh"
+amx_profile_file() { echo /userdata/profiles/Game.amgp; }
+community_cmd() {
+  case "$1" in
+    suggest-game) echo 'Detected Game';;
+    share) printf '%s\n' "$@" > "$TEST_HOME/shared-args"; printf '/userdata/package.zip\nhttps://github.com/example/issues/new\n';;
+  esac
+}
+menu_select() { echo use; }
+input_text() { if [ "$2" = 'Votre pseudo public' ]; then echo Tester; else printf '%s' "$3"; fi; }
+yesno() { return 0; }
+community_report() { :; }
+msgbox() { :; }
+i18n() { echo Back; }
+community_share antimicrox Community
+'''
+        self.home.mkdir(parents=True)
+        result = subprocess.run(['bash', '-c', script], capture_output=True, text=True,
+            env=dict(os.environ, ROOT=str(ROOT), TEST_HOME=str(self.home)), timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        args = (self.home/'shared-args').read_text().splitlines()
+        self.assertEqual(args[args.index('--game')+1], 'Detected Game')
+        self.assertEqual(args[args.index('--title')+1], 'Detected Game')
 
 
 if __name__ == '__main__': unittest.main()
