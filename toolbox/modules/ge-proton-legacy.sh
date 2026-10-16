@@ -1,15 +1,21 @@
 #!/bin/bash
 
 # GE-Proton compatibility policy for Batocera:
-# - GE-Proton 11.x+ => UMU only
-# - GE-Proton <=10 => legacy/manual Batocera layout supported by flattening files/ into runner root
+# Classic Batocera layout: flatten files/ into the runner root for all GE versions.
+# Batocera v44 is recommended for GE-Proton 11.x and later.
 
 if [ "${WT_LANGUAGE:-en}" = "fr" ]; then
-    I18N[runner_ge_umu_notice]="Pour les jeux non-Steam, l'utilisation de GE-Proton via UMU est recommandée, y compris pour les versions 10.x, car UMU fournit le runtime prévu pour Proton.\n\nCe menu classique reste néanmoins disponible pour les GE-Proton 10.x et antérieurs afin de conserver la rétrocompatibilité Batocera et de permettre des tests de compatibilité : certains jeux peuvent se comporter différemment entre un GE-Proton classique adapté à Batocera et son utilisation via UMU.\n\nLes GE-Proton 11.x et suivants ne sont pas proposés ici : utilisez UMU Runner Toolbox pour ces versions."
+    I18N[runner_ge_umu_notice]="Ce menu installe GE-Proton comme runner classique Batocera. Pour GE-Proton 11.x et suivants, Batocera v44 est conseillée. La compatibilité dépend du jeu et de la version de Batocera.
+
+UMU reste disponible depuis UMU Runner Toolbox pour utiliser son runtime dédié."
+    I18N[runner_ge_v44]="Batocera v44 conseillée"
     I18N[runner_ge_flattening]="Adaptation Batocera : déplacement du contenu de files/ à la racine du runner..."
     I18N[runner_ge_files_missing]="Impossible d'adapter %s pour Batocera : le dossier files/ attendu est absent."
 else
-    I18N[runner_ge_umu_notice]="For non-Steam games, using GE-Proton through UMU is recommended, including 10.x releases, because UMU provides Proton's intended runtime.\n\nThis classic menu remains available for GE-Proton 10.x and older to preserve Batocera backward compatibility and allow compatibility testing: some games may behave differently between a classic GE-Proton adapted for Batocera and the same family used through UMU.\n\nGE-Proton 11.x and later are not offered here: use UMU Runner Toolbox for those versions."
+    I18N[runner_ge_umu_notice]="This menu installs GE-Proton as a classic Batocera runner. Batocera v44 is recommended for GE-Proton 11.x and later. Compatibility depends on the game and Batocera version.
+
+UMU remains available through UMU Runner Toolbox with its dedicated runtime."
+    I18N[runner_ge_v44]="Batocera v44 recommended"
     I18N[runner_ge_flattening]="Batocera adaptation: moving the contents of files/ to the runner root..."
     I18N[runner_ge_files_missing]="Unable to adapt %s for Batocera: expected files/ directory is missing."
 fi
@@ -36,8 +42,6 @@ for rel in releases:
     tag=str(rel.get("tag_name") or "")
     m=re.match(r"^GE-Proton(\d+)-", tag)
     if not m:
-        continue
-    if int(m.group(1)) >= 11:
         continue
 
     assets=rel.get("assets") or []
@@ -166,7 +170,7 @@ runner_install_ge() {
 
     msgbox "$title" "$(i18n runner_ge_umu_notice)"
 
-    row="$(runner_choose_release ge-proton "$title")" || return
+    row="$(runner_choose_release ge-proton "$title" "$(i18n runner_ge_v44)")" || return
     IFS=$'\t' read -r tag name url size checksum_url <<< "$row"
 
     yesno "$title" "$(i18n runner_install_confirm "$tag" "$name" "$(human_bytes "$size")" "$BATOCERA_CUSTOM_WINE")" || return

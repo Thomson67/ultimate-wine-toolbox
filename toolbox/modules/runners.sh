@@ -235,7 +235,7 @@ PY
 }
 
 runner_choose_release() {
-    local source="$1" title="$2"
+    local source="$1" title="$2" recommendation="${3:-}"
     local rows="" choice
     local -a items=()
 
@@ -254,8 +254,9 @@ runner_choose_release() {
     # Format the entire menu in one process: large release lists must not
     # spawn a Python interpreter for every name and every size.
     mapfile -d '' -t items < <(
-        python3 - "$WT_ROOT/helpers" "$BATOCERA_CUSTOM_WINE" "$(i18n installed)" 3<<< "$rows" <<'PY'
+        python3 - "$WT_ROOT/helpers" "$BATOCERA_CUSTOM_WINE" "$(i18n installed)" "$recommendation" 3<<< "$rows" <<'PY'
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -280,7 +281,9 @@ for index, line in enumerate(os.fdopen(3), 1):
             break
         size /= 1024
     state = f" | {installed_label}" if (root / name).is_dir() or (root / legacy).is_dir() else ""
-    sys.stdout.write(f"{index}\0{name} | {readable}{state}\0")
+    match = re.match(r"^GE-Proton-?(\d+)-", name)
+    note = f" | {sys.argv[4]}" if sys.argv[4] and match and int(match[1]) >= 11 else ""
+    sys.stdout.write(f"{index}\0{name} | {readable}{state}{note}\0")
 PY
     )
     if [ "${#items[@]}" -eq 0 ]; then
