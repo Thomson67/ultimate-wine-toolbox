@@ -86,7 +86,7 @@ resh_diagnostic() {
 }
 
 resh_resume_diagnostic() {
-    local rom exe detected candidates evidence result
+    local rom exe detected candidates evidence result community_preset
     rom="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["rom"])' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || return
     if [ "$(cat "$WT_HOME/state/launch-game.request" 2>/dev/null)" = "$rom" ]; then
         rm -f -- "$WT_HOME/state/launch-game.request"
@@ -96,12 +96,17 @@ resh_resume_diagnostic() {
         return
     fi
     exe="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("installation_exe", ""))' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || exe=""
+    community_preset="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("community_preset", ""))' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || community_preset=""
     rm -f -- "$WT_HOME/state/reshade-diagnostic.json" "$WT_HOME/state/reshade-diagnostic.stop"
     detected="$(python3 "$WT_ROOT/helpers/reshade_diagnostic.py" --home "$WT_HOME" result "$rom")"
     candidates="${detected%%$'\t'*}"; evidence="${detected##*$'\t'}"
     result="$(cat "$WT_HOME/state/wsq-launch-result" 2>/dev/null)"
     msgbox "$(i18n resh_title)" "$(i18n resh_diag_result "${candidates:-?}" "${evidence:-?}" "${result:-?}")"
-    [ -z "$exe" ] || resh_install_game "$rom" "$exe"
+    if [ -n "$exe" ] && resh_install_game "$rom" "$exe" "$community_preset"; then
+        if [ -n "$community_preset" ] && [ -f "$community_preset" ]; then
+            community_import_actions reshade "$community_preset" "ReShade — $(community_txt 'Presets communautaires' 'Community presets')" "$rom"
+        fi
+    fi
     resh_game_menu "$rom"
 }
 
@@ -167,7 +172,7 @@ resh_api_select() {
 
 resh_install_game() {
     local rom="$1" exe selected dll version packs backend_packs state workspace name label model defaults current
-    local resume_exe="${2:-}" resumed=0 index
+    local resume_exe="${2:-}" community_preset="${3:-}" resumed=0 index
     local -a exes=() items=() shaders=()
     local listing
     listing="$(resh_cmd exes "$rom" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
@@ -192,7 +197,23 @@ resh_install_game() {
         exe="${exes[$((selected-1))]}"
     fi
     dll="$(resh_api_select "$rom" "$exe")" || {
-        [ ! -f "$WT_HOME/state/reshade-diagnostic.json" ] || exit 0
+        if [ -f "$WT_HOME/state/reshade-diagnostic.json" ]; then
+            if [ -n "$community_preset" ]; then
+                python3 - "$WT_HOME/state/reshade-diagnostic.json" "$community_preset" <<'PY_PENDING'
+import json, os, sys, tempfile
+from pathlib import Path
+path = Path(sys.argv[1]); data = json.loads(path.read_text())
+data['community_preset'] = sys.argv[2]
+fd, name = tempfile.mkstemp(dir=path.parent, prefix='.reshade-pending-')
+try:
+    with os.fdopen(fd, 'w') as stream: json.dump(data, stream, ensure_ascii=False)
+    os.replace(name, path)
+finally:
+    if os.path.exists(name): os.unlink(name)
+PY_PENDING
+            fi
+            exit 0
+        fi
         return 1
     }
     case "$dll" in dxgi|d3d9|opengl32) ;; *) return 1 ;; esac
@@ -237,6 +258,14 @@ resh_install_game() {
     state="$(resh_cmd status "$rom")"
     if [ "$state" != missing ]; then
         resh_cmd disable "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
+            msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"
+            return 1
+        }
+    fi
+    # Restore any integrated-injector masks before a managed installation takes over.
+    # This runs only after the final installation confirmation, never on cancellation.
+    if [ "$state" = missing ]; then
+        resh_cmd external-release "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
             msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"
             return 1
         }

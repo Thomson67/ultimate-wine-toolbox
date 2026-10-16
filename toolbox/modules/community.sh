@@ -39,21 +39,45 @@ community_import_actions() {
         *) return 0 ;;
       esac
     else
-      choice="$(menu_select "$title" "$(community_txt "Preset téléchargé :\n$path\n\nInstallez d’abord ReShade et les effets indiqués pour le jeu." "Preset downloaded:\n$path\n\nInstall ReShade and the listed effects for the game first.")" \
+      choice="$(menu_select "$title" "$(community_txt "Preset téléchargé :\n$path\n\nChoisissez le jeu cible. Si nécessaire, l’assistant proposera de configurer ReShade et ses effets avant l’application." "Preset downloaded:\n$path\n\nChoose the target game. If necessary, the wizard will offer to configure ReShade and its effects before applying the preset.")" \
         info "$(community_txt 'Afficher les effets et réglages du preset' 'Show preset effects and settings')" \
-        apply "$(community_txt 'Appliquer à un jeu ReShade configuré' 'Apply to a configured ReShade game')" back "$(i18n back)")" || return 0
+        apply "$(community_txt 'Appliquer à un jeu (configurer ReShade si nécessaire)' 'Apply to a game (configure ReShade if needed)')" back "$(i18n back)")" || return 0
       case "$choice" in
         info) output="$(community_cmd preset-info "$path" 2>&1)"; community_report "$title" "$output"; continue ;;
         apply) : ;;
         *) return 0 ;;
       esac
       if [ -z "$rom" ]; then
-        selected="$(community_pick_reshade_game "$title" managed)" || continue
+        selected="$(community_pick_game "$title")" || continue
         rom="${selected%%$'\t'*}"
       fi
       details="$(resh_cmd status "$rom")" || continue
-      if [ "$details" = missing ]; then msgbox "$title" "$(community_txt 'Installez ReShade pour ce jeu depuis son menu, puis réessayez.' 'Install ReShade for this game from its menu, then retry.')"; continue; fi
-      yesno "$title" "$(community_txt "Appliquer à $(basename "$rom") ?\nLe preset actuel sera exporté dans les sauvegardes communautaires avant remplacement. Les packs de shaders doivent être installés." "Apply to $(basename "$rom")?\nThe current preset will be exported to the community backups before replacement. Shader packs must be installed.")" || continue
+      if [ "$details" = missing ]; then
+        local integrated
+        integrated="$(resh_cmd external-info "$rom" 2>&1)" || { msgbox "$title" "$integrated"; continue; }
+        case "${integrated%%$'\n'*}" in
+          external-*)
+            yesno "$title" "$(community_txt "$(basename "$rom") possède un ReShade intégré.
+
+Pour appliquer ce preset via la Toolbox, il faut configurer une installation gérée par la Toolbox (version, injecteur et packs d’effets). Les fichiers remplacés sont sauvegardés par le gestionnaire ReShade ; une archive .wsquashfs reste inchangée.
+
+Ouvrir l’assistant de configuration ?" "$(basename "$rom") contains bundled ReShade.
+
+Applying this preset through the Toolbox requires a Toolbox-managed setup (version, injector and shader packs). Replaced files are backed up by the ReShade manager; a .wsquashfs archive remains unchanged.
+
+Open the configuration wizard?")" || continue ;;
+          *)
+            yesno "$title" "$(community_txt "ReShade n’est pas encore configuré par la Toolbox pour $(basename "$rom"). Un preset contient les réglages des effets, sans leur injecteur ni leurs shaders.
+
+Installer/configurer ReShade et les packs requis maintenant, puis appliquer le preset téléchargé ?" "ReShade is not configured by the Toolbox for $(basename "$rom"). A preset contains effect settings, without the injector or shaders.
+
+Install/configure ReShade and the required packs now, then apply the downloaded preset?")" || continue ;;
+        esac
+        resh_install_game "$rom" "" "$path" || continue
+        details="$(resh_cmd status "$rom")" || continue
+        case "$details" in enabled|disabled) : ;; *) msgbox "$title" "$(community_txt 'Configuration ReShade non terminée. Le preset téléchargé est conservé.' 'ReShade configuration is incomplete. The downloaded preset is retained.')"; continue ;; esac
+      fi
+      yesno "$title" "$(community_txt "Appliquer à $(basename "$rom") et activer ReShade ?\nLe preset actuel sera exporté dans les sauvegardes communautaires avant remplacement. Les packs de shaders doivent être installés." "Apply to $(basename "$rom") and enable ReShade?\nThe current preset will be exported to the community backups before replacement. Shader packs must be installed.")" || continue
       local backup_dir="$WT_HOME/exports/community-backups" backup
       mkdir -p "$backup_dir"
       backup="$(mktemp "$backup_dir/reshade-XXXXXX.ini")" || return 1
@@ -61,6 +85,9 @@ community_import_actions() {
         rm -f -- "$backup"; msgbox "$title" "$output"; continue
       fi
       if output="$(resh_cmd preset "$rom" "$path" 2>&1)"; then
+        if [ "$details" = disabled ] && ! output="$(resh_cmd enable "$rom" 2>&1)"; then
+          msgbox "$title" "$(community_txt "Preset importé mais activation de ReShade impossible.\nSauvegarde : $backup\n$output" "Preset imported but ReShade could not be enabled.\nBackup: $backup\n$output")"; return 1
+        fi
         msgbox "$title" "$(community_txt "Preset appliqué.\nSauvegarde : $backup" "Preset applied.\nBackup: $backup")"; return 0
       else
         msgbox "$title" "$(community_txt "Échec de l’application. Sauvegarde conservée :\n$backup\n$output" "Apply failed. Backup retained:\n$backup\n$output")"

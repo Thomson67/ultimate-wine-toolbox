@@ -34,6 +34,46 @@ resh_resume_diagnostic
                 self.assertEqual((base/'checklist').exists(),changed)
                 self.assertFalse((state/'reshade-diagnostic.json').exists())
 
+    def test_community_preset_survives_diagnostic_and_is_offered_after_setup(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder); state = base/'home/state'; state.mkdir(parents=True)
+            preset = base/'Community preset.ini'; preset.write_text('Techniques=CRT\n')
+            env = dict(self.environment(base), PRESET=str(preset))
+            result = subprocess.run(['bash','-c','''source "$WT_ROOT/lib/common.sh"
+WT_HOME="$TEST_HOME"
+source "$WT_ROOT/lang/fr.sh"
+source "$WT_ROOT/modules/reshade.sh"
+resh_cmd() { [ "$1" = exes ] && echo drive_c/game/Game.exe; }
+menu_select() { echo 1; }
+resh_api_select() {
+ python3 - "$WT_HOME/state/reshade-diagnostic.json" <<'JSON_STATE'
+import json,sys
+json.dump({'rom':'/games/Game.wine','installation_exe':'drive_c/game/Game.exe'},open(sys.argv[1],'w'))
+JSON_STATE
+ return 1
+}
+resh_install_game /games/Game.wine '' "$PRESET"
+'''], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            saved = json.loads((state/'reshade-diagnostic.json').read_text())
+            self.assertEqual(saved['community_preset'], str(preset))
+            result = subprocess.run(['bash','-c','''source "$WT_ROOT/lib/common.sh"
+WT_HOME="$TEST_HOME"
+source "$WT_ROOT/lang/fr.sh"
+source "$WT_ROOT/modules/community.sh"
+source "$WT_ROOT/modules/reshade.sh"
+msgbox() { :; }
+resh_install_game() { printf 'setup:%s:%s:%s\n' "$1" "$2" "$3" >> "$SUMMARY"; }
+community_import_actions() { printf 'import:%s:%s:%s\n' "$1" "$2" "$4" >> "$SUMMARY"; }
+resh_game_menu() { echo menu >> "$SUMMARY"; }
+resh_resume_diagnostic
+'''], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((base/'summary').read_text().splitlines(),
+                [f'setup:/games/Game.wine:drive_c/game/Game.exe:{preset}',
+                 f'import:reshade:{preset}:/games/Game.wine', 'menu'])
+            self.assertFalse((state/'reshade-diagnostic.json').exists())
+
     def test_named_templates_go_straight_to_confirmation_without_checklist(self):
         for model, expected in [('retro', ['crt-royale', 'rsretroarch-shaders', 'scaling-shaders', 'reshade-shaders-legacy', 'guestrr-shaders', 'uwt-retro-extras']),
                                 ('thomson', ['sweetfx-shaders', 'reshade-shaders-legacy', 'fubax-shaders',

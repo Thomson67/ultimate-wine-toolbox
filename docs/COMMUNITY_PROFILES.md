@@ -37,8 +37,15 @@ and restoration mechanism, with a working runtime/uinput required. A modified
 suspended Pad2Key is still protected; community downloads do not bypass its
 recovery checks.
 
-ReShade must already be configured for the game. Applying an imported preset
-first exports the previous preset to `exports/community-backups/`, then uses
+Applying a ReShade preset offers all Windows games in the ES gamelist. If a
+game has no Toolbox-managed ReShade setup, the user can open the existing
+installation wizard and select the injector, version and required shader packs,
+then continue with the downloaded preset. A graphics-API diagnostic launch retains
+the selected community preset and offers application after setup resumes. Bundled ReShade is explicitly identified
+before offering this managed setup; this configures a managed installation rather
+than silently replacing an arbitrary integrated preset. Cancelling or failing
+configuration does not import the preset. Disabled managed setups are enabled
+after a confirmed import. Applying an imported preset first exports the previous preset to `exports/community-backups/`, then uses
 the existing ReShade import mechanism. Shader packs are not installed
 automatically by this menu. Dependencies are displayed before download.
 
@@ -64,8 +71,8 @@ chooser distinguishes presets in the original game/archive from saved presets in
 existing Wine runner prefixes and marks the configured active preset when its path
 can be resolved inside that source. Archives are listed/read using `unsquashfs`,
 without extracting or rewriting the game. Unsupported loader variants can still
-share a detected preset. A manual `.ini` choice remains available. Applying a
-downloaded preset remains limited to Toolbox-managed ReShade installations.
+share a detected preset. A manual `.ini` choice remains available. Downloaded presets are applied through
+the managed ReShade installation workflow described above.
 
 Sharing creates a local ZIP in `exports/community/<kind>/`, removes controller identities
 from the exported copy, then sends the profile and public metadata over HTTPS after

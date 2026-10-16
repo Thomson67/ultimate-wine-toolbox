@@ -125,13 +125,14 @@ community_share reshade 'ReShade — Presets communautaires'
         with zipfile.ZipFile(args[1]) as package: meta = json.loads(package.read('metadata.json'))
         self.assertEqual(meta['kind'], 'reshade'); self.assertEqual(meta['game'], 'Game from ES')
 
-    def test_apply_without_game_context_uses_only_reshade_games_and_preserves_previous_preset(self):
+    def test_apply_without_game_context_uses_es_games_and_preserves_previous_preset(self):
         (self.home/'current.ini').write_bytes(OLD)
         ui = self.shell(r'''
 menu_select() {
  printf '%s\n' "$@" >> "$WT_HOME/ui"
  if [ "$3" = info ]; then echo apply; else echo 1; fi
 }
+community_cmd() { [ "$1" = games ] || return 1; printf '%s\tUn jeu de la gamelist ES\n' "$TEST_ROM"; }
 resh_cmd() {
  [ "$2" = "$TEST_ROM" ] || return 1
  case "$1" in status) echo enabled;; export) cp "$WT_HOME/current.ini" "$3";; preset) cp "$3" "$WT_HOME/current.ini";; *) return 1;; esac
@@ -139,10 +140,72 @@ resh_cmd() {
 community_import_actions reshade "$TEST_INI" 'ReShade — Presets communautaires'
 ''')
         self.assertNotIn('AntiMicroX', ui); self.assertNotIn('AMX_ONLY', ui); self.assertNotIn('Hotkey', ui)
-        self.assertIn('ReShade Toolbox activé', ui)
+        self.assertIn('Un jeu de la gamelist ES', ui)
         self.assertEqual((self.home/'current.ini').read_bytes(), PRESET)
         backups = list((self.home/'exports/community-backups').glob('*.ini'))
         self.assertEqual(len(backups), 1); self.assertEqual(backups[0].read_bytes(), OLD)
+
+    def test_game_without_managed_reshade_runs_wizard_then_applies_download(self):
+        for external in ('missing', 'external-enabled'):
+            with self.subTest(external=external):
+                for filename in ('ui', 'configured', 'current.ini', 'calls'):
+                    (self.home/filename).unlink(missing_ok=True)
+                ui = self.shell(r'''
+menu_select() { printf '%s\n' "$@" >> "$WT_HOME/ui"; echo apply; }
+resh_install_game() { echo wizard >> "$WT_HOME/calls"; touch "$WT_HOME/configured"; printf 'Techniques=Previous\n' > "$WT_HOME/current.ini"; }
+resh_cmd() {
+ printf '%s\n' "$1" >> "$WT_HOME/calls"
+ [ "$2" = "$TEST_ROM" ] || return 1
+ case "$1" in
+ status) if [ -f "$WT_HOME/configured" ]; then echo enabled; else echo missing; fi;;
+ external-info) echo EXTERNAL_STATE;;
+ export) cp "$WT_HOME/current.ini" "$3";;
+ preset) cp "$3" "$WT_HOME/current.ini";;
+ *) return 1;; esac
+}
+community_import_actions reshade "$TEST_INI" ReShade "$TEST_ROM"
+'''.replace('EXTERNAL_STATE', external))
+                self.assertEqual((self.home/'current.ini').read_bytes(), PRESET)
+                calls = (self.home/'calls').read_text().splitlines()
+                self.assertEqual(calls, ['status', 'external-info', 'wizard', 'status', 'export', 'preset'])
+                self.assertNotIn('AntiMicroX', ui)
+                self.assertIn('ReShade intégré' if external.startswith('external') else 'Installer/configurer ReShade', ui)
+
+    def test_cancelling_setup_never_imports_or_overwrites_preset(self):
+        for outcome in ('decline', 'cancel', 'incomplete'):
+            with self.subTest(outcome=outcome):
+                for filename in ('ui', 'apply-once', 'wizard'):
+                    (self.home/filename).unlink(missing_ok=True)
+                ui = self.shell(r'''
+menu_select() { if [ -f "$WT_HOME/apply-once" ]; then echo back; else touch "$WT_HOME/apply-once"; echo apply; fi; }
+yesno() { [ OUTCOME != decline ]; }
+resh_install_game() { touch "$WT_HOME/wizard"; [ OUTCOME = incomplete ]; }
+resh_cmd() {
+ case "$1" in status|external-info) echo missing;; *) echo UNEXPECTED-WRITE >> "$WT_HOME/ui"; return 1;; esac
+}
+community_import_actions reshade "$TEST_INI" ReShade "$TEST_ROM"
+'''.replace('OUTCOME', outcome))
+                self.assertNotIn('UNEXPECTED-WRITE', ui)
+                self.assertEqual((self.home/'wizard').exists(), outcome != 'decline')
+                self.assertEqual(self.preset.read_bytes(), PRESET)
+
+    def test_disabled_managed_reshade_is_enabled_after_import(self):
+        (self.home/'current.ini').write_bytes(OLD)
+        ui = self.shell(r'''
+menu_select() { echo apply; }
+resh_cmd() {
+ case "$1" in
+ status) echo disabled;;
+ export) cp "$WT_HOME/current.ini" "$3";;
+ preset) cp "$3" "$WT_HOME/current.ini";;
+ enable) touch "$WT_HOME/enabled";;
+ *) return 1;; esac
+}
+community_import_actions reshade "$TEST_INI" ReShade "$TEST_ROM"
+''')
+        self.assertTrue((self.home/'enabled').exists())
+        self.assertEqual((self.home/'current.ini').read_bytes(), PRESET)
+        self.assertIn('activer ReShade', ui)
 
     def test_preset_information_displays_effects_and_settings(self):
         info = community.preset_info(self.preset)
