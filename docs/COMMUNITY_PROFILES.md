@@ -55,10 +55,20 @@ sharing step. Manual selection reads `GET /systems/windows/games`; it does
 not scan ROM folders. If ES is unavailable, a locally derived proposal can
 still be accepted, while manual selection reports the unavailable list.
 
-Sharing creates a local ZIP in `exports/community/`, removes controller identities
+ReShade sharing lists both Toolbox-managed games and detected integrated installations.
+“Scan Windows games” scans the ES Windows game list for integrated ReShade injectors,
+including `.wsquashfs` archives. It does not use AntiMicroX associations. The preset
+chooser distinguishes presets in the original game/archive from saved presets in
+existing Wine runner prefixes and marks the configured active preset when its path
+can be resolved inside that source. Archives are listed/read using `unsquashfs`,
+without extracting or rewriting the game. Unsupported loader variants can still
+share a detected preset. A manual `.ini` choice remains available. Applying a
+downloaded preset remains limited to Toolbox-managed ReShade installations.
+
+Sharing creates a local ZIP in `exports/community/<kind>/`, removes controller identities
 from the exported copy, then sends the profile and public metadata over HTTPS after
-explicit confirmation. No GitHub account is needed. ReShade uses the existing
-manager to synchronize and export the preset first. Direct sharing accepts 64 KiB
+explicit confirmation. No GitHub account is needed. Managed ReShade presets use the existing
+manager to synchronize and export first; integrated presets are copied read-only. Direct sharing accepts 64 KiB
 profiles. The original file is unchanged. Failed or uncertain sends keep the ZIP;
 “Retry a saved package” resubmits its same identifier and checksum. A successful
 response writes a local `.receipt.json`. No automatic resend happens at startup.

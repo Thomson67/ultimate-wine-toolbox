@@ -281,8 +281,10 @@ resh_external_menu() {
         esac
         choice="$(menu_select "$(i18n resh_title) — ${rom##*/}" "$(i18n resh_external_info "$label"$'\n'"${details#*$'\n'}")" \
             enable "$(i18n resh_enable)" disable "$(i18n resh_disable)" \
-            release "$(i18n resh_external_release)" diagnostic "$(i18n resh_diag_title)" back "$(i18n back)")" || return
+            release "$(i18n resh_external_release)" diagnostic "$(i18n resh_diag_title)" \
+            community "$(i18n resh_community)" back "$(i18n back)")" || return
         case "$choice" in
+            community) community_menu reshade "$rom"; continue ;;
             enable|disable)
                 if [ "$state" = external-unsupported ]; then
                     msgbox "$(i18n resh_title)" "$(i18n resh_external_unsupported)"; continue

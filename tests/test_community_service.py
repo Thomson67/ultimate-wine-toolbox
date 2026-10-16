@@ -122,7 +122,7 @@ community_share antimicrox Community
         self.home.mkdir(parents=True)
         r = subprocess.run(['bash', '-c', script], capture_output=True, text=True, env=dict(os.environ, ROOT=str(ROOT), TEST_HOME=str(self.home)), timeout=5)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual((self.home/'sent').read_text().splitlines(), ['submit', '/userdata/package.zip'])
+        self.assertEqual((self.home/'sent').read_text().splitlines(), ['submit', '/userdata/package.zip', '--kind', 'antimicrox'])
 
     def test_validator_ui_pairs_without_key_entry_and_logs_out_after_review(self):
         script = r'''
@@ -248,6 +248,11 @@ community_validate antimicrox Community
                 finally:
                     if ui is not None: ui.close()
                     os.close(master); os.close(slave)
+
+    def test_submission_rejects_package_from_other_tool_before_network(self):
+        package, _ = self.pack('antimicrox')
+        with self.assertRaisesRegex(ValueError, 'other tool'): self.service.submit(package, 'reshade')
+        self.assertEqual(self.requests, [])
 
 
 if __name__ == '__main__': unittest.main()

@@ -173,8 +173,9 @@ class Service:
             if self.session.exists(): self.request('/v1/logout', {}, authenticated=True)
         finally: self.session.unlink(missing_ok=True)
 
-    def submit(self, package):
+    def submit(self, package, kind=None):
         payload = package_data(package)
+        if kind is not None and payload['metadata']['kind'] != kind: raise ValueError('This sharing package belongs to the other tool')
         result = self.request('/v1/submissions', payload)
         if result.get('id') != payload['metadata']['id'] or result.get('status') not in ('pending','publishing','approved','rejected'):
             raise ValueError('Invalid submission response')
@@ -247,7 +248,7 @@ def main():
     parser.add_argument('--language', default='fr')
     sub = parser.add_subparsers(dest='command', required=True)
     sub.add_parser('login'); sub.add_parser('logout'); sub.add_parser('connect'); sub.add_parser('forget')
-    arg = sub.add_parser('submit'); arg.add_argument('package')
+    arg = sub.add_parser('submit'); arg.add_argument('package'); arg.add_argument('--kind', choices=KINDS)
     for action in ('pending', 'review', 'approve', 'reject'):
         arg = sub.add_parser(action); arg.add_argument('kind', choices=KINDS)
         if action != 'pending': arg.add_argument('identifier')
@@ -258,7 +259,7 @@ def main():
     elif args.command == 'connect': service.connect(args.language)
     elif args.command == 'forget': service.forget()
     elif args.command == 'submit':
-        result = service.submit(args.package); print(result['id']+'\n'+result['status'])
+        result = service.submit(args.package, args.kind); print(result['id']+'\n'+result['status'])
     elif args.command == 'pending':
         for item in service.pending(args.kind): print(item['id']+'\t'+item['game']+' — '+item['title']+' — '+item['author'])
     elif args.command == 'review':

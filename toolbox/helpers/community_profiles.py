@@ -162,6 +162,24 @@ def es_games():
     return sorted(result.items(), key=lambda item: item[1].casefold())
 
 
+def reshade_games(home, managed_only=False):
+    """Only managed ReShade games can export/receive a Toolbox preset."""
+    from community_reshade import games
+    result = []
+    for path, state in games(Path(home), managed_only):
+        if any(ord(c) < 32 or ord(c) == 127 for c in path): continue
+        result.append((path, game_title(Path(path).name), state))
+    return result
+
+
+def preset_info(source, fr=True):
+    path = Path(source)
+    if path.stat().st_size > LIMIT: raise ValueError('Preset exceeds 2 MiB')
+    data = profile_bytes('reshade', path.read_bytes())
+    title = 'Preset ReShade' if fr else 'ReShade preset'
+    return title+' : '+path.name+'\n\n'+data.decode('utf-8-sig')
+
+
 def suggest_game(home, kind, source, rom=''):
     home, source = Path(home), Path(source)
     known_roms, candidate = [], ''
@@ -276,7 +294,7 @@ class Community:
                 'Je confirme être autorisé à partager ce profil publiquement / '
                 'I confirm I may share this profile publicly.\n')
         url = f'https://github.com/{self.repository}/issues/new?'+urllib.parse.urlencode({'title': '[Community] '+title, 'body': body})
-        directory = self.home/'exports/community'; directory.mkdir(parents=True, exist_ok=True)
+        directory = self.home/'exports/community'/kind; directory.mkdir(parents=True, exist_ok=True)
         path = directory/(identifier+'.zip')
         with path.open('xb') as stream, zipfile.ZipFile(stream, 'w', zipfile.ZIP_DEFLATED) as package:
             package.writestr('metadata.json', dump(metadata))
@@ -334,8 +352,13 @@ def main():
     parser.add_argument('--home', default='/userdata/system/ultimate-wine-toolbox')
     parser.add_argument('--language', default='fr')
     sub = parser.add_subparsers(dest='command', required=True)
-    sub.add_parser('refresh')
+    arg = sub.add_parser('refresh'); arg.add_argument('--kind', choices=KINDS)
     arg = sub.add_parser('games'); arg.add_argument('--query', default='')
+    arg = sub.add_parser('reshade-games'); arg.add_argument('--query', default=''); arg.add_argument('--managed-only', action='store_true')
+    sub.add_parser('reshade-scan')
+    arg = sub.add_parser('reshade-presets'); arg.add_argument('rom')
+    arg = sub.add_parser('reshade-export'); arg.add_argument('rom'); arg.add_argument('identifier'); arg.add_argument('destination')
+    arg = sub.add_parser('preset-info'); arg.add_argument('source')
     arg = sub.add_parser('suggest-game'); arg.add_argument('kind', choices=KINDS); arg.add_argument('source'); arg.add_argument('--rom', default='')
     for command in ('list', 'show', 'fetch'):
         arg = sub.add_parser(command); arg.add_argument('kind', choices=KINDS)
@@ -348,13 +371,30 @@ def main():
     arg = sub.add_parser('approve'); arg.add_argument('package'); arg.add_argument('--catalog-root', required=True)
     args = parser.parse_args()
     if args.command == 'approve': print(approve(args.package, args.catalog_root)); return
+    if args.command == 'preset-info': print(preset_info(args.source, args.language == 'fr')); return
+    if args.command == 'reshade-scan':
+        from reshade_manager import scan_external_games
+        print(' / '.join(map(str, scan_external_games(Path(args.home), [path for path, _ in es_games()])))); return
+    if args.command == 'reshade-presets':
+        from community_reshade import presets
+        for item in presets(args.home, args.rom, args.language == 'fr'): print(item['id']+'\t'+item['label'])
+        return
+    if args.command == 'reshade-export':
+        from community_reshade import export
+        export(args.home, args.rom, args.identifier, args.destination); return
+    if args.command == 'reshade-games':
+        for path, name, state in reshade_games(args.home, args.managed_only):
+            if args.query.casefold() in name.casefold(): print(path+'\t'+name+'\t'+state)
+        return
     if args.command == 'games':
         for path, name in es_games():
             if args.query.casefold() in name.casefold(): print(path+'\t'+name)
         return
     if args.command == 'suggest-game': print(suggest_game(args.home, args.kind, args.source, args.rom)); return
     community = Community(args.home)
-    if args.command == 'refresh': print(len(community.refresh()['entries']))
+    if args.command == 'refresh':
+        values = community.refresh()['entries']
+        print(sum(1 for item in values if not args.kind or item['kind'] == args.kind))
     elif args.command == 'list':
         for item in community.load()['entries']:
             if item['kind'] == args.kind and args.query.casefold() in (item['game']+' '+item['title']+' '+item['author']).casefold():
@@ -369,5 +409,5 @@ def main():
 
 if __name__ == '__main__':
     try: main()
-    except (OSError, ValueError, KeyError, ET.ParseError, configparser.Error, zipfile.BadZipFile) as error:
+    except (OSError, ValueError, RuntimeError, KeyError, ET.ParseError, configparser.Error, zipfile.BadZipFile) as error:
         raise SystemExit(str(error))
