@@ -15,16 +15,15 @@ def analyze(source, index=INDEX):
     packs=json.loads(Path(index).read_text())['packs']; lookup={}
     for pack, names in packs.items():
         for name in names:lookup.setdefault(name.casefold(),set()).add(pack)
-    # TechniqueSorting contains inactive effects too: it is deliberately ignored.
+    # Only Techniques enables effects. Sorting and saved sections can retain inactive ones.
     techniques=parser.get('UWT_PRESET','Techniques',fallback='')
     refs={PurePosixPath(v.replace('\\','/')).name for v in re.findall(r'@([^,\r\n]+\.fx)',techniques,re.I)}
-    sections={PurePosixPath(v.replace('\\','/')).name for v in parser.sections() if v.casefold().endswith('.fx')}
-    files=refs|sections
+    files=set(refs)
     bare=[v.strip() for v in techniques.split(',') if v.strip() and '@' not in v]
     unresolved=[]
     for name in bare:
         if (name+'.fx').casefold() in lookup:files.add(name+'.fx')
-        elif not sections:unresolved.append(name+' (technique sans fichier .fx)')
+        else:unresolved.append(name+' (technique sans fichier .fx)')
     selected={'reshade-shaders'};unknown=[];ambiguous={}
     for name in sorted(files,key=str.casefold):
         options=lookup.get(name.casefold(),set())
@@ -39,7 +38,9 @@ def analyze(source, index=INDEX):
 
 
 def report(value, fr=True):
-    lines=[('Packs détectés : ' if fr else 'Detected packs: ')+', '.join(value['packs'])]
+    lines=[('Effets actifs référencés : ' if fr else 'Referenced active effects: ')+(', '.join(value['files']) or ('aucun' if fr else 'none')),
+           ('Packs nécessaires : ' if fr else 'Required packs: ')+', '.join(value['packs']),
+           ('Le téléchargement inclut les packs complets et leurs dépendances.' if fr else 'Downloads include complete packs and their dependencies.')]
     if value['unknown']:lines.append(('Effets non reconnus : ' if fr else 'Unknown effects: ')+', '.join(value['unknown'][:80]))
     for name, packs in list(value['ambiguous'].items())[:80]:
         lines.append(('Choix à vérifier : ' if fr else 'Check pack selection: ')+name+' : '+', '.join(packs))

@@ -15,15 +15,37 @@ class PresetEffectsTests(unittest.TestCase):
             index=Path(folder)/'index.json';index.write_text(json.dumps({'packs':packs}))
             return e.analyze(source,index)
 
-    def test_real_index_resolves_effect_sections_and_technique_refs_to_backend_packs(self):
+    def test_real_index_resolves_only_active_technique_refs_to_backend_packs(self):
         result=self.analyze('Techniques=AA@MartysMods_SMAA.fx,Color@PD80_01B_RT_Correct_Color.fx\n[CAS.fx]\nSharpness=1\n')
-        self.assertEqual(set(result['packs']),{'reshade-shaders','immerse-shaders','prod80-shaders','sweetfx-shaders'})
+        self.assertEqual(set(result['packs']),{'reshade-shaders','immerse-shaders','prod80-shaders'})
         self.assertFalse(result['unknown']);self.assertFalse(result['ambiguous'])
 
     def test_inactive_sorting_does_not_pull_in_every_pack(self):
         result=self.analyze('Techniques=CAS@CAS.fx\nTechniqueSorting=CAS@CAS.fx,Other@PrivateShader.fx\n')
         self.assertEqual(result['packs'],['reshade-shaders','sweetfx-shaders'])
         self.assertFalse(result['unknown'])
+
+    def test_saved_inactive_sections_do_not_add_packs_or_request_manual_review(self):
+        result=self.analyze('Techniques=CAS@CAS.fx\n[PrivateShader.fx]\nValue=1\n[PD80_01B_RT_Correct_Color.fx]\nValue=2\n')
+        self.assertEqual(result['files'], ['CAS.fx'])
+        self.assertEqual(result['packs'], ['reshade-shaders', 'sweetfx-shaders'])
+        self.assertFalse(result['unknown']);self.assertFalse(result['ambiguous'])
+
+    def test_empty_active_list_does_not_enable_saved_or_sorted_effects(self):
+        result=self.analyze('Techniques=\nTechniqueSorting=Old@Custom.fx\n[Custom.fx]\nValue=1\n')
+        self.assertEqual(result['files'], [])
+        self.assertEqual(result['packs'], ['reshade-shaders'])
+        self.assertFalse(result['unknown'])
+
+    def test_unresolved_active_alias_requests_review_even_when_sections_exist(self):
+        result=self.analyze('Techniques=UnknownAlias\n[CAS.fx]\nSharpness=1\n')
+        self.assertTrue(result['unknown'])
+        self.assertNotIn('CAS.fx', result['files'])
+
+    def test_user_example_ignores_unrelated_saved_settings(self):
+        result=self.analyze('Techniques=AdaptiveSharpen@AdaptiveSharpen.fx,Clarity@Clarity.fx,prod80_01B_RT_Correct_Color@PD80_01B_RT_Correct_Color.fx,Tonemap@Tonemap.fx\n[MartysMods_SMAA.fx]\nValue=1\n')
+        self.assertEqual(set(result['files']), {'AdaptiveSharpen.fx','Clarity.fx','PD80_01B_RT_Correct_Color.fx','Tonemap.fx'})
+        self.assertNotIn('immerse-shaders',result['packs'])
 
     def test_unknown_and_ambiguous_files_are_reported_without_guessing_pack(self):
         result=self.analyze('Techniques=X@Shared.fx,Y@Custom.fx\n',{'one':['Shared.fx'],'two':['Shared.fx']})
