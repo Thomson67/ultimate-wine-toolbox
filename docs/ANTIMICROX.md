@@ -230,6 +230,16 @@ compositor windows; games with additional launcher windows may expose those too.
 - Game lifecycle: `/userdata/system/logs/ultimate-wine-toolbox/antimicrox.log`
 - Detached launch: `/userdata/system/logs/ultimate-wine-toolbox/antimicrox-handoff.log`
 
+After the Toolbox Ports launcher exits, live editing checks ES's in-memory game
+list via `GET /systems/{system}/games`. If the game is missing, it requests one
+`GET /reloadgames` refresh without confirmation, then waits up to 60 seconds for
+the exact ROM path before launching. Games already indexed do not trigger a
+refresh. This happens only once ES is idle, to avoid blocking its UI thread on
+the running Toolbox. `/launch` alone can return HTTP 200 for an unknown path.
+If refresh fails, the live session is restored and its error is reported when
+returning to the Toolbox; no repeated refresh or ES restart is attempted.
+ES may still display its own prompt if a scraper or hashing job is running.
+
 Automated checks cover asset selection, inherited Qt settings, extraction of an
 old download, editor failure reporting, associations, and start/stop locking
 with simulated device/process data. The official AppImage was downloaded and

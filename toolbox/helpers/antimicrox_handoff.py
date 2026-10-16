@@ -9,6 +9,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import urllib.parse
 
 from antimicrox_live import LiveSession, atomic
 
@@ -17,6 +18,32 @@ LOG_DIR = Path('/userdata/system/logs/ultimate-wine-toolbox')
 
 
 class EsApi:
+    def reload_games(self):
+        # ES queues this on its UI thread; Ports must already have exited.
+        with urllib.request.urlopen('http://127.0.0.1:1234/reloadgames', timeout=5) as response:
+            if response.status != 200:
+                raise RuntimeError(f'ES reload returned HTTP {response.status}')
+
+    def indexed(self, rom):
+        """Consult ES's in-memory list: /launch also returns 200 for unknown ROMs."""
+        parts = Path(rom).relative_to('/userdata/roms').parts
+        if len(parts) < 2:
+            raise ValueError('Invalid ROM path')
+        system = urllib.parse.quote(parts[0], safe='')
+        try:
+            with urllib.request.urlopen(f'http://127.0.0.1:1234/systems/{system}/games', timeout=5) as response:
+                if response.status != 200:
+                    raise RuntimeError(f'ES game list returned HTTP {response.status}')
+                games = json.loads(response.read())
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:  # A newly populated system may not be loaded yet.
+                return False
+            raise
+        if not isinstance(games, list) or any(not isinstance(game, dict) or
+                                               not isinstance(game.get('path'), str) for game in games):
+            raise ValueError('Invalid ES game list')
+        return any(os.path.normpath(game['path']) == os.path.normpath(rom) for game in games)
+
     def running(self):
         try:
             with urllib.request.urlopen('http://127.0.0.1:1234/runningGame', timeout=2) as response:
@@ -43,11 +70,12 @@ class EsApi:
 
 class Handoff:
     def __init__(self, session, rom, api=None, clock=time.monotonic, sleep=time.sleep,
-                 idle_timeout=30, start_timeout=300):
+                 idle_timeout=30, start_timeout=300, refresh_timeout=60):
         self.session, self.rom = session, rom
         self.api = api or EsApi()
         self.clock, self.sleep = clock, sleep
         self.idle_timeout, self.start_timeout = idle_timeout, start_timeout
+        self.refresh_timeout = refresh_timeout
         self.session_id = (session.read() or {}).get('session_id')
 
     def owns_session(self):
@@ -57,6 +85,32 @@ class Handoff:
     def require_active_session(self):
         if not self.owns_session() or self.session.read()['phase'] not in ('prepared', 'running'):
             raise RuntimeError('Live session was recovered or cancelled elsewhere')
+
+    def ensure_indexed(self):
+        self.require_active_session()
+        if self.api.indexed(self.rom):
+            return
+        self.log('Game absent from ES list; requesting one automatic game-list refresh')
+        # Recheck ES ownership immediately before queuing the refresh.
+        code, path = self.api.running()
+        if code not in (201, 404):
+            raise RuntimeError(f'ES is no longer idle; game-list refresh cancelled: {path}')
+        self.api.reload_games()
+        deadline = self.clock()+self.refresh_timeout
+        while self.clock() < deadline:
+            self.require_active_session()
+            code, path = self.api.running()
+            if code == 200 and path:
+                raise RuntimeError(f'A game started during game-list refresh: {path}')
+            try:
+                if code in (201, 404) and self.api.indexed(self.rom):
+                    self.log('Game found in ES after automatic refresh')
+                    return
+            except (OSError, ValueError, RuntimeError):
+                pass  # ES may be temporarily unavailable while reloading.
+            self.sleep(.5)
+        raise RuntimeError('Jeu toujours absent ou ES indisponible après actualisation automatique ; '
+                           'vérifiez le jeu et la liste dans ES (game-list refresh timed out)')
 
     def log(self, message):
         print(f'[{time.strftime("%F %T")}] {message}', flush=True)
@@ -126,6 +180,8 @@ class Handoff:
         result = 'launch_failed'
         try:
             if self.wait_for_slot() == 'launch':
+                self.ensure_indexed()
+                self.require_active_session()
                 self.log(f'Requesting game after Ports exit: {self.rom}')
                 self.api.launch(self.rom)
                 self.wait_for_target()
