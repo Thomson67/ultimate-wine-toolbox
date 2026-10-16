@@ -6,7 +6,7 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.5.8](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.8).** WSquashFS updates are validated; WSquashFS creation and ReShade remain in beta.
+**Stable version: [v0.5.8](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.8).** WSquashFS updates are validated; WSquashFS creation remains in beta.
 
 ## Features
 
@@ -18,7 +18,7 @@ Created by **Thomsonito**.
 - MangoHud global and per-game management
 - DXVK / VKD3D-Proton / DXVK-NVAPI bundles, Batocera 40–43 / 43.1 models and global or per-game selection
 - NVAPI version filtering based on known DXVK requirements
-- per-game ReShade: installation, toggling, presets, effect templates and API hints (beta)
+- per-game ReShade: installation, toggling, presets, effect templates and API hints
 - Wine bottle maintenance and orphan detection
 - runner and DXVK / VKD3D diagnostics
 - `.wine` / `.wsquashfs` squash and unsquash tools
@@ -164,9 +164,9 @@ In the DXVK / VKD3D manager, **Install a Batocera model** offers the official co
 
 After installation, select the model globally or per game. NVAPI remains controlled through game settings. Models do not replace your runner, drivers or Batocera configuration: recent VKD3D versions may crash DirectX 12 games with Vanilla-Proton-9.0-4. Models 40 to 42 let you test older graphics components.
 
-## Per-game ReShade (beta)
+## Per-game ReShade
 
-Open **Graphics settings → ReShade (beta)**, select a game, then **Install / change version and shaders**. Select the actual `.exe` (for some Unreal games, inside `Binaries/Win64`), the game's API **before** DXVK/VKD3D translation, the ReShade version and shader packs. Executable headers determine 32/64-bit architecture. Downloads are on demand; the Starter Pack is unchanged.
+Open **Graphics settings → ReShade**, select a game, then **Install / change version and shaders**. Select the actual `.exe` (for some Unreal games, inside `Binaries/Win64`), the game's API **before** DXVK/VKD3D translation, the ReShade version and shader packs. Executable headers determine 32/64-bit architecture. Downloads are on demand; the Starter Pack is unchanged.
 
 Launch from EmulationStation and press **Home** to open ReShade. New profiles skip the tutorial and use **End** to toggle effects; existing customized profiles are preserved. No effect is forced on first launch: enable the effects you want in ReShade. The Toolbox can import a preset `.ini`; its shaders must be available in your selected packs. This uses official Windows ReShade inside Wine/Proton.
 

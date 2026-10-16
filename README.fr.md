@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.5.8](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.8).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS et ReShade restent en bêta.
+**Version stable : [v0.5.8](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.5.8).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS reste en bêta.
 
 ## Fonctionnalités
 
@@ -18,7 +18,7 @@ Créée par **Thomsonito**.
 - gestion globale et par jeu de MangoHud
 - bundles DXVK / VKD3D-Proton / DXVK-NVAPI, modèles Batocera 40 à 43 / 43.1 et choix global ou par jeu
 - filtrage des versions NVAPI selon la compatibilité connue avec DXVK
-- ReShade par jeu : installation, activation/désactivation, presets, modèles d’effets et aide au choix de l’API (bêta)
+- ReShade par jeu : installation, activation/désactivation, presets, modèles d’effets et aide au choix de l’API
 - maintenance des Wine bottles et détection des bottles orphelines
 - diagnostics des runners et de DXVK / VKD3D
 - outils de squash / unsquash `.wine` / `.wsquashfs`
@@ -166,9 +166,9 @@ Dans le gestionnaire DXVK / VKD3D, **Installer un modèle Batocera** propose les
 
 Après installation, choisissez le modèle globalement ou par jeu. NVAPI reste contrôlé par les options du jeu. Le modèle ne remplace pas le runner, les pilotes ou la configuration de Batocera : notamment, un VKD3D récent peut provoquer des crashes DirectX 12 avec Vanilla-Proton-9.0-4. Les modèles 40 à 42 permettent de tester des composants plus anciens.
 
-## ReShade par jeu (bêta)
+## ReShade par jeu
 
-Dans **Réglages graphiques → ReShade (bêta)**, choisir le jeu puis **Installer / modifier version et shaders**. Sélectionner le véritable `.exe` (par exemple `Binaries/Win64/...exe` pour certains jeux Unreal), l’API du jeu **avant** traduction par DXVK/VKD3D, la version de ReShade et les packs de shaders. L’architecture 32/64 bits est détectée dans l’exécutable. Le téléchargement se fait à la demande ; le Starter Pack ne change pas.
+Dans **Réglages graphiques → ReShade**, choisir le jeu puis **Installer / modifier version et shaders**. Sélectionner le véritable `.exe` (par exemple `Binaries/Win64/...exe` pour certains jeux Unreal), l’API du jeu **avant** traduction par DXVK/VKD3D, la version de ReShade et les packs de shaders. L’architecture 32/64 bits est détectée dans l’exécutable. Le téléchargement se fait à la demande ; le Starter Pack ne change pas.
 
 Lancer ensuite le jeu depuis EmulationStation et appuyer sur **Home** pour ouvrir ReShade. Les nouveaux profils passent le tutoriel et utilisent **Fin** pour activer/désactiver les effets ; les profils déjà personnalisés sont conservés. Aucun effet n’est imposé au premier démarrage : activer les effets souhaités dans l’interface ReShade. On peut importer un preset `.ini` depuis la toolbox ; ses shaders doivent être présents dans les packs choisis. ReShade utilise le runtime Windows officiel dans Wine/Proton.
 

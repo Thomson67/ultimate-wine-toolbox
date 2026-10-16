@@ -1,4 +1,4 @@
-RESHADE PAR JEU — BÊTA
+RESHADE PAR JEU
 
 ReShade applique des effets à l’image du jeu : couleurs, netteté, rendu CRT ou filtres rétro. Les effets ont un coût en performances ; commencer avec quelques effets et comparer le résultat.
 

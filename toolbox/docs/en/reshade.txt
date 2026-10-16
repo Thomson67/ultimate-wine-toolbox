@@ -1,4 +1,4 @@
-PER-GAME RESHADE — BETA
+PER-GAME RESHADE
 
 ReShade applies effects to the game image: colors, sharpening, CRT rendering or retro filters. Effects have a performance cost; start with a few effects and compare the result.
 

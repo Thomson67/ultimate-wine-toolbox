@@ -483,7 +483,7 @@ antimicrox_menu() {
     intro="$(amx_txt 'Utilisez la manette dans les jeux prévus pour le clavier et la souris. Un profil enregistre les commandes de votre manette pour un jeu.\n\nCommencez par créer un profil en jeu, ou utilisez un profil déjà prêt.' 'Use your controller in games designed for keyboard and mouse. A profile stores your controller mappings for a game.\n\nStart by creating a profile in game, or use a ready-made profile.')"
     [ -n "$bin" ] || intro+="\n\n$(amx_txt 'AntiMicroX sera proposé à l’installation quand une action en a besoin.' 'You will be offered installation when an action needs AntiMicroX.')"
     choice="$(menu_select "AntiMicroX" "$intro" \
-      1 "$(amx_txt 'Créer ou modifier un profil en jeu (bêta)' 'Create or edit a profile in game (beta)')" \
+      1 "$(amx_txt 'Créer ou modifier un profil en jeu' 'Create or edit a profile in game')" \
       2 "$(amx_txt 'Mes jeux et leurs profils' 'My games and their profiles')" \
       3 "$(amx_txt 'Utiliser un profil existant pour un jeu' 'Use an existing profile for a game')" \
       4 "$(amx_txt 'Télécharger ou partager des profils' 'Download or share profiles')" \
