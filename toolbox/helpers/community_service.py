@@ -5,6 +5,10 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
+import shutil
+import socket
+import subprocess
 import sys
 import tempfile
 import time
@@ -17,6 +21,12 @@ from community_profiles import Community, KINDS, LIMIT, atomic, details, dump, e
 
 API = 'https://uwt-community-api.roeckel.workers.dev'
 PROFILE_LIMIT = 64*1024
+
+
+class ServiceError(ValueError):
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -43,6 +53,7 @@ class Service:
     def __init__(self, home, transport=None):
         self.home = Path(home)
         self.session = self.home/'state/community/validator-session.json'
+        self.device = self.home/'state/community/validator-device.json'
         self.transport = transport
         config = self.home/'config/community-source.json'
         settings = json.loads(config.read_text()) if config.exists() else {}
@@ -54,7 +65,7 @@ class Service:
         if settings.get('repository', Community(self.home).repository) != 'Thomson67/ultimate-wine-toolbox-community' and 'api' not in settings:
             raise ValueError('Configure a community API for this custom catalogue')
 
-    def request(self, path, payload=None, authenticated=False):
+    def request(self, path, payload=None, authenticated=False, timeout=90):
         headers = {'User-Agent': 'Ultimate-Wine-Toolbox', 'Accept': 'application/json'}
         if authenticated:
             saved = json.loads(self.session.read_text()) if self.session.exists() else {}
@@ -69,7 +80,7 @@ class Service:
         request = urllib.request.Request(self.api+path, data=data, headers=headers)
         try:
             if self.transport: return self.transport(request)
-            with urllib.request.build_opener(NoRedirect()).open(request, timeout=90) as response:
+            with urllib.request.build_opener(NoRedirect()).open(request, timeout=timeout) as response:
                 result = response.read(2*LIMIT+1)
             if len(result) > 2*LIMIT: raise ValueError('Community response too large')
             return json.loads(result)
@@ -78,17 +89,84 @@ class Service:
             try: message = json.loads(error.read(2048)).get('error', '')
             except (ValueError, AttributeError): message = ''
             message = ''.join(c for c in str(message) if ord(c) >= 32 and ord(c) != 127)[:300]
-            raise ValueError(f'Community HTTP {error.code}: {message or "service unavailable"}') from None
+            raise ServiceError(f'Community HTTP {error.code}: {message or "service unavailable"}', error.code) from None
         except (TimeoutError, urllib.error.URLError):
             raise ValueError('Community service unreachable; your local sharing package is preserved') from None
 
     def login(self, key):
         if not re.fullmatch('[a-f0-9]{64}', key): raise ValueError('Enter the generated 64-character validator key')
         result = self.request('/v1/login', {'key': key})
+        self.save_session(result)
+
+    def save_session(self, result):
         if not re.fullmatch('[a-f0-9]{64}', result.get('token', '')) or not isinstance(result.get('expires'), int):
             raise ValueError('Invalid login response')
         atomic(self.session, dump(dict(result, api=self.api)))
         os.chmod(self.session, 0o600)
+
+    def remembered_login(self):
+        if not self.device.exists(): return False
+        saved = json.loads(self.device.read_text())
+        if saved.get('api') != self.api or saved.get('expires', 0) <= time.time() or not re.fullmatch('[a-f0-9]{64}', saved.get('token', '')):
+            self.device.unlink(missing_ok=True)
+            return False
+        try:
+            result = self.request('/v1/device/login', {'secret': saved['token']}, timeout=10)
+        except ServiceError as error:
+            if error.status != 401: raise
+            self.device.unlink(missing_ok=True)
+            return False
+        self.save_session(result)
+        return True
+
+    def connect(self, language='fr', display=None, sleep=time.sleep, clock=time.monotonic):
+        if self.remembered_login(): return
+        secret = secrets.token_hex(32)
+        name = ''.join(c for c in socket.gethostname() if c.isalnum() or c in ' ._-')[:80] or 'Batocera'
+        start = self.request('/v1/pair/start', {'secret': secret, 'name': name}, timeout=10)
+        if not re.fullmatch('[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}', start.get('code', '')) or not isinstance(start.get('expires'), int):
+            raise ValueError('Invalid pairing response; update the Cloudflare Worker')
+        remaining = min(300, start['expires']-int(time.time()))
+        if remaining <= 0: raise ValueError('Pairing has expired; check the Batocera clock')
+        deadline = clock()+remaining
+        ui = None; completed = False
+        try:
+            ui = (display or show_pairing)(start['code'], self.api+'/pair', language)
+            while clock() < deadline:
+                if ui.poll() is not None: raise ValueError('Pairing cancelled')
+                result = self.request('/v1/pair/poll', {'secret': secret}, timeout=10)
+                if result.get('status') == 'approved':
+                    if not isinstance(result.get('remember'), bool) or not isinstance(result.get('expires'), int) or result['expires'] <= time.time():
+                        raise ValueError('Invalid pairing approval')
+                    if result['remember']:
+                        # Persist the grant before asking for a temporary session, so an
+                        # interrupted response can be recovered on the next connection.
+                        atomic(self.device, dump({'token': secret, 'expires': result['expires'], 'api': self.api}))
+                        os.chmod(self.device, 0o600)
+                        completed = True
+                        if not self.remembered_login(): raise ValueError('Device access was revoked; reconnect')
+                    else:
+                        self.save_session({'token': secret, 'expires': result['expires']})
+                        completed = True
+                    return
+                if result.get('status') != 'pending': raise ValueError('Invalid pairing status')
+                sleep(5)
+            raise ValueError('Pairing expired; start a new connection')
+        finally:
+            if ui is not None: ui.close()
+            if not completed:
+                try: self.request('/v1/pair/cancel', {'secret': secret}, timeout=10)
+                except (OSError, ValueError): pass
+
+    def forget(self):
+        try:
+            if self.device.exists():
+                saved = json.loads(self.device.read_text())
+                if saved.get('api') == self.api and re.fullmatch('[a-f0-9]{64}', saved.get('token', '')):
+                    self.request('/v1/device/forget', {'secret': saved['token']}, timeout=10)
+        finally:
+            self.device.unlink(missing_ok=True)
+            self.logout()
 
     def logout(self):
         try:
@@ -130,12 +208,44 @@ class Service:
         return self.request('/v1/submissions/'+identifier+'/'+decision, {}, authenticated=True)
 
 
+class PairingDisplay:
+    def __init__(self, process, tty):
+        self.process, self.tty = process, tty
+
+    def poll(self):
+        return self.process.poll() if self.process else None
+
+    def close(self):
+        if self.process and self.process.poll() is None:
+            self.process.terminate()
+            try: self.process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.process.kill(); self.process.wait(timeout=2)
+        self.tty.close()
+
+
+def show_pairing(code, url, language):
+    fr = language == 'fr'
+    message = (f"Sur votre PC ou téléphone, ouvrez :\n\n{url}\n\nCode : {code}\n\nCollez votre clé validateur sur cette page, vérifiez le code et autorisez cet appareil.\n\nLa Toolbox continuera automatiquement. Code valable 5 minutes.\nVous pouvez choisir de mémoriser cet appareil pendant 30 jours sur la page." if fr else
+               f"On your PC or phone, open:\n\n{url}\n\nCode: {code}\n\nPaste your validator key on that page, check the code and authorize this device.\n\nThe Toolbox will continue automatically. Code valid for 5 minutes.\nYou can choose to remember this device for 30 days on the page.")
+    tty = open('/dev/tty', 'r+')
+    try:
+        if shutil.which('dialog'):
+            process = subprocess.Popen(['dialog', '--no-shadow', '--title', 'UWT — '+('Appairage validateur' if fr else 'Validator pairing'),
+                                        '--ok-label', 'Annuler' if fr else 'Cancel', '--msgbox', message, '22', '96'], stdin=tty, stdout=tty, stderr=tty)
+        else:
+            tty.write(message+'\nCtrl+C : '+('annuler' if fr else 'cancel')+'\n'); tty.flush(); process = None
+        return PairingDisplay(process, tty)
+    except BaseException:
+        tty.close(); raise
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--home', default='/userdata/system/ultimate-wine-toolbox')
     parser.add_argument('--language', default='fr')
     sub = parser.add_subparsers(dest='command', required=True)
-    sub.add_parser('login'); sub.add_parser('logout')
+    sub.add_parser('login'); sub.add_parser('logout'); sub.add_parser('connect'); sub.add_parser('forget')
     arg = sub.add_parser('submit'); arg.add_argument('package')
     for action in ('pending', 'review', 'approve', 'reject'):
         arg = sub.add_parser(action); arg.add_argument('kind', choices=KINDS)
@@ -144,6 +254,8 @@ def main():
     args = parser.parse_args(); service = Service(args.home)
     if args.command == 'login': service.login(sys.stdin.readline(256).strip())
     elif args.command == 'logout': service.logout()
+    elif args.command == 'connect': service.connect(args.language)
+    elif args.command == 'forget': service.forget()
     elif args.command == 'submit':
         result = service.submit(args.package); print(result['id']+'\n'+result['status'])
     elif args.command == 'pending':
@@ -165,5 +277,7 @@ def main():
 
 if __name__ == '__main__':
     try: main()
+    except KeyboardInterrupt:
+        raise SystemExit('Pairing cancelled')
     except (OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
         raise SystemExit(str(error))

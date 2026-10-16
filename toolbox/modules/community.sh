@@ -165,20 +165,11 @@ community_retry_package() {
 # Subshell confines secrets and the EXIT trap; do not enable tracing here.
 community_validate() (
   set +x
-  local kind="$1" title="$2" key output rows selected review checksum choice
+  local kind="$1" title="$2" output rows selected review checksum choice
   local -a items=()
-  if have_dialog; then
-    wt_clear_tty
-    key="$(dialog --stdout --clear --no-shadow --title "$title" --insecure --passwordbox "$(community_txt 'Clé secrète validateur (64 caractères)' 'Validator secret key (64 characters)')" 12 96)" || return 0
-    wt_clear_tty
-  else
-    printf '%s : ' "$(community_txt 'Clé secrète validateur' 'Validator secret key')" >&2
-    IFS= read -r -s key || return 0
-    printf '\n' >&2
-  fi
-  output="$(printf '%s\n' "$key" | community_service_cmd login 2>&1)"
+  output="$(community_service_cmd connect 2>&1)"
   local result=$?
-  unset key
+  wt_clear_tty
   [ "$result" -eq 0 ] || { msgbox "$title" "$output"; return 0; }
   trap 'community_service_cmd logout >/dev/null 2>&1 || true' EXIT
   while true; do
@@ -213,7 +204,8 @@ community_menu() {
       refresh "$(community_txt 'Actualiser le catalogue' 'Refresh catalogue')" \
       share "$(community_txt 'Partager mon profil / preset' 'Share my profile / preset')" \
       retry "$(community_txt 'Renvoyer un paquet conservé' 'Retry a saved package')" \
-      validate "$(community_txt 'Espace validateur' 'Validator area')" back "$(i18n back)")" || return 0
+      validate "$(community_txt 'Espace validateur' 'Validator area')" \
+      forget "$(community_txt 'Oublier l’accès validateur de ce Batocera' 'Forget validator access on this Batocera')" back "$(i18n back)")" || return 0
     case "$choice" in
       refresh)
         if output="$(community_cmd refresh 2>&1)"; then msgbox "$title" "$(community_txt "Catalogue actualisé : $output entrées au total." "Catalogue refreshed: $output total entries.")"; else msgbox "$title" "$(community_txt 'Actualisation impossible ; le cache précédent reste disponible.' 'Refresh failed; the previous cache remains available.')\n$output"; fi
@@ -221,6 +213,12 @@ community_menu() {
       share) community_share "$kind" "$title" "$rom"; continue ;;
       retry) community_retry_package "$title"; continue ;;
       validate) community_validate "$kind" "$title"; continue ;;
+      forget)
+        if yesno "$title" "$(community_txt 'Révoquer l’autorisation mémorisée et déconnecter ce Batocera ?' 'Revoke the remembered authorization and sign this Batocera out?')"; then
+          if output="$(community_service_cmd forget 2>&1)"; then msgbox "$title" "$(community_txt 'Accès local oublié et autorisation révoquée.' 'Local access forgotten and authorization revoked.')";
+          else msgbox "$title" "$(community_txt 'Accès local oublié. Si la révocation distante a échoué, révoquez aussi l’appareil depuis la page d’appairage.' 'Local access forgotten. If remote revocation failed, also revoke the device on the pairing page.')\n$output"; fi
+        fi
+        continue ;;
       search) query="$(input_text "$title" "$(community_txt 'Jeu, titre du profil ou auteur' 'Game, profile title or author')" '')" || continue ;;
       browse) query="" ;;
       *) return 0 ;;

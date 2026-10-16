@@ -6,8 +6,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 import urllib.error
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'toolbox/helpers'))
@@ -121,15 +122,15 @@ community_share antimicrox Community
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual((self.home/'sent').read_text().splitlines(), ['submit', '/userdata/package.zip'])
 
-    def test_validator_ui_hides_secret_and_logs_out_after_review(self):
+    def test_validator_ui_pairs_without_key_entry_and_logs_out_after_review(self):
         script = r'''
 set -u
 WT_HOME="$TEST_HOME"; WT_LANGUAGE=fr
 source "$ROOT/toolbox/modules/community.sh"
-have_dialog() { return 1; }
+wt_clear_tty() { :; }
 community_service_cmd() {
  printf '%s\n' "$1" >> "$WT_HOME/calls"
- case "$1" in login) IFS= read -r key; [ "$key" = "$TEST_KEY" ];; pending) :;; esac
+ case "$1" in connect|pending) :;; esac
 }
 msgbox() { :; }
 community_validate antimicrox Community
@@ -138,7 +139,81 @@ community_validate antimicrox Community
         r = subprocess.run(['bash', '-x', '-c', script], input=key+'\n', capture_output=True, text=True, env=dict(os.environ, ROOT=str(ROOT), TEST_HOME=str(self.home), TEST_KEY=key), timeout=5)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertNotIn(key, r.stdout+r.stderr)
-        self.assertEqual((self.home/'calls').read_text().splitlines(), ['login', 'pending', 'logout'])
+        self.assertEqual((self.home/'calls').read_text().splitlines(), ['connect', 'pending', 'logout'])
+
+    def pairing_start(self):
+        return {'code': 'K7MP-4RXN', 'expires': int(time.time())+300, 'interval': 5}
+
+    def fake_display(self):
+        ui = Mock(); ui.poll.return_value = None
+        display = Mock(return_value=ui)
+        return ui, display
+
+    def test_pairing_opens_without_key_and_saves_only_temporary_session(self):
+        ui, display = self.fake_display()
+        self.responses.extend([self.pairing_start(), {'status': 'pending'}, {'status': 'approved', 'remember': False, 'expires': int(time.time())+1800}])
+        self.service.connect(display=display, sleep=Mock())
+        display.assert_called_once_with('K7MP-4RXN', service.API+'/pair', 'fr')
+        ui.close.assert_called_once()
+        secret = json.loads(self.requests[0].data)['secret']
+        self.assertEqual(json.loads(self.service.session.read_text())['token'], secret)
+        self.assertFalse(self.service.device.exists())
+        self.assertTrue(all('key' not in json.loads(r.data) for r in self.requests))
+        self.assertEqual(self.service.session.stat().st_mode & 0o777, 0o600)
+
+    def test_pairing_remembers_grant_but_logout_only_closes_temporary_session(self):
+        _, display = self.fake_display()
+        self.responses.extend([self.pairing_start(), {'status': 'approved', 'remember': True, 'expires': int(time.time())+30*86400}, {'token': 'ab'*32, 'expires': int(time.time())+1800}])
+        self.service.connect(display=display)
+        secret = json.loads(self.requests[0].data)['secret']
+        self.assertEqual(json.loads(self.service.device.read_text())['token'], secret)
+        self.assertEqual(self.service.device.stat().st_mode & 0o777, 0o600)
+        self.assertNotEqual(json.loads(self.service.session.read_text())['token'], secret)
+        self.responses.append({'ok': True}); self.service.logout()
+        self.assertFalse(self.service.session.exists()); self.assertTrue(self.service.device.exists())
+        self.responses.append({'token': 'cd'*32, 'expires': int(time.time())+1800})
+        self.service.connect(display=Mock(side_effect=AssertionError('must not ask for pairing')))
+        self.assertEqual(self.requests[-1].full_url, service.API+'/v1/device/login')
+
+    def test_cancelling_pairing_revokes_request_and_never_saves_access(self):
+        ui, display = self.fake_display(); ui.poll.return_value = 0
+        self.responses.extend([self.pairing_start(), {'ok': True}])
+        with self.assertRaisesRegex(ValueError, 'cancelled'): self.service.connect(display=display)
+        self.assertEqual(self.requests[-1].full_url, service.API+'/v1/pair/cancel')
+        self.assertFalse(self.service.device.exists()); self.assertFalse(self.service.session.exists())
+        ui.close.assert_called_once()
+
+    def test_expired_pairing_stops_and_cancels(self):
+        _, display = self.fake_display()
+        self.responses.extend([self.pairing_start(), {'status': 'pending'}, {'ok': True}])
+        with self.assertRaisesRegex(ValueError, 'expired'):
+            self.service.connect(display=display, sleep=Mock(), clock=Mock(side_effect=[0, 0, 301]))
+        self.assertEqual(self.requests[-1].full_url, service.API+'/v1/pair/cancel')
+
+    def save_device(self, **changes):
+        value = dict(token='de'*32, expires=int(time.time())+86400, api=self.service.api); value.update(changes)
+        profiles.atomic(self.service.device, profiles.dump(value))
+
+    def test_revoked_remembered_device_returns_to_pairing(self):
+        self.save_device(); _, display = self.fake_display()
+        self.responses.extend([service.ServiceError('revoked', 401), self.pairing_start(), {'status': 'approved', 'remember': False, 'expires': int(time.time())+1800}])
+        self.service.connect(display=display)
+        display.assert_called_once(); self.assertFalse(self.service.device.exists())
+
+    def test_network_error_preserves_remembered_access_without_new_pairing(self):
+        self.save_device(); self.responses.append(TimeoutError())
+        with self.assertRaises(ValueError): self.service.connect(display=Mock(side_effect=AssertionError('must not create new pairing')))
+        self.assertTrue(self.service.device.exists()); self.assertEqual(len(self.requests), 1)
+
+    def test_forget_revokes_grant_and_deletes_local_credentials(self):
+        self.login(); self.save_device(); self.responses.extend([{'ok': True}, {'ok': True}])
+        self.service.forget()
+        self.assertFalse(self.service.device.exists()); self.assertFalse(self.service.session.exists())
+        self.assertEqual(self.requests[-2].full_url, service.API+'/v1/device/forget')
+
+    def test_grant_from_another_service_is_never_sent(self):
+        self.save_device(api='https://other.example')
+        self.assertFalse(self.service.remembered_login()); self.assertFalse(self.service.device.exists()); self.assertEqual(self.requests, [])
 
 
 if __name__ == '__main__': unittest.main()

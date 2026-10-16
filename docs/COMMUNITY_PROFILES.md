@@ -69,13 +69,24 @@ publishes both profile and manifest in one non-forced Git commit; rejection publ
 nothing. Authors' nicknames are self-declared. The service forbids `execute` and
 `loadprofile`, but keyboard macros still require human review.
 
-The validator key is a generated 256-bit random secret entered through a password
-prompt, never a command argument. Its SHA-256 verifier and the repository-scoped
-GitHub token live only in Cloudflare secrets. A hashed random session token lives
-in D1; its client copy is mode 0600 in `state/community/validator-session.json`,
-expires after 30 minutes and is revoked/deleted when leaving moderation. Login
-tracing is disabled. The key is never saved by the Toolbox. Do not substitute a
-human-chosen password for the generated random key.
+Validators pair from their PC or phone instead of typing the generated 256-bit key
+on Batocera. `/pair` authenticates the validator using that existing key, then requires
+inspection and explicit approval of an eight-character, five-minute code displayed by
+the Toolbox. The short code cannot retrieve credentials; polling uses a separate random
+256-bit device secret. Pairing codes are single-approval and rate-limited. This is a
+custom pairing flow, not OAuth or two-factor authentication.
+
+The optional remembered-device grant lasts a fixed 30 days. Its token lives in
+`state/community/validator-device.json` (0600) and creates fresh 30-minute sessions.
+Only hashes are held server-side. Temporary session copies remain in
+`state/community/validator-session.json` (0600), revoked/deleted when leaving moderation.
+The master key is never stored by the Toolbox. A paired session can moderate profiles
+but cannot authorize other devices or manage device grants. The PC page stores its
+session only in memory and never puts the key or tokens in URLs or browser storage.
+Revocation from the PC blocks existing device sessions too. “Forget validator access”
+revokes that grant and removes the local credentials; a network error requires checking
+revocation on the PC. Existing sessions/key login remain compatible after rerunning
+the additive D1 schema and deploying the version-2 Worker. Existing proposals are kept.
 
 The first service version caps submissions at five attempts per IP/day, 100/day
 in total and 200 pending contributions. A daily Cron deletes expired rate counters,
