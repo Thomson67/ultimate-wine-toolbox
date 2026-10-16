@@ -3,7 +3,7 @@ DXVK / VKD3D-PROTON : CHOISIR LES COMPOSANTS GRAPHIQUES
 DXVK traduit les appels DirectX 9/10/11 vers Vulkan. VKD3D-Proton remplit ce rôle pour DirectX 12. Ils ne remplacent ni le runner Wine/Proton ni le pilote de la carte graphique.
 
 CHOIX DU BUNDLE
-Dans Réglages graphiques, ouvrir le gestionnaire DXVK / VKD3D. Un bundle regroupe les versions choisies des composants. Il peut être sélectionné globalement ou pour un jeu précis, qui conserve alors son propre choix.
+Dans Outils et compatibilité, ouvrir le gestionnaire DXVK / VKD3D. Un bundle regroupe les versions choisies des composants. Il peut être sélectionné globalement ou pour un jeu précis, qui conserve alors son propre choix.
 
 Pour commencer, utiliser les composants intégrés à Batocera. Si un jeu pose problème, essayer un modèle Batocera ou un bundle adapté. Les modèles proposés reprennent les combinaisons de composants des versions Batocera 40 à 43/43.1 ; ils ne changent pas la version de votre système.
 

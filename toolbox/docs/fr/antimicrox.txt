@@ -1,6 +1,6 @@
 ANTIMICROX : MANETTE, CLAVIER ET SOURIS
 
-Dans Réglages graphiques → AntiMicroX, un profil .amgp transforme les boutons et sticks de la manette en commandes clavier/souris. Il est associé séparément à chaque jeu. Si AntiMicroX manque, son installation est proposée dès qu’une action en a besoin.
+Dans Outils et compatibilité → AntiMicroX, un profil .amgp transforme les boutons et sticks de la manette en commandes clavier/souris. Il est associé séparément à chaque jeu. Si AntiMicroX manque, son installation est proposée dès qu’une action en a besoin.
 
 CRÉER OU MODIFIER EN JEU
 1. Choisir Créer ou modifier un profil en jeu, puis le jeu. Créer un profil, reprendre celui du jeu ou choisir un profil enregistré.

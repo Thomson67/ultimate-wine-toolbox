@@ -3,7 +3,7 @@ PER-GAME RESHADE
 ReShade applies effects to the game image: colors, sharpening, CRT rendering or retro filters. Effects have a performance cost; start with a few effects and compare the result.
 
 INSTALL
-In Graphics settings → ReShade, select the game, then Install / change version and shaders. Choose the actual game executable, API, ReShade version and shader packs.
+In Tools and compatibility → ReShade, select the game, then Install / change version and shaders. Choose the actual game executable, API, ReShade version and shader packs.
 
 Select the game’s API before DXVK/VKD3D translation: a DirectX 11 game using DXVK remains DirectX 11 for this selection. Launch diagnostics and PCGamingWiki lookups provide hints to confirm. Native Vulkan is not covered by this integration.
 

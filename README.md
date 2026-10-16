@@ -166,7 +166,7 @@ After installation, select the model globally or per game. NVAPI remains control
 
 ## Per-game ReShade
 
-Open **Graphics settings → ReShade**, select a game, then **Install / change version and shaders**. Select the actual `.exe` (for some Unreal games, inside `Binaries/Win64`), the game's API **before** DXVK/VKD3D translation, the ReShade version and shader packs. Executable headers determine 32/64-bit architecture. Downloads are on demand; the Starter Pack is unchanged.
+Open **Tools and compatibility → ReShade**, select a game, then **Install / change version and shaders**. Select the actual `.exe` (for some Unreal games, inside `Binaries/Win64`), the game's API **before** DXVK/VKD3D translation, the ReShade version and shader packs. Executable headers determine 32/64-bit architecture. Downloads are on demand; the Starter Pack is unchanged.
 
 Launch from EmulationStation and press **Home** to open ReShade. New profiles skip the tutorial and use **End** to toggle effects; existing customized profiles are preserved. No effect is forced on first launch: enable the effects you want in ReShade. The Toolbox can import a preset `.ini`; its shaders must be available in your selected packs. This uses official Windows ReShade inside Wine/Proton.
 

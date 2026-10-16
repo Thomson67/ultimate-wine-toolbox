@@ -3,7 +3,7 @@ MANGOHUD: DISPLAY PERFORMANCE
 MangoHud displays information while playing: FPS and, depending on the profile, frame pacing, load, temperatures and memory. It helps observe performance; enabling it does not itself optimize the game.
 
 USE
-Open Graphics settings, then MangoHud. Choose global activation or a setting for one game. A game can inherit the global setting, be forced On or be forced Off.
+Open Tools and compatibility, then MangoHud. Choose global activation or a setting for one game. A game can inherit the global setting, be forced On or be forced Off.
 
 Choose a profile:
 - Minimal: FPS only.

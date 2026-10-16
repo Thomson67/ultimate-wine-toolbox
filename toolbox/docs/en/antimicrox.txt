@@ -1,6 +1,6 @@
 ANTIMICROX: CONTROLLER, KEYBOARD AND MOUSE
 
-Open Graphics settings → AntiMicroX. An .amgp profile turns controller buttons and sticks into keyboard/mouse input. Profiles are assigned to each game separately. If AntiMicroX is missing, installation is offered when an action needs it.
+Open Tools and compatibility → AntiMicroX. An .amgp profile turns controller buttons and sticks into keyboard/mouse input. Profiles are assigned to each game separately. If AntiMicroX is missing, installation is offered when an action needs it.
 
 CREATE OR EDIT IN GAME
 1. Choose Create or edit a profile in game, then select the game. Create a profile, use the game's current one or select a saved profile.
