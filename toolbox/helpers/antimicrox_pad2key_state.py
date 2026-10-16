@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import stat
+import uuid
 
 from antimicrox_live import atomic
 
@@ -71,7 +72,7 @@ class Pad2KeyStore:
         if rom in entries:
             expected = base64.b64decode(entries[rom]['disabled'])
             if not path.exists() or path.read_bytes() != expected:
-                raise ValueError('Pad2Key changed while suspended; backup retained. Restore it before changing this assignment.')
+                raise ValueError('Pad2Key changed while suspended; backup retained. Reconvert this game’s current .keys file and enable that new profile to keep your edits.')
             config = json.loads(expected)
         else:
             original = path.read_bytes() if path.exists() else None
@@ -131,6 +132,23 @@ class Pad2KeyStore:
             suspended = self.read(self.state)
             converted = bool(profile) and str(Path(profile).resolve()) in registry
             extra = [self.keys_path(rom)] if converted or rom in suspended else []
+            adoption = None
+            if converted and rom in suspended:
+                path = self.keys_path(rom)
+                current = path.read_bytes() if path.exists() else None
+                expected = base64.b64decode(suspended[rom]['disabled'], validate=True)
+                metadata = registry[str(Path(profile).resolve())]
+                if (current is not None and current != expected and not path.is_symlink()
+                        and Path(metadata['source']).resolve() == path.resolve()
+                        and hashlib.sha256(current).hexdigest() == metadata.get('sha256')):
+                    live = self.read(self.home/'state/antimicrox-live.json')
+                    if live.get('rom') == rom and live.get('phase') != 'finished':
+                        raise ValueError('Finish the live editing session before adopting a modified Pad2Key')
+                    if suspended[rom].get('path') != str(path):
+                        raise ValueError('Invalid Pad2Key backup path; backup retained')
+                    archive = self.home/'state/antimicrox-pad2key-recoveries'/(uuid.uuid4().hex+'.json')
+                    extra.append(archive)
+                    adoption = (path, current, stat.S_IMODE(path.stat().st_mode), archive)
             if converted and rom not in suspended:
                 metadata = registry[str(Path(profile).resolve())]
                 source = Path(metadata['source'])
@@ -143,7 +161,21 @@ class Pad2KeyStore:
                     if hashlib.sha256(content).hexdigest() != metadata.get('sha256'):
                         raise ValueError('Pad2Key changed after conversion. Convert the updated file before activating it.')
             with self.transaction([rom], extra):
+                if adoption:
+                    path, content, mode, archive = adoption
+                    if path.read_bytes() != content:
+                        raise ValueError('Pad2Key changed during recovery; retry conversion')
+                    record = {'rom': rom, 'previous_backup': suspended[rom],
+                              'previous_associations': base64.b64encode(self.cfg.read_bytes() if self.cfg.exists() else b'').decode(),
+                              'new_profile': str(Path(profile).resolve()),
+                              'new_original': base64.b64encode(content).decode(), 'new_mode': mode}
+                    # Keep both generations before rebasing the active backup.
+                    atomic(archive, json.dumps(record, ensure_ascii=False, indent=2).encode())
+                    suspended[rom] = {'path': str(path), 'original': base64.b64encode(content).decode(),
+                                      'disabled': base64.b64encode(content).decode(), 'mode': mode}
+                    atomic(self.state, json.dumps(suspended, ensure_ascii=False, indent=2).encode())
                 self._assign(rom, profile, converted, suspended, registry)
+            return adoption[3] if adoption else None
 
     def _assign(self, rom, profile, converted, suspended, registry):
         if not profile:

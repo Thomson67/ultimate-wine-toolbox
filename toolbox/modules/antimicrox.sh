@@ -18,9 +18,14 @@ amx_set_profile() (
   case "$rom$profile" in *$'\t'*|*$'\n'*) return 1 ;; esac
   if [ -f "${WT_ROOT:-}/helpers/antimicrox_pad2key.py" ]; then
     if ! output="$(amx_pad2key_cmd assign "$rom" "$profile" 2>&1)"; then
+      case "$output" in
+        *'Pad2Key changed while suspended'*)
+          output="$(amx_txt 'Le Pad2Key a été remplacé ou modifié depuis son activation. Pour conserver vos modifications, reconvertissez le fichier .keys actuel de ce jeu, puis activez le nouveau profil. L’ancienne sauvegarde est conservée.' 'The Pad2Key was replaced or edited after activation. To keep your edits, reconvert this game’s current .keys file, then enable the new profile. The previous backup is retained.')" ;;
+      esac
       msgbox AntiMicroX "$(amx_txt 'Association impossible :' 'Could not change assignment:')\n$output"
       return 1
     fi
+    [ -z "$output" ] || msgbox AntiMicroX "$output"
     return 0
   fi
   mkdir -p "$(dirname "$AMX_OVERRIDES")"

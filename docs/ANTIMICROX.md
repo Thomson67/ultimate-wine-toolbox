@@ -126,6 +126,17 @@ added partially. Mouse sensitivity and deadzones may need adjustment in the
 editor because evmapy and AntiMicroX have different motion handling. Only the
 selected file is analyzed; global Pad2Key files are not silently imported.
 
+If a suspended `.keys` file was manually replaced or edited, activation remains
+blocked until a converted profile matches that game's current file: its source
+path must resolve to the game's `.keys` and its SHA-256 must match the current
+bytes. Activating that matching profile archives the previous backup and
+association in `state/antimicrox-pad2key-recoveries/`, adopts the edited file as
+the new original, then suspends it normally. Removing the association will thus
+restore the latest edits. An active live-editing session, stale conversion or
+conversion from another file cannot trigger this recovery. Archive creation,
+backup adoption and assignment roll back together on failure. Other unverified
+external changes still cause an error instead of being overwritten.
+
 Enabling a converted profile backs up the game's original `.keys` contents and
 mode in `state/antimicrox-pad2key-backups.json`. Player-one actions are replaced
 with empty-target overrides, which emit no input and shadow identical triggers

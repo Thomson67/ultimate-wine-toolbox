@@ -125,6 +125,82 @@ class Pad2KeyTests(unittest.TestCase):
             self.assertEqual(store.cfg.read_bytes(), cfg)
             self.assertIn(str(rom), store.read(store.state))
 
+    def test_reconverted_current_pad2key_is_adopted_and_previous_backup_is_archived(self):
+        import base64
+        with tempfile.TemporaryDirectory() as folder:
+            userdata, home, rom, keys, original, profile, store = self.setup_game(folder)
+            store.assign(str(rom), str(profile))
+            changed = json.loads(original)
+            changed['actions_player1'].append({'trigger': ['hotkey', 'b'], 'type': 'key', 'target': 'KEY_F1'})
+            edited = (json.dumps(changed)+'\n').encode(); keys.write_bytes(edited); keys.chmod(0o600)
+            replacement = convert(keys, home, userdata=userdata, hotkey='guide')
+            archive = store.assign(str(rom), str(replacement))
+            record = json.loads(archive.read_text())
+            self.assertEqual(base64.b64decode(record['previous_backup']['original']), original)
+            self.assertEqual(base64.b64decode(record['new_original']), edited)
+            self.assertEqual(base64.b64decode(record['previous_associations']), f'{rom}\t{profile}\n'.encode())
+            self.assertEqual(store.cfg.read_text(), f'{rom}\t{replacement}\n')
+            self.assertTrue(any(a['trigger'] == ['hotkey', 'b'] and a['target'] == []
+                                for a in json.loads(keys.read_text())['actions_player1']))
+            self.assertIsNone(store.assign(str(rom), str(replacement)))
+            self.assertEqual(len(list(archive.parent.glob('*.json'))), 1)
+            store.assign(str(rom), '')
+            self.assertEqual(keys.read_bytes(), edited)
+            self.assertEqual(keys.stat().st_mode & 0o777, 0o600)
+            self.assertTrue(archive.exists())
+
+    def test_recovery_refuses_stale_or_foreign_conversion_without_touching_edits(self):
+        with tempfile.TemporaryDirectory() as folder:
+            userdata, home, rom, keys, original, profile, store = self.setup_game(folder)
+            store.assign(str(rom), str(profile))
+            saved = (store.state.read_bytes(), store.cfg.read_bytes())
+            changed = json.loads(original); changed['actions_player1'][0]['target'] = 'KEY_F12'
+            edited = json.dumps(changed).encode(); keys.write_bytes(edited)
+            foreign = Path(folder)/'elsewhere.keys'; foreign.write_bytes(edited)
+            replacement = convert(foreign, home, userdata=userdata)
+            for selected in (profile, replacement):
+                with self.assertRaisesRegex(ValueError, 'changed while suspended'):
+                    store.assign(str(rom), str(selected))
+                self.assertEqual(keys.read_bytes(), edited)
+                self.assertEqual((store.state.read_bytes(), store.cfg.read_bytes()), saved)
+            self.assertEqual(list((home/'state').glob('antimicrox-pad2key-recoveries/*.json')), [])
+
+    def test_failed_recovery_assignment_rolls_back_both_backup_generations(self):
+        import antimicrox_pad2key_state as state_module
+        with tempfile.TemporaryDirectory() as folder:
+            userdata, home, rom, keys, original, profile, store = self.setup_game(folder)
+            store.assign(str(rom), str(profile))
+            changed = json.loads(original); changed['actions_player1'][0]['target'] = 'KEY_F11'
+            edited = json.dumps(changed).encode(); keys.write_bytes(edited)
+            replacement = convert(keys, home, userdata=userdata)
+            before = (store.state.read_bytes(), store.cfg.read_bytes())
+            real_atomic = state_module.atomic
+            for fail_path in ('archive', 'cfg'):
+                failed = []
+                def failing(path, *args):
+                    if not failed and ((fail_path == 'archive' and path.parent.name == 'antimicrox-pad2key-recoveries')
+                                       or (fail_path == 'cfg' and path == store.cfg)):
+                        failed.append(True); raise OSError('recovery write failed')
+                    return real_atomic(path, *args)
+                with patch.object(state_module, 'atomic', side_effect=failing):
+                    with self.assertRaises(OSError):
+                        store.assign(str(rom), str(replacement))
+                self.assertEqual(keys.read_bytes(), edited)
+                self.assertEqual((store.state.read_bytes(), store.cfg.read_bytes()), before)
+                self.assertEqual(list((home/'state').glob('antimicrox-pad2key-recoveries/*.json')), [])
+
+    def test_recovery_cannot_adopt_a_file_from_an_active_live_session(self):
+        with tempfile.TemporaryDirectory() as folder:
+            userdata, home, rom, keys, original, profile, store = self.setup_game(folder)
+            store.assign(str(rom), str(profile)); keys.write_bytes(original)
+            replacement = convert(keys, home, userdata=userdata)
+            (home/'state/antimicrox-live.json').write_text(json.dumps({'rom': str(rom), 'phase': 'prepared'}))
+            before = store.state.read_bytes()
+            with self.assertRaisesRegex(ValueError, 'Finish the live'):
+                store.assign(str(rom), str(replacement))
+            self.assertEqual(keys.read_bytes(), original)
+            self.assertEqual(store.state.read_bytes(), before)
+
     def test_live_editing_restores_suspended_file_then_unassign_restores_pad2key(self):
         with tempfile.TemporaryDirectory() as folder:
             _, home, rom, keys, original, profile, store = self.setup_game(folder)

@@ -304,7 +304,14 @@ def main():
         if args.profile and str(Path(args.profile).resolve()) in store.read(store.registry):
             if not os.access(Path(args.home)/'tools/antimicrox/antimicrox', os.X_OK) or not os.access('/dev/uinput', os.W_OK):
                 raise ValueError('Install AntiMicroX and check /dev/uinput before enabling the converted profile')
-        store.assign(args.rom, args.profile)
+        recovery = store.assign(args.rom, args.profile)
+        if recovery:
+            print(('Le Pad2Key modifié a été reconnu comme source du nouveau profil et adopté.\n'
+                   'Vos dernières modifications seront restaurées au retrait de l’association.\n'
+                   'L’ancienne sauvegarde a été conservée ici :\n' if args.language == 'fr' else
+                   'The modified Pad2Key matches the new profile source and has been adopted.\n'
+                   'Your latest edits will be restored when removing this assignment.\n'
+                   'The previous backup was retained here:\n')+str(recovery))
     else:
         Pad2KeyStore(args.home).restore_all()
 
