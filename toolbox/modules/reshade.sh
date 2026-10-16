@@ -324,8 +324,10 @@ resh_game_menu() {
             "$prompt" \
             install "$(i18n resh_install)" enable "$(i18n resh_enable)" disable "$(i18n resh_disable)" \
             preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)" \
+            community "$(i18n resh_community)" \
             back "$(i18n back)")" || return
         case "$choice" in
+            community) community_menu reshade "$rom" ;;
             install) resh_install_game "$rom" ;;
             enable|disable)
                 resh_cmd "$choice" "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
@@ -404,8 +406,10 @@ resh_menu() {
     while true; do
         choice="$(menu_select "$(i18n resh_title)" "$(i18n resh_list_prompt)" \
             all "$(i18n resh_list_all)" installed "$(i18n resh_list_installed)" \
+            community "$(i18n resh_community)" \
             scan "$(i18n resh_external_scan)" search "$(i18n resh_list_search)" back "$(i18n back)")" || return
         case "$choice" in
+            community) community_menu reshade ;;
             installed|all) resh_pick_game "$choice" ;;
             scan)
                 msgbox "$(i18n resh_title)" "$(i18n resh_external_scan_wait)" || continue

@@ -25,6 +25,13 @@ class Pad2KeyStore:
             raise ValueError(f'Invalid Pad2Key state: {path}')
         return value
 
+    def is_community(self, profile):
+        if not profile:
+            return False
+        imported = self.read(self.home/'state/community/imports.json')
+        value = imported.get(str(Path(profile).resolve()), {})
+        return isinstance(value, dict) and value.get('kind') == 'antimicrox'
+
     def keys_path(self, rom):
         rom = Path(rom).absolute()
         if '..' in rom.parts or not rom.is_relative_to(self.userdata):
@@ -131,7 +138,8 @@ class Pad2KeyStore:
             registry = self.read(self.registry)
             suspended = self.read(self.state)
             converted = bool(profile) and str(Path(profile).resolve()) in registry
-            extra = [self.keys_path(rom)] if converted or rom in suspended else []
+            managed = converted or self.is_community(profile)
+            extra = [self.keys_path(rom)] if managed or rom in suspended else []
             adoption = None
             if converted and rom in suspended:
                 path = self.keys_path(rom)
@@ -174,7 +182,7 @@ class Pad2KeyStore:
                     suspended[rom] = {'path': str(path), 'original': base64.b64encode(content).decode(),
                                       'disabled': base64.b64encode(content).decode(), 'mode': mode}
                     atomic(self.state, json.dumps(suspended, ensure_ascii=False, indent=2).encode())
-                self._assign(rom, profile, converted, suspended, registry)
+                self._assign(rom, profile, managed, suspended, registry)
             return adoption[3] if adoption else None
 
     def _assign(self, rom, profile, converted, suspended, registry):

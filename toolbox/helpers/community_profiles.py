@@ -1,0 +1,281 @@
+"""Small, reviewed GitHub catalogue shared by the AntiMicroX and ReShade menus."""
+import argparse
+import configparser
+import hashlib
+import io
+import json
+import os
+from pathlib import Path, PurePosixPath
+import re
+import tempfile
+import time
+import urllib.parse
+import urllib.request
+import uuid
+import xml.etree.ElementTree as ET
+import zipfile
+
+REPOSITORY = 'Thomson67/ultimate-wine-toolbox'
+REF = 'community-presets'
+LIMIT = 2*1024*1024
+KINDS = {'antimicrox': '.amgp', 'reshade': '.ini'}
+MODES = {'keyboard', 'mousebutton', 'mousemovement', 'pause', 'hold', 'cycle', 'distance',
+         'release', 'mousespeedmod', 'keypress', 'delay', 'setchange', 'textentry', 'mix'}
+
+
+def atomic(path, data):
+    path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(dir=path.parent, prefix='.community-')
+    try:
+        with os.fdopen(fd, 'wb') as stream: stream.write(data)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary): os.unlink(temporary)
+
+
+def dump(value):
+    return (json.dumps(value, ensure_ascii=False, indent=2)+'\n').encode()
+
+
+def clean(value, maximum=500):
+    if not isinstance(value, str) or len(value) > maximum or any(ord(c) < 32 or ord(c) == 127 for c in value):
+        raise ValueError('Invalid catalogue text')
+    return value.strip()
+
+
+def entry(value):
+    if not isinstance(value, dict): raise ValueError('Invalid catalogue entry')
+    result = dict(value)
+    if result.get('kind') not in KINDS: raise ValueError('Invalid profile type')
+    if not isinstance(result.get('id'), str) or not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,79}', result['id']): raise ValueError('Invalid profile id')
+    for key in ('game', 'title', 'author'):
+        result[key] = clean(result.get(key), 160)
+        if not result[key]: raise ValueError('Missing '+key)
+    for key in ('description', 'notes', 'tested_on', 'hotkey'):
+        result[key] = clean(result.get(key, ''), 2000)
+    requirements = result.get('requirements', [])
+    if not isinstance(requirements, list) or len(requirements) > 60: raise ValueError('Invalid requirements')
+    result['requirements'] = [clean(item, 160) for item in requirements]
+    path = result.get('file', '')
+    if (not isinstance(path, str) or '\\' in path or not re.fullmatch(r'[a-zA-Z0-9_./-]+', path)
+            or '..' in PurePosixPath(path).parts or PurePosixPath(path).is_absolute()
+            or len(PurePosixPath(path).parts) != 2 or PurePosixPath(path).parts[0] != result['kind']
+            or not path.endswith(KINDS[result['kind']])):
+        raise ValueError('Invalid catalogue file path')
+    if not isinstance(result.get('sha256'), str) or not re.fullmatch(r'[a-f0-9]{64}', result['sha256']): raise ValueError('Invalid checksum')
+    return result
+
+
+def catalogue(value):
+    if not isinstance(value, dict) or value.get('schema') != 1 or not isinstance(value.get('entries'), list):
+        raise ValueError('Unsupported catalogue format')
+    if len(value['entries']) > 10000: raise ValueError('Catalogue too large')
+    entries = [entry(item) for item in value['entries']]
+    if len({item['id'] for item in entries}) != len(entries): raise ValueError('Duplicate catalogue id')
+    return {'schema': 1, 'entries': entries}
+
+
+def profile_bytes(kind, data, export=False):
+    if kind not in KINDS or len(data) > LIMIT or b'\0' in data: raise ValueError('Invalid or oversized profile')
+    text = data.decode('utf-8-sig')
+    if kind == 'antimicrox':
+        if '<!DOCTYPE' in text.upper() or '<!ENTITY' in text.upper(): raise ValueError('XML entities are not allowed')
+        root = ET.fromstring(text)
+        if root.tag != 'gamecontroller': raise ValueError('Community profiles require SDL gamecontroller format')
+        if sum(1 for _ in root.iter()) > 30000: raise ValueError('XML profile too complex')
+        for slot in root.findall('.//slot'):
+            if slot.findtext('mode', 'keyboard') not in MODES:
+                raise ValueError('External commands/profile loading are not accepted in community profiles')
+        if export:
+            for parent in root.iter():
+                for node in list(parent):
+                    if node.tag.lower() in ('uniqueid', 'guid', 'serial', 'sdlname'):
+                        parent.remove(node)
+            ET.indent(root, space='  ')
+            data = ET.tostring(root, encoding='utf-8', xml_declaration=True)+b'\n'
+        elif any(node.text for node in root.iter() if node.tag.lower() in ('uniqueid', 'guid', 'serial', 'sdlname')):
+            raise ValueError('Controller identity must be stripped by the sharing export')
+    else:
+        if not re.search(r'^\s*Techniques\s*=', text, re.M | re.I):
+            raise ValueError('Select a ReShade preset, not the ReShade configuration INI')
+        # A preset may contain a global preamble; use an artificial section.
+        parser = configparser.ConfigParser(interpolation=None, strict=True)
+        parser.optionxform = str
+        parser.read_string('[UWT_PRESET]\n'+text)
+        if re.search(r'^\s*(EffectSearchPaths|TextureSearchPaths|PresetPath)\s*=', text, re.M | re.I):
+            raise ValueError('Export a portable preset without local ReShade search paths')
+    # Refuse machine-specific paths rather than silently publishing them.
+    portable = data.decode('utf-8-sig')
+    if re.search(r'/userdata/|/home/|[A-Za-z]:[\\/]|\\\\[^\s\\]+\\', portable):
+        raise ValueError('Profile contains local paths; remove them in a separate export before sharing')
+    return data
+
+
+def hotkey_name(data):
+    root = ET.fromstring(data)
+    indices = {node.get('index') for node in root.findall('./sets/set[@index="1"]/button')
+               if node.findtext('setselectcondition') == 'while-held'}
+    names = {'1': 'A Xbox / Croix PS', '2': 'B Xbox / Rond PS', '3': 'X Xbox / Carré PS',
+             '4': 'Y Xbox / Triangle PS', '5': 'Select / View / Share-Create', '6': 'Guide Xbox / PS',
+             '7': 'Start / Menu / Options', '8': 'L3', '9': 'R3', '10': 'L1 / LB', '11': 'R1 / RB'}
+    return ', '.join(names.get(index, index or '?') for index in sorted(indices))
+
+
+class Community:
+    def __init__(self, home, download=None):
+        self.home = Path(home)
+        config = self.home/'config/community-source.json'
+        source = json.loads(config.read_text()) if config.exists() else {}
+        self.repository, self.ref = source.get('repository', REPOSITORY), source.get('ref', REF)
+        if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', self.repository): raise ValueError('Invalid repository')
+        if not re.fullmatch(r'[A-Za-z0-9_.-]+', self.ref): raise ValueError('Invalid catalogue branch')
+        self.base = f'https://raw.githubusercontent.com/{self.repository}/{self.ref}/'
+        self.cache = self.home/'state/community/catalog.json'
+        self.download = download or self.network
+
+    def network(self, url):
+        with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'Ultimate-Wine-Toolbox'}), timeout=15) as response:
+            if not response.geturl().startswith(self.base): raise ValueError('Unexpected download redirect')
+            data = response.read(LIMIT+1)
+        if len(data) > LIMIT: raise ValueError('Download exceeds 2 MiB')
+        return data
+
+    def refresh(self):
+        value = catalogue(json.loads(self.download(self.base+'catalog.json')))
+        atomic(self.cache, dump({'source': self.base, 'updated': int(time.time()), 'catalog': value}))
+        return value
+
+    def load(self):
+        if self.cache.exists():
+            value = json.loads(self.cache.read_text())
+            if value.get('source') == self.base: return catalogue(value['catalog'])
+        return self.refresh()
+
+    def find(self, kind, identifier):
+        return next((item for item in self.load()['entries'] if item['kind'] == kind and item['id'] == identifier), None)
+
+    def fetch(self, kind, identifier):
+        item = self.find(kind, identifier)
+        if item is None: raise ValueError('Profile no longer in catalogue; refresh the catalogue')
+        data = self.download(self.base+item['file'])
+        if hashlib.sha256(data).hexdigest() != item['sha256']: raise ValueError('Profile checksum mismatch; refresh catalogue')
+        profile_bytes(kind, data)
+        directory = self.home/'config'/('antimicrox-profiles' if kind == 'antimicrox' else 'reshade-community-presets')
+        directory.mkdir(parents=True, exist_ok=True)
+        name = 'community-'+identifier+'-'+item['sha256'][:10]
+        path = directory/(name+KINDS[kind]); count = 2
+        while path.exists() or path.is_symlink():
+            if not path.is_symlink() and path.read_bytes() == data: break
+            path = directory/(name+f'-{count}'+KINDS[kind]); count += 1
+        else:
+            with path.open('xb') as stream: stream.write(data)
+        imports = self.home/'state/community/imports.json'
+        values = json.loads(imports.read_text()) if imports.exists() else {}
+        values[str(path.resolve())] = item
+        atomic(imports, dump(values))
+        return path
+
+    def share(self, kind, source, game, title, author, description='', notes='', tested_on='', requirements=()):
+        source = Path(source)
+        if source.stat().st_size > LIMIT: raise ValueError('Profile exceeds 2 MiB')
+        data = profile_bytes(kind, source.read_bytes(), export=True)
+        identifier = re.sub(r'[^a-z0-9]+', '-', title.casefold()).strip('-')[:65] or 'profile'
+        identifier += '-'+uuid.uuid4().hex[:8]
+        filename = kind+'/'+identifier+KINDS[kind]
+        metadata = entry({'id': identifier, 'kind': kind, 'game': game, 'title': title, 'author': author,
+                          'description': description, 'notes': notes, 'tested_on': tested_on,
+                          'requirements': list(requirements), 'hotkey': hotkey_name(data) if kind == 'antimicrox' else '',
+                          'file': filename, 'sha256': hashlib.sha256(data).hexdigest()})
+        body = (f"Type: {kind}\nJeu / Game: {game}\nTitre / Title: {title}\nAuteur / Author: {author}\n\n"
+                'Joindre le ZIP généré ici / Attach the generated ZIP here.\n'
+                'Je confirme être autorisé à partager ce profil publiquement / '
+                'I confirm I may share this profile publicly.\n')
+        url = f'https://github.com/{self.repository}/issues/new?'+urllib.parse.urlencode({'title': '[Community] '+title, 'body': body})
+        directory = self.home/'exports/community'; directory.mkdir(parents=True, exist_ok=True)
+        path = directory/(identifier+'.zip')
+        with path.open('xb') as stream, zipfile.ZipFile(stream, 'w', zipfile.ZIP_DEFLATED) as package:
+            package.writestr('metadata.json', dump(metadata))
+            package.writestr('profile'+KINDS[kind], data)
+            package.writestr('submission.txt', body+'\n'+url+'\n')
+        atomic(path.with_suffix('.txt'), (str(path)+'\n\n'+url+'\n').encode())
+        return path, url
+
+
+def approve(package, root):
+    """Maintainer-only local promotion; publication still uses normal Git review."""
+    root = Path(root)
+    with zipfile.ZipFile(package) as archive:
+        names = archive.namelist()
+        if len(names) != 3 or len(set(names)) != 3: raise ValueError('Invalid submission archive')
+        if any(info.file_size > LIMIT for info in archive.infolist()): raise ValueError('Submission too large')
+        metadata = entry(json.loads(archive.read('metadata.json')))
+        filename = 'profile'+KINDS[metadata['kind']]
+        if set(names) != {'metadata.json', filename, 'submission.txt'}: raise ValueError('Unexpected archive members')
+        data = archive.read(filename)
+    if hashlib.sha256(data).hexdigest() != metadata['sha256']: raise ValueError('Submission checksum mismatch')
+    profile_bytes(metadata['kind'], data)
+    catalog_file = root/'catalog.json'
+    current = catalogue(json.loads(catalog_file.read_text())) if catalog_file.exists() else {'schema': 1, 'entries': []}
+    if any(item['id'] == metadata['id'] for item in current['entries']): raise ValueError('Id already exists; review as an update')
+    destination = root/metadata['file']
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open('xb') as stream: stream.write(data)
+    try:
+        current['entries'].append(metadata)
+        atomic(catalog_file, dump(current))
+    except BaseException:
+        destination.unlink(); raise
+    return destination
+
+
+def details(item, fr=True):
+    if item is None: raise ValueError('Unknown catalogue entry')
+    fields = [('Jeu' if fr else 'Game', 'game'), ('Titre' if fr else 'Title', 'title'),
+              ('Auteur' if fr else 'Author', 'author'), ('Description', 'description'),
+              ('Testé avec' if fr else 'Tested with', 'tested_on'), ('Hotkey', 'hotkey'), ('Notes', 'notes')]
+    lines = [label+' : '+item.get(key, '') for label, key in fields if item.get(key)]
+    lines += [('Prérequis : ' if fr else 'Requirements: ')+(', '.join(item['requirements']) or ('aucun indiqué' if fr else 'none specified'))]
+    if item['kind'] == 'antimicrox':
+        lines += ['Vérifiez la Hotkey et les réglages de souris dans l’éditeur avant activation.' if fr else
+                  'Check the Hotkey and mouse settings in the editor before enabling.']
+    else:
+        lines += ['Installez les packs/effets indiqués pour le jeu avant d’appliquer ce preset.' if fr else
+                  'Install the listed shader packs/effects for the game before applying this preset.']
+    return '\n'.join(lines)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--home', default='/userdata/system/ultimate-wine-toolbox')
+    parser.add_argument('--language', default='fr')
+    sub = parser.add_subparsers(dest='command', required=True)
+    sub.add_parser('refresh')
+    for command in ('list', 'show', 'fetch'):
+        arg = sub.add_parser(command); arg.add_argument('kind', choices=KINDS)
+        if command == 'list': arg.add_argument('--query', default='')
+        else: arg.add_argument('identifier')
+    arg = sub.add_parser('share'); arg.add_argument('kind', choices=KINDS); arg.add_argument('source')
+    for name in ('game', 'title', 'author'): arg.add_argument('--'+name, required=True)
+    for name in ('description', 'notes', 'tested-on'): arg.add_argument('--'+name, default='')
+    arg.add_argument('--requirement', action='append', default=[])
+    arg = sub.add_parser('approve'); arg.add_argument('package'); arg.add_argument('--catalog-root', required=True)
+    args = parser.parse_args()
+    if args.command == 'approve': print(approve(args.package, args.catalog_root)); return
+    community = Community(args.home)
+    if args.command == 'refresh': print(len(community.refresh()['entries']))
+    elif args.command == 'list':
+        for item in community.load()['entries']:
+            if item['kind'] == args.kind and args.query.casefold() in (item['game']+' '+item['title']+' '+item['author']).casefold():
+                print(item['id']+'\t'+item['game']+' — '+item['title']+' — '+item['author'])
+    elif args.command == 'show': print(details(community.find(args.kind, args.identifier), args.language == 'fr'))
+    elif args.command == 'fetch': print(community.fetch(args.kind, args.identifier))
+    elif args.command == 'share':
+        path, url = community.share(args.kind, args.source, args.game, args.title, args.author,
+                                    args.description, args.notes, args.tested_on, args.requirement)
+        print(str(path)+'\n'+url)
+
+
+if __name__ == '__main__':
+    try: main()
+    except (OSError, ValueError, KeyError, ET.ParseError, configparser.Error, zipfile.BadZipFile) as error:
+        raise SystemExit(str(error))

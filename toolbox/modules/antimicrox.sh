@@ -436,6 +436,7 @@ antimicrox_menu() {
       7 "$(amx_txt 'Configurer et tester en jeu (bêta)' 'Configure and test in game (beta)')" \
       2 "$(amx_txt 'Gérer les jeux avec un profil associé' 'Manage games with assigned profiles')" \
       9 "$(amx_txt 'Convertir un Pad2Key en profil AntiMicroX' 'Convert Pad2Key to an AntiMicroX profile')" \
+      community "$(amx_txt 'Profils communautaires' 'Community profiles')" \
       1 "$(amx_txt 'Associer un profil à un jeu' 'Assign a game profile')" \
       3 "$(amx_txt 'Ouvrir l’éditeur de profils' 'Open profile editor')" \
       8 "$(amx_txt 'Supprimer un profil' 'Delete a profile')" \
@@ -444,6 +445,7 @@ antimicrox_menu() {
       6 "$(amx_txt "Diagnostic" "Diagnostics")" \
       0 "$(i18n back)")" || return
     case "$choice" in
+      community) community_menu antimicrox ;;
       7) amx_live_choose ;;
       9) amx_convert_pad2key ;;
       5)

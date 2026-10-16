@@ -770,3 +770,5 @@ declare -gA I18N=(
   [wsq_umu_direct_title]="Compatibilité UMU : lancement direct"
   [wsq_umu_direct_body]="Pour les jeux qui refusent un chemin redirigé, ou plantent à cause de ce chemin. Nécessite UMU Runner Toolbox 0.13.7 ou plus. Ne corrige pas tous les crashs. Désactivé par défaut ; enregistré dans autorun.cmd pour le partage."
 )
+
+I18N[resh_community]='Presets communautaires'

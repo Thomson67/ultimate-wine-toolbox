@@ -301,7 +301,7 @@ def main():
         print(convert(args.source, args.home, args.expected, hotkey=args.hotkey))
     elif args.action == 'assign':
         store = Pad2KeyStore(args.home)
-        if args.profile and str(Path(args.profile).resolve()) in store.read(store.registry):
+        if args.profile and (str(Path(args.profile).resolve()) in store.read(store.registry) or store.is_community(args.profile)):
             if not os.access(Path(args.home)/'tools/antimicrox/antimicrox', os.X_OK) or not os.access('/dev/uinput', os.W_OK):
                 raise ValueError('Install AntiMicroX and check /dev/uinput before enabling the converted profile')
         recovery = store.assign(args.rom, args.profile)
