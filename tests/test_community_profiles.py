@@ -51,7 +51,7 @@ class CommunityTests(unittest.TestCase):
             self.assertEqual(meta['sha256'], hashlib.sha256(data).hexdigest())
             self.assertIn('Guide', meta['hotkey'])
             self.assertNotIn(str(self.home).encode(), archive.read('metadata.json'))
-        self.assertTrue(url.startswith('https://github.com/Thomson67/ultimate-wine-toolbox/issues/new?'))
+        self.assertTrue(url.startswith('https://github.com/Thomson67/ultimate-wine-toolbox-community/issues/new?'))
         self.assertIn('Tester', url)
         self.assertTrue(package.with_suffix('.txt').is_file())
 
@@ -317,6 +317,7 @@ menu_select() { echo use; }
 input_text() { if [ "$2" = 'Votre pseudo public' ]; then echo Tester; else printf '%s' "$3"; fi; }
 yesno() { return 0; }
 community_report() { :; }
+community_send_package() { :; }
 msgbox() { :; }
 i18n() { echo Back; }
 community_share antimicrox Community

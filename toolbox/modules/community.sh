@@ -2,6 +2,7 @@
 # Shared implementation; each tool keeps its own menu and file type.
 community_txt() { if [ "${WT_LANGUAGE:-fr}" = fr ]; then printf '%s' "$1"; else printf '%s' "$2"; fi; }
 community_cmd() { python3 "$WT_ROOT/helpers/community_profiles.py" --home "$WT_HOME" --language "$WT_LANGUAGE" "$@"; }
+community_service_cmd() { python3 "$WT_ROOT/helpers/community_service.py" --home "$WT_HOME" --language "$WT_LANGUAGE" "$@"; }
 community_report() {
   local title="$1" content="$2" report
   report="$(mktemp /tmp/uwt-community.XXXXXX)" || return 1
@@ -124,7 +125,7 @@ community_share() {
   tested="$(input_text "$title" "$(community_txt 'Versions testées : jeu, Batocera, runner, AntiMicroX/ReShade' 'Tested versions: game, Batocera, runner, AntiMicroX/ReShade')" '')" || { rm -f -- "$temporary"; return 0; }
   requirement="$(input_text "$title" "$(community_txt 'Prérequis : manette/Hotkey ou packs de shaders, effets et textures' 'Requirements: controller/Hotkey or shader packs, effects and textures')" '')" || { rm -f -- "$temporary"; return 0; }
   notes="$(input_text "$title" "$(community_txt 'Remarques de compatibilité (facultatif)' 'Compatibility notes (optional)')" '')" || { rm -f -- "$temporary"; return 0; }
-  if ! yesno "$title" "$(community_txt "Préparer le partage public de « $name » pour $game, sous le pseudo $author ?\n\nUn ZIP sera créé avec le profil et ces informations. Vous pourrez le joindre à une proposition GitHub depuis votre PC ; un compte GitHub est nécessaire pour soumettre. Rien n’est publié automatiquement." "Prepare public sharing of '$name' for $game, credited to $author?\n\nA ZIP will contain the profile and these details. Attach it to a GitHub proposal from your PC; submitting requires a GitHub account. Nothing is published automatically.")"; then
+  if ! yesno "$title" "$(community_txt "Préparer le partage public de « $name » pour $game, sous le pseudo $author ?\n\nLe profil et ces informations seront envoyés au service communautaire pour validation. Ils deviendront publics après acceptation. Un paquet local sera conservé pour réessayer en cas de problème. Aucun compte GitHub nécessaire." "Prepare public sharing of '$name' for $game, credited to $author?\n\nThe profile and these details will be sent to the community service for review. They become public after approval. A local package is kept for retries. No GitHub account is required.")"; then
     rm -f -- "$temporary"; return 0
   fi
   local -a requirements=()
@@ -134,8 +135,72 @@ community_share() {
   local status=$?
   [ -z "$temporary" ] || rm -f -- "$temporary"
   if [ "$status" -ne 0 ]; then msgbox "$title" "$output"; return 1; fi
-  community_report "$title" "$(community_txt "Paquet prêt :\n$output\n\nLe même lien est enregistré dans le fichier .txt à côté du ZIP. Depuis votre PC, ouvrez ce lien et joignez le ZIP. Après validation, il rejoindra le catalogue." "Package ready:\n$output\n\nThe same link is saved in the .txt next to the ZIP. On your PC, open it and attach the ZIP. Once reviewed, it can enter the catalogue.")"
+  community_send_package "$title" "${output%%$'\n'*}"
 }
+
+community_send_package() {
+  local title="$1" package="$2" output status
+  while true; do
+    if output="$(community_service_cmd submit "$package" 2>&1)"; then
+      status="${output##*$'\n'}"
+      community_report "$title" "$(community_txt "Réponse du service : $status\n$output\n\nLa contribution est en attente de validation si son état est pending. Elle apparaîtra au catalogue après acceptation et actualisation.\nPaquet local : $package" "Service response: $status\n$output\n\nA pending contribution awaits review. It appears in the catalogue after approval and refresh.\nLocal package: $package")"
+      return 0
+    fi
+    msgbox "$title" "$(community_txt "Envoi non confirmé. Le paquet est conservé :\n$package\n\n$output" "Submission not confirmed. The package is retained:\n$package\n\n$output")"
+    yesno "$title" "$(community_txt 'Réessayer le même envoi maintenant ?' 'Retry the same submission now?')" || return 0
+  done
+}
+
+community_retry_package() {
+  local title="$1" package
+  if command -v yad >/dev/null 2>&1; then
+    package="$(DISPLAY="${DISPLAY:-:0}" yad --file-selection --title="$title" --filename="$WT_HOME/exports/community/" --file-filter='ZIP | *.zip' 2>/dev/null)" || return 0
+  else
+    package="$(input_text "$title" "$(community_txt 'Chemin du paquet ZIP conservé' 'Saved ZIP package path')" "$WT_HOME/exports/community/")" || return 0
+  fi
+  [ -f "$package" ] || return 0
+  community_send_package "$title" "$package"
+}
+
+# Subshell confines secrets and the EXIT trap; do not enable tracing here.
+community_validate() (
+  set +x
+  local kind="$1" title="$2" key output rows selected review checksum choice
+  local -a items=()
+  if have_dialog; then
+    wt_clear_tty
+    key="$(dialog --stdout --clear --no-shadow --title "$title" --insecure --passwordbox "$(community_txt 'Clé secrète validateur (64 caractères)' 'Validator secret key (64 characters)')" 12 96)" || return 0
+    wt_clear_tty
+  else
+    printf '%s : ' "$(community_txt 'Clé secrète validateur' 'Validator secret key')" >&2
+    IFS= read -r -s key || return 0
+    printf '\n' >&2
+  fi
+  output="$(printf '%s\n' "$key" | community_service_cmd login 2>&1)"
+  local result=$?
+  unset key
+  [ "$result" -eq 0 ] || { msgbox "$title" "$output"; return 0; }
+  trap 'community_service_cmd logout >/dev/null 2>&1 || true' EXIT
+  while true; do
+    if ! rows="$(community_service_cmd pending "$kind" 2>&1)"; then msgbox "$title" "$rows"; return 0; fi
+    [ -n "$rows" ] || { msgbox "$title" "$(community_txt 'Aucune proposition en attente.' 'No pending contributions.')"; return 0; }
+    items=()
+    while IFS=$'\t' read -r selected output; do items+=("$selected" "$output"); done <<< "$rows"
+    selected="$(menu_select "$title" "$(community_txt 'Propositions à valider — pseudo non vérifié' 'Contributions for review — unverified nickname')" "${items[@]}" back "$(i18n back)")" || return 0
+    [ "$selected" != back ] || return 0
+    review="$(community_service_cmd review "$kind" "$selected" 2>&1)" || { msgbox "$title" "$review"; continue; }
+    checksum="${review%%$'\n'*}"
+    community_report "$title" "${review#*$'\n'}"
+    choice="$(menu_select "$title" "$(community_txt 'Décision pour cette contribution' 'Decision for this contribution')" \
+      approve "$(community_txt 'Accepter et publier' 'Approve and publish')" \
+      reject "$(community_txt 'Refuser' 'Reject')" back "$(i18n back)")" || continue
+    case "$choice" in approve|reject) : ;; *) continue ;; esac
+    yesno "$title" "$(community_txt "Confirmer : $choice — $selected ?\nL’acceptation publie le profil et ses métadonnées sur GitHub." "Confirm: $choice — $selected?\nApproval publishes the profile and metadata on GitHub.")" || continue
+    if output="$(community_service_cmd "$choice" "$kind" "$selected" "$checksum" 2>&1)"; then
+      msgbox "$title" "$(community_txt "Décision enregistrée : $output" "Decision saved: $output")"
+    else msgbox "$title" "$output"; fi
+  done
+)
 
 community_menu() {
   local kind="$1" rom="${2:-}" title choice query="" rows id label selected details path output
@@ -146,12 +211,16 @@ community_menu() {
       browse "$(community_txt 'Parcourir le catalogue en cache' 'Browse cached catalogue')" \
       search "$(community_txt 'Rechercher un jeu / auteur' 'Search for a game / author')" \
       refresh "$(community_txt 'Actualiser le catalogue' 'Refresh catalogue')" \
-      share "$(community_txt 'Préparer le partage de mon profil / preset' 'Prepare sharing my profile / preset')" back "$(i18n back)")" || return 0
+      share "$(community_txt 'Partager mon profil / preset' 'Share my profile / preset')" \
+      retry "$(community_txt 'Renvoyer un paquet conservé' 'Retry a saved package')" \
+      validate "$(community_txt 'Espace validateur' 'Validator area')" back "$(i18n back)")" || return 0
     case "$choice" in
       refresh)
         if output="$(community_cmd refresh 2>&1)"; then msgbox "$title" "$(community_txt "Catalogue actualisé : $output entrées au total." "Catalogue refreshed: $output total entries.")"; else msgbox "$title" "$(community_txt 'Actualisation impossible ; le cache précédent reste disponible.' 'Refresh failed; the previous cache remains available.')\n$output"; fi
         continue ;;
       share) community_share "$kind" "$title" "$rom"; continue ;;
+      retry) community_retry_package "$title"; continue ;;
+      validate) community_validate "$kind" "$title"; continue ;;
       search) query="$(input_text "$title" "$(community_txt 'Jeu, titre du profil ou auteur' 'Game, profile title or author')" '')" || continue ;;
       browse) query="" ;;
       *) return 0 ;;

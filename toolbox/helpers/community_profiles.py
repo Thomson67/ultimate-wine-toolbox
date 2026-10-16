@@ -16,8 +16,8 @@ import uuid
 import xml.etree.ElementTree as ET
 import zipfile
 
-REPOSITORY = 'Thomson67/ultimate-wine-toolbox'
-REF = 'community-presets'
+REPOSITORY = 'Thomson67/ultimate-wine-toolbox-community'
+REF = 'main'
 LIMIT = 2*1024*1024
 ES_LIMIT = 32*1024*1024
 KINDS = {'antimicrox': '.amgp', 'reshade': '.ini'}
@@ -80,6 +80,7 @@ def catalogue(value):
 def profile_bytes(kind, data, export=False):
     if kind not in KINDS or len(data) > LIMIT or b'\0' in data: raise ValueError('Invalid or oversized profile')
     text = data.decode('utf-8-sig')
+    if re.search(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', text): raise ValueError('Profile contains control characters')
     if kind == 'antimicrox':
         if '<!DOCTYPE' in text.upper() or '<!ENTITY' in text.upper(): raise ValueError('XML entities are not allowed')
         root = ET.fromstring(text)

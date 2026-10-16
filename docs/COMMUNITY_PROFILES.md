@@ -4,10 +4,13 @@ The interface stays inside each tool: **AntiMicroX → Community profiles** and
 **ReShade → Community presets** (also available from a configured ReShade game).
 There is no additional shared entry in the Toolbox main menu.
 
-A single schema-1 JSON catalogue on the repository's `community-presets` branch
-contains both file types. Files are downloaded directly from GitHub's raw URLs;
-no API key, contributor token, paid host or database server is required. This
-uses no per-file REST API calls. Limits still apply to the GitHub service.
+A single schema-1 JSON catalogue in `Thomson67/ultimate-wine-toolbox-community`
+(branch `main`) contains both file types. Downloads use GitHub raw URLs directly;
+no account or API key is required for readers. The Cloudflare Worker only handles
+submissions and moderation. Each tool keeps its own community menu.
+
+Service deployment instructions, schema, sources and a ready-to-paste bundle:
+https://github.com/Thomson67/ultimate-wine-toolbox-community/blob/main/service/INSTALLATION_FR.md
 
 ## Read and import
 
@@ -52,21 +55,42 @@ sharing step. Manual selection reads `GET /systems/windows/games`; it does
 not scan ROM folders. If ES is unavailable, a locally derived proposal can
 still be accepted, while manual selection reports the unavailable list.
 
-Sharing prepares a ZIP and a companion text file in `exports/community/`, with
-a GitHub issue URL and no automatic upload. Authors enter public metadata and
-review it before creating the package. AntiMicroX controller identities are
-removed from the copy; originals are unchanged. ReShade export uses the
-existing manager to synchronize and export the game's preset before packaging.
+Sharing creates a local ZIP in `exports/community/`, removes controller identities
+from the exported copy, then sends the profile and public metadata over HTTPS after
+explicit confirmation. No GitHub account is needed. ReShade uses the existing
+manager to synchronize and export the preset first. Direct sharing accepts 64 KiB
+profiles. The original file is unchanged. Failed or uncertain sends keep the ZIP;
+“Retry a saved package” resubmits its same identifier and checksum. A successful
+response writes a local `.receipt.json`. No automatic resend happens at startup.
 
-Maintainers review the issue and can validate/promote the ZIP locally with
+The private D1 queue is visible only after validator login. Each tool's validator
+menu shows only its own type and displays all mappings or the full preset. Approval
+publishes both profile and manifest in one non-forced Git commit; rejection publishes
+nothing. Authors' nicknames are self-declared. The service forbids `execute` and
+`loadprofile`, but keyboard macros still require human review.
+
+The validator key is a generated 256-bit random secret entered through a password
+prompt, never a command argument. Its SHA-256 verifier and the repository-scoped
+GitHub token live only in Cloudflare secrets. A hashed random session token lives
+in D1; its client copy is mode 0600 in `state/community/validator-session.json`,
+expires after 30 minutes and is revoked/deleted when leaving moderation. Login
+tracing is disabled. The key is never saved by the Toolbox. Do not substitute a
+human-chosen password for the generated random key.
+
+The first service version caps submissions at five attempts per IP/day, 100/day
+in total and 200 pending contributions. A daily Cron deletes expired rate counters,
+sessions and submissions after 30 days. Check actual CPU usage on Workers Free
+before opening submissions publicly; local tests cannot establish the 10 ms limit.
+
+An offline maintainer fallback remains available:
 `community_profiles.py approve submission.zip --catalog-root <checkout>`.
-Only expected archive members are read, never extracted. This writes a profile
-and manifest entry locally; publishing still requires a normal Git commit.
+This reads only expected ZIP members without extraction; it does not publish Git.
 
-To move the catalogue to another public GitHub repository, create
-`config/community-source.json` with `repository` in `owner/name` form and `ref`
-set to a branch/tag name without slashes. The same catalogue schema and folder
-layout are required. A cache from another source is never reused.
+A custom `config/community-source.json` may specify `repository`, `ref`, and `api`
+(an HTTPS origin). Custom catalogue overrides are preserved; they must explicitly
+supply their own API to use submissions. Cached catalogues from a different source
+and validator sessions from another API are never reused. Existing installations
+pointing explicitly at the former `community-presets` branch should update this file.
 
 The automated tests simulate catalogue networking, exports, review/import,
 hash/content/path rejection, cache fallback, preservation of local edits,
