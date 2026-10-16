@@ -129,6 +129,7 @@ resh_menu
                 for marker in ('main-once', 'community-once', 'ui', 'questions'): (self.home/marker).unlink(missing_ok=True)
                 ui = self.shell(script, language)
                 self.assertNotIn('AntiMicroX', ui); self.assertNotIn('Hotkey', ui); self.assertNotIn('AMX_ONLY', ui)
+                self.assertNotIn(r'\n', ui)
                 self.assertEqual(len((self.home/'questions').read_text().splitlines()), 3)
                 payload = json.loads((self.home/'payload.json').read_text())
                 self.assertEqual(payload['metadata']['game'], 'ReShade Game')

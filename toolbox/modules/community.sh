@@ -21,7 +21,13 @@ community_import_actions() {
   local kind="$1" path="$2" title="$3" rom="${4:-}" choice output details selected
   while true; do
     if [ "$kind" = antimicrox ]; then
-      choice="$(menu_select "$title" "$(community_txt "Profil téléchargé :\n$path\n\nVérifiez la Hotkey dans l’éditeur avant activation. Le Pad2Key du jeu sera sauvegardé et suspendu lors de l’association." "Profile downloaded:\n$path\n\nCheck the Hotkey in the editor before enabling. The game’s Pad2Key will be backed up and suspended on assignment.")" \
+      choice="$(menu_select "$title" "$(community_txt "Profil téléchargé :
+$path
+
+Vérifiez la Hotkey dans l’éditeur avant activation. Le Pad2Key du jeu sera sauvegardé et suspendu lors de l’association." "Profile downloaded:
+$path
+
+Check the Hotkey in the editor before enabling. The game’s Pad2Key will be backed up and suspended on assignment.")" \
         info "$(community_txt 'Voir les commandes de la manette' 'View controller mappings')" \
         edit "$(community_txt 'Modifier le profil sans lancer de jeu' 'Edit the profile without starting a game')" \
         assign "$(community_txt 'Utiliser ce profil pour un jeu' 'Use this profile for a game')" \
@@ -32,14 +38,22 @@ community_import_actions() {
         assign|live)
           if amx_running; then msgbox "$title" "$(community_txt 'Fermez AntiMicroX et le jeu avant l’association.' 'Close AntiMicroX and the game before assigning.')"; continue; fi
           [ -n "$rom" ] || rom="$(amx_choose_game)" || continue
-          yesno "$title" "$(community_txt "Associer ce profil à $(basename "$rom") ?\nVérifiez ses prérequis et sa Hotkey. Le Pad2Key sera sauvegardé et suspendu." "Assign this profile to $(basename "$rom")?\nCheck its requirements and Hotkey. Pad2Key will be backed up and suspended.")" || continue
+          yesno "$title" "$(community_txt "Associer ce profil à $(basename "$rom") ?
+Vérifiez ses prérequis et sa Hotkey. Le Pad2Key sera sauvegardé et suspendu." "Assign this profile to $(basename "$rom")?
+Check its requirements and Hotkey. Pad2Key will be backed up and suspended.")" || continue
           amx_set_profile "$rom" "$path" || continue
           if [ "$choice" = live ]; then amx_live_start_for "$rom" "$path"; else msgbox "$title" "$(community_txt 'Profil associé.' 'Profile assigned.')"; fi
           return 0 ;;
         *) return 0 ;;
       esac
     else
-      choice="$(menu_select "$title" "$(community_txt "Preset téléchargé :\n$path\n\nChoisissez le jeu cible. Si nécessaire, l’assistant proposera de configurer ReShade et ses effets avant l’application." "Preset downloaded:\n$path\n\nChoose the target game. If necessary, the wizard will offer to configure ReShade and its effects before applying the preset.")" \
+      choice="$(menu_select "$title" "$(community_txt "Preset téléchargé :
+$path
+
+Choisissez le jeu cible. Si nécessaire, l’assistant proposera de configurer ReShade et ses effets avant l’application." "Preset downloaded:
+$path
+
+Choose the target game. If necessary, the wizard will offer to configure ReShade and its effects before applying the preset.")" \
         info "$(community_txt 'Voir les effets et les réglages' 'View effects and settings')" \
         apply "$(community_txt 'Appliquer ce preset à un jeu' 'Apply this preset to a game')" back "$(i18n back)")" || return 0
       case "$choice" in
@@ -70,7 +84,9 @@ Install/configure ReShade and the required packs now, then apply the downloaded 
         details="$(resh_cmd status "$rom")" || continue
         case "$details" in enabled|disabled) : ;; *) msgbox "$title" "$(community_txt 'Configuration ReShade non terminée. Le preset téléchargé est conservé.' 'ReShade configuration is incomplete. The downloaded preset is retained.')"; continue ;; esac
       fi
-      yesno "$title" "$(community_txt "Appliquer à $(basename "$rom") et activer ReShade ?\nLe preset actuel sera exporté dans les sauvegardes communautaires avant remplacement. Les packs de shaders doivent être installés." "Apply to $(basename "$rom") and enable ReShade?\nThe current preset will be exported to the community backups before replacement. Shader packs must be installed.")" || continue
+      yesno "$title" "$(community_txt "Appliquer à $(basename "$rom") et activer ReShade ?
+Le preset actuel sera exporté dans les sauvegardes communautaires avant remplacement. Les packs de shaders doivent être installés." "Apply to $(basename "$rom") and enable ReShade?
+The current preset will be exported to the community backups before replacement. Shader packs must be installed.")" || continue
       local backup_dir="$WT_HOME/exports/community-backups" backup
       mkdir -p "$backup_dir"
       backup="$(mktemp "$backup_dir/reshade-XXXXXX.ini")" || return 1
@@ -79,11 +95,21 @@ Install/configure ReShade and the required packs now, then apply the downloaded 
       fi
       if output="$(resh_cmd preset "$rom" "$path" 2>&1)"; then
         if [ "$details" = disabled ] && ! output="$(resh_cmd enable "$rom" 2>&1)"; then
-          msgbox "$title" "$(community_txt "Preset importé mais activation de ReShade impossible.\nSauvegarde : $backup\n$output" "Preset imported but ReShade could not be enabled.\nBackup: $backup\n$output")"; return 1
+          msgbox "$title" "$(community_txt "Preset importé mais activation de ReShade impossible.
+Sauvegarde : $backup
+$output" "Preset imported but ReShade could not be enabled.
+Backup: $backup
+$output")"; return 1
         fi
-        msgbox "$title" "$(community_txt "Preset appliqué.\nSauvegarde : $backup" "Preset applied.\nBackup: $backup")"; return 0
+        msgbox "$title" "$(community_txt "Preset appliqué.
+Sauvegarde : $backup" "Preset applied.
+Backup: $backup")"; return 0
       else
-        msgbox "$title" "$(community_txt "Échec de l’application. Sauvegarde conservée :\n$backup\n$output" "Apply failed. Backup retained:\n$backup\n$output")"
+        msgbox "$title" "$(community_txt "Échec de l’application. Sauvegarde conservée :
+$backup
+$output" "Apply failed. Backup retained:
+$backup
+$output")"
       fi
     fi
   done
@@ -98,13 +124,25 @@ community_apply_existing_reshade() {
   if [ "${#items[@]}" -eq 2 ]; then folder="${items[0]}";
   else folder="$(menu_select "$title" "$(community_txt 'Choisir le dossier de l’injecteur ReShade existant' 'Choose the existing ReShade injector folder')" "${items[@]}" back "$(i18n back)")" || return 1; fi
   [ "$folder" != back ] || return 1
-  yesno "$title" "$(community_txt "Appliquer le preset à $(basename "$rom") en conservant son ReShade existant ?\n\nSeuls le preset et son chemin dans ReShade.ini seront gérés par la Toolbox, avec sauvegarde des fichiers remplacés. Les DLL et packs d’effets sont conservés. Les effets requis doivent être présents.\nUne archive .wsquashfs reste inchangée ; les réglages sont appliqués dans ses préfixes Wine." "Apply the preset to $(basename "$rom") using its existing ReShade?\n\nThe Toolbox will manage only the preset and its path in ReShade.ini, backing up replaced files. DLLs and shader packs are retained. Required effects must already be present.\nA .wsquashfs archive is unchanged; settings are applied in its Wine prefixes.")" || return 1
+  yesno "$title" "$(community_txt "Appliquer le preset à $(basename "$rom") en conservant son ReShade existant ?
+
+Seuls le preset et son chemin dans ReShade.ini seront gérés par la Toolbox, avec sauvegarde des fichiers remplacés. Les DLL et packs d’effets sont conservés. Les effets requis doivent être présents.
+Une archive .wsquashfs reste inchangée ; les réglages sont appliqués dans ses préfixes Wine." "Apply the preset to $(basename "$rom") using its existing ReShade?
+
+The Toolbox will manage only the preset and its path in ReShade.ini, backing up replaced files. DLLs and shader packs are retained. Required effects must already be present.
+A .wsquashfs archive is unchanged; settings are applied in its Wine prefixes.")" || return 1
   output="$(resh_cmd existing-import "$rom" "$folder" "$path" 2>&1)" || { msgbox "$title" "$output"; return 1; }
   case "${details%%$'\n'*}" in
     external-disabled)
       if ! resh_cmd external-enable "$rom"; then msgbox "$title" "$(community_txt 'Preset importé ; réactivez ReShade depuis le menu du jeu.' 'Preset imported; re-enable ReShade from the game menu.')"; return 0; fi ;;
   esac
-  msgbox "$title" "$(community_txt "Preset appliqué au ReShade existant.\nSauvegardes : $output\n\nLe menu ReShade du jeu permet de restaurer les réglages précédents." "Preset applied to existing ReShade.\nBackups: $output\n\nUse the game’s ReShade menu to restore previous settings.")"
+  msgbox "$title" "$(community_txt "Preset appliqué au ReShade existant.
+Sauvegardes : $output
+
+Le menu ReShade du jeu permet de restaurer les réglages précédents." "Preset applied to existing ReShade.
+Backups: $output
+
+Use the game’s ReShade menu to restore previous settings.")"
 }
 
 # Return a validated downloaded INI path for use by the standard installation wizard.
@@ -136,7 +174,8 @@ community_pick_game() {
   local -a games=() items=()
   while true; do
     if ! rows="$(community_cmd games --query "$query" 2>&1)"; then
-      msgbox "$title" "$(community_txt 'Impossible de lire la liste des jeux Windows d’ES. Vérifiez que le jeu est référencé dans ES.' 'Unable to read the ES Windows game list. Check that ES has indexed the game.')\n$rows"; return 1
+      msgbox "$title" "$(community_txt 'Impossible de lire la liste des jeux Windows d’ES. Vérifiez que le jeu est référencé dans ES.' 'Unable to read the ES Windows game list. Check that ES has indexed the game.')
+$rows"; return 1
     fi
     games=(); items=()
     while IFS=$'\t' read -r path name; do
@@ -267,7 +306,11 @@ community_share() {
   name="$(input_text "$title" "$name_prompt" "$game")" || { rm -f -- "$temporary"; return 0; }
   author="$(input_text "$title" "$(community_txt 'Votre pseudo public' 'Your public nickname')" '')" || { rm -f -- "$temporary"; return 0; }
   description="$(input_text "$title" "$(community_txt 'Description (commandes ou effets, conseils utiles)' 'Description (controls or effects, useful tips)')" '')" || { rm -f -- "$temporary"; return 0; }
-  if ! yesno "$title" "$(community_txt "Partager « $name » pour $game, sous le pseudo $author ?\n\nLe $asset_fr et ces informations seront envoyés au service communautaire pour validation. Ils deviendront publics après acceptation. Aucun compte GitHub nécessaire." "Share '$name' for $game, credited to $author?\n\nThe $asset_en and these details will be sent to the community service for review. They become public after approval. No GitHub account is required.")"; then
+  if ! yesno "$title" "$(community_txt "Partager « $name » pour $game, sous le pseudo $author ?
+
+Le $asset_fr et ces informations seront envoyés au service communautaire pour validation. Ils deviendront publics après acceptation. Aucun compte GitHub nécessaire." "Share '$name' for $game, credited to $author?
+
+The $asset_en and these details will be sent to the community service for review. They become public after approval. No GitHub account is required.")"; then
     rm -f -- "$temporary"; return 0
   fi
   output="$(community_cmd share "$kind" "$source" --game "$game" --title "$name" --author "$author" \
@@ -294,7 +337,13 @@ community_send_package() {
       community_report "$title" "$output"
       return 0
     fi
-    msgbox "$title" "$(community_txt "Envoi non confirmé. Le paquet est conservé :\n$package\n\n$output" "Submission not confirmed. The package is retained:\n$package\n\n$output")"
+    msgbox "$title" "$(community_txt "Envoi non confirmé. Le paquet est conservé :
+$package
+
+$output" "Submission not confirmed. The package is retained:
+$package
+
+$output")"
     yesno "$title" "$(community_txt 'Réessayer le même envoi maintenant ?' 'Retry the same submission now?')" || return 0
   done
 }
@@ -337,13 +386,18 @@ community_remove_published() {
     case "$selected" in ''|back) return 0 ;; esac
     review="$(community_service_cmd published-review "$kind" "$selected" 2>&1)" || { msgbox "$title" "$review"; continue; }
     checksum="${review%%$'\n'*}"
-    if ! yesno_default_no "$title" "${review#*$'\n'}"$'\n\n'"$(community_txt 'Retirer ce partage du catalogue ?\n\nSon fichier et sa fiche seront supprimés du dépôt communautaire. Les profils déjà installés chez les joueurs restent conservés.' 'Remove this submission from the catalogue?\n\nIts file and catalogue entry will be deleted from the community repository. Profiles already installed by players are retained.')"; then continue; fi
+    if ! yesno_default_no "$title" "${review#*$'\n'}"$'\n\n'"$(community_txt 'Retirer ce partage du catalogue ?
+
+Son fichier et sa fiche seront supprimés du dépôt communautaire. Les profils déjà installés chez les joueurs restent conservés.' 'Remove this submission from the catalogue?
+
+Its file and catalogue entry will be deleted from the community repository. Profiles already installed by players are retained.')"; then continue; fi
     if output="$(community_service_cmd remove-published "$kind" "$selected" "$checksum" 2>&1)"; then
       # Refresh this machine immediately; other users see removal on their next refresh.
       if community_cmd refresh --kind "$kind" >/dev/null 2>&1; then
         msgbox "$title" "$(community_txt 'Partage retiré. La liste communautaire est à jour.' 'Submission removed. The community list is up to date.')"
       else msgbox "$title" "$(community_txt 'Partage retiré. Mettez la liste à jour quand la connexion sera rétablie.' 'Submission removed. Refresh the list when the connection is restored.')"; fi
-    else msgbox "$title" "$(community_txt 'Suppression non confirmée. Actualisez la liste avant de réessayer.' 'Removal not confirmed. Refresh the list before retrying.')\n$output"; fi
+    else msgbox "$title" "$(community_txt 'Suppression non confirmée. Actualisez la liste avant de réessayer.' 'Removal not confirmed. Refresh the list before retrying.')
+$output"; fi
   done
 }
 
@@ -398,14 +452,16 @@ community_menu() {
       forget "$(community_txt 'Retirer l’accès modérateur de ce PC' 'Remove moderator access from this PC')" back "$(i18n back)")" || return 0
     case "$choice" in
       refresh)
-        if output="$(community_cmd refresh --kind "$kind" 2>&1)"; then msgbox "$title" "$(community_txt "Catalogue actualisé : $output $count_label." "Catalogue refreshed: $output $count_label.")"; else msgbox "$title" "$(community_txt 'Actualisation impossible ; le cache précédent reste disponible.' 'Refresh failed; the previous cache remains available.')\n$output"; fi
+        if output="$(community_cmd refresh --kind "$kind" 2>&1)"; then msgbox "$title" "$(community_txt "Catalogue actualisé : $output $count_label." "Catalogue refreshed: $output $count_label.")"; else msgbox "$title" "$(community_txt 'Actualisation impossible ; le cache précédent reste disponible.' 'Refresh failed; the previous cache remains available.')
+$output"; fi
         continue ;;
       share) community_share "$kind" "$title" "$rom"; continue ;;
       validate) community_validate "$kind" "$title"; continue ;;
       forget)
         if yesno "$title" "$(community_txt 'Révoquer l’autorisation mémorisée et déconnecter ce Batocera ?' 'Revoke the remembered authorization and sign this Batocera out?')"; then
           if output="$(community_service_cmd forget 2>&1)"; then msgbox "$title" "$(community_txt 'Accès local oublié et autorisation révoquée.' 'Local access forgotten and authorization revoked.')";
-          else msgbox "$title" "$(community_txt 'Accès local oublié. Si la révocation distante a échoué, révoquez aussi l’appareil depuis la page d’appairage.' 'Local access forgotten. If remote revocation failed, also revoke the device on the pairing page.')\n$output"; fi
+          else msgbox "$title" "$(community_txt 'Accès local oublié. Si la révocation distante a échoué, révoquez aussi l’appareil depuis la page d’appairage.' 'Local access forgotten. If remote revocation failed, also revoke the device on the pairing page.')
+$output"; fi
         fi
         continue ;;
       search) query="$(input_text "$title" "$search_prompt" '')" || continue ;;
