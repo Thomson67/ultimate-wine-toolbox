@@ -62,6 +62,12 @@ class CommunityTests(unittest.TestCase):
                 path.unlink()
                 self.assertIsNone(self.community.local_profile(item))
 
+    def test_generic_internal_profile_name_falls_back_to_game_filename(self):
+        source = self.base/'Max Payne.amgp'
+        source.write_text('<gamecontroller><profilename>Default</profilename></gamecontroller>')
+        with patch.object(community, 'es_games', return_value=[]):
+            self.assertEqual(community.suggest_game(self.home, 'antimicrox', source), 'Max Payne')
+
     def test_related_games_are_ranked_first_without_hiding_other_games(self):
         games = [('other', 'Unrelated'), ('mp3', 'Max Payne 3'), ('mp1', 'Max Payne'),
                  ('mp2', 'MAX PAYNE 2'), ('partial', 'Payne')]
@@ -273,6 +279,7 @@ yesno() { return 0; }
 msgbox() { :; }
 amx_running() { return 1; }
 amx_set_profile() { printf '%s' "$2" > "$WT_HOME/assigned"; }
+amx_ensure_installed() { return 0; }
 amx_live_start_for() { touch "$WT_HOME/live"; exit 0; }
 community_import_actions antimicrox /userdata/profile.amgp AntiMicroX /userdata/roms/windows/Game.wine
 echo must-not-continue

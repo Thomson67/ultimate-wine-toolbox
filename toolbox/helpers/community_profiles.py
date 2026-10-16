@@ -224,8 +224,10 @@ def suggest_game(home, kind, source, rom=''):
     if not candidate:
         candidate = source.stem
     candidate = game_title(candidate)
-    if game_key(candidate) in ('default', 'defaultprofile', 'profile', 'profil', 'reshadepreset', 'gamecontroller'):
-        return ''
+    generic = ('default', 'defaultprofile', 'profile', 'profil', 'reshadepreset', 'gamecontroller')
+    if game_key(candidate) in generic:
+        candidate = game_title(source.stem)
+        if game_key(candidate) in generic: return ''
     try:
         games = es_games()
     except (OSError, ValueError):

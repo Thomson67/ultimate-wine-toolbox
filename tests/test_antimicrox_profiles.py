@@ -182,7 +182,7 @@ class ProfileTests(unittest.TestCase):
                        PATH=str(commands)+os.pathsep+os.environ['PATH'], PROFILE=str(profile))
             module = ROOT/'toolbox/modules/antimicrox.sh'
             for value, expected in [('', str(profile.parent)+'/'), ('"$PROFILE"', str(profile))]:
-                command = f'source "{module}"\namx_profile_file {value}'
+                command = f'source "{module}"\namx_browse_profile {value}'
                 result = subprocess.run(['bash', '-c', command], env=env, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn('--filename='+expected, (service.home/'yad-args').read_text())

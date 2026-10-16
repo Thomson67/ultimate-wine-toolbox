@@ -190,7 +190,9 @@ resh_install_game() {
             exe="$resume_exe"; resumed=1; break
         fi
     done
-    if [ "$resumed" -eq 0 ]; then
+    if [ "$resumed" -eq 0 ] && [ "${#exes[@]}" -eq 1 ]; then
+        exe="${exes[0]}"
+    elif [ "$resumed" -eq 0 ]; then
         selected="$(menu_select "$(i18n resh_title)" "$(i18n resh_exe_prompt)" "${items[@]}")" || return 1
         case "$selected" in ''|*[!0-9]*) return 1 ;; esac
         [ "$selected" -ge 1 ] && [ "$selected" -le "${#exes[@]}" ] || return 1
@@ -376,12 +378,14 @@ resh_game_menu() {
             IFS=$'\t' read -r version arch dll exe packs <<< "$details"
             prompt+="\n\n$(i18n resh_details "$version" "$arch" "$dll" "$exe" "$packs")"
         fi
-        choice="$(menu_select "$(i18n resh_title) — $(basename "$rom")" \
-            "$prompt" \
-            install "$(i18n resh_install)" enable "$(i18n resh_enable)" disable "$(i18n resh_disable)" \
-            preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)" \
-            community "$(i18n resh_community)" \
-            back "$(i18n back)")" || return
+        local -a actions=(install "$(i18n resh_install)")
+        if [ "$state" != missing ]; then
+            if [ "$state" = disabled ]; then actions+=(enable "$(i18n resh_enable)")
+            else actions+=(disable "$(i18n resh_disable)"); fi
+            actions+=(preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)")
+        fi
+        choice="$(menu_select "$(i18n resh_title) — $(basename "$rom")" "$prompt" \
+            "${actions[@]}" community "$(i18n resh_community)" back "$(i18n back)")" || return
         case "$choice" in
             community) community_menu reshade "$rom" ;;
             install) resh_install_game "$rom" ;;

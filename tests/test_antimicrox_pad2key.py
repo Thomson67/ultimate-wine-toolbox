@@ -258,10 +258,12 @@ WT_ROOT="$ROOT/toolbox"
 i18n() { echo Retour; }
 menu_select() { if [ -f "$WT_HOME/selected" ]; then echo live; else touch "$WT_HOME/selected"; echo game; fi; }
 amx_choose_game() { echo "$GAME"; }
+amx_game_for_profile() { echo "$GAME"; }
 amx_pad2key_cmd() { case "$1" in preview) printf 'abc\\nConversion test\\n';; convert) echo "$WT_HOME/profile.amgp";; assign) return 0;; esac; }
 have_dialog() { return 1; }
 yesno() { return 0; }
 amx_running() { return 1; }
+amx_ensure_installed() { return 0; }
 amx_live_start_for() { echo started > "$WT_HOME/live"; exit 0; }
 amx_convert_pad2key
 echo must_not_continue

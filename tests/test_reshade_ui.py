@@ -13,6 +13,32 @@ class ReShadeUiTests(unittest.TestCase):
         return dict(os.environ, WT_ROOT=str(ROOT / 'toolbox'), TEST_HOME=str(base/'home'),
                     WT_LANGUAGE='fr', SUMMARY=str(base/'summary'), CHECKLIST=str(base/'checklist'))
 
+    def test_game_menu_only_offers_actions_valid_for_its_installation_state(self):
+        for state in ('missing', 'enabled', 'disabled'):
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as folder:
+                base = Path(folder)
+                result = subprocess.run(['bash', '-c', r'''
+WT_HOME="$TEST_HOME"
+source "$WT_ROOT/modules/reshade.sh"
+i18n() { echo "$1"; }
+resh_cmd() {
+ case "$1" in
+  status) echo "$STATE";;
+  external-info) echo missing;;
+  details) printf '6.6.0\tx86\td3d9\tGame.exe\tstandard';;
+ esac
+}
+menu_select() { printf '%s\n' "$@" > "$CHECKLIST"; echo back; }
+resh_game_menu /games/Game.wine
+'''], env=dict(self.environment(base), STATE=state), capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                actions = (base/'checklist').read_text().splitlines()[2::2]
+                self.assertIn('install', actions)
+                self.assertIn('community', actions)
+                self.assertEqual('preset' in actions, state != 'missing')
+                self.assertEqual('enable' in actions, state == 'disabled')
+                self.assertEqual('disable' in actions, state == 'enabled')
+
     def test_diagnostic_resume_returns_to_api_for_the_chosen_executable(self):
         for remembered, changed in [('drive_c/game/Chosen Game.exe',False),('drive_c/game/Removed.exe',True)]:
             with self.subTest(changed=changed), tempfile.TemporaryDirectory() as folder:

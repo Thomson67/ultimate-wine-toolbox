@@ -36,6 +36,7 @@ Check the Hotkey in the editor before enabling. The game’s Pad2Key will be bac
         info) amx_profile_info "$path" ;;
         edit) amx_editor "$path" ;;
         assign|live)
+          amx_ensure_installed || continue
           if amx_running; then msgbox "$title" "$(community_txt 'Fermez AntiMicroX et le jeu avant l’association.' 'Close AntiMicroX and the game before assigning.')"; continue; fi
           if [ -z "$rom" ]; then
             local preferred
@@ -169,8 +170,7 @@ community_choose_reshade_preset() {
       refresh) info="$(community_cmd refresh --kind reshade 2>&1)" || msgbox "$title" "$info"; continue ;;
     esac
     info="$(community_cmd show reshade "$choice" 2>&1)" || { msgbox "$title" "$info"; continue; }
-    community_report "$title" "$info"
-    yesno "$title" "$(community_txt 'Utiliser ce preset pour cette installation ? Les packs d’effets requis seront à sélectionner ensuite.' 'Use this preset for this installation? You will select the required shader packs next.')" || continue
+    yesno "$title" "$info"$'\n\n'"$(community_txt 'Utiliser ce preset pour cette installation ? Les packs d’effets seront identifiés à partir du preset.' 'Use this preset for this installation? Shader packs will be identified from the preset.')" || continue
     path="$(community_cmd fetch reshade "$choice" 2>&1)" || { msgbox "$title" "$path"; continue; }
     printf '%s' "$path"; return 0
   done
@@ -222,7 +222,7 @@ community_pick_reshade_game() {
       items+=("${#games[@]}" "$name — $state")
     done <<< "$rows"
     if [ "${#games[@]}" -eq 0 ]; then
-      msgbox "$title" "$(community_txt 'Aucun jeu ReShade trouvé pour cette recherche. Lancez la détection ci-dessous ou partagez directement un fichier preset .ini. Pour appliquer un preset téléchargé, le jeu doit être géré par la Toolbox.' 'No ReShade game matches this search. Run detection below or share a preset .ini file directly. Applying a downloaded preset requires a Toolbox-managed game.')"
+      msgbox "$title" "$(community_txt 'Aucun jeu ReShade trouvé pour cette recherche. Lancez la détection ci-dessous ou partagez directement un fichier preset .ini. Vous pouvez appliquer un preset téléchargé à un autre jeu depuis le catalogue communautaire.' 'No ReShade game matches this search. Run detection below or share a preset .ini file directly. You can apply a downloaded preset to another game from the community catalogue.')"
     fi
     choice="$(menu_select "$title" "$(community_txt 'Choisir un jeu configuré avec ReShade' 'Choose a game configured with ReShade')" \
       scan "$(community_txt 'Détecter les ReShade intégrés aux jeux (.wine, .pc, .wsquashfs)' 'Detect bundled ReShade (.wine, .pc, .wsquashfs)')" \
@@ -482,14 +482,13 @@ $output"; fi
     selected="$(menu_select "$title" "$(community_txt 'Choisir un profil ou un preset' 'Choose a profile or preset')" "${items[@]}" back "$(i18n back)")" || continue
     [ "$selected" != back ] || continue
     details="$(community_cmd show "$kind" "$selected" 2>&1)" || { msgbox "$title" "$details"; continue; }
-    community_report "$title" "$details"
     path="$(community_cmd local "$kind" "$selected" 2>/dev/null)" || path=""
     if [ -n "$path" ]; then
-      yesno "$title" "$(community_txt 'Ce fichier est déjà téléchargé. Utiliser votre copie locale ?' 'This file is already downloaded. Use your local copy?')" || continue
+      yesno "$title" "$details"$'\n\n'"$(community_txt 'Ce fichier est déjà téléchargé. Utiliser votre copie locale ?' 'This file is already downloaded. Use your local copy?')" || continue
       community_import_actions "$kind" "$path" "$title" "$rom"
       continue
     fi
-    yesno "$title" "$(community_txt 'Télécharger ce fichier ? Vous pourrez ensuite l’utiliser pour un jeu.' 'Download this file? You can then use it for a game.')" || continue
+    yesno "$title" "$details"$'\n\n'"$(community_txt 'Télécharger ce fichier ? Vous pourrez ensuite l’utiliser pour un jeu.' 'Download this file? You can then use it for a game.')" || continue
     if path="$(community_cmd fetch "$kind" "$selected" 2>&1)"; then community_import_actions "$kind" "$path" "$title" "$rom"; else msgbox "$title" "$path"; fi
   done
 }

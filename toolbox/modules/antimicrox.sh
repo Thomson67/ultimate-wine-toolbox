@@ -6,6 +6,20 @@ amx_binary() {
   if [ -x "$WT_HOME/tools/antimicrox/antimicrox" ]; then printf '%s\n' "$WT_HOME/tools/antimicrox/antimicrox"
   else return 1; fi
 }
+amx_install() {
+  yesno AntiMicroX "$(amx_txt 'Télécharger et installer AntiMicroX 3.6.1 pour continuer ?' 'Download and install AntiMicroX 3.6.1 to continue?')" || return 1
+  if ! WT_HOME="$WT_HOME" bash "$WT_ROOT/helpers/install-antimicrox.sh" > /tmp/uwt-amx-install.log 2>&1; then
+    msgbox AntiMicroX "$(amx_txt 'Échec de l’installation. Journal : /tmp/uwt-amx-install.log' 'Installation failed. Log: /tmp/uwt-amx-install.log')"
+    return 1
+  fi
+  amx_binary >/dev/null || {
+    msgbox AntiMicroX "$(amx_txt 'Installation incomplète. Journal : /tmp/uwt-amx-install.log' 'Installation incomplete. Log: /tmp/uwt-amx-install.log')"
+    return 1
+  }
+}
+amx_ensure_installed() {
+  amx_binary >/dev/null 2>&1 || amx_install
+}
 amx_running() {
   pgrep -x antimicrox >/dev/null 2>&1 ||
     pgrep -f "^$WT_HOME/tools/antimicrox/squashfs-root/(AppRun|usr/bin/antimicrox)([[:space:]]|$)" >/dev/null 2>&1
@@ -65,7 +79,8 @@ amx_editor() {
     profile="$(amx_validate_profile "$profile")" || return 1
     profile_args=(--profile "$profile")
   fi
-  bin="$(amx_binary)" || { msgbox AntiMicroX "$(amx_txt 'Installez AntiMicroX depuis son menu.' 'Install AntiMicroX from its menu.')"; return 1; }
+  amx_ensure_installed || return 1
+  bin="$(amx_binary)" || return 1
   log="$(amx_log_path)"
   mkdir -p "$(dirname "$log")"
   # An editor must not silently replace a running game's mapping via IPC.
@@ -91,7 +106,7 @@ amx_editor() {
   fi
   return "$rc"
 }
-amx_profile_file() {
+amx_browse_profile() {
   local current="${1:-}" directory="$WT_HOME/config/antimicrox-profiles" start
   mkdir -p "$directory"
   start="$directory/"
@@ -102,6 +117,42 @@ amx_profile_file() {
   else
     input_text AntiMicroX "$(amx_txt 'Chemin absolu du profil .amgp sous /userdata :' 'Absolute .amgp profile path under /userdata:')" "$start"
   fi
+}
+# Select saved profiles directly; manual browsing remains available in the same menu.
+amx_profile_file() {
+  local current="${1:-}" rows profile selected label
+  local -a profiles=() items=()
+  rows="$(amx_profiles_cmd list 2>&1)" || { msgbox AntiMicroX "$rows"; return 1; }
+  while IFS= read -r profile; do
+    [ -n "$profile" ] || continue
+    profiles+=("$profile")
+    label="${profile##*/}"
+    [ "$profile" != "$current" ] || label+=" — $(amx_txt 'actuel' 'current')"
+    items+=("${#profiles[@]}" "$label")
+  done <<< "$rows"
+  selected="$(menu_select AntiMicroX "$(amx_txt 'Choisir un profil enregistré' 'Choose a saved profile')" "${items[@]}" \
+    manual "$(amx_txt 'Parcourir les fichiers .amgp…' 'Browse .amgp files…')" back "$(i18n back)")" || return 1
+  case "$selected" in
+    manual) amx_browse_profile "$current" ;;
+    back|'') return 1 ;;
+    *) [[ "$selected" =~ ^[0-9]+$ ]] || return 1
+       [ "$selected" -ge 1 ] && [ "$selected" -le "${#profiles[@]}" ] || return 1
+       printf '%s\n' "${profiles[$((selected-1))]}" ;;
+  esac
+}
+amx_game_for_profile() {
+  local profile="$1" preferred selected
+  preferred="$(community_cmd suggest-game antimicrox "$profile" 2>/dev/null)" || preferred=""
+  selected="$(community_pick_game AntiMicroX "$preferred")" || return 1
+  printf '%s\n' "${selected%%$'\t'*}"
+}
+amx_assign_existing() {
+  local profile rom
+  amx_ensure_installed || return 1
+  profile="$(amx_profile_file)" || return 1
+  profile="$(amx_validate_profile "$profile")" || return 1
+  rom="$(amx_game_for_profile "$profile")" || return 1
+  amx_assign_profile_for "$rom" "$profile"
 }
 amx_profiles_cmd() { python3 "$WT_ROOT/helpers/antimicrox_profiles.py" --home "$WT_HOME" --language "$WT_LANGUAGE" "$@"; }
 amx_pad2key_cmd() { python3 "$WT_ROOT/helpers/antimicrox_pad2key.py" --home "$WT_HOME" --language "$WT_LANGUAGE" "$@"; }
@@ -164,7 +215,8 @@ amx_convert_pad2key() {
       info) amx_profile_info "$profile" ;;
       edit) amx_editor "$profile" ;;
       activate|live)
-        [ -n "$rom" ] || rom="$(amx_choose_game)" || continue
+        amx_ensure_installed || continue
+        [ -n "$rom" ] || rom="$(amx_game_for_profile "$profile")" || continue
         if amx_running; then
           msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX avant d’activer la conversion.' 'Close the game and AntiMicroX before enabling the conversion.')"
           continue
@@ -229,7 +281,7 @@ amx_delete_profiles() {
     selected="$(menu_select AntiMicroX "$(amx_txt 'Choisissez le profil à supprimer. Il sera aussi retiré des jeux qui l’utilisent.' 'Choose a profile to delete. It will also be removed from games that use it.')" \
       "${options[@]}" other "$(amx_txt 'Choisir un autre fichier .amgp' 'Choose another .amgp file')" back "$(i18n back)")" || return 0
     case "$selected" in
-      other) profile="$(amx_profile_file '')" || continue ;;
+      other) profile="$(amx_browse_profile '')" || continue ;;
       back|'') return 0 ;;
       *)
         [[ "$selected" =~ ^[0-9]+$ ]] || return 0
@@ -251,9 +303,14 @@ amx_current_profile() {
   awk -F '\t' -v p="$1" '$1==p {v=$2} END{print v}' "$AMX_OVERRIDES" 2>/dev/null
 }
 amx_assign_profile_for() {
-  local rom="$1" current new_profile
+  local rom="$1" current new_profile="${2:-}"
+  amx_ensure_installed || return 1
+  if amx_running; then
+    msgbox AntiMicroX "$(amx_txt 'Fermez le jeu ou AntiMicroX avant de changer son profil.' 'Close the game or AntiMicroX before changing its profile.')"
+    return 1
+  fi
   current="$(amx_current_profile "$rom")"
-  new_profile="$(amx_profile_file "$current")" || return 1
+  [ -n "$new_profile" ] || new_profile="$(amx_profile_file "$current")" || return 1
   new_profile="$(amx_validate_profile "$new_profile")" || return 1
   amx_set_profile "$rom" "$new_profile" || return 1
   msgbox AntiMicroX "$(amx_txt 'Profil associé au jeu.' 'Profile assigned to game.')"
@@ -339,8 +396,9 @@ amx_live_cmd() { python3 "$WT_ROOT/helpers/antimicrox_live.py" --home "$WT_HOME"
 amx_live_start_for() {
   local rom="$1" profile="${2:-}" selected switch_label
   local -a options=()
-  [ -n "$(amx_binary 2>/dev/null)" ] && [ -w /dev/uinput ] || {
-    msgbox AntiMicroX "$(amx_txt 'Installez AntiMicroX et vérifiez /dev/uinput avec le diagnostic.' 'Install AntiMicroX and check /dev/uinput in diagnostics.')"; return 1;
+  amx_ensure_installed || return 1
+  [ -w /dev/uinput ] || {
+    msgbox AntiMicroX "$(amx_txt 'Accès à /dev/uinput indisponible. Consultez le diagnostic AntiMicroX.' 'Access to /dev/uinput is unavailable. Check AntiMicroX diagnostics.')"; return 1;
   }
   command -v batocera-evmapy >/dev/null 2>&1 || {
     msgbox AntiMicroX "$(amx_txt 'batocera-evmapy est indisponible : session annulée.' 'batocera-evmapy is unavailable: session cancelled.')"; return 1;
@@ -369,6 +427,7 @@ amx_live_start_for() {
 amx_live_choose() {
   local rom current choice profile
   local -a options=()
+  amx_ensure_installed || return 1
   rom="$(amx_choose_game)" || return
   current="$(awk -F '\t' -v p="$rom" '$1==p {v=$2} END{print v}' "$AMX_OVERRIDES" 2>/dev/null)"
   [ ! -f "$current" ] || options=(current "$(amx_txt 'Modifier le profil actuel de ce jeu' 'Edit this game’s current profile')")
@@ -433,7 +492,7 @@ antimicrox_menu() {
   while true; do
     bin="$(amx_binary 2>/dev/null || true)"
     intro="$(amx_txt 'Utilisez la manette dans les jeux prévus pour le clavier et la souris. Un profil enregistre les commandes de votre manette pour un jeu.\n\nCommencez par créer un profil en jeu, ou utilisez un profil déjà prêt.' 'Use your controller in games designed for keyboard and mouse. A profile stores your controller mappings for a game.\n\nStart by creating a profile in game, or use a ready-made profile.')"
-    [ -n "$bin" ] || intro+="\n\n$(amx_txt 'AntiMicroX n’est pas installé : choisissez « Installer ou mettre à jour AntiMicroX ».' 'AntiMicroX is not installed: choose “Install or update AntiMicroX”.')"
+    [ -n "$bin" ] || intro+="\n\n$(amx_txt 'AntiMicroX sera proposé à l’installation quand une action en a besoin.' 'You will be offered installation when an action needs AntiMicroX.')"
     choice="$(menu_select "AntiMicroX" "$intro" \
       1 "$(amx_txt 'Créer ou modifier un profil en jeu (bêta)' 'Create or edit a profile in game (beta)')" \
       2 "$(amx_txt 'Mes jeux et leurs profils' 'My games and their profiles')" \
@@ -449,25 +508,17 @@ antimicrox_menu() {
     case "$choice" in
       1) amx_live_choose ;;
       2) amx_manage_associations ;;
-      3)
-        rom="$(amx_choose_game)" || continue
-        amx_assign_profile_for "$rom" ;;
+      3) amx_assign_existing ;;
       4|community) community_menu antimicrox ;;
       5) amx_convert_pad2key ;;
       6) amx_editor ;;
       7)
-        [ -n "$bin" ] || { msgbox "AntiMicroX" "$(amx_txt 'Installez d’abord AntiMicroX depuis ce menu.' 'Install AntiMicroX from this menu first.')"; continue; }
+        amx_ensure_installed || continue
+        bin="$(amx_binary)" || continue
         output="$(timeout 15 "$bin" --list 2>&1)"; rc=$?
         msgbox "AntiMicroX" "$(amx_txt "Manettes détectées (code $rc) :" "Detected controllers (code $rc):")\n$output" ;;
       8) amx_delete_profiles ;;
-      9)
-        if yesno "AntiMicroX" "$(amx_txt 'Télécharger la version officielle AntiMicroX 3.6.1 et l’installer sur ce Batocera ?' 'Download official AntiMicroX 3.6.1 and install it on this Batocera?')"; then
-          if "$WT_ROOT/helpers/install-antimicrox.sh" > /tmp/uwt-amx-install.log 2>&1; then
-            msgbox "AntiMicroX" "$(amx_txt 'AntiMicroX est installé. Vous pouvez maintenant créer un profil ou ouvrir l’éditeur.' 'AntiMicroX is installed. You can now create a profile or open the editor.')"
-          else
-            msgbox "AntiMicroX" "$(amx_txt 'Échec de l’installation. Consultez /tmp/uwt-amx-install.log' 'Installation failed. Check /tmp/uwt-amx-install.log')"
-          fi
-        fi ;;
+      9) amx_install && msgbox AntiMicroX "$(amx_txt 'AntiMicroX est installé.' 'AntiMicroX is installed.')" ;;
       10) amx_diagnostic ;;
       0|'') return ;;
     esac
