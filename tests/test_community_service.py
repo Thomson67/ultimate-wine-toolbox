@@ -1,4 +1,6 @@
 import hashlib
+import builtins
+import pty
 import json
 import os
 from pathlib import Path
@@ -214,6 +216,38 @@ community_validate antimicrox Community
     def test_grant_from_another_service_is_never_sent(self):
         self.save_device(api='https://other.example')
         self.assertFalse(self.service.remembered_login()); self.assertFalse(self.service.device.exists()); self.assertEqual(self.requests, [])
+
+    def test_pairing_display_uses_nonseekable_terminal_with_or_without_dialog(self):
+        for dialog in (False, True):
+            with self.subTest(dialog=dialog):
+                master, slave = pty.openpty()
+                ui = None
+                try:
+                    def terminal_open(path, *args, **kwargs):
+                        self.assertEqual(path, '/dev/tty')
+                        return builtins.open(os.ttyname(slave), *args, **kwargs)
+                    child = Mock(); child.poll.return_value = None
+                    with patch.object(service, 'open', side_effect=terminal_open, create=True), \
+                         patch.object(service.shutil, 'which', return_value='/usr/bin/dialog' if dialog else None), \
+                         patch.object(service.subprocess, 'Popen', return_value=child) as popen:
+                        ui = service.show_pairing('K7MP-4RXN', service.API+'/pair', 'fr')
+                    self.assertTrue(ui.tty.isatty()); self.assertFalse(ui.tty.seekable())
+                    if dialog:
+                        self.assertIs(popen.call_args.kwargs['stdin'], ui.tty)
+                        self.assertIs(popen.call_args.kwargs['stderr'], ui.tty)
+                        self.assertIn('K7MP-4RXN', popen.call_args.args[0][-3])
+                        os.write(ui.tty.fileno(), b'dialog terminal output')
+                        self.assertIn(b'dialog terminal output', os.read(master, 4096))
+                    else:
+                        popen.assert_not_called()
+                        rendered = os.read(master, 4096).decode('utf-8')
+                        self.assertIn('K7MP-4RXN', rendered); self.assertIn(service.API+'/pair', rendered)
+                        self.assertIn('téléphone', rendered)
+                    ui.close(); self.assertTrue(ui.tty.closed); ui = None
+                    if dialog: child.terminate.assert_called_once()
+                finally:
+                    if ui is not None: ui.close()
+                    os.close(master); os.close(slave)
 
 
 if __name__ == '__main__': unittest.main()

@@ -228,13 +228,14 @@ def show_pairing(code, url, language):
     fr = language == 'fr'
     message = (f"Sur votre PC ou téléphone, ouvrez :\n\n{url}\n\nCode : {code}\n\nCollez votre clé validateur sur cette page, vérifiez le code et autorisez cet appareil.\n\nLa Toolbox continuera automatiquement. Code valable 5 minutes.\nVous pouvez choisir de mémoriser cet appareil pendant 30 jours sur la page." if fr else
                f"On your PC or phone, open:\n\n{url}\n\nCode: {code}\n\nPaste your validator key on that page, check the code and authorize this device.\n\nThe Toolbox will continue automatically. Code valid for 5 minutes.\nYou can choose to remember this device for 30 days on the page.")
-    tty = open('/dev/tty', 'r+')
+    # A terminal cannot seek: buffered text update mode (r+) fails on PTYs.
+    tty = open('/dev/tty', 'r+b', buffering=0)
     try:
         if shutil.which('dialog'):
             process = subprocess.Popen(['dialog', '--no-shadow', '--title', 'UWT — '+('Appairage validateur' if fr else 'Validator pairing'),
                                         '--ok-label', 'Annuler' if fr else 'Cancel', '--msgbox', message, '22', '96'], stdin=tty, stdout=tty, stderr=tty)
         else:
-            tty.write(message+'\nCtrl+C : '+('annuler' if fr else 'cancel')+'\n'); tty.flush(); process = None
+            tty.write((message+'\nCtrl+C : '+('annuler' if fr else 'cancel')+'\n').encode('utf-8')); process = None
         return PairingDisplay(process, tty)
     except BaseException:
         tty.close(); raise
