@@ -195,9 +195,9 @@ def introduction(owner, windows, api, clock=time.monotonic, sleep=time.sleep,
                                'Configure with AntiMicroX: Alt+Tab or Hotkey + A (Xbox) / Cross (PlayStation)'
                                '\nRelease the buttons after switching. Save the profile before quitting.')
                     try:
-                        run(['batocera-flash-screen', '6', 'white', message, '18'],
-                            timeout=9, check=False, stdin=subprocess.DEVNULL)
-                        print('AntiMicroX live game-first introduction shown', flush=True)
+                        result = run([sys.executable, str(Path(__file__).with_name('antimicrox_notice.py')), message],
+                                     timeout=9, check=False, stdin=subprocess.DEVNULL)
+                        print(f'AntiMicroX live passive introduction exit={result.returncode}', flush=True)
                     except (OSError, subprocess.TimeoutExpired) as exc:
                         print(f'AntiMicroX live introduction failed: {exc}', flush=True)
                     return

@@ -178,12 +178,19 @@ use `--no-tray`, avoiding the Settings OK crash.
 At startup, the live focus observer waits for a stable Wine XWayland window,
 checks that ES runs the requested ROM, and asks the window manager to bring
 that window forward once. AntiMicroX remains open for Alt+Tab. After game focus
-is confirmed, a six-second Batocera banner explains Alt+Tab and Hotkey + Xbox A /
+is confirmed, a six-second passive banner explains Alt+Tab and Hotkey + Xbox A /
 PlayStation Cross, in the Toolbox's language. No confirmation is needed.
 The initial wait is bounded to 120 seconds and activation is requested only
 once; unrelated foreground applications are not raised over. If activation is
 ignored, no banner is shown over the editor. Later switches remain manual.
-This startup behavior still needs a hardware test on Batocera/labwc.
+The startup banner uses a non-interactive GTK layer-shell overlay on Wayland
+(keyboard mode NONE, no exclusive zone, pointer/touch pass-through). On X11 it
+uses an override-redirect popup that does not accept focus. If the safe Wayland
+overlay is unavailable, the banner is skipped instead of using a normal window.
+The earlier `batocera-flash-screen` startup banner could activate a GTK window;
+Max Payne reported `DIERR_NOTACQUIRED` at that point. The passive replacement
+still needs a hardware test on Batocera/labwc. The previously validated short
+focus-recovery banner on later editor-to-game returns is unchanged.
 
 Use **Alt+Tab** on the keyboard or **Hotkey + bottom face button** (DualSense
 Cross / Xbox A) on Batocera player 1's controller. Release the combination after

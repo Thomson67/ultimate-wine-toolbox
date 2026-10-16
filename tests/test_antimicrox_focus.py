@@ -130,9 +130,10 @@ class IntroductionTests(unittest.TestCase):
         self.windows.activate.assert_called_once_with(2)
         self.run.assert_called_once()
         command = self.run.call_args.args[0]
-        self.assertEqual(command[:3], ['batocera-flash-screen', '6', 'white'])
-        self.assertIn('Alt+Tab', command[3]); self.assertIn('Hotkey + A', command[3])
-        self.assertIn('Croix', command[3])
+        self.assertEqual(Path(command[1]).name, 'antimicrox_notice.py')
+        self.assertNotIn('batocera-flash-screen', command)
+        self.assertIn('Alt+Tab', command[2]); self.assertIn('Hotkey + A', command[2])
+        self.assertIn('Croix', command[2])
 
     def test_already_foreground_game_only_shows_popup_once_in_english(self):
         (self.owner.home/'config/language').write_text('en\n')
@@ -140,7 +141,7 @@ class IntroductionTests(unittest.TestCase):
         self.intro()
         self.windows.activate.assert_not_called()
         self.run.assert_called_once()
-        self.assertIn('Cross (PlayStation)', self.run.call_args.args[0][3])
+        self.assertIn('Cross (PlayStation)', self.run.call_args.args[0][2])
 
     def test_other_app_is_not_interrupted_and_wrong_rom_gets_no_popup(self):
         self.windows.game_window.return_value = 2
