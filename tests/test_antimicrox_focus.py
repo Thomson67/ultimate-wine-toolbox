@@ -55,7 +55,7 @@ class FocusTests(unittest.TestCase):
             if len(calls) == 3:
                 owner.active.return_value = False
         focus.watch(owner, windows, service, clock=iter([0, 1, 1.3]).__next__,
-                    sleep=sleep, run=runner)
+                    sleep=sleep, run=runner, show_intro=False)
         return runner
 
     def test_verified_return_runs_only_the_timed_popup(self):
@@ -96,5 +96,84 @@ class FocusTests(unittest.TestCase):
         windows = Mock(); windows.current.side_effect = [('editor', 1), ('game', 2), ('game', 2), ('game', 2)]
         api = Mock(); api.running.return_value = (200, '/game')
         run = Mock(side_effect=OSError('not available'))
-        focus.watch(owner, windows, api, clock=iter([0, 1, 1.3]).__next__, sleep=lambda _: None, run=run)
+        focus.watch(owner, windows, api, clock=iter([0, 1, 1.3]).__next__, sleep=lambda _: None, run=run,
+                    show_intro=False)
         run.assert_called_once()
+
+
+class IntroductionTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
+        home = Path(self.temp.name); (home/'config').mkdir()
+        (home/'config/language').write_text('fr\n')
+        self.owner = Mock(pid=42, rom='/userdata/roms/windows/Game.wsquashfs', home=home)
+        self.owner.active.return_value = True
+        self.now = 0
+        self.windows = Mock()
+        self.windows.current.return_value = ('editor', 1)
+        self.windows.game_window.return_value = 0
+        self.api = Mock(); self.api.running.return_value = (200, self.owner.rom)
+        self.run = Mock()
+
+    def intro(self, advance=None, timeout=5):
+        def sleep(seconds):
+            self.now += seconds
+            if advance: advance(self.now)
+        focus.introduction(self.owner, self.windows, self.api, clock=lambda: self.now,
+                           sleep=sleep, run=self.run, timeout=timeout)
+
+    def test_waits_for_game_then_activates_once_and_shows_switch_instructions(self):
+        self.windows.activate.side_effect = lambda _: setattr(self.windows.current, 'return_value', ('game', 2))
+        def advance(now):
+            if now >= 1: self.windows.game_window.return_value = 2
+        self.intro(advance)
+        self.windows.activate.assert_called_once_with(2)
+        self.run.assert_called_once()
+        command = self.run.call_args.args[0]
+        self.assertEqual(command[:3], ['batocera-flash-screen', '6', 'white'])
+        self.assertIn('Alt+Tab', command[3]); self.assertIn('Hotkey + A', command[3])
+        self.assertIn('Croix', command[3])
+
+    def test_already_foreground_game_only_shows_popup_once_in_english(self):
+        (self.owner.home/'config/language').write_text('en\n')
+        self.windows.current.return_value = ('game', 2)
+        self.intro()
+        self.windows.activate.assert_not_called()
+        self.run.assert_called_once()
+        self.assertIn('Cross (PlayStation)', self.run.call_args.args[0][3])
+
+    def test_other_app_is_not_interrupted_and_wrong_rom_gets_no_popup(self):
+        self.windows.game_window.return_value = 2
+        self.windows.current.return_value = ('other', 3)
+        self.intro()
+        self.windows.activate.assert_not_called(); self.run.assert_not_called()
+        self.now = 0; self.windows.current.return_value = ('editor', 1)
+        self.api.running.return_value = (200, '/other.wine')
+        self.intro()
+        self.windows.activate.assert_not_called(); self.run.assert_not_called()
+
+    def test_failed_activation_never_displays_popup_over_editor_or_retries(self):
+        self.windows.game_window.return_value = 2
+        self.intro(timeout=10)
+        self.windows.activate.assert_called_once_with(2)
+        self.run.assert_not_called()
+
+    def test_session_stops_before_game_appears(self):
+        self.intro(lambda now: setattr(self.owner.active, 'return_value', False))
+        self.windows.activate.assert_not_called(); self.run.assert_not_called()
+
+    def test_focus_changes_during_api_call_do_not_raise_game(self):
+        self.windows.game_window.return_value = 2
+        def running():
+            self.windows.current.return_value = ('other', 3)
+            return 200, self.owner.rom
+        self.api.running.side_effect = running
+        self.intro()
+        self.windows.activate.assert_not_called(); self.run.assert_not_called()
+
+    def test_missing_popup_tool_does_not_repeat_or_stop_session(self):
+        self.windows.current.return_value = ('game', 2)
+        self.run.side_effect = OSError('missing')
+        self.intro()
+        self.run.assert_called_once()
+        self.assertTrue(self.owner.active())

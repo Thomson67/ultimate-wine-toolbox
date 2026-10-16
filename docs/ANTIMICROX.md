@@ -175,6 +175,16 @@ Its Windows game hook starts one visible AntiMicroX editing instance with that
 profile, uinput, isolated settings and the enlarged window. The editor does not
 use `--no-tray`, avoiding the Settings OK crash.
 
+At startup, the live focus observer waits for a stable Wine XWayland window,
+checks that ES runs the requested ROM, and asks the window manager to bring
+that window forward once. AntiMicroX remains open for Alt+Tab. After game focus
+is confirmed, a six-second Batocera banner explains Alt+Tab and Hotkey + Xbox A /
+PlayStation Cross, in the Toolbox's language. No confirmation is needed.
+The initial wait is bounded to 120 seconds and activation is requested only
+once; unrelated foreground applications are not raised over. If activation is
+ignored, no banner is shown over the editor. Later switches remain manual.
+This startup behavior still needs a hardware test on Batocera/labwc.
+
 Use **Alt+Tab** on the keyboard or **Hotkey + bottom face button** (DualSense
 Cross / Xbox A) on Batocera player 1's controller. Release the combination after
 each switch. A temporary per-ROM evmapy rule sends Alt+Tab independently of the

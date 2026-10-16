@@ -46,7 +46,7 @@ class Owner:
 
 
 class XWindows:
-    """Observe XWayland activation without changing windows or sending keys."""
+    """Observe XWayland windows and request initial activation through the WM."""
     def __init__(self):
         self.x = C.CDLL(ctypes.util.find_library('X11') or 'libX11.so.6')
         self.x.XOpenDisplay.argtypes = [C.c_char_p]
@@ -61,6 +61,8 @@ class XWindows:
             C.POINTER(C.c_void_p)]
         self.x.XFree.argtypes = [C.c_void_p]
         self.x.XCloseDisplay.argtypes = [C.c_void_p]
+        self.x.XSendEvent.argtypes = [C.c_void_p, C.c_ulong, C.c_int, C.c_long, C.c_void_p]
+        self.x.XFlush.argtypes = [C.c_void_p]
         # Windows may disappear between activation and PID lookup.
         self.error = C.CFUNCTYPE(C.c_int, C.c_void_p, C.c_void_p)(lambda *_: 0)
         self.x.XSetErrorHandler.argtypes = [C.c_void_p]
@@ -70,33 +72,39 @@ class XWindows:
             raise RuntimeError('Cannot observe XWayland activation')
         self.root = self.x.XDefaultRootWindow(self.display)
         self.atoms = {name: self.x.XInternAtom(self.display, name.encode(), 0)
-                      for name in ('_NET_ACTIVE_WINDOW', '_NET_WM_PID')}
+                      for name in ('_NET_ACTIVE_WINDOW', '_NET_WM_PID', '_NET_CLIENT_LIST_STACKING')}
         self.kinds = {}
 
-    def cardinal(self, window, name):
+    def cardinals(self, window, name, limit=1):
         actual, count, remaining = C.c_ulong(), C.c_ulong(), C.c_ulong()
         fmt, data = C.c_int(), C.c_void_p()
         try:
             status = self.x.XGetWindowProperty(self.display, window, self.atoms[name],
-                0, 1, 0, 0, C.byref(actual), C.byref(fmt), C.byref(count),
+                0, limit, 0, 0, C.byref(actual), C.byref(fmt), C.byref(count),
                 C.byref(remaining), C.byref(data))
             if status == 0 and fmt.value == 32 and count.value and data.value:
-                return C.cast(data, C.POINTER(C.c_ulong))[0]
-            return 0
+                return list(C.cast(data, C.POINTER(C.c_ulong))[:count.value])
+            return []
         finally:
             if data.value:
                 self.x.XFree(data)
+
+    def cardinal(self, window, name):
+        return next(iter(self.cardinals(window, name)), 0)
 
     def current(self, editor_pid):
         window = self.cardinal(self.root, '_NET_ACTIVE_WINDOW')
         if not window:
             return 'unknown', 0
+        return self.kind(window, editor_pid), window
+
+    def kind(self, window, editor_pid):
         pid = self.cardinal(window, '_NET_WM_PID')
         if pid == editor_pid:
-            return 'editor', window
+            return 'editor'
         identity = (pid, process_start(pid))
         if identity in self.kinds:
-            return self.kinds[identity], window
+            return self.kinds[identity]
         kind = 'other'
         try:
             maps = Path(f'/proc/{pid}/maps').read_text()
@@ -107,7 +115,27 @@ class XWindows:
         if len(self.kinds) >= 128:
             self.kinds.clear()
         self.kinds[identity] = kind
-        return kind, window
+        return kind
+
+    def game_window(self, editor_pid):
+        for window in reversed(self.cardinals(self.root, '_NET_CLIENT_LIST_STACKING', 4096)):
+            if self.kind(window, editor_pid) == 'game':
+                return window
+        return 0
+
+    def activate(self, window):
+        # EWMH client message: ask labwc/X11 WM, without injecting Alt+Tab/keys.
+        class Message(C.Structure):
+            _fields_ = [('type', C.c_int), ('serial', C.c_ulong), ('send_event', C.c_int),
+                        ('display', C.c_void_p), ('window', C.c_ulong),
+                        ('message_type', C.c_ulong), ('format', C.c_int), ('data', C.c_long*5)]
+        class Event(C.Union):
+            _fields_ = [('message', Message), ('pad', C.c_long*24)]
+        event = Event()
+        event.message = Message(33, 0, 1, self.display, window,
+                                self.atoms['_NET_ACTIVE_WINDOW'], 32, (C.c_long*5)(2, 0, 0, 0, 0))
+        self.x.XSendEvent(self.display, self.root, 0, (1 << 20) | (1 << 19), C.byref(event))
+        self.x.XFlush(self.display)
 
     def close(self):
         self.x.XCloseDisplay(self.display)
@@ -138,9 +166,50 @@ class Returns:
         return None
 
 
+def introduction(owner, windows, api, clock=time.monotonic, sleep=time.sleep,
+                 run=subprocess.run, timeout=120):
+    """Give the game initial focus once; later user switches remain untouched."""
+    deadline = clock()+timeout
+    candidate, since, requested = 0, 0, False
+    while owner.active() and clock() < deadline:
+        kind, current = windows.current(owner.pid)
+        target = current if kind == 'game' else windows.game_window(owner.pid)
+        if target != candidate:
+            candidate, since = target, clock()
+        if candidate and clock()-since >= 1 and kind in ('editor', 'game'):
+            if api.running() == (200, owner.rom) and owner.active():
+                # Recheck after the HTTP call; never raise over another app.
+                observed = windows.current(owner.pid)
+                if observed[0] == 'editor' and not requested:
+                    windows.activate(candidate)
+                    requested = True
+                    deadline = min(deadline, clock()+5)
+                elif observed == ('game', candidate):
+                    try:
+                        language = (owner.home/'config/language').read_text().strip()
+                    except OSError:
+                        language = 'fr' if os.environ.get('LANG', '').startswith('fr') else 'en'
+                    message = ('Configurer avec AntiMicroX : Alt+Tab ou Hotkey + A (Xbox) / Croix (PlayStation)'
+                               '\nRelâchez les boutons après la bascule. Enregistrez le profil avant de quitter.'
+                               if language == 'fr' else
+                               'Configure with AntiMicroX: Alt+Tab or Hotkey + A (Xbox) / Cross (PlayStation)'
+                               '\nRelease the buttons after switching. Save the profile before quitting.')
+                    try:
+                        run(['batocera-flash-screen', '6', 'white', message, '18'],
+                            timeout=9, check=False, stdin=subprocess.DEVNULL)
+                        print('AntiMicroX live game-first introduction shown', flush=True)
+                    except (OSError, subprocess.TimeoutExpired) as exc:
+                        print(f'AntiMicroX live introduction failed: {exc}', flush=True)
+                    return
+        sleep(.1)
+    print('AntiMicroX live introduction skipped: game focus unavailable or session ended', flush=True)
+
+
 def watch(owner, windows, api=None, clock=time.monotonic, sleep=time.sleep,
-          run=subprocess.run):
+          run=subprocess.run, show_intro=True):
     api, returns = api or EsApi(), Returns()
+    if show_intro:
+        introduction(owner, windows, api, clock, sleep, run)
     while owner.active():
         target = returns.observe(windows.current(owner.pid), clock())
         if target:
