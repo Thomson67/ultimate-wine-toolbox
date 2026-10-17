@@ -25,7 +25,7 @@ SAVE_ROOTS = (
 )
 # Broad data formats remain candidates, but explicit save evidence ranks higher.
 SAVE_EXTENSIONS = {".sav", ".save", ".profile", ".slot", ".dat", ".bin", ".json"}
-SAVE_NAME_HINTS = ("sav", "slot")
+SAVE_NAME_HINTS = ("sav", "slot", "user")
 STRONG_SAVE_EXTENSIONS = {".sav", ".save", ".profile", ".slot"}
 TEMPORARY_EXTENSIONS = {".log", ".tmp", ".temp", ".dmp", ".mdmp", ".wer", ".etl", ".part", ".partial"}
 TEMPORARY_DIRS = {"cache", "caches", "shadercache", "shader_cache", "webcache", "gpucache", "d3dscache", "temp", "tmp"}
@@ -327,13 +327,22 @@ def score_save_dir(rel_dir: str, changed_files, directory_files=None):
         score -= 15
         reasons.append("cache/log-like path")
 
+    # Cache data can use save-like names and extensions too (usercache.dat).
+    # Do not let these files supply positive evidence for a save directory.
+    save_files = [name for name in meaningful if "cache" not in Path(name).name.casefold()]
+    if "cache" in low:
+        score -= 20
+        reasons.append("cache directory name")
+    if len(save_files) < len(meaningful):
+        score -= 20 if not save_files else 5
+        reasons.append("cache filename(s)")
     name_hits = sum(any(hint in Path(name).name.casefold() for hint in SAVE_NAME_HINTS)
-                    for name in meaningful)
-    strong_hits = sum(Path(name).suffix.casefold() in STRONG_SAVE_EXTENSIONS for name in meaningful)
+                    for name in save_files)
+    strong_hits = sum(Path(name).suffix.casefold() in STRONG_SAVE_EXTENSIONS for name in save_files)
     if name_hits or strong_hits:
         score += 65 + min(15, max(name_hits, strong_hits) * 5)
         reasons.append("save-like filename or extension")
-    ext_hits = sum(Path(name).suffix.casefold() in SAVE_EXTENSIONS for name in meaningful)
+    ext_hits = sum(Path(name).suffix.casefold() in SAVE_EXTENSIONS for name in save_files)
     if ext_hits:
         score += min(30, ext_hits * 10)
         reasons.append(f"{ext_hits} save-like file(s)")

@@ -70,6 +70,28 @@ class SaveDirectoryDetectionTests(unittest.TestCase):
             self.assertGreater(scores['drive_c/game/'+folder], scores['drive_c/game/generic'])
         self.assertNotIn('drive_c/game/temporary', scores)
 
+    def test_user_filenames_rank_higher_but_temporary_files_still_do_not_count(self):
+        plain = builder.score_save_dir('drive_c/game/storage', ['state.txt'])[0]
+        for filename in ('User01.dat', 'USERDATA.txt', 'user1'):
+            with self.subTest(filename=filename):
+                self.assertGreater(builder.score_save_dir('drive_c/game/storage', [filename])[0], plain)
+        self.assertEqual(builder.score_save_dir('drive_c/game/storage', ['user.tmp'])[0], 0)
+
+    def test_cache_names_lower_scores_and_do_not_supply_save_evidence(self):
+        plain = builder.score_save_dir('drive_c/game/storage', ['state.txt'])[0]
+        for filename in ('usercache.dat', 'SAVE_CACHE.sav', 'slotCache.txt'):
+            with self.subTest(filename=filename):
+                self.assertLess(builder.score_save_dir('drive_c/game/storage', [filename])[0], plain)
+        real_save = builder.score_save_dir('drive_c/game/storage', ['user.sav'])[0]
+        for directory in ('cache', 'ShaderCache', 'CacheData'):
+            with self.subTest(directory=directory):
+                score = builder.score_save_dir('drive_c/game/'+directory, ['user.sav'])[0]
+                self.assertGreater(score, 0)
+                self.assertLess(score, real_save)
+        mixed = builder.score_save_dir('drive_c/game/storage', ['user.sav', 'cache.bin'])[0]
+        self.assertGreater(mixed, plain)
+        self.assertLess(mixed, real_save)
+
     def test_executable_folder_and_ancestors_rejected_but_save_children_and_siblings_allowed(self):
         executable = 'drive_c/game/bin/Game.exe'
         self.write(executable, 'executable')

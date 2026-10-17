@@ -20,7 +20,7 @@ If the controller does not work, select enable HIDRAW and relaunch. DXVK, FPS li
 
 4. SELECT THE SAVE LOCATION
 B / Back returns to the preceding screen. Abandoning the operation remains a separate action. After externalization, going back does not repeat data transfers.
-Review the detected locations and inspect their contents to confirm where the save is stored. Game subdirectories are also checked for SAVEDIR, even with arbitrary names. Filenames containing sav or slot and save-related extensions rank higher. Folders containing only temporary files such as .log or .tmp are ignored; .txt and extensionless files remain possible candidates. Saves beside the executable belong to individual-file selection (SAVEFILES), rather than externalizing the whole game directory.
+Review the detected locations and inspect their contents to confirm where the save is stored. Game subdirectories are also checked for SAVEDIR, even with arbitrary names. Filenames containing sav, slot or user and save-related extensions rank higher. Cache in a directory or filename lowers the score; cache files do not count as positive evidence even when they contain user or use a .sav extension. Folders containing only temporary files such as .log or .tmp are ignored; .txt and extensionless files remain possible candidates. Saves beside the executable belong to individual-file selection (SAVEFILES), rather than externalizing the whole game directory.
 For long lists, See more possible locations groups lower-scoring suggestions; tied scores stay together.
 Manual search opens a folder picker so you can browse the prefix and choose another folder.
 Select the game's own save folder, rather than a general folder containing unrelated data.
