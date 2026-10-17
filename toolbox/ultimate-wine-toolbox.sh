@@ -73,6 +73,7 @@ if [ "${WT_AUTO_RESUME_WSQ:-0}" = "1" ]; then
     wsq_resume_build
     wsq_rc=$?
     [ "$wsq_rc" -eq 20 ] && exit 0
+    [ "$wsq_rc" -ne 12 ] || wsquashfs_menu
 fi
 
 if [ "${WT_AUTO_RESUME_RESH:-0}" = "1" ] || [ -f "$WT_HOME/state/reshade-diagnostic.json" ]; then

@@ -39,6 +39,52 @@ runner_release_rows_ge
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertEqual([line.split('\t')[0] for line in result.stdout.splitlines()], ['GE-Proton11-7','GE-Proton10-25'])
 
+    def test_x86_archives_and_matching_checksums_for_legacy_and_current_names(self):
+        # Official 11-1/11-3 have ARM first and an unsuffixed x86_64 archive;
+        # 11-4 onward explicitly names both architectures.
+        with tempfile.TemporaryDirectory() as folder:
+            base=Path(folder); releases=[]
+            cases=[('GE-Proton11-1',['GE-Proton11-1-aarch64.tar.gz','GE-Proton11-1.tar.gz']),
+                   ('GE-Proton11-2',['GE-Proton11-2.tar.gz']),
+                   ('GE-Proton11-3',['GE-Proton11-3-aarch64.tar.gz','GE-Proton11-3.tar.gz']),
+                   ('GE-Proton11-4',['GE-Proton11-4-aarch64.tar.gz','GE-Proton11-4-x86_64.tar.gz']),
+                   ('GE-Proton11-5',['GE-Proton11-5-aarch64.tar.gz','GE-Proton11-5-arm64.tar.gz']),
+                   ('GE-Proton11-6',['GE-Proton11-6.tar.gz','GE-Proton11-6-x86_64.tar.gz'])]
+            for tag, names in cases:
+                assets=[]
+                for name in names:
+                    checksum=name.removesuffix('.tar.gz')+'.sha512sum'
+                    for filename in (name,checksum):
+                        assets.append(dict(name=filename,browser_download_url='https://example.test/'+filename,size=100))
+                releases.append(dict(tag_name=tag,assets=assets))
+            (base/'releases').write_text('\n'.join(json.dumps(item) for item in releases))
+            for definition in ('base','classic'):
+                with self.subTest(definition=definition):
+                    code=('source "$WT_ROOT/modules/runners.sh"\n' if definition=='base' else '')+"""runner_fetch_all_releases() { cp "$WT_HOME/releases" "$2"; }
+runner_release_rows_ge
+"""
+                    result=self.run_shell(base,code)
+                    self.assertEqual(result.returncode,0,result.stderr)
+                    rows={parts[0]:parts for parts in (line.split('\t') for line in result.stdout.splitlines())}
+                    self.assertNotIn('GE-Proton11-5',rows)
+                    for tag,expected in [('GE-Proton11-1','GE-Proton11-1.tar.gz'),('GE-Proton11-2','GE-Proton11-2.tar.gz'),
+                                         ('GE-Proton11-3','GE-Proton11-3.tar.gz'),('GE-Proton11-4','GE-Proton11-4-x86_64.tar.gz'),
+                                         ('GE-Proton11-6','GE-Proton11-6-x86_64.tar.gz')]:
+                        self.assertEqual(rows[tag][1],expected)
+                        self.assertEqual(rows[tag][4],'https://example.test/'+expected.removesuffix('.tar.gz')+'.sha512sum')
+
+    def test_archive_suffixed_checksum_naming_is_also_supported(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base=Path(folder);tag='GE-Proton10-25';name=tag+'.tar.gz'
+            (base/'releases').write_text(json.dumps(dict(tag_name=tag,assets=[
+                dict(name=name,browser_download_url='archive',size=100),
+                dict(name=name+'.sha512sum',browser_download_url='checksum')]))+'\n')
+            result=self.run_shell(base,"""runner_fetch_all_releases() { cp "$WT_HOME/releases" "$2"; }
+runner_release_rows_ge
+""")
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(result.stdout.strip().split('\t')[4],'checksum')
+
     def test_version_note_only_marks_ge_11_in_both_languages(self):
         for language in ('fr','en'):
             with self.subTest(language=language), tempfile.TemporaryDirectory() as folder:

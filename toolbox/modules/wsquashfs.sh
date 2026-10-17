@@ -537,72 +537,77 @@ wsq_create_new() {
         return
     }
 
-    source="$(wsq_select_source_game)" || return
-    [ -d "$source" ] || {
-        msgbox "$(i18n wsq_create_title)" "$(i18n wsq_source_invalid "$source")"
-        return
-    }
-
-    source="$(readlink -f -- "$source" 2>/dev/null || printf '%s' "$source")"
-    local windows_root
-    windows_root="$(readlink -f -- "$WSQ_WINDOWS_DIR" 2>/dev/null || printf '%s' "$WSQ_WINDOWS_DIR")"
-
-    if [ "$source" = "$windows_root" ]; then
-        msgbox "$(i18n wsq_create_title)" "$(i18n wsq_source_root_forbidden "$source")"
-        return
-    fi
-
-    if [[ "$(basename "$source")" == *.wine ]]; then
-        target="$source"
-        raw_name="$(basename "$source")"
-        raw_name="${raw_name%.wine}"
-        game_name="$(wsq_clean_name "$raw_name")"
-        [ -n "$game_name" ] || game_name="$raw_name"
-
-        [ -d "$target/drive_c" ] || {
-            msgbox "$(i18n wsq_create_title)" "$(i18n wsq_wine_invalid "$target")"
-            return
-        }
-    else
-        if find "$source" -mindepth 1 -maxdepth 1 \
-            \( -type d \( -iname '*.wine' -o -iname '*.pc' \) -o -type f -iname '*.wsquashfs' \) \
-            -print -quit 2>/dev/null | grep -q .; then
-            msgbox "$(i18n wsq_create_title)" "$(i18n wsq_source_contains_games "$source")"
-            return
-        fi
-
-        wsq_select_template || return
-        template="$WSQ_SELECTED_TEMPLATE"
-        raw_name="$(basename "$source")"
-        raw_name="${raw_name%.pc}"
-        game_name="$(wsq_clean_name "$raw_name")"
-        [ -n "$game_name" ] || game_name="$raw_name"
-        target="$(dirname "$source")/$game_name.wine"
-
-        [ ! -e "$target" ] || {
-            msgbox "$(i18n wsq_create_title)" "$(i18n wsq_target_exists "$target")"
+    local WT_MENU_CANCEL_LABEL="$(i18n back)"
+    while true; do
+        source="$(wsq_select_source_game)" || return
+        [ -d "$source" ] || {
+            msgbox "$(i18n wsq_create_title)" "$(i18n wsq_source_invalid "$source")"
             return
         }
 
-        yesno_default_no "$(i18n wsq_create_title)" \
-            "$(i18n wsq_move_confirm "$source" "$template" "$target")" || return
+        source="$(readlink -f -- "$source" 2>/dev/null || printf '%s' "$source")"
+        local windows_root
+        windows_root="$(readlink -f -- "$WSQ_WINDOWS_DIR" 2>/dev/null || printf '%s' "$WSQ_WINDOWS_DIR")"
 
-        if ! wsq_prepare_prefix "$source" "$template" "$game_name" "$target"; then
-            msgbox "$(i18n wsq_create_title)" "$(i18n wsq_prepare_failed "$target")"
+        if [ "$source" = "$windows_root" ]; then
+            msgbox "$(i18n wsq_create_title)" "$(i18n wsq_source_root_forbidden "$source")"
             return
         fi
-    fi
 
-    exe_rel="$(wsq_select_executable "$target")" || {
-        msgbox "$(i18n wsq_create_title)" "$(i18n wsq_prefix_kept "$target")"
-        return
-    }
+        if [[ "$(basename "$source")" == *.wine ]]; then
+            target="$source"
+            raw_name="$(basename "$source")"
+            raw_name="${raw_name%.wine}"
+            game_name="$(wsq_clean_name "$raw_name")"
+            [ -n "$game_name" ] || game_name="$raw_name"
+
+            [ -d "$target/drive_c" ] || {
+                msgbox "$(i18n wsq_create_title)" "$(i18n wsq_wine_invalid "$target")"
+                return
+            }
+        else
+            if find "$source" -mindepth 1 -maxdepth 1 \
+                \( -type d \( -iname '*.wine' -o -iname '*.pc' \) -o -type f -iname '*.wsquashfs' \) \
+                -print -quit 2>/dev/null | grep -q .; then
+                msgbox "$(i18n wsq_create_title)" "$(i18n wsq_source_contains_games "$source")"
+                return
+            fi
+
+            local prepared=0
+            while true; do
+                wsq_select_template || break
+                template="$WSQ_SELECTED_TEMPLATE"
+                raw_name="$(basename "$source")"
+                raw_name="${raw_name%.pc}"
+                game_name="$(wsq_clean_name "$raw_name")"
+                [ -n "$game_name" ] || game_name="$raw_name"
+                target="$(dirname "$source")/$game_name.wine"
+
+                [ ! -e "$target" ] || {
+                    msgbox "$(i18n wsq_create_title)" "$(i18n wsq_target_exists "$target")"
+                    return
+                }
+
+                yesno_default_no "$(i18n wsq_create_title)" \
+                    "$(i18n wsq_move_confirm "$source" "$template" "$target")" || continue
+
+                if ! wsq_prepare_prefix "$source" "$template" "$game_name" "$target"; then
+                    msgbox "$(i18n wsq_create_title)" "$(i18n wsq_prepare_failed "$target")"
+                    return
+                fi
+                prepared=1
+                break
+            done
+            [ "$prepared" -eq 1 ] || continue
+        fi
+
+        while true; do
+            exe_rel="$(wsq_select_executable "$target")" || break
+            runner="$(wsq_select_runner)" || continue
+            break 2
+        done
+    done
     wsq_write_autorun "$target" "$exe_rel"
-
-    runner="$(wsq_select_runner)" || {
-        msgbox "$(i18n wsq_create_title)" "$(i18n wsq_prefix_kept "$target")"
-        return
-    }
 
     rom_name="$(basename "$target")"
     wsq_set_runner_config "$rom_name" "$runner" || {
@@ -883,7 +888,17 @@ wsq_copy_savefiles() {
         WSQ_LAST_SAVE_BACKUP=""
         wsq_save_destination_prepare "$WSQ_SAVE_ROOT/$game_name"
         rc=$?
-        if [ "$rc" -eq 0 ]; then
+        if [ "$rc" -eq 11 ]; then
+            local name
+            for name in "${names[@]}"; do
+                [ -f "$WSQ_SAVE_ROOT/$game_name/$name" ] || { rm -rf -- "$staging"; return 9; }
+            done
+            python3 "$WT_ROOT/helpers/wsquashfs_savefiles.py" remove "$prefix" "$snapshot" \
+                --folder "$save_rel" --save-root "$WSQ_SAVE_ROOT" "${names[@]}" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1
+            rc=$?
+            rm -rf -- "$staging"
+            return "$rc"
+        elif [ "$rc" -eq 0 ]; then
             cp -a -- "$staging/." "$WSQ_SAVE_ROOT/$game_name/"
             rc=$?
             if [ "$rc" -eq 0 ]; then
@@ -899,59 +914,50 @@ wsq_copy_savefiles() {
 
 wsq_select_save_candidate() {
     local prefix="$1" snapshot="$2"
-    WSQ_SELECTED_SAVE=""
-    WSQ_SELECTED_SAVEFILES=""
-    WSQ_SAVE_KIND="directory"
-    local -a items=()
-    local rows="" score count rel reason idx=1 choice validated
+    local WT_MENU_CANCEL_LABEL="$(i18n back)"
+    WSQ_SELECTED_SAVE=""; WSQ_SELECTED_SAVEFILES=""; WSQ_SAVE_KIND=directory
+    local -a primary=() secondary=() paths=() items=()
+    local score count rel reason idx=0 choice validated cutoff="" view=primary prompt
     while IFS=$'\t' read -r score count rel reason; do
         [ -n "$rel" ] || continue
+        [[ "$score" =~ ^[0-9]+$ ]] || continue
         validated="$(python3 "$WSQ_HELPER" validate-save "$prefix" "$rel" "$exe_rel" --save-root "$WSQ_SAVE_ROOT" 2>/dev/null)" || continue
-        items+=("$idx" "[$score] $(wsq_path_label "$validated")  ($count)")
-        rows+="$validated"$'\n'
-        idx=$((idx+1))
+        paths+=("$validated"); idx=$((idx+1))
+        if [ "$idx" -le 6 ] || [ "$score" -ge "$cutoff" ]; then
+            primary+=("$idx" "[$score] $(wsq_path_label "$validated")  ($count)")
+            cutoff="$score"
+        else
+            secondary+=("$idx" "[$score] $(wsq_path_label "$validated")  ($count)")
+        fi
     done < <(python3 "$WSQ_HELPER" diff "$prefix" "$snapshot")
-
-    if [ "${#items[@]}" -gt 0 ]; then
-        items+=("files" "$(i18n wsq_files_title)"
-                "browse" "$(i18n wsq_browser_title)"
-                "terminal" "$(i18n wsq_browser_terminal)"
-                "retry" "$(i18n wsq_no_save_retry)"
-                "registry" "$(i18n wsq_registry_title)"
-                "cancel" "$(i18n wsq_launch_cancel)")
-        while true; do
-            choice="$(menu_select "$(i18n wsq_save_title)" "$(i18n wsq_detected_choices)" "${items[@]}")" || return 1
-            case "$choice" in
-                browse) wsq_browse_save && return 0 ;;
-                terminal) wsq_browse_save terminal && return 0 ;;
-                retry) wsq_retry_pending; return 1 ;;
-                files) wsq_select_savefiles && return 0 ;;
-                registry) wsq_registry_save && return 0 ;;
-                cancel) wsq_cancel_pending; return 1 ;;
-                *)
-                    case "$choice" in ''|*[!0-9]*) continue ;; esac
-                    [ "$choice" -ge 1 ] && [ "$choice" -lt "$idx" ] || continue
-                    rel="$(sed -n "${choice}p" <<< "$rows")"
-                    wsq_review_save_candidate "$rel" && return 0 ;;
-            esac
-        done
-    fi
-
     while true; do
-        choice="$(menu_select "$(i18n wsq_save_title)" "$(i18n wsq_no_save_choices)" \
-            "retry" "$(i18n wsq_no_save_retry)" \
-            "registry" "$(i18n wsq_registry_title)" \
-            "files" "$(i18n wsq_files_title)" \
-            "browse" "$(i18n wsq_browser_title)" \
-            "terminal" "$(i18n wsq_browser_terminal)" \
-            "cancel" "$(i18n wsq_launch_cancel)")" || return 1
+        if [ "$view" = more ]; then
+            items=("${secondary[@]}" back "$(i18n back)")
+            prompt="$(i18n wsq_more_save_prompt)"
+        else
+            items=("${primary[@]}")
+            [ "${#secondary[@]}" -eq 0 ] || items+=(more "$(i18n wsq_more_save_locations)")
+            items+=(files "$(i18n wsq_files_title)" browse "$(i18n wsq_browser_title)"
+                    terminal "$(i18n wsq_browser_terminal)" retry "$(i18n wsq_no_save_retry)"
+                    registry "$(i18n wsq_registry_title)" back "$(i18n back)"
+                    cancel "$(i18n wsq_launch_cancel)")
+            if [ "${#paths[@]}" -gt 0 ]; then prompt="$(i18n wsq_detected_choices)"
+            else prompt="$(i18n wsq_no_save_choices)"; fi
+        fi
+        choice="$(menu_select "$(i18n wsq_save_title)" "$prompt" "${items[@]}")" || choice=back
         case "$choice" in
+            more) view=more ;;
+            back|'') if [ "$view" = more ]; then view=primary; else return 12; fi ;;
+            browse) wsq_browse_save && return 0 ;;
+            terminal) wsq_browse_save terminal && return 0 ;;
             retry) wsq_retry_pending; return 1 ;;
             files) wsq_select_savefiles && return 0 ;;
             registry) wsq_registry_save && return 0 ;;
-            browse) wsq_browse_save && return 0 ;;
-            terminal) wsq_browse_save terminal && return 0 ;;
             cancel) wsq_cancel_pending; return 1 ;;
+            *)
+                [[ "$choice" =~ ^[0-9]+$ ]] || continue
+                [ "$choice" -ge 1 ] && [ "$choice" -le "${#paths[@]}" ] || continue
+                wsq_review_save_candidate "${paths[$((choice-1))]}" && return 0 ;;
         esac
     done
 }
@@ -967,11 +973,12 @@ wsq_copy_registry_save() {
     fi
     wsq_save_destination_prepare "$dest"
     local rc=$?
-    if [ "$rc" -ne 0 ]; then
+    if [ "$rc" -eq 11 ]; then
+        [ -f "$dest/user.reg" ] || { rm -f -- "$tmp"; return 9; }
+    elif [ "$rc" -ne 0 ]; then
         rm -f -- "$tmp"
         return "$rc"
-    fi
-    if ! cp -- "$tmp" "$dest/user.reg"; then
+    elif ! cp -- "$tmp" "$dest/user.reg"; then
         rm -f -- "$tmp"
         return 1
     fi
@@ -990,6 +997,8 @@ wsq_copy_registry_save() {
 wsq_save_destination_prepare() {
     local dest="$1"
     local choice backup stamp
+    local -a keep=()
+    [ "${WSQ_ALLOW_KEEP_EXISTING:-0}" != 1 ] || keep=(keep "$(i18n wsq_save_conflict_keep)")
 
     if [ ! -e "$dest" ]; then
         mkdir -p "$dest"
@@ -1002,9 +1011,10 @@ wsq_save_destination_prepare() {
         "$(i18n wsq_save_conflict_body "$dest")" \
         "1" "$(i18n wsq_save_conflict_backup)" \
         "2" "$(i18n wsq_save_conflict_replace)" \
-        "0" "$(i18n cancel)")" || return 10
+        "${keep[@]}" "0" "$(i18n back)")" || return 10
 
     case "$choice" in
+        keep) [ "${WSQ_ALLOW_KEEP_EXISTING:-0}" = 1 ] && return 11; return 10 ;;
         1)
             stamp="$(date '+%Y%m%d-%H%M%S')"
             backup="${dest}.backup-${stamp}"
@@ -1065,6 +1075,14 @@ wsq_move_save_data() {
 
     wsq_save_destination_prepare "$dest"
     local prepare_rc=$?
+    if [ "$prepare_rc" -eq 11 ]; then
+        # Keeping existing saves explicitly discards test data inside this prefix.
+        # Never empty an external save target, or follow a save-directory symlink.
+        if [ ! -L "$save_abs" ] && [[ "$source_real" = "$prefix_real/"* ]]; then
+            find "$save_abs" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + || return 9
+        fi
+        return 0
+    fi
     [ "$prepare_rc" -eq 0 ] || return "$prepare_rc"
 
     shopt -s dotglob nullglob
@@ -1411,7 +1429,7 @@ wsq_launch_failure_menu() {
                 wsq_retry_pending
                 return 1 ;;
             retry) wsq_retry_pending; return 1 ;;
-            options) wsq_game_options_menu || return 1 ;;
+            options) wsq_game_options_menu || continue ;;
             cancel) wsq_cancel_pending; return 1 ;;
         esac
     done
@@ -1444,7 +1462,10 @@ wsq_review_launch() {
             yes)
                 rm -f -- "$WSQ_STATE_DIR/wsq-launch-result"
                 return 0 ;;
-            no) wsq_launch_failure_menu "$(i18n wsq_game_failed)"; return 1 ;;
+            no)
+                wsq_launch_failure_menu "$(i18n wsq_game_failed)"
+                [ -s "$WSQ_STATE_FILE" ] || return 1
+                continue ;;
             executable)
                 new_exe="$(wsq_update_select_executable "$prefix")" || continue
                 [ "$new_exe" != "$exe_rel" ] || continue
@@ -1458,7 +1479,7 @@ wsq_review_launch() {
                 }
                 wsq_retry_pending
                 return 1 ;;
-            options) wsq_game_options_menu || return 1 ;;
+            options) wsq_game_options_menu || continue ;;
             cancel) wsq_cancel_pending; return 1 ;;
         esac
     done
@@ -1466,6 +1487,7 @@ wsq_review_launch() {
 
 wsq_resume_build() {
     local prefix game_name snapshot exe_rel runner save_rel dest archive save_kind
+    local WT_MENU_CANCEL_LABEL="$(i18n back)" navigation_rc
     [ -s "$WSQ_STATE_FILE" ] || {
         msgbox "$(i18n wsq_resume_title)" "$(i18n wsq_no_pending)"
         return
@@ -1483,38 +1505,52 @@ wsq_resume_build() {
     }
 
     if [ "$(wsq_state_value mode)" = update ]; then
-        if [ "$(wsq_state_value phase)" = testing ]; then
-            wsq_review_launch || return
-        fi
-        wsq_resume_update
-        return $?
+        while true; do
+            if [ "$(wsq_state_value phase)" = testing ]; then
+                wsq_review_launch || return 12
+            fi
+            wsq_resume_update
+            navigation_rc=$?
+            if [ "$navigation_rc" -eq 12 ] && [ -s "$WSQ_STATE_FILE" ] &&
+               [ "$(wsq_state_value phase)" = testing ]; then continue; fi
+            return "$navigation_rc"
+        done
     fi
 
-    wsq_review_launch || return
+    local WSQ_ALLOW_KEEP_EXISTING=1
+    while true; do
+        wsq_review_launch || return 12
+        while true; do
+            wsq_select_save_candidate "$prefix" "$snapshot"
+            navigation_rc=$?
+            if [ "$navigation_rc" -eq 12 ]; then break; fi
+            [ "$navigation_rc" -eq 0 ] || return 12
+            save_rel="$WSQ_SELECTED_SAVE"
+            save_kind="$WSQ_SAVE_KIND"
 
-    wsq_select_save_candidate "$prefix" "$snapshot" || return
-    save_rel="$WSQ_SELECTED_SAVE"
-    save_kind="$WSQ_SAVE_KIND"
+            if [ "$save_kind" = registry ]; then
+                WSQ_LAST_SAVE_BACKUP=""
+                wsq_copy_registry_save
+            elif [ "$save_kind" = files ]; then
+                yesno_default_no "$(i18n wsq_files_title)" "$(i18n wsq_files_confirm "$save_rel" "$WSQ_SELECTED_SAVEFILES")" || continue
+                wsq_copy_savefiles
+            else
+                yesno_default_no "$(i18n wsq_save_title)" \
+                    "$(i18n wsq_save_confirm "$(wsq_display_path "$save_rel")" "$(wsq_display_path "$WSQ_SAVE_ROOT/$game_name")")" || continue
+                wsq_move_save_data "$prefix" "$save_rel" "$game_name"
+            fi
+            local move_rc=$?
+            if [ "$move_rc" -ne 0 ]; then
+                if [ "$move_rc" -eq 10 ]; then
+                    continue
+                fi
+                msgbox "$(i18n wsq_save_title)" "$(i18n wsq_save_move_failed "$WSQ_SAVE_ROOT/$game_name")"
+                return
+            fi
 
-    if [ "$save_kind" = registry ]; then
-        WSQ_LAST_SAVE_BACKUP=""
-        wsq_copy_registry_save
-    elif [ "$save_kind" = files ]; then
-        yesno_default_no "$(i18n wsq_files_title)" "$(i18n wsq_files_confirm "$save_rel" "$WSQ_SELECTED_SAVEFILES")" || return
-        wsq_copy_savefiles
-    else
-        yesno_default_no "$(i18n wsq_save_title)" \
-            "$(i18n wsq_save_confirm "$(wsq_display_path "$save_rel")" "$(wsq_display_path "$WSQ_SAVE_ROOT/$game_name")")" || return
-        wsq_move_save_data "$prefix" "$save_rel" "$game_name"
-    fi
-    local move_rc=$?
-    if [ "$move_rc" -ne 0 ]; then
-        if [ "$move_rc" -eq 10 ]; then
-            return
-        fi
-        msgbox "$(i18n wsq_save_title)" "$(i18n wsq_save_move_failed "$WSQ_SAVE_ROOT/$game_name")"
-        return
-    fi
+            break 2
+        done
+    done
 
     if [ "$save_kind" = directory ]; then
         wsq_cleanup_internal_savedir "$prefix" "$save_rel" || {
@@ -1534,7 +1570,8 @@ wsq_resume_build() {
     if [ -n "${WSQ_LAST_SAVE_BACKUP:-}" ]; then
         msgbox "$(i18n wsq_save_title)" "$(i18n wsq_save_backup_done "$WSQ_LAST_SAVE_BACKUP")"
     fi
-
+    WSQ_LAST_SAVE_BACKUP=""
+    WSQ_ALLOW_KEEP_EXISTING=0
     rm -f -- "$snapshot" "$WSQ_STATE_FILE"
 
     local build_prompt
@@ -1545,14 +1582,14 @@ wsq_resume_build() {
     else
         build_prompt="$(i18n wsq_build_now)"
     fi
-    if yesno "$(i18n wsq_create_title)" "$build_prompt"; then
+    while yesno "$(i18n wsq_create_title)" "$build_prompt"; do
         archive="${prefix%.wine}.wsquashfs"
         wsq_prepare_existing_archive "$archive" choose
         local archive_rc=$?
         if [ "$archive_rc" -ne 0 ]; then
             case "$archive_rc" in
                 10)
-                    return
+                    continue
                     ;;
                 4)
                     msgbox "$(i18n wsq_archive_conflict_title)" "$(i18n wsq_archive_conflict_invalid "$archive")"
@@ -1574,7 +1611,8 @@ wsq_resume_build() {
             wsq_save_destination_prepare "$dest"
             local save_rc=$?
             if [ "$save_rc" -ne 0 ]; then
-                [ "$save_rc" -eq 10 ] || msgbox "$(i18n wsq_save_title)" "$(i18n wsq_save_move_failed "$dest")"
+                [ "$save_rc" -ne 10 ] || continue
+                msgbox "$(i18n wsq_save_title)" "$(i18n wsq_save_move_failed "$dest")"
                 return
             fi
             cp -a -- "$WSQ_SAVE_ROOT/$game_name/." "$dest/" || {
@@ -1621,9 +1659,9 @@ wsq_resume_build() {
         else
             msgbox "$(i18n wsq_create_title)" "$(i18n wsq_build_failed)"
         fi
-    else
-        msgbox "$(i18n wsq_create_title)" "$(i18n wsq_ready_to_squash "$prefix")"
-    fi
+    done
+    msgbox "$(i18n wsq_create_title)" "$(i18n wsq_ready_to_squash "$prefix")"
+    return 12
 }
 
 wsq_final_archive_check() {

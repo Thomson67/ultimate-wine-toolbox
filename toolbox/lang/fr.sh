@@ -608,7 +608,7 @@ declare -gA I18N=(
   [wsq_winetricks_dotnet48]="Microsoft .NET Framework 4.8"
   [wsq_launch_runner]="Choisir un autre runner et relancer"
   [wsq_launch_retry]="Réessayer avec le même runner"
-  [wsq_launch_cancel]="Annuler la création (conserver le dossier .wine)"
+  [wsq_launch_cancel]="Abandonner l’opération (conserver le dossier .wine)"
   [wsq_pending_invalid]="L'état de création en attente est incomplet ou le préfixe/snapshot n'existe plus."
 
   [wsq_pending_operation_update]="Mise à jour d’un jeu"
@@ -639,6 +639,9 @@ declare -gA I18N=(
   [wsq_inspect_title]="Inspecter le contenu du dossier"
   [wsq_inspect_header]="Lecture seule : fichiers et sous-dossiers, tailles en octets et dates de modification.\nFlèches / Page haut-bas pour parcourir la liste, Retour pour fermer.\nAperçu limité à 3 niveaux et 500 entrées. Pour voir plus loin, ouvrez un sous-dossier avec le navigateur puis inspectez-le."
   [wsq_candidate_prompt]="Dossier proposé :\n%s\n\nVous pouvez vérifier son contenu avant de l’utiliser ou choisir un autre dossier dans le préfixe."
+  [wsq_more_save_locations]="Voir plus d’emplacements possibles (scores inférieurs)"
+  [wsq_more_save_prompt]="Autres emplacements, classés avec un score inférieur. Retour revient aux meilleures propositions."
+  [wsq_save_conflict_keep]="Conserver la sauvegarde existante (ignorer celle du test)"
   [wsq_detected_choices]="Dossiers détectés : choisissez un candidat pour l’inspecter ou le valider.\n\nVous pouvez aussi parcourir librement le préfixe et choisir un autre dossier, relancer le jeu ou examiner le registre."
   [wsq_registry_build_now]="SAVEFILES=user.reg a été configuré. Le registre a été copié vers les sauvegardes ; une copie valide reste dans le préfixe.\n\nCréer maintenant le .wsquashfs ?"
   [wsq_no_save_choices]="Aucun dossier de sauvegarde plausible n’a été détecté. Vous pouvez relancer le jeu en créant une sauvegarde, examiner le registre ou choisir un dossier manuellement."

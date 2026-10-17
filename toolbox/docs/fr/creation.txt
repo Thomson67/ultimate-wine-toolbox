@@ -19,14 +19,16 @@ La Toolbox se relance et vous demande de valider le lancement. En cas de problè
 Si la manette ne fonctionne pas, choisissez l'activation de HIDRAW puis la relance. Les options DXVK, limiteur de FPS, adresses larges et bureau virtuel peuvent aussi être ajustées pour ce jeu.
 
 4. CHOISIR L'EMPLACEMENT DES SAUVEGARDES
-Examinez les emplacements détectés. Inspectez leur contenu pour confirmer où se trouve la sauvegarde.
+Le bouton B / Retour remonte à l’écran précédent. Abandonner l’opération reste une action distincte. Après l’externalisation, un retour ne rejoue pas le déplacement des données.
+Examinez les emplacements détectés. Inspectez leur contenu pour confirmer où se trouve la sauvegarde. Les sous-dossiers du jeu sont aussi recherchés pour SAVEDIR, même avec un nom quelconque. Les noms de fichiers contenant sav ou slot et les extensions de sauvegarde sont prioritaires. Les dossiers contenant uniquement des fichiers temporaires comme .log ou .tmp sont ignorés ; les .txt et fichiers sans extension restent des candidats possibles. Les fichiers de sauvegarde placés à côté de l’exécutable relèvent du choix de fichiers individuels (SAVEFILES), pas de l’externalisation de tout le dossier du jeu.
+Si les propositions sont nombreuses, Voir plus d’emplacements possibles regroupe les scores inférieurs ; les ex æquo restent ensemble.
 La recherche manuelle permet de parcourir le préfixe et de sélectionner un autre dossier avec l'explorateur.
 Choisissez le dossier propre aux sauvegardes du jeu, pas un dossier général contenant d'autres données.
 Si rien n'est détecté, vous pouvez relancer le jeu pour créer une sauvegarde, rechercher manuellement, utiliser user.reg si le jeu y stocke sa progression, ou quitter la création.
 Pour user.reg, le fichier complet est conservé : il peut aussi contenir des réglages Wine.
 
 5. EXTERNALISER ET COMPRESSER
-Validez l'externalisation vers /userdata/saves/windows/<nom du jeu>. Si cette destination contient déjà des sauvegardes, choisissez de les sauvegarder ou de les remplacer.
+Validez l'externalisation vers /userdata/saves/windows/<nom du jeu>. Si cette destination contient déjà des sauvegardes, choisissez de les sauvegarder, de les remplacer ou de conserver la sauvegarde existante. En conservant l’existante, les données créées pendant le test sont écartées, sans copie supplémentaire. Pour les fichiers individuels ou le registre, les fichiers attendus doivent déjà être présents dans la destination conservée.
 La Toolbox prépare autorun.cmd avec SAVEDIR=, et SAVEFILES=user.reg dans le cas du registre.
 Vous pouvez compresser immédiatement ou conserver le préfixe préparé pour plus tard.
 Avant compression, gardez le nom proposé ou choisissez un autre nom. Si l'archive existe déjà, vous pouvez la sauvegarder puis la remplacer, la remplacer directement ou créer une archive sous un autre nom.
