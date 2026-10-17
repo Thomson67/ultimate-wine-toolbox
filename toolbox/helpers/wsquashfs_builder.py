@@ -25,6 +25,7 @@ SAVE_ROOTS = (
 )
 # Broad data formats remain candidates, but explicit save evidence ranks higher.
 SAVE_EXTENSIONS = {".sav", ".save", ".profile", ".slot", ".dat", ".bin", ".json"}
+SAVE_NAME_HINTS = ("sav", "slot")
 STRONG_SAVE_EXTENSIONS = {".sav", ".save", ".profile", ".slot"}
 TEMPORARY_EXTENSIONS = {".log", ".tmp", ".temp", ".dmp", ".mdmp", ".wer", ".etl", ".part", ".partial"}
 TEMPORARY_DIRS = {"cache", "caches", "shadercache", "shader_cache", "webcache", "gpucache", "d3dscache", "temp", "tmp"}
@@ -326,7 +327,8 @@ def score_save_dir(rel_dir: str, changed_files, directory_files=None):
         score -= 15
         reasons.append("cache/log-like path")
 
-    name_hits = sum("sav" in Path(name).name.casefold() for name in meaningful)
+    name_hits = sum(any(hint in Path(name).name.casefold() for hint in SAVE_NAME_HINTS)
+                    for name in meaningful)
     strong_hits = sum(Path(name).suffix.casefold() in STRONG_SAVE_EXTENSIONS for name in meaningful)
     if name_hits or strong_hits:
         score += 65 + min(15, max(name_hits, strong_hits) * 5)

@@ -58,6 +58,28 @@ class SaveDirectoryDetectionTests(unittest.TestCase):
         self.assertGreater(scores['drive_c/game/b'], scores['drive_c/game/a'])
         self.assertGreater(scores['drive_c/game/c'], scores['drive_c/game/a'])
 
+    def test_slot_in_filenames_ranks_higher_including_text_and_extensionless_files(self):
+        before = builder.snapshot(self.prefix)
+        self.write('drive_c/game/generic/state.dat')
+        for folder, filename in [('a', 'slot01.dat'), ('b', 'SLOT_2.txt'), ('c', 'slot3')]:
+            self.write('drive_c/game/'+folder+'/'+filename)
+        self.write('drive_c/game/temporary/slot4.tmp')
+        rows = builder.diff_snapshots(self.prefix, before, builder.snapshot(self.prefix))
+        scores = {row[1]: row[0] for row in rows}
+        for folder in ('a', 'b', 'c'):
+            self.assertGreater(scores['drive_c/game/'+folder], scores['drive_c/game/generic'])
+        self.assertNotIn('drive_c/game/temporary', scores)
+
+    def test_executable_folder_and_ancestors_rejected_but_save_children_and_siblings_allowed(self):
+        executable = 'drive_c/game/bin/Game.exe'
+        self.write(executable, 'executable')
+        for folder in ('drive_c/game/bin/saves', 'drive_c/game/saves', 'drive_c/OtherSaves'):
+            self.write(folder+'/slot1.txt')
+            self.assertEqual(builder.safe_save_dir(self.prefix, folder, executable), folder)
+        for folder in ('drive_c/game/bin', 'drive_c/game', 'drive_c'):
+            with self.assertRaises(ValueError, msg=folder):
+                builder.safe_save_dir(self.prefix, folder, executable)
+
     def test_temp_only_folders_are_ignored_even_if_their_name_suggests_saves(self):
         before = builder.snapshot(self.prefix)
         for name in ('game.LOG','save_slot.tmp','crash.dmp','report.etl'):
