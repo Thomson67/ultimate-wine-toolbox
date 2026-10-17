@@ -212,10 +212,12 @@ for rel in releases:
     for a in assets:
         n=a.get("name") or ""
         u=a.get("browser_download_url") or ""
-        if n.endswith(".tar.gz") and n.startswith("GE-Proton"):
+        # Legacy x86_64 builds have no architecture suffix. Never fall back
+        # to another architecture when a release has only ARM archives.
+        if n in (tag+".tar.gz", tag+"-x86_64.tar.gz", tag+"-amd64.tar.gz", tag+"-x64.tar.gz"):
             tars.append(a)
         elif n.endswith(".sha512sum"):
-            checks[n[:-10]]=u
+            checks[n]=u
     if not tars:
         continue
     chosen=next((a for a in tars if "x86_64" in (a.get("name") or "")), tars[0])
@@ -225,7 +227,7 @@ for rel in releases:
         name,
         chosen.get("browser_download_url") or "",
         str(chosen.get("size") or 0),
-        checks.get(name, "")
+        checks.get(name+".sha512sum") or checks.get(name.removesuffix(".tar.gz")+".sha512sum", "")
     ]))
 PY
 
