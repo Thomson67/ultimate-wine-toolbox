@@ -6,7 +6,7 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.6.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.6.0).** WSquashFS updates are validated; WSquashFS creation remains in beta.
+**Stable version: [v0.6.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.6.1).** WSquashFS updates are validated; WSquashFS creation remains in beta.
 
 ## Features
 
@@ -33,15 +33,14 @@ Created by **Thomsonito**.
 - native Batocera Ports launcher and Pad2Key support
 - update checks at startup and from the toolbox menu
 
-## New in v0.6.0
+## New in v0.6.1
 
-- Native AntiMicroX: create and edit profiles in game, switch using the keyboard or controller, and convert Pad2Key mappings including identifiable Hotkey combinations.
-- Community AntiMicroX profiles and ReShade presets: search, download, submit directly and moderate through browser pairing.
-- ReShade: reuse bundled installations, apply presets to new games and select packs from active effects in `Techniques=`.
-- Classic GE-Proton 11.x downloads restored with a “Batocera v44 recommended” label.
-- Streamlined workflows, Tools and compatibility menu and updated French/English offline guides.
+- WSquashFS: B / Back returns between steps; existing saves can be retained during creation without keeping a separate copy of test data.
+- Improved save detection inside game subdirectories, ranking sav / slot / user filenames higher and cache data lower. Temporary-only folders are excluded.
+- Lower-ranked save locations are grouped behind “See more possible locations”, with tied scores kept together.
+- Fixed classic GE-Proton 11.x asset selection for older release naming, avoiding ARM archives on x86_64.
 
-[v0.6.0 release notes](release-notes/v0.6.0.md) · [Release history](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
+[v0.6.1 release notes](release-notes/v0.6.1.md) · [Release history](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 
