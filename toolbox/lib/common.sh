@@ -160,7 +160,7 @@ menu_select() {
     if have_dialog; then
         wt_clear_tty
         local result rc
-        result="$(dialog --stdout --clear --no-shadow --cr-wrap --ok-label "$(i18n ok)" --cancel-label "$(i18n cancel)" \
+        result="$(dialog --stdout --clear --no-shadow --cr-wrap --ok-label "$(i18n ok)" --cancel-label "${WT_MENU_CANCEL_LABEL:-$(i18n cancel)}" \
             --title "$title" --menu "$prompt" 24 100 16 "$@")"
         rc=$?
         wt_clear_tty
@@ -185,7 +185,7 @@ directory_select() {
     if have_dialog; then
         wt_clear_tty
         local result rc
-        result="$(dialog --stdout --clear --no-shadow             --ok-label "$(i18n ok)" --cancel-label "$(i18n cancel)"             --title "$title" --dselect "$initial" 22 100)"
+        result="$(dialog --stdout --clear --no-shadow             --ok-label "$(i18n ok)" --cancel-label "${WT_MENU_CANCEL_LABEL:-$(i18n cancel)}"             --title "$title" --dselect "$initial" 22 100)"
         rc=$?
         wt_clear_tty
         [ "$rc" -eq 0 ] && printf '%s' "${result%/}"
@@ -202,7 +202,7 @@ input_text() {
         wt_clear_tty
         local result rc
         result="$(dialog --stdout --clear --no-shadow --cr-wrap \
-            --ok-label "$(i18n ok)" --cancel-label "$(i18n cancel)" \
+            --ok-label "$(i18n ok)" --cancel-label "${WT_MENU_CANCEL_LABEL:-$(i18n cancel)}" \
             --title "$title" --inputbox "$prompt" 12 96 "$initial")"
         rc=$?
         wt_clear_tty
@@ -224,7 +224,7 @@ checklist_select() {
         wt_clear_tty
         local result rc
         result="$(dialog --stdout --separate-output --clear --no-shadow \
-            --ok-label "$(i18n ok)" --cancel-label "$(i18n cancel)" \
+            --ok-label "$(i18n ok)" --cancel-label "${WT_MENU_CANCEL_LABEL:-$(i18n cancel)}" \
             --title "$title" --checklist "$prompt" 26 110 18 "$@")"
         rc=$?
         wt_clear_tty

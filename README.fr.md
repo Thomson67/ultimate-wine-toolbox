@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.6.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.6.0).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS reste en bêta.
+**Version stable : [v0.6.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.6.1).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS reste en bêta.
 
 ## Fonctionnalités
 
@@ -33,15 +33,14 @@ Créée par **Thomsonito**.
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
 
-## Nouveautés de la v0.6.0
+## Nouveautés de la v0.6.1
 
-- AntiMicroX intégré : création et modification des profils en jeu, bascule clavier/manette et conversion des Pad2Key, y compris les combinaisons Hotkey identifiables.
-- Profils AntiMicroX et presets ReShade communautaires : recherche, téléchargement, partage direct et validation par appairage dans un navigateur.
-- ReShade : réutilisation des installations intégrées, application des presets à de nouveaux jeux et sélection des packs d’après les effets actifs de `Techniques=`.
-- GE-Proton 11.x réintégrés aux téléchargements classiques avec la mention « Batocera v44 conseillée ».
-- Parcours simplifiés, menu Outils et compatibilité et documentation intégrée française/anglaise actualisée.
+- WSquashFS : B / Retour remonte entre les étapes ; la création peut conserver une sauvegarde existante sans copie séparée des données du test.
+- Détection améliorée dans les sous-dossiers du jeu : fichiers contenant sav / slot / user favorisés, données de cache pénalisées et dossiers purement temporaires écartés.
+- Les emplacements de sauvegarde moins bien classés sont regroupés dans « Voir plus d’emplacements possibles », en gardant les ex æquo ensemble.
+- Correction du choix des archives GE-Proton 11.x classiques pour les anciens noms de releases, afin d’éviter les archives ARM sur x86_64.
 
-[Notes de la v0.6.0](release-notes/v0.6.0.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
+[Notes de la v0.6.1](release-notes/v0.6.1.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 

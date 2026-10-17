@@ -608,7 +608,7 @@ declare -gA I18N=(
   [wsq_winetricks_dotnet48]="Microsoft .NET Framework 4.8"
   [wsq_launch_runner]="Choose another runner and launch again"
   [wsq_launch_retry]="Retry with the same runner"
-  [wsq_launch_cancel]="Cancel creation (keep the .wine folder)"
+  [wsq_launch_cancel]="Abandon this operation (keep the .wine folder)"
   [wsq_pending_invalid]="The pending build state is incomplete or its prefix/snapshot no longer exists."
 
   [wsq_pending_operation_update]="Game update"
@@ -639,6 +639,9 @@ declare -gA I18N=(
   [wsq_inspect_title]="Inspect directory contents"
   [wsq_inspect_header]="Read only: files and subdirectories, sizes in bytes and modification dates.\nUse arrows / Page Up-Down to scroll, Back to close.\nPreview limited to 3 levels and 500 entries. To inspect deeper, open a subdirectory in the browser and inspect it."
   [wsq_candidate_prompt]="Suggested directory:\n%s\n\nYou can inspect its contents before using it, or choose another directory in the prefix."
+  [wsq_more_save_locations]="See more possible locations (lower scores)"
+  [wsq_more_save_prompt]="Other locations with lower scores. Back returns to the best candidates."
+  [wsq_save_conflict_keep]="Keep the existing save (ignore test data)"
   [wsq_detected_choices]="Detected directories: choose a candidate to inspect or confirm it.\n\nYou can also browse the prefix and choose another directory, launch again or inspect the registry."
   [wsq_registry_build_now]="SAVEFILES=user.reg has been configured. The registry was copied to the save directory; a valid copy remains in the prefix.\n\nCreate the .wsquashfs now?"
   [wsq_no_save_choices]="No plausible save directory was detected. You can launch again and create a save, inspect the registry, or choose a directory manually."

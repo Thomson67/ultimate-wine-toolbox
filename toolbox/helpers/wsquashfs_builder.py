@@ -23,9 +23,12 @@ SAVE_ROOTS = (
     "AppData/Local", "AppData/LocalLow", "AppData/Roaming",
     "Documents", "Saved Games",
 )
-SAVE_EXTENSIONS = {
-    ".sav", ".save", ".dat", ".profile", ".slot", ".bin", ".json",
-}
+# Broad data formats remain candidates, but explicit save evidence ranks higher.
+SAVE_EXTENSIONS = {".sav", ".save", ".profile", ".slot", ".dat", ".bin", ".json"}
+SAVE_NAME_HINTS = ("sav", "slot", "user")
+STRONG_SAVE_EXTENSIONS = {".sav", ".save", ".profile", ".slot"}
+TEMPORARY_EXTENSIONS = {".log", ".tmp", ".temp", ".dmp", ".mdmp", ".wer", ".etl", ".part", ".partial"}
+TEMPORARY_DIRS = {"cache", "caches", "shadercache", "shader_cache", "webcache", "gpucache", "d3dscache", "temp", "tmp"}
 POSITIVE_PATH = (
     "save", "saved", "savegame", "savegames", "profile", "profiles",
     "userdata", "user data",
@@ -275,7 +278,7 @@ def snapshot(prefix: Path):
         for root, dirs, files in os.walk(base):
             dirs[:] = [
                 d for d in dirs
-                if not any(x in d.casefold() for x in ("cache", "shadercache", "webcache", "temp"))
+                if d.casefold() not in TEMPORARY_DIRS
             ]
             root_p = Path(root)
             for filename in files:
@@ -305,20 +308,43 @@ def snapshot(prefix: Path):
     return out
 
 
-def score_save_dir(rel_dir: str, changed_files):
+def score_save_dir(rel_dir: str, changed_files, directory_files=None):
+    # A savedir may have any name and contain text or extensionless saves.
+    # Reject only folders whose observed files are all clearly temporary.
+    files = list(directory_files if directory_files is not None else changed_files)
+    meaningful = [name for name in files if Path(name).suffix.casefold() not in TEMPORARY_EXTENSIONS]
+    if files and not meaningful:
+        return 0, "temporary/log files only"
     low = rel_dir.casefold()
     score = 25
     reasons = []
     if any(x in low for x in POSITIVE_PATH):
         score += 45
         reasons.append("save-like path")
-    if any(x in low for x in NEGATIVE_PATH):
-        score -= 70
+    # Match directory words, not substrings of game titles such as Logan or Temple.
+    words = set(re.split(r"[^a-z0-9]+", low))
+    if words.intersection(NEGATIVE_PATH):
+        score -= 15
         reasons.append("cache/log-like path")
 
-    ext_hits = sum(Path(f).suffix.casefold() in SAVE_EXTENSIONS for f in changed_files)
+    # Cache data can use save-like names and extensions too (usercache.dat).
+    # Do not let these files supply positive evidence for a save directory.
+    save_files = [name for name in meaningful if "cache" not in Path(name).name.casefold()]
+    if "cache" in low:
+        score -= 20
+        reasons.append("cache directory name")
+    if len(save_files) < len(meaningful):
+        score -= 20 if not save_files else 5
+        reasons.append("cache filename(s)")
+    name_hits = sum(any(hint in Path(name).name.casefold() for hint in SAVE_NAME_HINTS)
+                    for name in save_files)
+    strong_hits = sum(Path(name).suffix.casefold() in STRONG_SAVE_EXTENSIONS for name in save_files)
+    if name_hits or strong_hits:
+        score += 65 + min(15, max(name_hits, strong_hits) * 5)
+        reasons.append("save-like filename or extension")
+    ext_hits = sum(Path(name).suffix.casefold() in SAVE_EXTENSIONS for name in save_files)
     if ext_hits:
-        score += min(40, ext_hits * 10)
+        score += min(30, ext_hits * 10)
         reasons.append(f"{ext_hits} save-like file(s)")
 
     if "/documents/" in f"/{low}/" or "/saved games/" in f"/{low}/":
@@ -330,22 +356,32 @@ def score_save_dir(rel_dir: str, changed_files):
     return score, ", ".join(reasons) or "changed during test"
 
 
+def snapshot_files(value):
+    # Reuse the existing game inventory for directory detection too. It covers
+    # arbitrary subfolder names and autorun DIR paths, without another game scan.
+    # The inventory remains unchanged for the separate SAVEFILES workflow.
+    files = dict(value.get("__game_files__", {}))
+    files.update((rel, state) for rel, state in value.items()
+                 if rel not in ("__registry__", "__game_files__"))
+    return files
+
+
 def diff_snapshots(prefix: Path, before, after):
-    changed = []
-    for rel, state in after.items():
-        if rel in ("__registry__", "__game_files__"):
+    old_files, new_files = snapshot_files(before), snapshot_files(after)
+    grouped, observed = {}, {}
+    for rel, state in new_files.items():
+        if any(char in rel for char in ("\t", "\n", "\r")):
             continue
-        if before.get(rel) != state:
-            changed.append(rel)
-
-    grouped = {}
-    for rel in changed:
         parent = str(Path(rel).parent).replace("\\", "/")
-        grouped.setdefault(parent, []).append(rel)
+        observed.setdefault(parent, []).append(rel)
+        if old_files.get(rel) != state:
+            grouped.setdefault(parent, []).append(rel)
 
+    # The caller validates each directory against the chosen executable before
+    # offering it as SAVEDIR; files beside that executable remain SAVEFILES.
     candidates = []
     for parent, files in grouped.items():
-        score, reason = score_save_dir(parent, files)
+        score, reason = score_save_dir(parent, files, observed[parent])
         if score <= 0:
             continue
         candidates.append((score, parent, len(files), reason))
