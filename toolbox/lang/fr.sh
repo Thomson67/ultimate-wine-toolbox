@@ -681,6 +681,8 @@ declare -gA I18N=(
   [wsq_savedir_not_empty]="Le dossier SAVEDIR contient encore des données et ne sera pas inclus dans l'archive :\n%s\n\nLa compression est interrompue pour éviter d'embarquer des sauvegardes."
   [wsq_savedir_cleanup_failed]="Impossible de supprimer proprement le dossier/lien SAVEDIR avant compression :\n%s\n\nLa compression est interrompue."
   [wsq_post_title]="Création terminée"
+  [wsq_post_update_title]="Mise à jour terminée"
+  [wsq_post_update]="Mettre à jour un autre WSquashFS"
   [wsq_post_prompt]="Que souhaitez-vous faire maintenant ?"
   [wsq_post_new]="Créer un autre WSquashFS"
   [wsq_post_toolbox]="Retourner au menu principal de la Toolbox"
@@ -744,7 +746,7 @@ declare -gA I18N=(
   [wsq_update_source_browse]="Parcourir… (choisir un autre dossier)"
   [wsq_update_source_list_prompt]="Choisissez le dossier contenant la nouvelle version du jeu parmi les dossiers Windows, ou utilisez Parcourir pour un autre emplacement. Les dossiers cachés et de médias sont exclus. Pour un préfixe Wine, le dossier du jeu est repris automatiquement. Le dossier source sera déplacé sous le nom du dossier original."
 
-  [wsq_update_name_match]="dossier du même nom disponible"
+  [wsq_update_name_match]="nom proche disponible — à vérifier"
 
   [wsq_update_remove_old]="Lancement validé : suppression de l’ancien dossier du jeu (.bak) avant recompression."
 

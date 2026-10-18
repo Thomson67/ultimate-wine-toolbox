@@ -1231,13 +1231,22 @@ wsq_prepare_existing_archive() {
 }
 
 wsq_post_build_menu() {
-    local choice
-    choice="$(menu_select "$(i18n wsq_post_title)" "$(i18n wsq_post_prompt)" \
+    local choice title="$(i18n wsq_post_title)"
+    local -a items=()
+    if [ "${1:-create}" = update ]; then
+        title="$(i18n wsq_post_update_title)"
+        items+=(update "$(i18n wsq_post_update)")
+    fi
+    choice="$(menu_select "$title" "$(i18n wsq_post_prompt)" "${items[@]}" \
         "1" "$(i18n wsq_post_new)" \
         "2" "$(i18n wsq_post_toolbox)" \
         "3" "$(i18n wsq_post_es)")" || return 20
 
     case "$choice" in
+        update)
+            wsq_update_new
+            return 0
+            ;;
         1)
             wsq_create_new
             return 0

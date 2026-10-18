@@ -21,7 +21,7 @@ def game_name(name):
 
 
 def update_listing(directory, kind, preferred=''):
-    """One shallow scan: compare exact game names, not game contents."""
+    """One shallow scan: rank exact names, then first-word suggestions."""
     entries = list(os.scandir(directory))
     ignored = {'media', 'medias', 'médias', 'image', 'images', 'video', 'videos', 'vidéos',
                'manual', 'manuals', 'music', 'musiques', 'marquee', 'marquees', 'thumbnail',
@@ -34,9 +34,20 @@ def update_listing(directory, kind, preferred=''):
     names = {game_name(entry.name) for entry in folders}
     candidates = folders if kind == 'sources' else [entry for entry in entries
         if entry.is_file(follow_symlinks=False) and entry.name.casefold().endswith('.wsquashfs')]
-    rows = [(entry.path, game_name(entry.name) == game_name(preferred) if kind == 'sources'
-             else game_name(entry.name) in names) for entry in candidates]
-    return sorted(rows, key=lambda row: (not row[1], Path(row[0]).name.casefold(), row[0]))
+    reference_names = {game_name(preferred)} if kind == 'sources' else names
+    reference_names.discard('')
+    first_words = {name.split()[0] for name in reference_names}
+
+    def rank(entry):
+        name = game_name(entry.name)
+        if name and name in reference_names:
+            return 0
+        if name and name.split()[0] in first_words:
+            return 1
+        return 2
+
+    candidates.sort(key=lambda entry: (rank(entry), entry.name.casefold(), entry.path))
+    return [(entry.path, rank(entry) < 2) for entry in candidates]
 
 
 def ensure_root_alias(prefix):

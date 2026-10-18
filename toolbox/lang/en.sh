@@ -681,6 +681,8 @@ declare -gA I18N=(
   [wsq_savedir_not_empty]="The SAVEDIR still contains data and will not be included in the archive:\n%s\n\nCompression was stopped to avoid embedding save files."
   [wsq_savedir_cleanup_failed]="Unable to cleanly remove the SAVEDIR directory/link before compression:\n%s\n\nCompression was stopped."
   [wsq_post_title]="Build completed"
+  [wsq_post_update_title]="Update completed"
+  [wsq_post_update]="Update another WSquashFS"
   [wsq_post_prompt]="What would you like to do next?"
   [wsq_post_new]="Create another WSquashFS"
   [wsq_post_toolbox]="Return to the Toolbox main menu"
@@ -744,7 +746,7 @@ declare -gA I18N=(
   [wsq_update_source_browse]="Browse… (select another directory)"
   [wsq_update_source_list_prompt]="Select the updated game from the Windows directories, or Browse for another location. Hidden and media directories are excluded. For a Wine prefix, its game directory is selected automatically. The source directory is moved under the original game directory name."
 
-  [wsq_update_name_match]="matching game folder available"
+  [wsq_update_name_match]="similar name available — please verify"
 
   [wsq_update_remove_old]="Launch validated: removing the old game directory (.bak) before recompression."
 

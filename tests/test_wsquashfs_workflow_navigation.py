@@ -40,6 +40,30 @@ have_dialog() { return 1; }
         self.assertEqual(result.returncode,0,result.stderr)
         return result
 
+    def test_update_completion_offers_another_update_and_dispatches_it(self):
+        self.shell(r"""
+menu_select() { printf '%s\n' "$@" > "$WT_HOME/options"; echo update; }
+wsq_update_new() { echo update > "$WT_HOME/action"; }
+wsq_create_new() { echo create > "$WT_HOME/action"; }
+wsq_post_build_menu update
+""")
+        options=(self.home/'options').read_text().splitlines()
+        self.assertEqual(options[0], 'Mise à jour terminée')
+        self.assertIn('Mettre à jour un autre WSquashFS', options)
+        self.assertIn('Créer un autre WSquashFS', options)
+        self.assertEqual((self.home/'action').read_text().strip(), 'update')
+
+    def test_creation_completion_retains_original_menu(self):
+        self.shell(r"""
+menu_select() { printf '%s\n' "$@" > "$WT_HOME/options"; echo 1; }
+wsq_create_new() { echo create > "$WT_HOME/action"; }
+wsq_post_build_menu
+""")
+        options=(self.home/'options').read_text().splitlines()
+        self.assertEqual(options[0], 'Création terminée')
+        self.assertNotIn('update', options)
+        self.assertEqual((self.home/'action').read_text().strip(), 'create')
+
     def test_keep_existing_directory_retains_old_and_discards_test_data_without_backup(self):
         source=self.prefix/'drive_c/game/Saves'
         (source/'slot.sav').write_text('tested progression');(source/'.hidden').write_text('hidden')

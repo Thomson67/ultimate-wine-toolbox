@@ -518,5 +518,5 @@ wsq_resume_update() {
     fi
     wsq_restart_emulationstation_deferred || true
     game_name="$original_name"
-    wsq_post_build_menu
+    wsq_post_build_menu update
 }
