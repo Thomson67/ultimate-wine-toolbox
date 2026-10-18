@@ -21,7 +21,7 @@ def game_name(name):
 
 
 def update_listing(directory, kind, preferred=''):
-    """One shallow scan: rank exact names, then first-word suggestions."""
+    """One shallow scan: prefer exact names; suggest first-word matches only as fallback."""
     entries = list(os.scandir(directory))
     ignored = {'media', 'medias', 'médias', 'image', 'images', 'video', 'videos', 'vidéos',
                'manual', 'manuals', 'music', 'musiques', 'marquee', 'marquees', 'thumbnail',
@@ -37,12 +37,13 @@ def update_listing(directory, kind, preferred=''):
     reference_names = {game_name(preferred)} if kind == 'sources' else names
     reference_names.discard('')
     first_words = {name.split()[0] for name in reference_names}
+    use_first_word = not any(game_name(entry.name) in reference_names for entry in candidates)
 
     def rank(entry):
         name = game_name(entry.name)
         if name and name in reference_names:
             return 0
-        if name and name.split()[0] in first_words:
+        if use_first_word and name and name.split()[0] in first_words:
             return 1
         return 2
 

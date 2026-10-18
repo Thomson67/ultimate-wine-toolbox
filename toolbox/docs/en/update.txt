@@ -17,4 +17,4 @@ Choose to back up the old archive before replacement or replace it directly. Aft
 
 An unfinished operation can be resumed from the menu. Errors identify the retained prefix and the log to inspect. After success, old game bottles are cleaned and removing the working prefix is offered. Finally, launch the new WSquashFS and verify your progress.
 
-Exact name matches are listed first, followed by names sharing the first word. Verify these suggestions; other folders and Browse remain available. After success, “Update another WSquashFS” starts the next update.
+Existing exact-name matching is retained. Names sharing the first word are suggested only when no exact match is available. Verify these suggestions; other folders and Browse remain available. After success, “Update another WSquashFS” starts the next update.

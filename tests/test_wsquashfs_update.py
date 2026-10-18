@@ -650,7 +650,7 @@ wsq_update_select_source
         result = subprocess.run(['bash', '-c', browse], capture_output=True, text=True)
         self.assertEqual(result.stdout.strip(), str(self.source), result.stderr)
 
-    def test_archive_priority_ranks_exact_then_first_word_and_keeps_all_games(self):
+    def test_archive_priority_keeps_exact_matching_when_available(self):
         roms = self.base / 'priority'; roms.mkdir()
         names = ['Alpha.wsquashfs', 'Bravo.wsquashfs', 'Charlie.wsquashfs', 'Delta.wsquashfs', 'Images.wsquashfs']
         for name in names: (roms / name).write_bytes(b'not opened')
@@ -658,8 +658,8 @@ wsq_update_select_source
             (roms / name).mkdir()
         with patch.object(update.os, 'walk', side_effect=AssertionError('must not recurse')):
             rows = update.update_listing(roms, 'archives')
-        self.assertEqual([Path(path).name for path, _ in rows], ['Bravo.wsquashfs', 'Charlie.wsquashfs', 'Delta.wsquashfs', 'Alpha.wsquashfs', 'Images.wsquashfs'])
-        self.assertEqual([matched for _, matched in rows], [True, True, True, False, False])
+        self.assertEqual([Path(path).name for path, _ in rows], ['Bravo.wsquashfs', 'Charlie.wsquashfs', 'Alpha.wsquashfs', 'Delta.wsquashfs', 'Images.wsquashfs'])
+        self.assertEqual([matched for _, matched in rows], [True, True, False, False, False])
         self.assertEqual(len(rows), len(names))
         sources = update.update_listing(roms, 'sources', 'Charlie.wsquashfs')
         self.assertEqual(Path(sources[0][0]).name, 'CHARLIE.pc')
@@ -676,7 +676,7 @@ wsq_update_select_source
         self.assertEqual(rows, [(str(archive), True)])
         sources = update.update_listing(roms, 'sources', archive.name)
         self.assertEqual(sources[0], (str(matching), True))
-        self.assertEqual(sources[1], (str(other), True))
+        self.assertEqual(sources[1], (str(other), False))
         self.assertEqual(update.game_name('Game [GE-Proton-11-7][Hidraw].wine'), 'game')
         self.assertNotEqual(update.game_name('Game Definitive Edition.wsquashfs'), update.game_name('Game'))
         self.assertNotEqual(update.game_name('Game 2[Wine-9.17].wsquashfs'), update.game_name('Game'))
@@ -690,10 +690,16 @@ wsq_update_select_source
             (roms / name).mkdir()
         rows = update.update_listing(roms, 'archives')
         self.assertEqual([Path(path).name for path, matched in rows if matched],
-                         ['Game.wsquashfs', 'Game 2[Wine].wsquashfs', 'Gameplay.wsquashfs'])
+                         ['Game.wsquashfs'])
         sources = update.update_listing(roms, 'sources', 'Game 2[Wine].wsquashfs')
         self.assertEqual([Path(path).name for path, matched in sources if matched],
                          ['Game', 'gAME Deluxe Build 123'])
+        exact_sources = update.update_listing(roms, 'sources', 'Game[Wine].wsquashfs')
+        self.assertEqual([Path(path).name for path, matched in exact_sources if matched], ['Game'])
+        (roms / 'Game').rmdir()
+        fallback_archives = update.update_listing(roms, 'archives')
+        self.assertEqual([Path(path).name for path, matched in fallback_archives if matched],
+                         ['Game 2[Wine].wsquashfs', 'Game.wsquashfs', 'Gameplay.wsquashfs'])
         self.assertFalse(any(matched for _, matched in update.update_listing(roms, 'sources')))
 
     def test_update_moves_game_without_copying_and_retains_bak_until_validation(self):

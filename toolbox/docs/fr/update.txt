@@ -17,4 +17,4 @@ Choisir de sauvegarder l’ancienne archive avant remplacement ou de la remplace
 
 Une opération inachevée peut être reprise depuis le menu. Les erreurs indiquent le préfixe conservé et le journal à consulter. Après réussite, les anciennes bottles du jeu sont nettoyées et la suppression du préfixe de travail est proposée. Vérifier ensuite la progression en lançant le nouveau WSquashFS.
 
-Les correspondances exactes sont proposées en premier, puis les noms partageant le premier mot. Ces suggestions restent à vérifier ; les autres dossiers et Parcourir restent accessibles. Après réussite, « Mettre à jour un autre WSquashFS » permet d’enchaîner une nouvelle mise à jour.
+Le matching exact habituel est conservé. Les noms partageant le premier mot sont suggérés uniquement en l’absence de correspondance exacte. Ces suggestions restent à vérifier ; les autres dossiers et Parcourir restent accessibles. Après réussite, « Mettre à jour un autre WSquashFS » permet d’enchaîner une nouvelle mise à jour.
