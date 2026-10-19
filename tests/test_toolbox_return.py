@@ -26,10 +26,11 @@ class Api:
         self.calls = []
         self.code = 201
         self.launches = 0
+        self.targets = []
     def running(self):
         self.calls.append('running')
         return self.code, ''
-    def indexed(self, rom):
+    def indexed(self, rom, system=None):
         self.calls.append('indexed')
         return self.present
     def reload_games(self):
@@ -38,6 +39,7 @@ class Api:
     def launch(self, rom):
         self.calls.append('launch')
         self.launches += 1
+        self.targets.append(rom)
         if self.launches == self.consume_on: self.request.unlink()
 
 
@@ -104,6 +106,24 @@ class ToolboxReturnTests(unittest.TestCase):
         api.reload_games = refresh
         self.assertFalse(self.run_return(api))
         self.assertEqual(api.launches, 0)
+
+    def test_grouped_ports_uses_owned_child_without_changing_global_grouping(self):
+        api = Api(self.request)
+        api.system_info = lambda name: dict(groupsystem='true')
+        target = str(self.home/'runtime/proxy.sh')
+        with patch.object(helper, 'ensure_proxy', return_value=('uwt_return', target)) as create:
+            self.assertTrue(self.run_return(api))
+        create.assert_called_once_with(self.home)
+        self.assertEqual(api.targets, [target])
+        self.assertEqual(api.calls.count('reload'), 1)
+
+    def test_ungrouped_ports_keeps_native_launch_without_creating_proxy(self):
+        api = Api(self.request)
+        api.system_info = lambda name: dict(groupsystem='false')
+        with patch.object(helper, 'ensure_proxy') as create:
+            self.assertTrue(self.run_return(api))
+        create.assert_not_called()
+        self.assertEqual(api.targets, [helper.TOOLBOX])
 
     def test_spawn_detaches_and_closes_inherited_descriptors(self):
         with patch.object(helper, 'LOG_DIR', self.home), patch.object(helper.subprocess, 'Popen') as popen:

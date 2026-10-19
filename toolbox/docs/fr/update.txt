@@ -23,3 +23,6 @@ Avec mergerfs, si le déplacement direct échoue avec EXDEV, la Toolbox essaie d
 
 DÉPART DEPUIS UN .WINE EXISTANT
 La liste initiale propose aussi les préfixes .wine contenant system.reg et autorun.cmd. Ils sont réutilisés sur place, sans suppression ni extraction. Choisir ensuite le dossier de la nouvelle version. L’archive finale porte le même nom avec l’extension .wsquashfs : si elle existe, les options habituelles de sauvegarde/remplacement sont proposées ; sinon, une création est proposée. Un ancien dossier .bak non résolu doit être traité avant de recommencer.
+
+COMPATIBILITÉ AVEC PORTS REGROUPÉ
+Si l’API ES refuse le groupe Ports, le retour utilise un lanceur technique appartenant au sous-système uwt_return, lui-même rattaché à Ports. La Toolbox crée uniquement es_systems_uwt_return.cfg et ses fichiers dans runtime/es-return-proxy. Le lanceur et son dossier sont marqués cachés. La commande native de Ports et le profil Pad2Key de la Toolbox sont repris. Le réglage global ports.ungroup n’est pas modifié. Si vous aviez activé le dégroupage pour un test, rétablissez le regroupement souhaité depuis les paramètres des collections d’ES.

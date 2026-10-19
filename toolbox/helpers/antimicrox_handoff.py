@@ -24,12 +24,14 @@ class EsApi:
             if response.status != 200:
                 raise RuntimeError(f'ES reload returned HTTP {response.status}')
 
-    def indexed(self, rom):
+    def indexed(self, rom, system=None):
         """Consult ES's in-memory list: /launch also returns 200 for unknown ROMs."""
-        parts = Path(rom).relative_to('/userdata/roms').parts
-        if len(parts) < 2:
-            raise ValueError('Invalid ROM path')
-        system = urllib.parse.quote(parts[0], safe='')
+        if system is None:
+            parts = Path(rom).relative_to('/userdata/roms').parts
+            if len(parts) < 2:
+                raise ValueError('Invalid ROM path')
+            system = parts[0]
+        system = urllib.parse.quote(system, safe='')
         try:
             with urllib.request.urlopen(f'http://127.0.0.1:1234/systems/{system}/games', timeout=5) as response:
                 if response.status != 200:
@@ -43,6 +45,14 @@ class EsApi:
                                                not isinstance(game.get('path'), str) for game in games):
             raise ValueError('Invalid ES game list')
         return any(os.path.normpath(game['path']) == os.path.normpath(rom) for game in games)
+
+    def system_info(self, system):
+        name = urllib.parse.quote(system, safe='')
+        with urllib.request.urlopen(f'http://127.0.0.1:1234/systems/{name}', timeout=5) as response:
+            data = json.loads(response.read())
+        if not isinstance(data, dict):
+            raise ValueError('Invalid ES system information')
+        return data
 
     def running(self):
         try:

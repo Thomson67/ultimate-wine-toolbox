@@ -8,6 +8,7 @@ import sys
 import time
 
 from antimicrox_handoff import EsApi, TOOLBOX, LOG_DIR
+from es_return_proxy import ensure_proxy
 
 HOME = Path('/userdata/system/ultimate-wine-toolbox')
 
@@ -48,11 +49,27 @@ def resume(home, parent_pid, api=None, clock=time.monotonic, sleep=time.sleep,
             return False
         sleep(.25)
 
-    if not api.indexed(TOOLBOX):
-        log('Toolbox missing from ES index; refreshing game list once')
-        api.reload_games()
+    target, proxy_system = TOOLBOX, None
+    if hasattr(api, 'system_info'):
+        info = api.system_info('ports')
+        if str(info.get('groupsystem', False)).lower() == 'true':
+            log('Ports is grouped; preparing an owned child-system launcher without ungrouping Ports')
+            proxy_system, target = ensure_proxy(home)
+            # Reload only while idle; no compositor or ES process is stopped.
+            code, _ = api.running()
+            if code != 201:
+                log('ES became busy before proxy registration; request retained')
+                return False
+            api.reload_games()
+    def indexed():
+        return api.indexed(target, system=proxy_system) if proxy_system else api.indexed(target)
+
+    if proxy_system or not indexed():
+        log('Waiting for Toolbox return entry in ES index')
+        if not proxy_system:
+            api.reload_games()
         deadline = clock() + refresh_timeout
-        while not api.indexed(TOOLBOX):
+        while not indexed():
             if not request.exists():
                 return True
             code, _ = api.running()
@@ -71,7 +88,7 @@ def resume(home, parent_pid, api=None, clock=time.monotonic, sleep=time.sleep,
             return False
         log(f'launching through ES, attempt={attempt}')
         try:
-            api.launch(TOOLBOX)
+            api.launch(target)
         except (OSError, RuntimeError) as exc:
             log(f'launch request failed: {exc}')
         deadline = clock() + confirm_timeout
