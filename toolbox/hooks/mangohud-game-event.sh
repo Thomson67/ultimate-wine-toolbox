@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ROOT="/userdata/system/ultimate-wine-toolbox"
+ROOT="${WT_HOME:-/userdata/system/ultimate-wine-toolbox}"
 CONFIG_DIR="$ROOT/config"
 GLOBAL_FILE="$CONFIG_DIR/mangohud-global"
 OVERRIDE_FILE="$CONFIG_DIR/mangohud-games.tsv"
@@ -13,7 +13,7 @@ MANGOHUD64_LIB="$MANGOHUD_RUNTIME/lib64/mangohud/libMangoHud.so"
 MANGOHUD_UMU_EXTRA_RO="$MANGOHUD_RUNTIME"
 MANGOHUD_PRELOAD="libMangoHud_shim.so"
 MANGOHUD_LIBPATH_PREFIX="$MANGOHUD_RUNTIME/lib64/mangohud:$MANGOHUD_RUNTIME/lib32/mangohud"
-LOG_DIR="/userdata/system/logs/ultimate-wine-toolbox"
+LOG_DIR="${WT_MANGOHUD_LOG_DIR:-/userdata/system/logs/ultimate-wine-toolbox}"
 HOOK_LOG="$LOG_DIR/mangohud-hook.log"
 
 hook_log() {
@@ -23,15 +23,15 @@ hook_log() {
 
 event="${1:-}"
 system="${2:-}"
+emulator="${3:-}"
+core="${4:-}"
 rom="${5:-}"
 
 case "$event" in
     gameStart|gameStop) ;;
     *) exit 0 ;;
 esac
-[ "$system" = "windows" ] || exit 0
 [ -n "$rom" ] || exit 0
-hook_log "event=$event system=$system rom=$rom"
 
 batocera_major() {
     local raw=""
@@ -53,6 +53,30 @@ is_legacy_mangohud_batocera() {
         *) return 1 ;;
     esac
 }
+
+# Keep native behavior if restoring an older package without the resolver.
+# Custom systems require explicit selection and a supported actual emulator.
+backend=native
+saved_autorun=""
+resolver=(python3 "$ROOT/toolbox/helpers/wine_systems.py" --home "$ROOT")
+[ -z "${WT_ES_USER_DIR:-}" ] || resolver+=(--es-user-dir "$WT_ES_USER_DIR")
+[ -z "${WT_ES_SYSTEM_FILE:-}" ] || resolver+=(--es-system-file "$WT_ES_SYSTEM_FILE")
+if [ -f "$ROOT/toolbox/helpers/wine_systems.py" ]; then
+    major="$(batocera_major)"
+    mapfile -t launch_context < <("${resolver[@]}" context --event "$event" \
+        --system "$system" --emulator "$emulator" --core "$core" --rom "$rom" \
+        --major "${major:-0}")
+    [ "${#launch_context[@]}" -eq 3 ] || exit 0
+    system="${launch_context[0]}"
+    backend="${launch_context[1]}"
+    saved_autorun="${launch_context[2]}"
+else
+    [ "$system" = windows ] || exit 0
+fi
+hook_log "event=$event system=$system emulator=$emulator core=$core backend=$backend rom=$rom"
+# Stock Wine uses Windows settings/bottles; DCG passes its custom system.
+settings_system=windows
+[ "$backend" != dcg ] || settings_system="$system"
 
 ensure_x86_vulkan_layer() {
     [ -r "$MANGOHUD32_LIB" ] || return 0
@@ -279,34 +303,69 @@ PY
 
 get_runner() {
     local romname="$1" runner
-    runner="$(batocera-settings-get "windows[\"$romname\"].wine-runner" "windows.wine-runner" "global.wine-runner" 2>/dev/null || true)"
+    runner="$(batocera-settings-get "$settings_system[\"$romname\"].wine-runner" "$settings_system.wine-runner" "global.wine-runner" 2>/dev/null || true)"
     if [ -z "$runner" ]; then
-        runner="$(batocera-settings-get "windows[\"$romname\"].core" "windows.core" "global.core" 2>/dev/null || true)"
+        runner="$(batocera-settings-get "$settings_system[\"$romname\"].core" "$settings_system.core" "global.core" 2>/dev/null || true)"
+    fi
+    if [ -z "$runner" ] && [ "$backend" = dcg ]; then
+        runner="$(batocera-settings-get windows.wine-runner 2>/dev/null || true)"
     fi
     case "$runner" in
         lutris) runner="wine-tkg" ;;
         proton) runner="wine-proton" ;;
         "") runner="wine-tkg" ;;
     esac
+    # Mirror DCG's fallback when a configured custom runner is unavailable.
+    if [ "$backend" = dcg ]; then
+        case "$runner" in
+            wine-tkg|wine-proton) ;;
+            *) [ -e "/userdata/system/wine/custom/$runner" ] || runner=wine-tkg ;;
+        esac
+    fi
+    case "$runner" in */*|*\\*|*$'\n'*|*$'\r'*|*$'\t'*|.|..) return 1 ;; esac
     printf '%s' "$runner"
 }
 
+apply_autorun() {
+    local target="$1"
+    if rewrite_autorun "$target" "$desired" "$legacy_mangohud"; then
+        hook_log "autorun=$target backend=$backend rewritten=1 desired=$desired"
+        if [ "$system" != windows ]; then
+            if [ "$event" = gameStart ] && [ "$desired" = 1 ]; then
+                "${resolver[@]}" remember "$system" "$backend" "$rom" "$target" || true
+            elif [ "$event" = gameStop ]; then
+                "${resolver[@]}" forget "$rom" || true
+            fi
+        fi
+    else
+        hook_log "autorun=$target backend=$backend rewritten=0"
+    fi
+}
+
+# Cleanup uses the precise target from gameStart, even after deselection,
+# XML removal, a missing ROM or a changed runner setting.
+if [ "$event" = gameStop ] && [ -n "$saved_autorun" ]; then
+    apply_autorun "$saved_autorun"
+    exit 0
+fi
+
+BOTTLES_ROOT="${WT_WINE_BOTTLES_ROOT:-/userdata/system/wine-bottles}"
 case "${rom,,}" in
     *.pc|*.wine)
         [ -d "$rom" ] || exit 0
-        rewrite_autorun "$rom/autorun.cmd" "$desired" "$legacy_mangohud" || true
+        apply_autorun "$rom/autorun.cmd"
         ;;
     *.wsquashfs)
         [ -f "$rom" ] || exit 0
         romname="$(basename "$rom")"
 
-        if [ "$legacy_mangohud" = "1" ]; then
+        if [ "$legacy_mangohud" = "1" ] && [ "$backend" = native ]; then
             # Batocera 41/42 use the game basename directly as the OverlayFS
             # upperdir, with no runner subdirectory and no .wine suffix.
-            upper="/userdata/system/wine-bottles/windows/$romname"
+            upper="$BOTTLES_ROOT/$settings_system/$romname"
         else
-            runner="$(get_runner "$romname")"
-            upper="/userdata/system/wine-bottles/windows/$runner/$romname.wine"
+            runner="$(get_runner "$romname")" || exit 0
+            upper="$BOTTLES_ROOT/$settings_system/$runner/$romname.wine"
         fi
 
         autorun="$upper/autorun.cmd"
@@ -320,8 +379,7 @@ case "${rom,,}" in
         fi
 
         if [ -f "$autorun" ]; then
-            rewrite_autorun "$autorun" "$desired" "$legacy_mangohud" || true
-            hook_log "autorun=$autorun legacy=$legacy_mangohud rewritten=1"
+            apply_autorun "$autorun"
             hook_log "autorun_env=$(grep -m1 '^ENV=' "$autorun" 2>/dev/null || true)"
         else
             hook_log "autorun=$autorun legacy=$legacy_mangohud rewritten=0"
@@ -329,9 +387,9 @@ case "${rom,,}" in
         ;;
     *.wtgz)
         romname="$(basename "$rom")"
-        runner="$(get_runner "$romname")"
-        prefix="/userdata/system/wine-bottles/windows/$runner/$romname.wine"
-        [ -f "$prefix/autorun.cmd" ] && rewrite_autorun "$prefix/autorun.cmd" "$desired" "$legacy_mangohud" || true
+        runner="$(get_runner "$romname")" || exit 0
+        prefix="$BOTTLES_ROOT/$settings_system/$runner/$romname.wine"
+        [ -f "$prefix/autorun.cmd" ] && apply_autorun "$prefix/autorun.cmd"
         ;;
 esac
 

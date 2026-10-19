@@ -1,5 +1,17 @@
 MANGOHUD: DISPLAY PERFORMANCE
 
+CUSTOM WINE SYSTEMS (TEST)
+In MangoHud, open "Custom Wine systems (test)" and select the desired collections. Custom systems are off by default. Compatible games appear with [system_name] in the MangoHud picker, using the same global and per-game settings as Windows. Deselecting a system retains its individual overrides for later use.
+
+Discovery reads EmulationStation es_systems.cfg and es_systems_*.cfg files, preferring user definitions. A wine or wine-dcg emulator and a recognized launcher are required; platform=windows is a hint, not a requirement. No XML or third-party launcher is changed. Files are refreshed when opening the picker and at game events, without scanning ROMs or archives at launch.
+
+Initial support covers .wine/.pc directories and .wsquashfs archives through autorun.cmd. Bottle paths and runner options use the backend's namespace: windows for stock Wine, the custom system name for DCG Wine. Stock Wine must already be routed correctly by the custom system; the Toolbox does not fix its routing. linuxloader-dcg and windows-arcade-loader alternatives are ignored. Custom .wtgz, direct .exe, .squashfs and .windowsloader launches are not covered yet. ReShade, AntiMicroX and DXVK game lists are unchanged.
+
+DCG v44: wine-dcg is explicitly recognized. With a wine event, only teknoparrot/windows_squash have confirmed DCG redirection in the reviewed source. Other cases are skipped rather than guessing paths. DCG 41/42 retains per-runner storage even when stock Wine uses its legacy layout.
+
+Close games before changing the selection. gameStop cleanup remembers the autorun modified even if the selection, XML or runner changes. Standard Batocera game events are required. Event delivery, ordering and actual MangoHud rendering still require on-device Batocera/DCG validation; local tests cover environment preparation and cleanup.
+
+
 MangoHud displays information while playing: FPS and, depending on the profile, frame pacing, load, temperatures and memory. It helps observe performance; enabling it does not itself optimize the game.
 
 USE
