@@ -3,6 +3,7 @@
 import argparse
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import time
@@ -36,9 +37,22 @@ def check(archive, mode, log_path, cancel, executable='unsquashfs'):
         if cancel.exists():
             return 130
         if mode == 'full':
-            help_result = subprocess.run([executable, '-help'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            if b'-pf ' not in help_result.stdout and b'-pseudo-file' not in help_result.stdout:
-                log.write(b'Full check unsupported: unsquashfs has no pseudo-file output option.\n')
+            # Since 4.7, -help may only show a summary. Older versions expose
+            # all options there and may not support -help-all at all.
+            for help_option in ('-help', '-help-all'):
+                if cancel.exists():
+                    return 130
+                help_result = subprocess.run([executable, help_option], stdout=subprocess.PIPE,
+                                             stderr=subprocess.STDOUT, timeout=10,
+                                             env=dict(os.environ, PAGER='cat'))
+                if re.search(rb'(?<!\S)-(?:pf|pseudo-file)(?=\s|$)', help_result.stdout):
+                    log.write(f'Pseudo-file output supported (detected via {help_option}).\n'.encode())
+                    break
+                log.write(f'unsquashfs {help_option} (exit {help_result.returncode}):\n'.encode())
+                log.write(help_result.stdout + b'\n')
+            else:
+                log.write(b'Full check unsupported: neither help listing exposes pseudo-file output. '
+                          b'Archive data was not checked.\n')
                 return 3
         code = run([executable, '-s', str(archive)], log, cancel)
         if code:
