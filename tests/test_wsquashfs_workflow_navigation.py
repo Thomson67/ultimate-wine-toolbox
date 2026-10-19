@@ -64,6 +64,56 @@ wsq_post_build_menu
         self.assertNotIn('update', options)
         self.assertEqual((self.home/'action').read_text().strip(), 'create')
 
+    def test_extraction_report_captures_stdout_stderr_and_failure_with_or_without_dialog(self):
+        for graphical in (0, 1):
+            with self.subTest(dialog=graphical):
+                self.shell(r"""
+source "$WT_ROOT/modules/maintenance.sh"
+wt_clear_tty() { :; }; clear() { :; }
+have_dialog() { [ "$TEST_GRAPHICAL" = 1 ]; }
+dialog() { cat > "$WT_HOME/gauge"; }
+WT_SESSION_LOG="$WT_HOME/session.log"
+failing_unsquashfs() { echo 'stdout diagnostic'; echo 'FATAL ERROR: No space left on device' >&2; return 7; }
+wsq_update_extract title body "$WT_HOME/extract.log" failing_unsquashfs 'Game [Wine].wsquashfs'
+[ "$?" -eq 7 ] || exit 1
+wsq_update_log_detail "$WT_HOME/extract.log" > "$WT_HOME/detail"
+""".replace('source "$WT_ROOT/modules/maintenance.sh"',
+                'TEST_GRAPHICAL='+str(graphical)+'; source "$WT_ROOT/modules/maintenance.sh"'))
+                report=(self.home/'extract.log').read_text()
+                self.assertIn('stdout diagnostic',report)
+                self.assertIn('FATAL ERROR: No space left on device',report)
+                self.assertIn('Extraction exit=7',report)
+                self.assertIn('No space left on device',(self.home/'detail').read_text())
+                (self.home/'extract.log').unlink()
+
+    def test_extraction_raises_file_limit_only_in_child(self):
+        self.shell(r"""
+source "$WT_ROOT/modules/maintenance.sh"
+clear() { :; }
+# Simulate a low inherited soft limit without requiring elevated hard limits.
+UWT_TEST_SOFT=1024
+ulimit() {
+ case "$1" in
+  -Sn) if [ "$#" -eq 1 ]; then echo "$UWT_TEST_SOFT"; else UWT_TEST_SOFT="$2"; fi ;;
+  -Hn) echo 1048576 ;;
+ esac
+}
+extract_command() { [ "$(ulimit -Sn)" -eq 65536 ]; }
+wsq_update_extract title body "$WT_HOME/extract.log" extract_command || exit 1
+[ "$(ulimit -Sn)" -eq 1024 ] || exit 2
+""")
+        self.assertIn('soft=65536 hard=1048576 (previous soft=1024)',
+                      (self.home/'extract.log').read_text())
+
+    def test_successful_extraction_reports_zero_exit(self):
+        self.shell(r"""
+source "$WT_ROOT/modules/maintenance.sh"
+wt_clear_tty() { :; }; clear() { :; }
+successful_unsquashfs() { echo extracted; }
+wsq_update_extract title body "$WT_HOME/extract.log" successful_unsquashfs || exit 1
+""")
+        self.assertIn('Extraction exit=0',(self.home/'extract.log').read_text())
+
     def test_keep_existing_directory_retains_old_and_discards_test_data_without_backup(self):
         source=self.prefix/'drive_c/game/Saves'
         (source/'slot.sav').write_text('tested progression');(source/'.hidden').write_text('hidden')

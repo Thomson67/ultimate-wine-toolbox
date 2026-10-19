@@ -717,6 +717,7 @@ declare -gA I18N=(
   [wsq_update_copy]="Déplacement de la nouvelle version et préparation des sauvegardes de test. Cette opération peut prendre plusieurs minutes."
   [wsq_update_validate]="Contrôle complet de la nouvelle archive avant remplacement. Les données sont lues sans extraction supplémentaire."
   [wsq_update_elapsed]="Opération en cours — %s secondes écoulées."
+  [wsq_update_extract_failed]="L’extraction du préfixe a échoué.\\n\\nDétail :\\n%s\\n\\nPréfixe de travail conservé :\\n%s\\n\\nRapport complet :\\n%s\\nL’archive originale est conservée."
   [wsq_update_failed]="L’opération n’a pas abouti. Le préfixe de travail est conservé :\\n%s\\n\\nRapport :\\n%s\\nConsultez aussi le log de la session. L’archive originale ou sa sauvegarde est conservée."
   [wsq_update_bottles_cleanup_failed]="L’archive a été mise à jour, mais des bottles Wine associées n’ont pas pu être supprimées. L’opération reste en attente pour permettre une nouvelle tentative. Log :\n%s"
   [wsq_update_prepare_failed]="La préparation du jeu a échoué. Détail :\\n%s\\n\\nPréfixe de travail conservé :\\n%s\\n\\nRapport complet :\\n%s\\nL’archive originale est conservée."

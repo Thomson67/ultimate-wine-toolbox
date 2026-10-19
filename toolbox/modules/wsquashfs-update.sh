@@ -20,6 +20,44 @@ wsq_update_run() {
     return "$rc"
 }
 
+# Keep both output streams in the operation report while forwarding progress.
+# PIPESTATUS preserves unsquashfs failures rather than tee's successful exit.
+wsq_update_logged_command() {
+    local log="$1"
+    shift
+    {
+        # This pipeline runs in a subshell: keep Toolbox/session limits unchanged.
+        local soft hard target=65536
+        soft="$(ulimit -Sn)"; hard="$(ulimit -Hn)"
+        if [ "$hard" != unlimited ] && [ "$hard" -lt "$target" ]; then
+            ulimit -Hn "$target" 2>/dev/null || true
+            hard="$(ulimit -Hn)"
+            [ "$hard" = unlimited ] || [ "$hard" -ge "$target" ] || target="$hard"
+        fi
+        if [ "$soft" != unlimited ] && [ "$soft" -lt "$target" ]; then
+            ulimit -Sn "$target" 2>/dev/null || true
+        fi
+        printf 'Extraction open files: soft=%s hard=%s (previous soft=%s)\n' \
+            "$(ulimit -Sn)" "$(ulimit -Hn)" "$soft"
+        "$@"
+    } 2>&1 | tee -a "$log"
+    local -a statuses=("${PIPESTATUS[@]}")
+    [ "${statuses[0]}" -eq 0 ] || return "${statuses[0]}"
+    return "${statuses[1]}"
+}
+
+wsq_update_extract() {
+    local title="$1" body="$2" log="$3" rc=0
+    shift 3
+    {
+        printf '\n[%s] Extraction started\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+        printf 'Command:'; printf ' %q' "$@"; printf '\n'
+    } >> "$log" || return 1
+    maintenance_run_progress "$title" "$body" wsq_update_logged_command "$log" "$@" || rc=$?
+    printf '\nExtraction exit=%s\n' "$rc" >> "$log" || return 1
+    return "$rc"
+}
+
 wsq_update_log_detail() {
     python3 - "$1" <<'PY'
 from pathlib import Path
@@ -303,9 +341,11 @@ wsq_update_new() {
     wsq_begin_update_state "$prefix" "$game_name" "$snapshot" "$archive" "$metadata" "$log" extracting || {
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
     }
-    if ! maintenance_run_progress "$(i18n wsq_update_title)" "$(i18n wsq_update_extract)" \
+    if ! wsq_update_extract "$(i18n wsq_update_title)" "$(i18n wsq_update_extract)" "$log" \
         unsquashfs -no-xattrs -percentage -d "$prefix" "$archive"; then
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
+        msgbox "$(i18n wsq_update_title)" \
+            "$(i18n wsq_update_extract_failed "$(wsq_update_log_detail "$log")" "$prefix" "$log")"
+        return
     fi
     wsq_update_state phase preparing || return
     if ! wsq_update_run "$(i18n wsq_update_title)" "$(i18n wsq_update_copy)" "$log" \
