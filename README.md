@@ -10,6 +10,8 @@ Created by **Thomsonito**.
 
 ## Features
 
+Test branch: MangoHud can opt into custom ES Wine collections from its **Custom Wine systems (test)** menu. Discovery accepts Wine declarations even with another platform name, including DCG `teknoparrot` and `windows_squash`. Initial coverage is `.wine`, `.pc` and `.wsquashfs`; mixed native/arcade loaders and other formats are skipped. Settings and bottle paths follow stock Wine or DCG. Custom systems are off by default; Batocera/DCG event delivery and actual rendering still require device validation. Other hooks are not expanded yet.
+
 - French / English interface
 - UMU Runner Toolbox integration
 - Wine Runner Starter Pack, with a list of installed and missing runners

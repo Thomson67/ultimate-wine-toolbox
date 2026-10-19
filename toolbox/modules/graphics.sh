@@ -67,24 +67,81 @@ mangohud_list_games() {
         2>/dev/null | sort -f
 }
 
+# The existing list is also used by ReShade/AntiMicroX. Expand MangoHud's
+# picker only until those backends have their own custom-prefix adapters.
+mangohud_systems_cmd() {
+    python3 "$WT_ROOT/helpers/wine_systems.py" --home "$WT_HOME" "$@"
+}
+
+mangohud_list_compatible_games() {
+    {
+        mangohud_list_games
+        mangohud_systems_cmd games
+    } | sort -fu
+}
+
+mangohud_game_label() {
+    local path="$1" name root label backend selected best="" best_root=""
+    while IFS=$'\t' read -r name root label backend selected; do
+        [ -n "$root" ] || continue
+        case "$path" in
+            "$root"/*)
+                if [ "${#root}" -gt "${#best_root}" ]; then best="$name"; best_root="$root"; fi ;;
+        esac
+    done <<< "${MANGOHUD_CUSTOM_SYSTEMS:-}"
+    if [ -n "$best" ]; then
+        printf '[%s] %s' "$best" "$(basename "$path")"
+    else
+        basename "$path"
+    fi
+}
+
+mangohud_custom_systems_menu() {
+    local name root label backend state selected id rows="" count=0
+    local -a items=() names=()
+    while IFS=$'\t' read -r name root label backend state; do
+        [ -n "$name" ] || continue
+        count=$((count+1))
+        items+=("$count" "$label [$name]" "$state")
+        rows+="$name"$'\n'
+    done < <(mangohud_systems_cmd systems)
+    if [ "$count" -eq 0 ]; then
+        msgbox "$(i18n mangohud_custom_title)" "$(i18n mangohud_custom_none)"
+        return
+    fi
+    selected="$(checklist_select "$(i18n mangohud_custom_title)" \
+        "$(i18n mangohud_custom_prompt)" "${items[@]}")" || return
+    while IFS= read -r id; do
+        [ -n "$id" ] || continue
+        name="$(sed -n "${id}p" <<< "$rows")"
+        [ -n "$name" ] && names+=("$name")
+    done <<< "$selected"
+    if mangohud_systems_cmd select "${names[@]}"; then
+        msgbox "$(i18n mangohud_custom_title)" "$(i18n mangohud_custom_saved)"
+    else
+        msgbox "$(i18n mangohud_custom_title)" "$(i18n mangohud_custom_failed)"
+    fi
+}
+
 mangohud_game_menu() {
     local -a items=()
     local rows="" path state selected="" id count=0 failures=0 idx=1
 
+    MANGOHUD_CUSTOM_SYSTEMS="$(mangohud_systems_cmd systems)"
     while IFS= read -r path; do
         [ -n "$path" ] || continue
         state="$(mangohud_game_override "$path")"
 
         if [ "$state" = "on" ]; then
-            items+=("$idx" "$(basename "$path")" "on")
+            items+=("$idx" "$(mangohud_game_label "$path")" "on")
         else
-            items+=("$idx" "$(basename "$path")" "off")
+            items+=("$idx" "$(mangohud_game_label "$path")" "off")
         fi
 
         rows+="$path"$'\n'
         idx=$((idx+1))
         count=$((count+1))
-    done < <(mangohud_list_games)
+    done < <(mangohud_list_compatible_games)
 
     if [ "$count" -eq 0 ]; then
         msgbox "$(i18n mangohud_per_game)" "$(i18n mangohud_no_games)"
@@ -122,11 +179,12 @@ mangohud_disable_individual_menu() {
         return
     fi
 
+    MANGOHUD_CUSTOM_SYSTEMS="$(mangohud_systems_cmd systems)"
     while IFS=$'\t' read -r state path; do
         [ "$state" = "on" ] || continue
         [ -n "$path" ] || continue
 
-        items+=("$idx" "$(basename "$path")" "off")
+        items+=("$idx" "$(mangohud_game_label "$path")" "off")
         rows+="$path"$'\n'
         idx=$((idx+1))
         count=$((count+1))
@@ -194,6 +252,7 @@ mangohud_menu() {
             "3" "$(i18n mangohud_per_game)" \
             "4" "$(i18n mangohud_disable_individual)" \
             "5" "$(i18n mangohud_profile_title)" \
+            "6" "$(i18n mangohud_custom_title)" \
             "0" "$(i18n back)")" || return
 
         case "$choice" in
@@ -202,6 +261,7 @@ mangohud_menu() {
             3) mangohud_game_menu ;;
             4) mangohud_disable_individual_menu ;;
             5) mangohud_profile_menu ;;
+            6) mangohud_custom_systems_menu ;;
             0|"") return ;;
         esac
     done

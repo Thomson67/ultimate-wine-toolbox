@@ -12,6 +12,17 @@ Choisir un profil :
 
 Fermer puis relancer le jeu après un changement. Le réglage de la Toolbox concerne les jeux Windows qu’elle gère ; il ne règle pas l’affichage des performances de tous les émulateurs.
 
+SYSTÈMES WINE PERSONNALISÉS (TEST)
+Dans MangoHud, ouvrir « Systèmes Wine personnalisés (test) » et cocher les collections souhaitées. Elles sont désactivées par défaut. Les jeux compatibles apparaissent avec [nom_du_système] dans la liste MangoHud ; les réglages globaux et par jeu s'appliquent comme pour Windows. Décocher un système conserve ses réglages individuels pour une réactivation ultérieure.
+
+La détection lit les fichiers es_systems.cfg et es_systems_*.cfg d'EmulationStation, avec priorité aux définitions utilisateur. Un émulateur wine ou wine-dcg et un lanceur reconnu sont nécessaires ; platform=windows est un indice, pas une obligation. Aucun XML ni lanceur tiers n'est modifié. Les fichiers sont relus à l'ouverture de la liste et lors des événements, sans analyser les archives ni parcourir les ROMs au lancement.
+
+Cette première version couvre les dossiers .wine/.pc et les archives .wsquashfs via autorun.cmd. Les bouteilles et les options du runner suivent le backend : windows pour Wine natif, nom du système pour Wine DCG. Le Wine natif stock doit déjà être correctement lancé par le système custom ; la Toolbox ne corrige pas son routage. Les variantes linuxloader-dcg et windows-arcade-loader sont ignorées. .exe direct, .wtgz custom, .squashfs et .windowsloader restent hors périmètre. Les listes ReShade, AntiMicroX et DXVK ne sont pas élargies.
+
+DCG v44 : wine-dcg est reconnu explicitement ; avec un événement wine, seuls teknoparrot/windows_squash ont une redirection DCG confirmée dans le code examiné. Les autres cas sont ignorés au lieu de deviner leurs chemins. Pour DCG 41/42, le rangement par runner est conservé même si Wine natif utilise l'ancien rangement.
+
+Fermer les jeux avant de changer la sélection. Le nettoyage à gameStop retrouve l'autorun modifié, même si la sélection, le XML ou le runner ont changé. Les jeux doivent émettre les événements Batocera usuels. Leur réception, leur ordre et l'affichage réel de MangoHud doivent encore être validés sur Batocera/DCG ; les tests locaux vérifient la préparation et le nettoyage de l'environnement.
+
 COMMENT COMPARER ?
 Utiliser la même scène, la même résolution et les mêmes options graphiques. Observer la régularité, pas seulement le FPS maximal. Modifier un réglage à la fois permet de savoir ce qui améliore réellement le résultat.
 

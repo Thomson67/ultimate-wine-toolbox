@@ -1,5 +1,7 @@
 # Ultimate Wine Toolbox pour Batocera
 
+Branche de test : MangoHud peut inclure des collections Wine personnalisées depuis **Systèmes Wine personnalisés (test)**. La détection accepte un émulateur Wine même avec une autre plateforme, dont les systèmes DCG `teknoparrot` et `windows_squash`. Première prise en charge : `.wine`, `.pc`, `.wsquashfs` ; les autres chargeurs et formats sont ignorés. Les options et les bouteilles suivent Wine natif ou DCG. Les systèmes custom sont désactivés par défaut ; les événements et l'affichage réel restent à valider sur Batocera/DCG. Les autres hooks ne sont pas encore élargis.
+
 [English](README.md) | [Français](README.fr.md)
 
 **Ultimate Wine Toolbox** est une toolbox Wine / Proton / UMU conçue pour Batocera.
