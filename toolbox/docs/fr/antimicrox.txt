@@ -8,6 +8,8 @@ CRÉER OU MODIFIER EN JEU
 3. Modifier les commandes et les tester dans le jeu. Enregistrer le profil dans AntiMicroX AVANT de quitter le jeu.
 4. À la fin, choisir Utiliser ce profil aux prochains lancements pour l’activer, ou continuer les réglages.
 
+Le retour automatique utilise le même mécanisme ES que les essais WSquashFS et ReShade, y compris avec Ports regroupé en v44. Il confirme la réouverture de la Toolbox et conserve la reprise en attente si ES est occupé ou indisponible. Le regroupement des systèmes reste inchangé.
+
 UTILISER UN PROFIL EXISTANT
 Choisir le profil dans la liste ou Parcourir les fichiers .amgp, puis choisir le jeu. Les jeux dont le nom ressemble au profil sont proposés en priorité ; les autres restent accessibles. Le profil sera chargé au prochain lancement du jeu depuis EmulationStation.
 

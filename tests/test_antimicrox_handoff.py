@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'toolbox/helpers'))
 import antimicrox_handoff as handoff
+import toolbox_return
 from antimicrox_live import LiveSession
 
 
@@ -31,6 +32,8 @@ class Api:
     def reload_games(self): self.calls.append(('reload', None))
     def launch(self, rom):
         self.launches.append(rom); self.calls.append(('launch', rom))
+        if getattr(self, 'request', None) and rom != getattr(self, 'game', None):
+            self.request.unlink(missing_ok=True)
 
 
 class HandoffTests(unittest.TestCase):
@@ -43,6 +46,8 @@ class HandoffTests(unittest.TestCase):
         self.clock = Clock(); self.stopped = []
 
     def worker(self, api):
+        api.request = self.session.home/'state/resume-wsq.request'
+        api.game = str(self.rom)
         worker = handoff.Handoff(self.session, str(self.rom), api, self.clock.time,
                                   self.clock.sleep, idle_timeout=1, start_timeout=1)
         worker.stop_mapping = lambda: self.stopped.append(str(self.rom))
@@ -58,7 +63,7 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(api.launches, [str(self.rom), handoff.TOOLBOX])
         self.assertEqual(self.stopped, [str(self.rom)])
         self.assertFalse(Path(self.data['keys']).exists())
-        self.assertEqual((self.session.home/'state/resume-wsq.request').read_text(), 'antimicrox\n')
+        self.assertFalse((self.session.home/'state/resume-wsq.request').exists())
 
     def test_ports_status_200_is_never_treated_as_a_running_target(self):
         api = Api([(200, handoff.TOOLBOX)])
@@ -71,7 +76,7 @@ class HandoffTests(unittest.TestCase):
         api = Api([(200, handoff.TOOLBOX), (201, ''), (201, ''), (201, ''),
                    (201, ''), (200, str(self.rom)), (201, ''), (201, '')])
         indexed = iter([False, False, True])
-        api.indexed = lambda rom: next(indexed)
+        api.indexed = lambda rom: True if rom == handoff.TOOLBOX else next(indexed)
         self.assertEqual(self.worker(api).run(), 'short')
         self.assertEqual(api.calls.count(('reload', None)), 1)
         self.assertEqual(api.calls[:4], [('running', (200, handoff.TOOLBOX)),
@@ -85,7 +90,7 @@ class HandoffTests(unittest.TestCase):
         self.assertNotIn(('reload', None), api.calls)
 
     def test_missing_game_after_refresh_restores_session_without_launching_it(self):
-        api = Api([(201, '')]); api.indexed = lambda rom: False
+        api = Api([(201, '')]); api.indexed = lambda rom: rom == handoff.TOOLBOX
         worker = self.worker(api); worker.refresh_timeout = 1
         self.assertEqual(worker.run(), 'launch_failed')
         self.assertEqual(api.calls.count(('reload', None)), 1)
@@ -104,7 +109,12 @@ class HandoffTests(unittest.TestCase):
     def test_temporary_api_failure_during_refresh_can_recover(self):
         api = Api([(201, ''), (201, ''), (201, ''), (201, ''),
                    (200, str(self.rom)), (201, ''), (201, '')])
-        with patch.object(api, 'indexed', side_effect=[False, TimeoutError(), True]):
+        results = iter([False, TimeoutError(), True])
+        def indexed(rom):
+            result = True if rom == handoff.TOOLBOX else next(results)
+            if isinstance(result, Exception): raise result
+            return result
+        with patch.object(api, 'indexed', side_effect=indexed):
             self.assertEqual(self.worker(api).run(), 'short')
         self.assertEqual(api.calls.count(('reload', None)), 1)
 
@@ -117,7 +127,7 @@ class HandoffTests(unittest.TestCase):
         self.assertFalse(Path(self.data['keys']).exists())
 
     def test_failed_refresh_request_restores_session_without_launching_game(self):
-        api = Api([(201, '')]); api.indexed = lambda rom: False
+        api = Api([(201, '')]); api.indexed = lambda rom: rom == handoff.TOOLBOX
         with patch.object(api, 'reload_games', side_effect=OSError('reload failed')):
             self.assertEqual(self.worker(api).run(), 'launch_failed')
         self.assertEqual(api.launches, [handoff.TOOLBOX])
@@ -168,6 +178,60 @@ class HandoffTests(unittest.TestCase):
             self.assertTrue(kwargs['start_new_session'])
             self.assertTrue(kwargs['close_fds'])
             self.assertEqual(kwargs['stdin'], subprocess.DEVNULL)
+
+    def test_grouped_return_confirms_antimicrox_marker_through_shared_proxy(self):
+        api = Api([(201, ''), (200, str(self.rom)), (201, '')])
+        api.system_info = lambda name: dict(groupsystem='true')
+        api.indexed = lambda rom, system=None: True
+        target = str(handoff.proxy_launcher(self.session.home))
+        original_launch = api.launch
+        def launch(rom):
+            if rom == target:
+                self.assertEqual(api.request.read_text(), 'antimicrox\n')
+                self.assertFalse(Path(self.data['keys']).exists())
+                self.assertEqual(self.session.read()['phase'], 'finished')
+            original_launch(rom)
+        api.launch = launch
+        with patch.object(toolbox_return, 'ensure_proxy', return_value=('uwt_return', target)):
+            self.assertEqual(self.worker(api).run(), 'short')
+        self.assertEqual(api.launches, [str(self.rom), target])
+        self.assertFalse(api.request.exists())
+        self.assertEqual(api.calls.count(('reload', None)), 1)
+
+    def test_second_live_test_waits_for_proxy_to_release_then_launches_game(self):
+        proxy = str(handoff.proxy_launcher(self.session.home))
+        api = Api([(200, proxy), (201, ''), (200, proxy),
+                   (200, str(self.rom)), (201, '')])
+        self.assertEqual(self.worker(api).run(), 'short')
+        self.assertEqual(api.launches, [str(self.rom), handoff.TOOLBOX])
+        self.assertEqual(api.calls[:2], [('running', (200, proxy)), ('running', (201, ''))])
+
+    def test_foreign_path_with_same_proxy_name_is_not_toolbox(self):
+        api = Api([(200, '/another/runtime/es-return-proxy/Ultimate Wine Toolbox Return.sh')])
+        self.assertEqual(self.worker(api).run(), 'launch_failed')
+        self.assertEqual(api.launches, [])
+
+    def test_failed_proxy_setup_keeps_antimicrox_recovery_marker(self):
+        api = Api([(201, '')])
+        api.system_info = lambda name: dict(groupsystem='true')
+        worker = self.worker(api)
+        with patch.object(toolbox_return, 'ensure_proxy', side_effect=ValueError('foreign config')):
+            worker.resume()
+        self.assertEqual(api.request.read_text(), 'antimicrox\n')
+        self.assertEqual(api.launches, [])
+
+    def test_ignored_return_retries_and_keeps_antimicrox_recovery(self):
+        api = Api([(201, '')])
+        api.launch = lambda rom: api.launches.append(rom)
+        self.worker(api).resume()
+        self.assertEqual(api.launches, [handoff.TOOLBOX] * 3)
+        self.assertEqual(api.request.read_text(), 'antimicrox\n')
+
+    def test_game_starting_during_return_idle_check_is_not_interrupted(self):
+        api = Api([(201, ''), (200, '/userdata/roms/windows/Other.wine')])
+        self.worker(api).resume()
+        self.assertEqual(api.launches, [])
+        self.assertEqual(api.request.read_text(), 'antimicrox\n')
 
 
 class EsApiTests(unittest.TestCase):

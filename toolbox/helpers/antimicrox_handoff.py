@@ -12,6 +12,7 @@ import urllib.request
 import urllib.parse
 
 from antimicrox_live import LiveSession, atomic
+from es_return_proxy import proxy_launcher
 
 TOOLBOX = '/userdata/roms/ports/Ultimate Wine Toolbox.sh'
 LOG_DIR = Path('/userdata/system/logs/ultimate-wine-toolbox')
@@ -92,6 +93,9 @@ class Handoff:
         data = self.session.read()
         return bool(data and data['rom'] == self.rom and data.get('session_id') == self.session_id)
 
+    def is_toolbox(self, path):
+        return path in (TOOLBOX, str(proxy_launcher(self.session.home)))
+
     def require_active_session(self):
         if not self.owns_session() or self.session.read()['phase'] not in ('prepared', 'running'):
             raise RuntimeError('Live session was recovered or cancelled elsewhere')
@@ -136,7 +140,7 @@ class Handoff:
             if code == 200 and path == self.rom:
                 self.log('Requested game already active; attach without a second launch')
                 return 'attach'
-            if code == 200 and path and path != TOOLBOX:
+            if code == 200 and path and not self.is_toolbox(path):
                 raise RuntimeError(f'Another game is running: {path}')
             self.sleep(.25)
         raise RuntimeError('Toolbox port was not released within the timeout')
@@ -149,7 +153,7 @@ class Handoff:
             if code == 200 and path == self.rom:
                 self.log(f'Confirmed requested game: {path}')
                 return
-            if code == 200 and path and path not in (TOOLBOX, self.rom):
+            if code == 200 and path and path != self.rom and not self.is_toolbox(path):
                 raise RuntimeError(f'A different game started: {path}')
             self.sleep(.25)
         raise RuntimeError('Requested game launch was not confirmed')
@@ -174,8 +178,17 @@ class Handoff:
             code, path = self.api.running()
             if code in (201, 404):
                 atomic(self.session.home/'state/resume-wsq.request', b'antimicrox\n')
-                self.api.launch(TOOLBOX)
-                self.log('Requested return to AntiMicroX menu')
+                # Import at handoff time: the shared return helper uses EsApi.
+                from toolbox_return import resume
+                try:
+                    confirmed = resume(self.session.home, None, api=self.api,
+                                       clock=self.clock, sleep=self.sleep,
+                                       timeout=self.idle_timeout, refresh_timeout=self.refresh_timeout)
+                except (OSError, ValueError, RuntimeError) as exc:
+                    self.log(f'Automatic Toolbox return failed; request retained: {exc}')
+                    return
+                self.log('Confirmed return to AntiMicroX menu' if confirmed else
+                         'Return unconfirmed; reopen the Toolbox to recover AntiMicroX')
                 return
             if code == 200 and path:
                 self.log('Another Ports/game session is active; defer recovery to next Toolbox opening')

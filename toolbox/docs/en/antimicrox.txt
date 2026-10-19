@@ -8,6 +8,8 @@ CREATE OR EDIT IN GAME
 3. Edit mappings and test them in the game. Save the profile in AntiMicroX BEFORE quitting the game.
 4. Afterwards, choose Use this profile whenever this game starts to enable it, or continue adjusting controls.
 
+Automatic return uses the same ES mechanism as WSquashFS and ReShade tests, including grouped Ports on v44. It confirms the Toolbox has reopened and keeps recovery pending if ES is busy or unavailable. System grouping remains unchanged.
+
 USE AN EXISTING PROFILE
 Select a profile from the list or Browse .amgp files, then choose the game. Games with names similar to the profile appear first; all other games remain available. The profile will load the next time the game starts from EmulationStation.
 

@@ -24,6 +24,20 @@ def parent_alive(pid):
 
 def resume(home, parent_pid, api=None, clock=time.monotonic, sleep=time.sleep,
            alive=parent_alive, timeout=30, refresh_timeout=60, confirm_timeout=10):
+    """Shared confirmed return for every workflow; None means Ports already exited."""
+    state = Path(home) / 'state'
+    state.mkdir(parents=True, exist_ok=True)
+    with (state / 'toolbox-return.lock').open('a') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print('Toolbox return already running; request retained', flush=True)
+            return False
+        return _resume(home, parent_pid, api, clock, sleep, alive, timeout,
+                       refresh_timeout, confirm_timeout)
+
+
+def _resume(home, parent_pid, api, clock, sleep, alive, timeout, refresh_timeout, confirm_timeout):
     api = api or EsApi()
     request = Path(home) / 'state/resume-wsq.request'
 
@@ -31,7 +45,7 @@ def resume(home, parent_pid, api=None, clock=time.monotonic, sleep=time.sleep,
         print(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Toolbox return: {message}', flush=True)
 
     deadline = clock() + timeout
-    while alive(parent_pid):
+    while parent_pid is not None and alive(parent_pid):
         if clock() >= deadline:
             log('old Ports launcher still active; request retained')
             return False
@@ -117,15 +131,8 @@ def main():
                 start_new_session=True, close_fds=True)
         print(f'Toolbox return detached pid={process.pid}', flush=True)
         return
-    state = args.home / 'state'
-    state.mkdir(parents=True, exist_ok=True)
-    with (state / 'toolbox-return.lock').open('a') as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise SystemExit('Toolbox return already running')
-        if not resume(args.home, args.parent_pid):
-            raise SystemExit(1)
+    if not resume(args.home, args.parent_pid):
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':

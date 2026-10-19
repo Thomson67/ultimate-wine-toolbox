@@ -1,5 +1,6 @@
 """A confirmed ES return must release the previous Ports process and restore its lifecycle."""
 import os
+import fcntl
 from pathlib import Path
 import subprocess
 import sys
@@ -67,6 +68,14 @@ class ToolboxReturnTests(unittest.TestCase):
     def test_busy_parent_retains_request_without_touching_es(self):
         api = Api(self.request)
         self.assertFalse(self.run_return(api, lambda pid: True))
+        self.assertEqual(api.calls, [])
+        self.assertTrue(self.request.exists())
+
+    def test_shared_lock_prevents_two_workflows_from_launching_toolbox(self):
+        api = Api(self.request)
+        with (self.home/'state/toolbox-return.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertFalse(self.run_return(api))
         self.assertEqual(api.calls, [])
         self.assertTrue(self.request.exists())
 

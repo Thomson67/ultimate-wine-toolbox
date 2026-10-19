@@ -11,6 +11,10 @@ MARKER = 'Managed by Ultimate Wine Toolbox: ES return proxy v1'
 CONFIG_NAME = 'es_systems_uwt_return.cfg'
 
 
+def proxy_launcher(home):
+    return Path(home) / 'runtime/es-return-proxy/Ultimate Wine Toolbox Return.sh'
+
+
 def atomic_owned(path, content, mode=0o644, marker=MARKER):
     if path.is_symlink() or (path.exists() and marker.encode() not in path.read_bytes()):
         raise ValueError(f'foreign return-proxy file will not be replaced: {path}')
@@ -61,7 +65,7 @@ def ensure_proxy(home, config_directory=None, system_directory=None, port=None):
     system_directory = Path(system_directory or '/usr/share/emulationstation')
     port = Path(port or '/userdata/roms/ports/Ultimate Wine Toolbox.sh')
     runtime = home / 'runtime/es-return-proxy'
-    launcher = runtime / 'Ultimate Wine Toolbox Return.sh'
+    launcher = proxy_launcher(home)
     config = config_directory / CONFIG_NAME
     if runtime.is_symlink() or runtime.resolve() != runtime:
         raise ValueError('return-proxy directory must not redirect outside its owned path')
