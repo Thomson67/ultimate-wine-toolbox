@@ -160,6 +160,7 @@ monitor_wsq_launch
             script = 'resume_wsquashfs_toolbox() {'+function+'''
 wait_for_es_api() { return 0; }
 launch_game_via_es() { printf '%s' "$RESUME_ENV" > "$TEST_DIR/env"; }
+launch_toolbox_confirmed() { launch_game_via_es "$TOOLBOX_PORT"; }
 resume_wsquashfs_toolbox
 '''
             env = dict(os.environ, TEST_DIR=folder, AMX_REQUEST=str(base/'live'),

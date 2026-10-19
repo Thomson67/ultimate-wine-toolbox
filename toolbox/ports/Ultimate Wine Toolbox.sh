@@ -283,6 +283,46 @@ resume_wsq_unavailable() {
     resume_wsquashfs_toolbox || true
 }
 
+launch_toolbox_confirmed() {
+    local attempt poll code="" idle=0
+    # /launch acknowledges queued requests before ES executes them. Let the
+    # post-game transition finish and confirm consumption by the new Ports run.
+    for ((poll=0; poll<40; poll++)); do
+        code="$(get_running_game_http_code)"
+        if [ "$code" = 201 ]; then
+            idle=$((idle+1))
+            [ "$idle" -lt 3 ] || break
+        else
+            idle=0
+        fi
+        sleep 0.25
+    done
+    if [ "$idle" -lt 3 ]; then
+        echo "ERROR: ES is not confirmed idle for Toolbox return (HTTP=$code); request retained." >>"$BOOT_LOG"
+        return 2
+    fi
+    for attempt in 1 2 3; do
+        echo "wsq_resume_attempt=$attempt" >>"$BOOT_LOG"
+        launch_game_via_es "$TOOLBOX_PORT" || true
+        for ((poll=0; poll<40; poll++)); do
+            if [ ! -f "$RESUME_REQUEST" ]; then
+                echo "wsq_resume_request_consumed_after_attempt=$attempt" >>"$BOOT_LOG"
+                return 0
+            fi
+            sleep 0.25
+        done
+        # Avoid launching over any game/Ports session or during an API outage.
+        code="$(get_running_game_http_code)"
+        if [ "$code" != 201 ]; then
+            echo "ERROR: Toolbox return unconfirmed (HTTP=$code); request retained, no duplicate launch." >>"$BOOT_LOG"
+            return 2
+        fi
+        echo "WARNING: ES accepted no confirmed Toolbox return; retrying while idle." >>"$BOOT_LOG"
+    done
+    echo "ERROR: Toolbox return not confirmed after three attempts." >>"$BOOT_LOG"
+    return 1
+}
+
 resume_wsquashfs_toolbox() {
     echo "wsq_auto_resume=1" >>"$BOOT_LOG"
 
@@ -299,9 +339,17 @@ resume_wsquashfs_toolbox() {
         : > "$RESUME_REQUEST"
     fi
 
-    if wait_for_es_api && launch_game_via_es "$TOOLBOX_PORT"; then
-        echo "wsq_resume_via_es=1" >>"$BOOT_LOG"
-        return 0
+    local launch_rc=0
+    if wait_for_es_api; then
+        launch_toolbox_confirmed || launch_rc=$?
+        if [ "$launch_rc" -eq 0 ]; then
+            echo "wsq_resume_via_es=1" >>"$BOOT_LOG"
+            return 0
+        fi
+        [ "$launch_rc" -ne 2 ] || return 1
+    else
+        echo "ERROR: ES API unavailable for Toolbox return; request retained." >>"$BOOT_LOG"
+        return 1
     fi
 
     echo "ERROR: WSquashFS resume via EmulationStation failed; using direct xterm fallback." >>"$BOOT_LOG"
