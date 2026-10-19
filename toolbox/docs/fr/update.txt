@@ -18,3 +18,5 @@ Choisir de sauvegarder l’ancienne archive avant remplacement ou de la remplace
 Une opération inachevée peut être reprise depuis le menu. Les erreurs indiquent le préfixe conservé et le journal à consulter. Après réussite, les anciennes bottles du jeu sont nettoyées et la suppression du préfixe de travail est proposée. Vérifier ensuite la progression en lançant le nouveau WSquashFS.
 
 Le matching exact habituel est conservé. Les noms partageant le premier mot sont suggérés uniquement en l’absence de correspondance exacte. Ces suggestions restent à vérifier ; les autres dossiers et Parcourir restent accessibles. Après réussite, « Mettre à jour un autre WSquashFS » permet d’enchaîner une nouvelle mise à jour.
+
+Avec mergerfs, si le déplacement direct échoue avec EXDEV, la Toolbox essaie de déplacer chaque partie du dossier sur sa branche physique, sans recopier les fichiers du jeu. Les chemins sont consignés dans le rapport et le manifeste de préparation ; les déplacements sont annulés si une étape échoue. En cas de retour en arrière incomplet, conserver le préfixe, le .bak et le rapport pour récupération.

@@ -736,6 +736,42 @@ wsq_update_select_source
         self.assertFalse(self.game.with_name('game.bak').exists())
         self.assertEqual(self.archive.read_bytes(), b'old archive')
 
+    def test_exdev_dispatches_to_physical_mergerfs_move_and_retains_old_game(self):
+        import errno
+        original = Path.rename
+        def rename(path, target):
+            if path == self.source:
+                raise OSError(errno.EXDEV, 'mergerfs rename restriction')
+            return original(path, target)
+        def physical(source, target, record):
+            record([dict(source=str(source), destination=str(target), moved=False)])
+            original(source, target)
+            record([dict(source=str(source), destination=str(target), moved=True)])
+        inode = (self.source / 'new.exe').stat().st_ino
+        with patch.object(Path, 'rename', rename), patch.object(update, 'rename_in_branches', side_effect=physical) as fallback:
+            self.prepare()
+        fallback.assert_called_once()
+        self.assertEqual((self.game / 'new.exe').stat().st_ino, inode)
+        self.assertTrue((self.game.with_name('game.bak') / 'old.exe').exists())
+        self.assertTrue(json.loads(self.manifest.read_text())['physical_moves'][0]['moved'])
+        self.assertEqual(self.archive.read_bytes(), b'old archive')
+
+    def test_incomplete_physical_rollback_does_not_restore_old_game_over_new_parts(self):
+        import errno
+        original = Path.rename
+        def rename(path, target):
+            if path == self.source: raise OSError(errno.EXDEV, 'mergerfs')
+            return original(path, target)
+        def partial(source, target, record):
+            target.mkdir(); (target / 'partial').write_text('new part')
+            raise update.MoveRecoveryRequired('retain backup')
+        with patch.object(Path, 'rename', rename), patch.object(update, 'rename_in_branches', side_effect=partial):
+            with self.assertRaises(update.MoveRecoveryRequired): self.prepare()
+        self.assertEqual((self.game / 'partial').read_text(), 'new part')
+        self.assertTrue((self.game.with_name('game.bak') / 'old.exe').exists())
+        self.assertTrue((self.source / 'new.exe').exists())
+        self.assertEqual(self.archive.read_bytes(), b'old archive')
+
     def test_direct_archive_replacement_does_not_create_an_archive_backup(self):
         self.prepare()
         staged = self.base / 'new.wsquashfs'; staged.write_bytes(b'updated archive')

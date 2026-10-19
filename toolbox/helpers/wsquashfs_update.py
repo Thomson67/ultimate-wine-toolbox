@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Prepare an isolated game update; preserve launch directives and commit safely."""
 import argparse
+import errno
 import fnmatch
 import json
 import os
@@ -9,6 +10,8 @@ import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
+
+from mergerfs_move import MoveRecoveryRequired, rename_in_branches
 
 
 def game_name(name):
@@ -392,9 +395,22 @@ def prepare(prefix, source, archive, save_root, manifest):
             shutil.copytree(location, embedded, symlinks=True)
     game.rename(old_game)
     try:
-        # Path.rename never falls back to an implicit cross-filesystem copy.
-        source.rename(game)
-    except OSError:
+        try:
+            source.rename(game)
+        except OSError as exc:
+            if exc.errno != errno.EXDEV:
+                raise
+            print('Direct rename returned EXDEV; checking mergerfs physical branches (no copy).', flush=True)
+            def record_moves(plan):
+                data['physical_moves'] = plan
+                save_json(manifest, data)
+            try:
+                rename_in_branches(source, game, record_moves)
+            except (OSError, ValueError) as physical_error:
+                raise OSError(errno.EXDEV, f'Cannot move without copying: {physical_error}') from exc
+    except MoveRecoveryRequired:
+        raise  # Partial new game must not be mixed with the old .bak.
+    except Exception:
         old_game.rename(game)
         raise
     # Original start.bat scripts take precedence, even if the new game supplies
