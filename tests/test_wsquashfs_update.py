@@ -772,6 +772,77 @@ wsq_update_select_source
         self.assertTrue((self.source / 'new.exe').exists())
         self.assertEqual(self.archive.read_bytes(), b'old archive')
 
+    def test_reused_prefix_preserves_old_game_and_archive_without_extraction(self):
+        (self.prefix / 'system.reg').write_text('existing registry')
+        update.prepare(self.prefix, self.source, self.archive, self.saves, self.manifest, reuse_prefix=True)
+        self.assertEqual((self.prefix / 'system.reg').read_text(), 'existing registry')
+        self.assertTrue((self.game.with_name('game.bak') / 'old.exe').exists())
+        self.assertTrue((self.game / 'new.exe').exists())
+        self.assertEqual(self.archive.read_bytes(), b'old archive')
+        self.assertTrue(json.loads(self.manifest.read_text())['reuse_prefix'])
+
+    def test_reused_prefix_can_create_a_missing_archive(self):
+        (self.prefix / 'system.reg').write_text('registry')
+        self.archive.unlink()
+        update.prepare(self.prefix, self.source, self.archive, self.saves, self.manifest, reuse_prefix=True)
+        self.assertIsNone(json.loads(self.manifest.read_text())['archive_signature'])
+        staged = self.base / 'validated.wsquashfs'; staged.write_bytes(b'new archive')
+        result = update.commit(self.manifest, staged)
+        self.assertEqual(result, '')
+        self.assertEqual(self.archive.read_bytes(), b'new archive')
+        self.assertFalse(staged.exists())
+        self.assertTrue(json.loads(self.manifest.read_text())['committed'])
+
+    def test_new_archive_created_by_another_process_is_never_overwritten(self):
+        (self.prefix / 'system.reg').write_text('registry')
+        self.archive.unlink()
+        update.prepare(self.prefix, self.source, self.archive, self.saves, self.manifest, reuse_prefix=True)
+        staged = self.base / 'validated.wsquashfs'; staged.write_bytes(b'validated')
+        self.archive.write_bytes(b'appeared later')
+        with self.assertRaisesRegex(ValueError, 'appeared'):
+            update.commit(self.manifest, staged)
+        self.assertEqual(self.archive.read_bytes(), b'appeared later')
+        self.assertTrue(staged.exists())
+
+    def test_new_archive_creation_race_preserves_other_archive_and_rolls_back_saves(self):
+        (self.prefix / 'system.reg').write_text('registry')
+        self.archive.unlink()
+        update.prepare(self.prefix, self.source, self.archive, self.saves, self.manifest, reuse_prefix=True)
+        staged = self.base / 'validated.wsquashfs'; staged.write_bytes(b'validated')
+        prepared = self.saves / 'prepared'; prepared.mkdir(); (prepared / 'slot').write_text('updated save')
+        def create_competing_archive(src, dst):
+            Path(dst).write_bytes(b'concurrent archive')
+            raise FileExistsError('destination was created during commit')
+        with patch.object(update.os, 'link', side_effect=create_competing_archive):
+            with self.assertRaises(FileExistsError): update.commit(self.manifest, staged, prepared)
+        self.assertEqual(self.archive.read_bytes(), b'concurrent archive')
+        self.assertEqual((self.original_save / 'slot').read_text(), 'original')
+        self.assertEqual((prepared / 'slot').read_text(), 'updated save')
+        self.assertTrue(staged.exists())
+
+    def test_reuse_requires_a_real_prefix_and_is_not_implicitly_enabled(self):
+        with self.assertRaisesRegex(ValueError, 'system.reg'):
+            update.prepare(self.prefix, self.source, self.archive, self.saves, self.manifest, reuse_prefix=True)
+        self.assertTrue((self.source / 'new.exe').exists())
+        self.assertTrue((self.game / 'old.exe').exists())
+        self.archive.unlink()
+        with self.assertRaisesRegex(ValueError, 'regular file'):
+            self.prepare()
+
+    def test_base_list_includes_valid_wine_prefix_and_excludes_it_from_source_matches(self):
+        (self.prefix / 'system.reg').write_text('registry')
+        invalid = self.base / 'Invalid.wine'; invalid.mkdir()
+        alias = self.base / 'Alias.wine'; alias.symlink_to(self.prefix, target_is_directory=True)
+        bases = [Path(path) for path, _ in update.update_listing(self.base, 'bases')]
+        self.assertIn(self.prefix, bases)
+        self.assertIn(self.archive, bases)
+        self.assertNotIn(invalid, bases)
+        self.assertNotIn(alias, bases)
+        sources = [Path(path) for path, _ in update.update_listing(
+            self.base, 'sources', self.archive.name, str(self.prefix))]
+        self.assertNotIn(self.prefix, sources)
+        self.assertIn(self.source, sources)
+
     def test_direct_archive_replacement_does_not_create_an_archive_backup(self):
         self.prepare()
         staged = self.base / 'new.wsquashfs'; staged.write_bytes(b'updated archive')

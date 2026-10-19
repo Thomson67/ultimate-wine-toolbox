@@ -707,7 +707,7 @@ declare -gA I18N=(
   [settings_language]="Language"
   [settings_title]="Settings"
   [wsq_update_title]="Update a WSquashFS"
-  [wsq_update_intro]="Replace the existing game directory with a directory containing the new game version. Keep the prefix and launch directives. Test the game and review its saves before recompression. At completion, choose backup and replacement or direct replacement."
+  [wsq_update_intro]="Choose a WSquashFS to extract or an existing .wine prefix to reuse without extraction. Replace its game directory with the updated version, then test before recompression."
   [wsq_update_pending]="A creation or update is already pending. Resume it from the menu or cancel it in the wizard before starting another task."
   [wsq_update_source_title]="Choose the directory containing the new game version"
   [wsq_update_source_prompt]="Choose the directory directly containing the updated game files. For a Wine prefix, select its game-content directory. The source directory will be moved into the test prefix under the original game directory name."
@@ -743,6 +743,12 @@ declare -gA I18N=(
   [wsq_update_root_prompt]="A link points to the Windows save root. The folder created by the game may be unknown before launch. Explicitly identifiable folders are copied for testing, but the entire save root is never copied. If your progress is in another folder, select it here to copy it before testing."
   [wsq_update_root_continue]="Continue with the prepared test saves"
   [wsq_update_root_copy]="Copy an existing progress folder for testing"
+
+  [wsq_update_done_new]="Update completed, new WSquashFS created:\\n%s\\n\\nWorking prefix:\\n%s"
+  [wsq_update_reuse_label]="reuse this prefix without extraction"
+  [wsq_update_no_base]="No WSquashFS or .wine prefix containing system.reg and autorun.cmd is available."
+  [wsq_update_reuse_confirm]="Reuse this Wine prefix without deleting or extracting it again:\\n%s\\n\\nUpdated game directory:\\n%s\\n\\nFinal WSquashFS:\\n%s\\n\\nThe prefix will be modified in place. The old game directory stays in .bak until validation. The updated game directory is moved into the prefix. Continue?"
+  [wsq_update_new_archive]="Create this WSquashFS after compression and validation:\\n%s\\n\\nIt does not exist yet. A file created there in the meantime will not be overwritten. Continue?"
 
   [wsq_update_source_browse]="Browse… (select another directory)"
   [wsq_update_source_list_prompt]="Select the updated game from the Windows directories, or Browse for another location. Hidden and media directories are excluded. For a Wine prefix, its game directory is selected automatically. The source directory is moved under the original game directory name."

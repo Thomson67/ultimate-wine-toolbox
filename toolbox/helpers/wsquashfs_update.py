@@ -23,7 +23,7 @@ def game_name(name):
     return ' '.join(name.split()).casefold()
 
 
-def update_listing(directory, kind, preferred=''):
+def update_listing(directory, kind, preferred='', exclude=''):
     """One shallow scan: prefer exact names; suggest first-word matches only as fallback."""
     entries = list(os.scandir(directory))
     ignored = {'media', 'medias', 'médias', 'image', 'images', 'video', 'videos', 'vidéos',
@@ -37,6 +37,12 @@ def update_listing(directory, kind, preferred=''):
     names = {game_name(entry.name) for entry in folders}
     candidates = folders if kind == 'sources' else [entry for entry in entries
         if entry.is_file(follow_symlinks=False) and entry.name.casefold().endswith('.wsquashfs')]
+    if kind == 'bases':
+        candidates += [entry for entry in folders if entry.name.casefold().endswith('.wine')
+                       and (Path(entry.path) / 'system.reg').is_file()
+                       and (Path(entry.path) / 'autorun.cmd').is_file()
+                       and (Path(entry.path) / 'drive_c').is_dir()]
+    candidates = [entry for entry in candidates if entry.path != exclude]
     reference_names = {game_name(preferred)} if kind == 'sources' else names
     reference_names.discard('')
     first_words = {name.split()[0] for name in reference_names}
@@ -342,12 +348,16 @@ def cleanup_test_saves(manifest):
         shutil.rmtree(test)
 
 
-def prepare(prefix, source, archive, save_root, manifest):
-    if archive.is_symlink() or not archive.is_file():
+def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False):
+    new_archive = reuse_prefix and not archive.exists() and not archive.is_symlink()
+    if not new_archive and (archive.is_symlink() or not archive.is_file()):
         raise ValueError('archive must be a regular file')
     if prefix.is_symlink() or not prefix.is_dir():
         raise ValueError('working prefix must be a real directory')
     root = prefix.resolve()
+    if reuse_prefix and (prefix.suffix.casefold() != '.wine' or not (root / 'system.reg').is_file()
+                         or not (root / 'autorun.cmd').is_file()):
+        raise ValueError('reusing a prefix requires a .wine directory with system.reg and autorun.cmd')
     ensure_root_alias(root)
     game = game_directory(root)
     if (root / 'drive_c').is_symlink() or not game.is_dir() or game.is_symlink():
@@ -378,7 +388,8 @@ def prepare(prefix, source, archive, save_root, manifest):
     if source.stat().st_dev != game.parent.stat().st_dev:
         raise ValueError('game source and prefix must be on the same filesystem for a move without copying')
     existing_launch = launch_executable(root)
-    data = {'archive': str(archive), 'archive_signature': signature(archive),
+    data = {'archive': str(archive), 'archive_signature': None if new_archive else signature(archive),
+            'reuse_prefix': reuse_prefix,
             'prefix': str(prefix), 'source': str(source), 'game_dir': game.relative_to(root).as_posix(), 'game_backup': str(old_game),
             'original_save': str(original_save), 'test_save': str(test_save),
             'autorun': text, 'savedir': values.get('SAVEDIR', ''),
@@ -647,12 +658,16 @@ def copy_config(conf, source, dest, backup_dir=None, preserve_existing=False):
 def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
     data = json.loads(manifest.read_text())
     archive = Path(data['archive'])
-    if archive.is_symlink() or signature(archive) != data['archive_signature']:
+    new_archive = data.get('reuse_prefix') and data.get('archive_signature') is None
+    if new_archive:
+        if archive.exists() or archive.is_symlink():
+            raise ValueError('new archive destination appeared since preparation; creation refused')
+    elif archive.is_symlink() or signature(archive) != data['archive_signature']:
         raise ValueError('original archive changed since preparation; replacement refused')
     if staged.is_symlink() or not staged.is_file() or staged.parent.resolve() != archive.parent.resolve() or staged == archive:
         raise ValueError('validated replacement must be a distinct adjacent file')
     backup = None
-    if keep_archive_backup:
+    if keep_archive_backup and not new_archive:
         backup = archive.with_name(archive.stem + '.backup-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + archive.suffix)
         try:
             os.link(archive, backup)
@@ -680,7 +695,10 @@ def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
             swapped.append((target, prepared, backup_path))
             prepared.rename(target)
             save_backup = backup_path or save_backup
-        os.replace(staged, archive)
+        if new_archive:
+            os.link(staged, archive)  # Atomic no-clobber publication of a new archive.
+        else:
+            os.replace(staged, archive)
     except Exception:
         for target, prepared, backup_path in reversed(swapped):
             if target.exists():
@@ -690,6 +708,11 @@ def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
         raise
     data.update(committed=True, archive_backup=str(backup or ''), save_backup=str(save_backup or ''))
     save_json(manifest, data)
+    if new_archive:
+        try:
+            staged.unlink()
+        except OSError as exc:
+            print(f'New archive committed; temporary hardlink retained: {exc}', file=sys.stderr)
     return backup or ''
 
 
@@ -697,10 +720,11 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     sp = p.add_subparsers(dest='action', required=True)
     a = sp.add_parser('listing')
-    a.add_argument('directory', type=Path); a.add_argument('kind', choices=('archives', 'sources')); a.add_argument('--preferred', default='')
+    a.add_argument('directory', type=Path); a.add_argument('kind', choices=('archives', 'sources', 'bases')); a.add_argument('--preferred', default=''); a.add_argument('--exclude', default='')
     a = sp.add_parser('prepare')
     for name in ('prefix', 'source', 'archive', 'save_root', 'manifest'):
         a.add_argument(name, type=Path)
+    a.add_argument('--reuse-prefix', action='store_true')
     a = sp.add_parser('autorun')
     a.add_argument('prefix', type=Path); a.add_argument('exe')
     a.add_argument('--savedir'); a.add_argument('--savefiles')
@@ -727,8 +751,8 @@ def main():
     a = p.parse_args()
     try:
         if a.action == 'listing':
-            for path, matched in update_listing(a.directory, a.kind, a.preferred): print(f'{path}\t{int(matched)}')
-        elif a.action == 'prepare': prepare(a.prefix, a.source, a.archive, a.save_root, a.manifest)
+            for path, matched in update_listing(a.directory, a.kind, a.preferred, a.exclude): print(f'{path}\t{int(matched)}')
+        elif a.action == 'prepare': prepare(a.prefix, a.source, a.archive, a.save_root, a.manifest, a.reuse_prefix)
         elif a.action == 'autorun': write_autorun(a.prefix, a.exe, a.savedir, a.savefiles)
         elif a.action == 'detach': detach_saves(a.prefix, a.save)
         elif a.action == 'config': print(copy_config(a.conf, a.source, a.dest, a.backup_dir, a.preserve_existing))

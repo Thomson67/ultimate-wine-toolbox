@@ -219,7 +219,7 @@ wsq_update_select_executable() {
 }
 
 wsq_update_select_source() {
-    local path base choice selected game_dir matched preferred="${1:-}" idx=1
+    local path base choice selected game_dir matched preferred="${1:-}" excluded="${2:-}" idx=1
     local -a folders=() items=()
     while IFS=$'\t' read -r path matched; do
         [ -d "$path" ] && [ ! -L "$path" ] || continue
@@ -229,7 +229,7 @@ wsq_update_select_source() {
         [ "$matched" != 1 ] || base="$base — $(i18n wsq_update_name_match)"
         items+=("$idx" "$base")
         idx=$((idx+1))
-    done < <(python3 "$WSQ_UPDATE_HELPER" listing "$WSQ_WINDOWS_DIR" sources --preferred "$preferred")
+    done < <(python3 "$WSQ_UPDATE_HELPER" listing "$WSQ_WINDOWS_DIR" sources --preferred "$preferred" --exclude "$excluded")
     items+=(browse "$(i18n wsq_update_source_browse)")
     choice="$(menu_select "$(i18n wsq_update_source_title)" "$(i18n wsq_update_source_list_prompt)" "${items[@]}")" || return 1
     case "$choice" in
@@ -291,7 +291,8 @@ wsq_update_prefix_target() {
 
 wsq_update_new() {
     wsq_pending_guard || return
-    local archive source prefix game_name exe_rel runner snapshot metadata log choice idx=1 rows="" path stamp matched label
+    local archive source prefix game_name exe_rel runner snapshot metadata log choice idx=1 rows="" path stamp matched label base reuse_prefix=0 phase
+    local -a prepare_args=()
     local WT_MENU_CANCEL_LABEL="$(i18n back)"
     local -a items=()
     command -v unsquashfs >/dev/null 2>&1 && command -v mksquashfs >/dev/null 2>&1 || {
@@ -300,34 +301,56 @@ wsq_update_new() {
     while IFS=$'\t' read -r path matched; do
         [ -n "$path" ] || continue
         label="${path##*/}"
+        if [ -d "$path" ]; then
+            label="$label — $(i18n wsq_update_reuse_label)"
+        fi
         [ "$matched" != 1 ] || label="$label — $(i18n wsq_update_name_match)"
         items+=("$idx" "$label")
         rows+="$path"$'\n'
         idx=$((idx+1))
-    done < <(python3 "$WSQ_UPDATE_HELPER" listing "$WSQ_WINDOWS_DIR" archives)
+    done < <(python3 "$WSQ_UPDATE_HELPER" listing "$WSQ_WINDOWS_DIR" bases)
     [ "${#items[@]}" -gt 0 ] || {
-        msgbox "$(i18n wsq_update_title)" "$(i18n squash_no_wsquashfs)"; return
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_no_base)"; return
     }
     while true; do
         choice="$(menu_select "$(i18n wsq_update_title)" "$(i18n wsq_update_intro)\n\n$(i18n wsq_version_warning)" "${items[@]}")" || return
         case "$choice" in ''|*[!0-9]*) return ;; esac
         [ "$choice" -ge 1 ] && [ "$choice" -lt "$idx" ] || return
-        archive="$(sed -n "${choice}p" <<< "$rows")"
-        while true; do
-            source="$(wsq_update_select_source "${archive##*/}")" || break
-            [ -d "$source" ] || { msgbox "$(i18n wsq_update_title)" "$(i18n wsq_source_invalid "$source")"; return; }
-            [ "$(maintenance_detect_wsquashfs_type "$archive")" = wine ] || {
-                msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_prefix_required)"; return
+        base="$(sed -n "${choice}p" <<< "$rows")"
+        reuse_prefix=0; prepare_args=()
+        if [ -d "$base" ] && [ ! -L "$base" ]; then
+            reuse_prefix=1
+            prefix="$base"
+            archive="${base%.*}.wsquashfs"
+            prepare_args+=(--reuse-prefix)
+            python3 "$WSQ_UPDATE_HELPER" game-dir "$prefix" >/dev/null 2>&1 || {
+                msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_prefix_required)"; continue
             }
+        else
+            archive="$base"
+        fi
+        while true; do
+            source="$(wsq_update_select_source "${archive##*/}" "$base")" || break
+            [ -d "$source" ] || { msgbox "$(i18n wsq_update_title)" "$(i18n wsq_source_invalid "$source")"; return; }
+            if [ "$reuse_prefix" -eq 0 ]; then
+                [ "$(maintenance_detect_wsquashfs_type "$archive")" = wine ] || {
+                    msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_prefix_required)"; return
+                }
+            fi
             game_name="$(basename "$archive")"; game_name="${game_name%.*}"
             stamp="$(date '+%Y%m%d-%H%M%S')-$$"
-            prefix="$(wsq_update_prefix_target "$archive" "$source")" || continue
-            yesno_default_no "$(i18n wsq_update_title)" \
-                "$(i18n wsq_update_confirm "$(wsq_display_path "$archive")" "$(wsq_display_path "$source")" "$(wsq_display_path "$prefix")")" || continue
+            if [ "$reuse_prefix" -eq 1 ]; then
+                yesno_default_no "$(i18n wsq_update_title)" \
+                    "$(i18n wsq_update_reuse_confirm "$(wsq_display_path "$prefix")" "$(wsq_display_path "$source")" "$(wsq_display_path "$archive")")" || continue
+            else
+                prefix="$(wsq_update_prefix_target "$archive" "$source")" || continue
+                yesno_default_no "$(i18n wsq_update_title)" \
+                    "$(i18n wsq_update_confirm "$(wsq_display_path "$archive")" "$(wsq_display_path "$source")" "$(wsq_display_path "$prefix")")" || continue
+            fi
             break 2
         done
     done
-    if [ -e "$prefix" ]; then
+    if [ "$reuse_prefix" -eq 0 ] && [ -e "$prefix" ]; then
         maintenance_delete_wine_dir_symlink_safe "$prefix" || {
             msgbox "$(i18n wsq_update_title)" "$(i18n wsq_source_invalid "$prefix")"; return
         }
@@ -338,18 +361,24 @@ wsq_update_new() {
     log="$WT_LOG_DIR/wsquashfs-integrity-update-$stamp.log"
     : > "$log"
     wsq_integrity_rotate_logs "$log" || true
-    wsq_begin_update_state "$prefix" "$game_name" "$snapshot" "$archive" "$metadata" "$log" extracting || {
+    phase=extracting
+    [ "$reuse_prefix" -eq 0 ] || phase=preparing
+    wsq_begin_update_state "$prefix" "$game_name" "$snapshot" "$archive" "$metadata" "$log" "$phase" || {
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
     }
+    if [ "$reuse_prefix" -eq 0 ]; then
     if ! wsq_update_extract "$(i18n wsq_update_title)" "$(i18n wsq_update_extract)" "$log" \
         unsquashfs -no-xattrs -percentage -d "$prefix" "$archive"; then
         msgbox "$(i18n wsq_update_title)" \
             "$(i18n wsq_update_extract_failed "$(wsq_update_log_detail "$log")" "$prefix" "$log")"
         return
     fi
+    else
+        printf 'Reusing existing Wine prefix without extraction: %s\n' "$prefix" >> "$log"
+    fi
     wsq_update_state phase preparing || return
     if ! wsq_update_run "$(i18n wsq_update_title)" "$(i18n wsq_update_copy)" "$log" \
-        python3 "$WSQ_UPDATE_HELPER" prepare "$prefix" "$source" "$archive" "$WSQ_SAVE_ROOT" "$metadata"; then
+        python3 "$WSQ_UPDATE_HELPER" prepare "$prefix" "$source" "$archive" "$WSQ_SAVE_ROOT" "$metadata" "${prepare_args[@]}"; then
         msgbox "$(i18n wsq_update_title)" \
             "$(i18n wsq_update_prepare_failed "$(wsq_update_log_detail "$log")" "$prefix" "$log")"
         return
@@ -437,11 +466,12 @@ PYCODE
 
 wsq_resume_update() {
     # prefix/game_name/snapshot/exe_rel/runner are local to wsq_resume_build.
-    local metadata phase save_rel save_kind test_save archive staged backup log original_name prepared_save final_mode
+    local metadata phase save_rel save_kind test_save archive staged backup log original_name prepared_save final_mode new_archive=0
     local -a commit_args=()
     metadata="$(wsq_state_value metadata)"; phase="$(wsq_state_value phase)"; log="$(wsq_state_value update_log)"
     [ -s "$metadata" ] || { msgbox "$(i18n wsq_update_title)" "$(i18n wsq_pending_invalid)"; return; }
     archive="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" archive)" || return
+    [ "$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" archive_signature)" != None ] || new_archive=1
     test_save="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" test_save)" || return
     original_name="$game_name"
     game_name="$(basename "$prefix" .wine).validated"
@@ -510,6 +540,11 @@ wsq_resume_update() {
         wsq_update_state phase ready || return
     fi
     if [ "$phase" != committed ]; then
+    if [ "$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" archive_signature)" = None ]; then
+        yesno_default_no "$(i18n wsq_update_title)" \
+            "$(i18n wsq_update_new_archive "$(wsq_display_path "$archive")")" || return 12
+        commit_args+=(--replace)
+    else
     final_mode="$(menu_select "$(i18n wsq_update_title)" \
         "$(i18n wsq_update_final_prompt "$(wsq_display_path "$archive")")" \
         backup "$(i18n wsq_update_final_backup)" \
@@ -520,6 +555,7 @@ wsq_resume_update() {
         replace) commit_args+=(--replace) ;;
         *) return 12 ;;
     esac
+    fi
     staged="$archive.update-tmp-$$"
     if ! maintenance_squash_wine "$prefix" "$staged" ask-full "$log"; then
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
@@ -548,7 +584,9 @@ wsq_resume_update() {
         return
     }
     rm -f -- "$snapshot" "$WSQ_STATE_FILE" "$metadata" "$WSQ_STATE_DIR/wsq-launch-result"
-    if [ -n "$backup" ]; then
+    if [ "$new_archive" -eq 1 ]; then
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_done_new "$archive" "$prefix")"
+    elif [ -n "$backup" ]; then
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_done "$archive" "$backup" "$prefix")"
     else
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_done_replace "$archive" "$prefix")"

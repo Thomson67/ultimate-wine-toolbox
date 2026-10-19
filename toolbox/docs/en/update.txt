@@ -20,3 +20,6 @@ An unfinished operation can be resumed from the menu. Errors identify the retain
 Existing exact-name matching is retained. Names sharing the first word are suggested only when no exact match is available. Verify these suggestions; other folders and Browse remain available. After success, “Update another WSquashFS” starts the next update.
 
 With mergerfs, if direct renaming fails with EXDEV, the Toolbox attempts to rename each physical source directory within its own branch without copying game files. Paths are recorded in the report and preparation manifest; moves are rolled back on failure. If rollback is incomplete, retain the prefix, .bak and report for recovery.
+
+STARTING FROM AN EXISTING .WINE
+The initial list also offers .wine prefixes containing system.reg and autorun.cmd. They are reused in place without deletion or extraction. Then select the updated game directory. The final archive uses the same basename with .wsquashfs: existing archives offer the usual backup/replacement choices; otherwise, creation is offered. An unresolved old .bak directory must be addressed before restarting.

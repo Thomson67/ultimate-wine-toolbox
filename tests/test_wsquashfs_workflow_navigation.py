@@ -114,6 +114,35 @@ wsq_update_extract title body "$WT_HOME/extract.log" successful_unsquashfs || ex
 """)
         self.assertIn('Extraction exit=0',(self.home/'extract.log').read_text())
 
+    def test_update_reuses_existing_prefix_without_extraction_or_deletion(self):
+        (self.prefix/'system.reg').write_text('existing registry')
+        (self.prefix/'autorun.cmd').write_text('DIR=drive_c/game\nCMD=Game.exe\n')
+        source=self.home/'new-version';source.mkdir();(source/'Game.exe').write_text('updated executable')
+        self.shell(r"""
+WSQ_WINDOWS_DIR="$WT_HOME"; WT_LOG_DIR="$WT_HOME/logs"; WSQ_CONF="$WT_HOME/batocera.conf"
+: > "$WSQ_CONF"
+unsquashfs() { echo forbidden-extraction >&2; exit 90; }
+mksquashfs() { :; }
+wsq_pending_guard() { return 0; }
+menu_select() { printf '%s\n' "$@" > "$WT_HOME/options"; echo 1; }
+wsq_update_select_source() { echo "$WT_HOME/new-version"; }
+yesno_default_no() { printf '%s\n' "$@" > "$WT_HOME/confirmation"; return 0; }
+maintenance_delete_wine_dir_symlink_safe() { echo forbidden-deletion >&2; exit 91; }
+wsq_integrity_rotate_logs() { :; }
+wsq_update_run() { shift 3; "$@"; }
+wsq_request_game_launch() { echo "$1" > "$WT_HOME/launched"; }
+wsq_restart_emulationstation_deferred() { return 0; }
+wsq_update_new
+""")
+        self.assertEqual((self.prefix/'system.reg').read_text(),'existing registry')
+        self.assertEqual((self.prefix/'drive_c/game/Game.exe').read_text(),'updated executable')
+        self.assertTrue((self.prefix/'drive_c/game.bak/Game.exe').exists())
+        self.assertEqual((self.home/'launched').read_text().strip(),str(self.prefix))
+        self.assertIn('sans le supprimer ni le réextraire',(self.home/'confirmation').read_text())
+        data=json.loads(self.state.read_text())
+        self.assertEqual(data['mode'],'update');self.assertEqual(data['phase'],'testing')
+        self.assertTrue(json.loads(Path(data['metadata']).read_text())['reuse_prefix'])
+
     def test_keep_existing_directory_retains_old_and_discards_test_data_without_backup(self):
         source=self.prefix/'drive_c/game/Saves'
         (source/'slot.sav').write_text('tested progression');(source/'.hidden').write_text('hidden')

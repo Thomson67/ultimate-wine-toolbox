@@ -20,3 +20,6 @@ Une opération inachevée peut être reprise depuis le menu. Les erreurs indique
 Le matching exact habituel est conservé. Les noms partageant le premier mot sont suggérés uniquement en l’absence de correspondance exacte. Ces suggestions restent à vérifier ; les autres dossiers et Parcourir restent accessibles. Après réussite, « Mettre à jour un autre WSquashFS » permet d’enchaîner une nouvelle mise à jour.
 
 Avec mergerfs, si le déplacement direct échoue avec EXDEV, la Toolbox essaie de déplacer chaque partie du dossier sur sa branche physique, sans recopier les fichiers du jeu. Les chemins sont consignés dans le rapport et le manifeste de préparation ; les déplacements sont annulés si une étape échoue. En cas de retour en arrière incomplet, conserver le préfixe, le .bak et le rapport pour récupération.
+
+DÉPART DEPUIS UN .WINE EXISTANT
+La liste initiale propose aussi les préfixes .wine contenant system.reg et autorun.cmd. Ils sont réutilisés sur place, sans suppression ni extraction. Choisir ensuite le dossier de la nouvelle version. L’archive finale porte le même nom avec l’extension .wsquashfs : si elle existe, les options habituelles de sauvegarde/remplacement sont proposées ; sinon, une création est proposée. Un ancien dossier .bak non résolu doit être traité avant de recommencer.

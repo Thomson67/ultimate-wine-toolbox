@@ -707,7 +707,7 @@ declare -gA I18N=(
   [settings_language]="Langue"
   [settings_title]="Paramètres"
   [wsq_update_title]="Mettre à jour un WSquashFS"
-  [wsq_update_intro]="Remplacez le dossier du jeu existant dans le préfixe par la nouvelle version du jeu. Le préfixe et les directives de lancement sont conservés. Un test et une vérification des sauvegardes précèdent la recompression. À la fin, choisissez de sauvegarder l’ancienne archive puis remplacer, ou de remplacer directement."
+  [wsq_update_intro]="Choisissez un WSquashFS à extraire ou un préfixe .wine existant à réutiliser sans extraction. Le dossier du jeu sera remplacé par la nouvelle version, puis testé avant recompression."
   [wsq_update_pending]="Une création ou mise à jour est déjà en attente. Reprenez-la depuis le menu ou annulez-la dans l’assistant avant de commencer un autre travail."
   [wsq_update_source_title]="Choisir le dossier de la nouvelle version du jeu"
   [wsq_update_source_prompt]="Choisissez le dossier contenant directement les fichiers du jeu mis à jour. Pour un préfixe Wine, choisissez son dossier de fichiers du jeu (souvent drive_c/game). Le dossier source sera déplacé dans le préfixe de test, sous le nom du dossier original."
@@ -743,6 +743,12 @@ declare -gA I18N=(
   [wsq_update_root_prompt]="Un lien pointe vers la racine des sauvegardes Windows. Le nom créé par le jeu peut être inconnu avant lancement. Les dossiers explicitement identifiables sont copiés pour le test, mais la racine entière ne sera pas copiée. Si votre progression se trouve dans un autre dossier, choisissez-le ici pour en copier le contenu avant le test."
   [wsq_update_root_continue]="Continuer avec les sauvegardes de test préparées"
   [wsq_update_root_copy]="Copier un dossier de progression existant pour le test"
+
+  [wsq_update_done_new]="Mise à jour terminée, nouveau WSquashFS créé :\\n%s\\n\\nPréfixe de travail :\\n%s"
+  [wsq_update_reuse_label]="réutiliser ce préfixe, sans extraction"
+  [wsq_update_no_base]="Aucun WSquashFS ni préfixe .wine avec system.reg et autorun.cmd disponible."
+  [wsq_update_reuse_confirm]="Réutiliser ce préfixe Wine sans le supprimer ni le réextraire :\\n%s\\n\\nNouvelle version à intégrer :\\n%s\\n\\nWSquashFS final :\\n%s\\n\\nLe préfixe sera modifié sur place. L’ancien dossier du jeu sera conservé en .bak jusqu’à validation. Le dossier de la nouvelle version sera déplacé dans le préfixe. Continuer ?"
+  [wsq_update_new_archive]="Créer le WSquashFS suivant après compression et vérification :\\n%s\\n\\nIl n’existe pas encore. Aucun fichier apparu entre-temps ne sera écrasé. Continuer ?"
 
   [wsq_update_source_browse]="Parcourir… (choisir un autre dossier)"
   [wsq_update_source_list_prompt]="Choisissez le dossier contenant la nouvelle version du jeu parmi les dossiers Windows, ou utilisez Parcourir pour un autre emplacement. Les dossiers cachés et de médias sont exclus. Pour un préfixe Wine, le dossier du jeu est repris automatiquement. Le dossier source sera déplacé sous le nom du dossier original."
