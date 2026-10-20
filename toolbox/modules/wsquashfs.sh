@@ -749,7 +749,7 @@ wsq_browse_save() {
     fi
     while true; do
         selected="$(DISPLAY="${DISPLAY:-:0}" LANGUAGE="$WT_LANGUAGE" yad \
-            --file-selection --directory --filename="$prefix/" \
+            --file --directory --filename="$prefix/" \
             --title="$(i18n wsq_browser_title)" --width="$browser_width" --height="$browser_height")"
         rc=$?
         case "$rc" in

@@ -63,7 +63,7 @@ resh_preset_file() {
     if command -v yad >/dev/null 2>&1; then
         local -a flags=()
         [ "$mode" != export ] || flags+=(--save --confirm-overwrite)
-        DISPLAY="${DISPLAY:-:0}" LANGUAGE="$WT_LANGUAGE" yad --file-selection "${flags[@]}" \
+        DISPLAY="${DISPLAY:-:0}" LANGUAGE="$WT_LANGUAGE" yad --file "${flags[@]}" \
             --filename="/userdata/$([ "$mode" != export ] || printf '%s' "$name")" \
             --title="$(i18n "resh_${mode}_title")" --file-filter='ReShade presets | *.ini *.INI' \
             --file-filter="$(i18n resh_all_files) | *" --width=1000 --height=700

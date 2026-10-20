@@ -176,7 +176,7 @@ class ProfileTests(unittest.TestCase):
             service, profile, _ = self.fixture(folder)
             commands = Path(folder)/'bin'; commands.mkdir()
             yad = commands/'yad'
-            yad.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$WT_HOME/yad-args"\n')
+            yad.write_text('#!/bin/sh\n[ "$1" = --file ] || exit 255\nprintf "%s\\n" "$@" > "$WT_HOME/yad-args"\n')
             yad.chmod(0o755)
             env = dict(os.environ, WT_HOME=str(service.home), WT_LANGUAGE='fr',
                        PATH=str(commands)+os.pathsep+os.environ['PATH'], PROFILE=str(profile))

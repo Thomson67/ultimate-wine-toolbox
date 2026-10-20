@@ -112,7 +112,7 @@ amx_browse_profile() {
   start="$directory/"
   case "$current" in "$directory/"*) [ ! -f "$current" ] || start="$current" ;; esac
   if command -v yad >/dev/null 2>&1; then
-    DISPLAY="${DISPLAY:-:0}" yad --file-selection --title="AntiMicroX — .amgp" \
+    DISPLAY="${DISPLAY:-:0}" yad --file --title="AntiMicroX — .amgp" \
       --filename="$start" --file-filter='AntiMicroX | *.amgp' 2>/dev/null
   else
     input_text AntiMicroX "$(amx_txt 'Chemin absolu du profil .amgp sous /userdata :' 'Absolute .amgp profile path under /userdata:')" "$start"
@@ -159,7 +159,7 @@ amx_pad2key_cmd() { python3 "$WT_ROOT/helpers/antimicrox_pad2key.py" --home "$WT
 amx_pad2key_source() {
   local current="${1:-/userdata/roms/windows/}"
   if command -v yad >/dev/null 2>&1; then
-    DISPLAY="${DISPLAY:-:0}" yad --file-selection --title="Pad2Key — .keys" --filename="$current" --file-filter='Pad2Key | *.keys' 2>/dev/null
+    DISPLAY="${DISPLAY:-:0}" yad --file --title="Pad2Key — .keys" --filename="$current" --file-filter='Pad2Key | *.keys' 2>/dev/null
   else
     input_text AntiMicroX "$(amx_txt 'Chemin du fichier Pad2Key .keys :' 'Pad2Key .keys file path:')" "$current"
   fi

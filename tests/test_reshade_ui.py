@@ -171,7 +171,7 @@ if [ "$MODE" = standard-community ]; then resh_install_game /games/Test.wine; el
             private = base/'bin'
             private.mkdir()
             yad = private/'yad'
-            yad.write_text('#!/bin/bash\nprintf "%s\\0" "$@" > "$SUMMARY"\nprintf "%s" "$SELECTED"\n')
+            yad.write_text('#!/bin/bash\n[ "$1" = --file ] || exit 255\nprintf "%s\\0" "$@" > "$SUMMARY"\nprintf "%s" "$SELECTED"\n')
             yad.chmod(0o755)
             for mode in ['import', 'export']:
                 env = dict(self.environment(base), PATH=str(private)+':'+os.environ['PATH'],
@@ -187,7 +187,7 @@ resh_preset_file "$MODE" '/games/Example[Runner].wsquashfs'
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, env['SELECTED'])
                 flags = (base/'summary').read_bytes().decode().split('\0')
-                self.assertIn('--file-selection', flags)
+                self.assertIn('--file', flags)
                 self.assertEqual('--save' in flags, mode == 'export')
                 self.assertEqual('--confirm-overwrite' in flags, mode == 'export')
 

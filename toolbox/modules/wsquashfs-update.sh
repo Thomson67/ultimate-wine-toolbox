@@ -235,7 +235,7 @@ wsq_update_select_source() {
     case "$choice" in
         browse)
     if command -v yad >/dev/null 2>&1; then
-        selected="$(DISPLAY="${DISPLAY:-:0}" LANGUAGE="$WT_LANGUAGE" yad --file-selection --directory \
+        selected="$(DISPLAY="${DISPLAY:-:0}" LANGUAGE="$WT_LANGUAGE" yad --file --directory \
             --filename="$WSQ_WINDOWS_DIR/" --title="$(i18n wsq_update_source_title)" --width=1000 --height=700)" || return
     else
         selected="$(input_text "$(i18n wsq_update_source_title)" "$(i18n wsq_update_source_prompt)" "$WSQ_WINDOWS_DIR/")" || return
