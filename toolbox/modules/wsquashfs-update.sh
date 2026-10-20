@@ -405,10 +405,11 @@ wsq_update_new() {
 }
 
 wsq_update_review_save() {
-    local metadata="$1" savedir savefiles choice legacy
+    local metadata="$1" savedir savefiles choice legacy original_save
     savedir="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" savedir)" || return 1
     savefiles="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" savefiles)" || return 1
     legacy="$(python3 "$WSQ_UPDATE_HELPER" legacy-summary "$metadata")" || return 1
+    original_save="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" original_save)" || return 1
     if [ -z "$savedir$savefiles" ] && [ -n "$legacy" ]; then
         while true; do
             choice="$(menu_select "$(i18n wsq_update_save_title)" \
@@ -438,6 +439,7 @@ wsq_update_review_save() {
         choice="$(menu_select "$(i18n wsq_update_save_title)" \
             "$(i18n wsq_update_save_prompt "$(wsq_display_path "SAVEDIR=$savedir  SAVEFILES=$savefiles")")" \
             keep "$(i18n wsq_update_save_keep)" \
+            inspect-existing "$(i18n wsq_inspect_existing_save)" \
             inspect "$(i18n wsq_inspect_title)" \
             detect "$(i18n wsq_update_save_detect)" \
             browse "$(i18n wsq_browser_title)" \
@@ -446,6 +448,7 @@ wsq_update_review_save() {
         case "$choice" in
             keep)
                 WSQ_SAVE_KIND=existing; WSQ_SELECTED_SAVE="$savedir"; return 0 ;;
+            inspect-existing) wsq_inspect_save_destination "$original_save" || true ;;
             inspect)
                 local normalized
                 normalized="$(python3 - "$savedir" <<'PYCODE'
@@ -464,11 +467,32 @@ PYCODE
     done
 }
 
+wsq_update_final_choice() {
+    local archive="$1" new_archive="$2" choice
+    if [ "$new_archive" -eq 1 ]; then
+        yesno_default_no "$(i18n wsq_update_title)" \
+            "$(i18n wsq_update_new_archive "$(wsq_display_path "$archive")")" || return 10
+        printf replace
+        return 0
+    fi
+    choice="$(menu_select "$(i18n wsq_update_title)" \
+        "$(i18n wsq_update_final_prompt "$(wsq_display_path "$archive")")" \
+        backup "$(i18n wsq_update_final_backup)" \
+        replace "$(i18n wsq_update_final_replace)" \
+        back "$(i18n back)")" || return 10
+    case "$choice" in
+        backup|replace) printf '%s' "$choice" ;;
+        *) return 10 ;;
+    esac
+}
+
 wsq_resume_update() {
     # prefix/game_name/snapshot/exe_rel/runner are local to wsq_resume_build.
-    local metadata phase save_rel save_kind test_save archive staged backup log original_name prepared_save final_mode new_archive=0
+    local metadata phase save_rel save_kind test_save archive staged backup log original_name prepared_save final_mode="" new_archive=0
+    local ready_review ready_kind skip_save_prepare=0
     local -a commit_args=()
     metadata="$(wsq_state_value metadata)"; phase="$(wsq_state_value phase)"; log="$(wsq_state_value update_log)"
+    ready_review="$(wsq_state_value save_review_ready)"; ready_kind="$(wsq_state_value save_ready_kind)"
     [ -s "$metadata" ] || { msgbox "$(i18n wsq_update_title)" "$(i18n wsq_pending_invalid)"; return; }
     archive="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" archive)" || return
     [ "$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" archive_signature)" != None ] || new_archive=1
@@ -489,6 +513,13 @@ wsq_resume_update() {
         while true; do
             wsq_update_review_save "$metadata" || return $?
             save_kind="$WSQ_SAVE_KIND"; save_rel="$WSQ_SELECTED_SAVE"
+            # Choose the archive action before save transfers or detachment:
+            # Back can then revisit save review without replaying mutations.
+            final_mode="$(wsq_update_final_choice "$archive" "$new_archive")" || continue
+            if [ "$ready_review" = 1 ] && [ "$save_kind" = existing ] && [ "$ready_kind" = existing ]; then
+                skip_save_prepare=1
+                break
+            fi
             case "$save_kind" in
                 legacy)
                     python3 "$WSQ_UPDATE_HELPER" stage-legacy "$metadata" >> "$log" 2>&1 || return
@@ -525,7 +556,7 @@ wsq_resume_update() {
             esac
             break
         done
-        if [ "$save_kind" != legacy ]; then
+        if [ "$skip_save_prepare" -eq 0 ] && [ "$save_kind" != legacy ]; then
         python3 "$WSQ_UPDATE_HELPER" restore-scripts "$metadata" >> "$log" 2>&1 || return
         python3 "$WSQ_UPDATE_HELPER" detach "$prefix" "$test_save" >> "$log" 2>&1 || {
             msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
@@ -537,25 +568,19 @@ wsq_resume_update() {
         if [ -n "${WSQ_LAST_SAVE_BACKUP:-}" ]; then
             msgbox "$(i18n wsq_save_title)" "$(i18n wsq_save_backup_done "$WSQ_LAST_SAVE_BACKUP")"
         fi
-        wsq_update_state phase ready || return
+        wsq_update_state phase ready save_ready_kind "$save_kind" save_review_ready 0 || return
     fi
     if [ "$phase" != committed ]; then
-    if [ "$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" archive_signature)" = None ]; then
-        yesno_default_no "$(i18n wsq_update_title)" \
-            "$(i18n wsq_update_new_archive "$(wsq_display_path "$archive")")" || return 12
-        commit_args+=(--replace)
-    else
-    final_mode="$(menu_select "$(i18n wsq_update_title)" \
-        "$(i18n wsq_update_final_prompt "$(wsq_display_path "$archive")")" \
-        backup "$(i18n wsq_update_final_backup)" \
-        replace "$(i18n wsq_update_final_replace)" \
-        back "$(i18n back)")" || return 12
-    case "$final_mode" in
-        backup) ;;
-        replace) commit_args+=(--replace) ;;
-        *) return 12 ;;
-    esac
+    if [ -z "$final_mode" ]; then
+        final_mode="$(wsq_update_final_choice "$archive" "$new_archive")" || {
+            # Keep the prepared copy. Re-selecting the same existing rules does
+            # not repeat transfers; selecting a new location uses normal review.
+            wsq_update_state phase configuring save_review_ready 1 || return
+            game_name="$original_name"
+            return 13
+        }
     fi
+    [ "$final_mode" != replace ] || commit_args+=(--replace)
     staged="$archive.update-tmp-$$"
     if ! maintenance_squash_wine "$prefix" "$staged" ask-full "$log"; then
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return

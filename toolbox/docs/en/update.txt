@@ -12,6 +12,8 @@ The first test keeps the archive’s executable and arguments. Check launch, con
 3. CONFIRM SAVES
 Keep existing save rules or select another location. Tests normally use a separate copy of the saves. Exception: a link to the root /userdata/saves/windows keeps its target and directly uses shared saves.
 
+“Inspect existing saves” shows the path, filenames, sizes and dates in the existing Batocera save folder without modifying it. The test prefix contents remain separately accessible. Back from the final archive choice returns to save review before preparation. Resuming after a compression failure also allows save review; retaining the same existing rules reuses the prepared copy without repeating its transfer.
+
 4. COMPRESS AND FINALIZE
 Choose to back up the old archive before replacement or replace it directly. After compression, run the proposed full check or skip it. Cancel at this stage does not replace the archive. Skipped checks can be run later from WSquashFS Management.
 

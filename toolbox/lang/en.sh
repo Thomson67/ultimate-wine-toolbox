@@ -637,6 +637,7 @@ declare -gA I18N=(
   [wsq_save_title]="Save detection"
   [wsq_save_prompt]="Directories changed since the previous snapshot. Scoring favors typical save paths/extensions and penalizes caches/logs."
   [wsq_inspect_title]="Inspect directory contents"
+  [wsq_inspect_existing_save]="Inspect existing saves"
   [wsq_inspect_header]="Read only: files and subdirectories, sizes in bytes and modification dates.\nUse arrows / Page Up-Down to scroll, Back to close.\nPreview limited to 3 levels and 500 entries. To inspect deeper, open a subdirectory in the browser and inspect it."
   [wsq_candidate_prompt]="Suggested directory:\n%s\n\nYou can inspect its contents before using it, or choose another directory in the prefix."
   [wsq_more_save_locations]="See more possible locations (lower scores)"

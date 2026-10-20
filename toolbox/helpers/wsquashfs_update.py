@@ -797,7 +797,7 @@ def main():
                         if entry.resolve() != target.resolve():
                             target.parent.mkdir(parents=True, exist_ok=True)
                             shutil.copy2(entry, target)
-                rewrite_save_rules(root, data.get('savedir', ''), data.get('savefiles', ''))
+            rewrite_save_rules(Path(data['prefix']), data.get('savedir', ''), data.get('savefiles', ''))
         elif a.action == 'finish-game': finish_game(a.manifest)
         elif a.action == 'restore-custom':
             data = json.loads(a.manifest.read_text()); restore_legacy(Path(data['prefix']), a.manifest, 'custom')

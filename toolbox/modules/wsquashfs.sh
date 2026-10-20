@@ -685,6 +685,7 @@ wsq_inspect_folder() {
     local folder="$1" listing rc
     listing="$(mktemp /tmp/uwt-save-inspect.XXXXXX)" || return 1
     printf '%b\n\n' "$(i18n wsq_inspect_header)" > "$listing"
+    printf '%s\n\n' "$prefix/$folder" >> "$listing"
     if ! python3 "$WSQ_HELPER" inspect "$prefix" "$folder" --save-root "$WSQ_SAVE_ROOT" >> "$listing" 2>&1; then
         rm -f -- "$listing"
         msgbox "$(i18n wsq_inspect_title)" "$(i18n wsq_browser_invalid)"
@@ -702,6 +703,19 @@ wsq_inspect_folder() {
     fi
     rm -f -- "$listing"
     return "$rc"
+}
+
+wsq_inspect_save_destination() {
+    local dest="$1" base real prefix
+    base="$(readlink -f -- "$WSQ_SAVE_ROOT")" || return 1
+    real="$(readlink -f -- "$dest")" || return 1
+    # Only inspect a dedicated save location, never the shared root or an escape.
+    [ -d "$dest" ] && [[ "$real" = "$base/"* ]] || {
+        msgbox "$(i18n wsq_inspect_title)" "$(i18n wsq_browser_invalid)"
+        return 1
+    }
+    prefix="$real"
+    wsq_inspect_folder .
 }
 
 wsq_review_save_candidate() {
@@ -1007,46 +1021,49 @@ wsq_save_destination_prepare() {
 
     [ -d "$dest" ] && [ ! -L "$dest" ] || return 4
 
-    choice="$(menu_select "$(i18n wsq_save_conflict_title)" \
-        "$(i18n wsq_save_conflict_body "$dest")" \
-        "1" "$(i18n wsq_save_conflict_backup)" \
-        "2" "$(i18n wsq_save_conflict_replace)" \
-        "${keep[@]}" "0" "$(i18n back)")" || return 10
+    while true; do
+        choice="$(menu_select "$(i18n wsq_save_conflict_title)" \
+            "$(i18n wsq_save_conflict_body "$dest")" \
+            "1" "$(i18n wsq_save_conflict_backup)" \
+            "2" "$(i18n wsq_save_conflict_replace)" \
+            "${keep[@]}" inspect "$(i18n wsq_inspect_existing_save)" "0" "$(i18n back)")" || return 10
 
-    case "$choice" in
-        keep) [ "${WSQ_ALLOW_KEEP_EXISTING:-0}" = 1 ] && return 11; return 10 ;;
-        1)
-            stamp="$(date '+%Y%m%d-%H%M%S')"
-            backup="${dest}.backup-${stamp}"
-            while [ -e "$backup" ]; do
-                sleep 1
+        case "$choice" in
+            inspect) wsq_inspect_save_destination "$dest" || true; continue ;;
+            keep) [ "${WSQ_ALLOW_KEEP_EXISTING:-0}" = 1 ] && return 11; return 10 ;;
+            1)
                 stamp="$(date '+%Y%m%d-%H%M%S')"
                 backup="${dest}.backup-${stamp}"
-            done
-            if ! mv -- "$dest" "$backup"; then
-                return 5
-            fi
-            mkdir -p "$dest" || {
-                mv -- "$backup" "$dest" 2>/dev/null || true
-                return 6
-            }
-            WSQ_LAST_SAVE_BACKUP="$backup"
-            return 0
-            ;;
-        2)
-            yesno_default_no "$(i18n wsq_save_conflict_title)" \
-                "$(i18n wsq_save_replace_confirm "$dest")" || return 10
-            rm -rf -- "$dest" || return 7
-            mkdir -p "$dest" || return 8
-            WSQ_LAST_SAVE_BACKUP=""
-            return 0
-            ;;
-        0|"")
-            return 10
-            ;;
-    esac
+                while [ -e "$backup" ]; do
+                    sleep 1
+                    stamp="$(date '+%Y%m%d-%H%M%S')"
+                    backup="${dest}.backup-${stamp}"
+                done
+                if ! mv -- "$dest" "$backup"; then
+                    return 5
+                fi
+                mkdir -p "$dest" || {
+                    mv -- "$backup" "$dest" 2>/dev/null || true
+                    return 6
+                }
+                WSQ_LAST_SAVE_BACKUP="$backup"
+                return 0
+                ;;
+            2)
+                yesno_default_no "$(i18n wsq_save_conflict_title)" \
+                    "$(i18n wsq_save_replace_confirm "$dest")" || return 10
+                rm -rf -- "$dest" || return 7
+                mkdir -p "$dest" || return 8
+                WSQ_LAST_SAVE_BACKUP=""
+                return 0
+                ;;
+            0|"")
+                return 10
+                ;;
+        esac
 
-    return 10
+        return 10
+    done
 }
 
 wsq_move_save_data() {
@@ -1520,6 +1537,7 @@ wsq_resume_build() {
             fi
             wsq_resume_update
             navigation_rc=$?
+            [ "$navigation_rc" -ne 13 ] || continue
             if [ "$navigation_rc" -eq 12 ] && [ -s "$WSQ_STATE_FILE" ] &&
                [ "$(wsq_state_value phase)" = testing ]; then continue; fi
             return "$navigation_rc"

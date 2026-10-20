@@ -637,6 +637,7 @@ declare -gA I18N=(
   [wsq_save_title]="Détection de la sauvegarde"
   [wsq_save_prompt]="Dossiers modifiés depuis le snapshot précédent. Le score privilégie les chemins et extensions typiques de sauvegardes et pénalise caches/logs."
   [wsq_inspect_title]="Inspecter le contenu du dossier"
+  [wsq_inspect_existing_save]="Inspecter la sauvegarde existante"
   [wsq_inspect_header]="Lecture seule : fichiers et sous-dossiers, tailles en octets et dates de modification.\nFlèches / Page haut-bas pour parcourir la liste, Retour pour fermer.\nAperçu limité à 3 niveaux et 500 entrées. Pour voir plus loin, ouvrez un sous-dossier avec le navigateur puis inspectez-le."
   [wsq_candidate_prompt]="Dossier proposé :\n%s\n\nVous pouvez vérifier son contenu avant de l’utiliser ou choisir un autre dossier dans le préfixe."
   [wsq_more_save_locations]="Voir plus d’emplacements possibles (scores inférieurs)"

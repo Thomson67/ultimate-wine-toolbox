@@ -213,6 +213,48 @@ wsq_save_destination_prepare "$WSQ_SAVE_ROOT/Game"
         self.assertNotIn('keep',(self.home/'options').read_text().splitlines())
         self.assertEqual((self.saves/'Game/slot.sav').read_text(),'original')
 
+    def test_inspecting_existing_destination_returns_to_menu_without_changing_files(self):
+        (self.saves/'Game/slot.sav').write_text('original progression')
+        self.shell(r'''
+menu_select() {
+ printf '%s\n' "$@" > "$WT_HOME/options"
+ if [ ! -f "$WT_HOME/inspected" ]; then echo inspect; else return 1; fi
+}
+wsq_inspect_folder() {
+ printf '%s\n%s\n' "$prefix" "$1" > "$WT_HOME/inspected"
+}
+wsq_save_destination_prepare "$WSQ_SAVE_ROOT/Game"
+[ "$?" -eq 10 ] || exit 1
+''')
+        self.assertEqual((self.home/'inspected').read_text().splitlines(), [str(self.saves/'Game'), '.'])
+        self.assertEqual((self.saves/'Game/slot.sav').read_text(),'original progression')
+        self.assertIn('Inspecter la sauvegarde existante', (self.home/'options').read_text())
+
+    def test_save_inspection_rejects_shared_root_and_external_symlink_targets(self):
+        external=self.home/'external'; external.mkdir()
+        (self.saves/'escape').symlink_to(external, target_is_directory=True)
+        self.shell(r'''
+wsq_inspect_folder() { echo forbidden >&2; exit 9; }
+wsq_inspect_save_destination "$WSQ_SAVE_ROOT" && exit 1
+wsq_inspect_save_destination "$WSQ_SAVE_ROOT/escape" && exit 2
+exit 0
+''')
+
+    def test_update_existing_save_inspection_uses_original_destination_not_test_prefix(self):
+        metadata=self.home/'metadata.json'
+        metadata.write_text(json.dumps(dict(savedir='drive_c/game/Saves', savefiles='',
+                            original_save=str(self.saves/'Game'),save_links=[])))
+        self.shell(r'''
+menu_select() {
+ if [ ! -f "$WT_HOME/inspected" ]; then echo inspect-existing; else echo keep; fi
+}
+wsq_inspect_folder() { printf '%s\n' "$prefix" > "$WT_HOME/inspected"; }
+prefix="$TEST_PREFIX"; snapshot="$TEST_SNAPSHOT"
+wsq_update_review_save "$WT_HOME/metadata.json" || exit 1
+[ "$WSQ_SAVE_KIND" = existing ] || exit 2
+''')
+        self.assertEqual((self.home/'inspected').read_text().strip(), str(self.saves/'Game'))
+
     def test_more_locations_only_has_lower_scores_and_back_returns_to_primary(self):
         scores=[120,115,110,105,100,90,90,50,30]
         (self.home/'candidates').write_text(''.join(f'{score}\t1\tdrive_c/game/p{i}\treason\n' for i,score in enumerate(scores,1)))

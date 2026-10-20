@@ -270,7 +270,7 @@ wsq_apply_executable_selection drive_c/game/new.exe
         self.assertEqual((self.original_save / 'slot').read_text(), 'original')
         self.assertEqual((prepared / 'slot').read_text(), 'new save')
 
-    def test_shell_compression_failure_can_resume_without_touching_original_saves(self, final_mode="backup"):
+    def test_shell_compression_failure_can_resume_without_touching_original_saves(self, final_mode="backup", navigate_back=0):
         test_save = self.prepare()
         (test_save / 'slot').write_text('tested save')
         root = Path(__file__).resolve().parents[1]
@@ -294,9 +294,23 @@ have_dialog() {{ return 1; }}
 wt_clear_tty() {{ :; }}
 i18n() {{ printf '%s' "$1"; }}
 msgbox() {{ :; }}
-menu_select() {{ printf {final_mode}; }}
+menu_select() {{
+    echo final >> "$WT_HOME/navigation"
+    if [ {navigate_back} -ne 0 ] && [ ! -f "$WT_HOME/back-once" ] &&
+       {{ [ {navigate_back} -ne 3 ] || [ "$(wsq_state_value phase)" = ready ]; }}; then
+        touch "$WT_HOME/back-once"
+        if [ {navigate_back} -ne 3 ]; then
+            [ ! -d "$WSQ_SAVE_ROOT/Game.update-test.validated" ] || exit 80
+            [ -L "$prefix/drive_c/users/root/Saved" ] || exit 82
+        fi
+        [ "$(cat {q(str(test_save / 'slot'))})" = 'tested save' ] || exit 81
+        if [ {navigate_back} -ne 2 ]; then echo back; return 0; fi
+        return 1
+    fi
+    printf {final_mode}
+}}
 wsq_review_launch() {{ :; }}
-wsq_update_review_save() {{ WSQ_SAVE_KIND=existing; WSQ_SELECTED_SAVE=drive_c/users/root/Saved; }}
+wsq_update_review_save() {{ echo review >> "$WT_HOME/navigation"; WSQ_SAVE_KIND=existing; WSQ_SELECTED_SAVE=drive_c/users/root/Saved; }}
 yesno_default_no() {{ [ "$1" != squash_delete_source_title ]; }}
 wsq_restart_emulationstation_deferred() {{ :; }}
 wsq_post_build_menu() {{ :; }}
@@ -319,6 +333,36 @@ wsq_resume_build
         self.assertEqual(self.archive.read_bytes(), b'new archive')
         self.assertEqual((self.original_save / 'slot').read_text(), 'tested save')
         self.assertEqual(len(list(self.base.glob('Game.backup-*.wsquashfs'))), 1 if final_mode == 'backup' else 0)
+        if navigate_back in (1, 2):
+            self.assertEqual((self.base/'navigation').read_text().splitlines()[:4],
+                             ['review', 'final', 'review', 'final'])
+        if navigate_back == 3:
+            self.assertEqual((self.base/'navigation').read_text().splitlines(),
+                             ['review', 'final', 'final', 'review', 'final'])
+            self.assertEqual(list(self.saves.glob('*.validated.backup-*')), [])
+
+    def test_update_final_menu_back_revisits_existing_save_rules_before_preparing_data(self):
+        self.test_shell_compression_failure_can_resume_without_touching_original_saves(navigate_back=1)
+
+    def test_update_final_menu_back_button_revisits_existing_save_rules(self):
+        self.test_shell_compression_failure_can_resume_without_touching_original_saves(navigate_back=2)
+
+    def test_prepared_update_back_reuses_existing_save_copy_without_repeating_transfers(self):
+        self.test_shell_compression_failure_can_resume_without_touching_original_saves(navigate_back=3)
+
+    def test_restoring_existing_rules_after_changing_location_keeps_test_data(self):
+        test_save = self.prepare()
+        (test_save/'slot').write_text('tested progression')
+        update.rewrite_save_rules(self.prefix, 'drive_c/game/Other', 'slot.sav')
+        helper = Path(__file__).resolve().parents[1]/'toolbox/helpers/wsquashfs_update.py'
+        result = subprocess.run([sys.executable, str(helper),
+                                 'restore-save-rules', str(self.manifest)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        values = update.directives(self.prefix)[1]
+        self.assertEqual(values.get('SAVEDIR'), 'drive_c/users/root/Saved')
+        self.assertFalse(values.get('SAVEFILES'))
+        self.assertEqual((test_save/'slot').read_text(), 'tested progression')
+        self.assertEqual((self.original_save/'slot').read_text(), 'original')
 
     @unittest.skipUnless(shutil.which('mksquashfs') and shutil.which('unsquashfs'), 'SquashFS tools unavailable')
     def test_real_archive_round_trip_and_corruption_refusal(self):
