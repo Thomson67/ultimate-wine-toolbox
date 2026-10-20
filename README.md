@@ -6,7 +6,7 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.6.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.6.1).** WSquashFS updates are validated; WSquashFS creation remains in beta.
+**Stable version: [v0.6.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.6.2).** WSquashFS updates are validated; WSquashFS creation remains in beta.
 
 ## Features
 
@@ -33,14 +33,14 @@ Created by **Thomsonito**.
 - native Batocera Ports launcher and Pad2Key support
 - update checks at startup and from the toolbox menu
 
-## New in v0.6.1
+## New in v0.6.2
 
-- WSquashFS: B / Back returns between steps; existing saves can be retained during creation without keeping a separate copy of test data.
-- Improved save detection inside game subdirectories, ranking sav / slot / user filenames higher and cache data lower. Temporary-only folders are excluded.
-- Lower-ranked save locations are grouped behind “See more possible locations”, with tied scores kept together.
-- Fixed classic GE-Proton 11.x asset selection for older release naming, avoiding ARM archives on x86_64.
+- Automatic return after WSquashFS, ReShade and AntiMicroX tests on Batocera v44, preserving grouped Ports and controller mapping.
+- Updates from existing .wine prefixes, first-word game suggestions after exact matching and an option to update another archive.
+- Physical branch moves on mergerfs without copying game data, plus more complete extraction logs.
+- Full integrity checks support both older and recent unsquashfs help output.
 
-[v0.6.1 release notes](release-notes/v0.6.1.md) · [Release history](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
+[v0.6.2 release notes](release-notes/v0.6.2.md) · [Release history](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 

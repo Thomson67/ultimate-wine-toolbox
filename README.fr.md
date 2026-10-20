@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.6.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.6.1).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS reste en bêta.
+**Version stable : [v0.6.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.6.2).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS reste en bêta.
 
 ## Fonctionnalités
 
@@ -33,14 +33,14 @@ Créée par **Thomsonito**.
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
 
-## Nouveautés de la v0.6.1
+## Nouveautés de la v0.6.2
 
-- WSquashFS : B / Retour remonte entre les étapes ; la création peut conserver une sauvegarde existante sans copie séparée des données du test.
-- Détection améliorée dans les sous-dossiers du jeu : fichiers contenant sav / slot / user favorisés, données de cache pénalisées et dossiers purement temporaires écartés.
-- Les emplacements de sauvegarde moins bien classés sont regroupés dans « Voir plus d’emplacements possibles », en gardant les ex æquo ensemble.
-- Correction du choix des archives GE-Proton 11.x classiques pour les anciens noms de releases, afin d’éviter les archives ARM sur x86_64.
+- Retour automatique après les essais WSquashFS, ReShade et AntiMicroX sous Batocera v44, en conservant Ports regroupé et le profil manette.
+- Mise à jour depuis un .wine existant, suggestions de jeux par premier mot en complément du matching exact et possibilité d'enchaîner une autre mise à jour.
+- Déplacements mergerfs par branches physiques sans copie du jeu et journaux d'extraction plus complets.
+- Vérification complète compatible avec les aides anciennes et récentes d'unsquashfs.
 
-[Notes de la v0.6.1](release-notes/v0.6.1.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
+[Notes de la v0.6.2](release-notes/v0.6.2.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 
