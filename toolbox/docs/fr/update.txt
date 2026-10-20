@@ -14,6 +14,8 @@ Conserver les règles existantes ou choisir un autre emplacement. Les tests util
 
 « Inspecter la sauvegarde existante » affiche le chemin, les fichiers, leurs tailles et leurs dates dans le dossier de sauvegarde Batocera, sans les modifier. Le contenu du préfixe d’essai reste consultable séparément. Depuis le choix de l’archive finale, Retour ramène au choix des sauvegardes avant leur préparation. Une reprise après échec de compression permet aussi de revoir ce choix ; conserver les mêmes règles existantes réutilise la copie déjà préparée sans rejouer son transfert.
 
+L’inspection est aussi disponible pour les anciens liens de sauvegarde. Si un lien vise la racine partagée saves/windows, choisir le sous-dossier du jeu à consulter. Le retour depuis la sélection des sauvegardes permet de revoir les réglages du jeu ; l’opération reste reprenable si elle est quittée à cette étape. Une nouvelle relance rétablit les liens de test avant le lancement, tout en conservant le cas particulier des anciens liens visant la racine partagée.
+
 4. COMPRESSER ET FINALISER
 Choisir de sauvegarder l’ancienne archive avant remplacement ou de la remplacer directement. Après compression, lancer le contrôle complet proposé ou l’ignorer. Annuler à ce stade ne remplace pas l’archive. Un contrôle ignoré peut être lancé plus tard depuis Gestion des WSquashFS.
 

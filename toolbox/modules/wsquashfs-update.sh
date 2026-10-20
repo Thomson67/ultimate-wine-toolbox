@@ -138,7 +138,9 @@ wsq_pending_guard() {
         "$(wsq_display_path "$prefix")" "$(wsq_display_path "$archive")" "$(wsq_display_path "$log")")"
 
     # Testing and prepared updates retain the snapshot needed to resume safely.
-    if { [ "$phase" = testing ] || [ "$phase" = ready ]; } && [ -d "$prefix" ] && [ -s "$snapshot" ] &&
+    if { [ "$phase" = testing ] || [ "$phase" = ready ] ||
+         { [ "$mode" = update ] && [ "$phase" = configuring ] &&
+           [ "$(wsq_state_value save_review_ready)" = 1 ]; }; } && [ -d "$prefix" ] && [ -s "$snapshot" ] &&
         { [ "$mode" != update ] || [ -s "$metadata" ]; }; then
         choice="$(menu_select "$(i18n wsq_resume_title)" \
             "$summary\n\n$(i18n wsq_pending_what_next)" \
@@ -404,17 +406,42 @@ wsq_update_new() {
     exit 0
 }
 
+wsq_update_inspect_existing_save() {
+    local metadata="$1" path choice idx=1
+    local -a paths=() items=()
+    while IFS= read -r -d '' path; do
+        paths+=("$path")
+        items+=("$idx" "$(wsq_path_label "$path")")
+        idx=$((idx+1))
+    done < <(python3 "$WSQ_UPDATE_HELPER" save-locations "$metadata")
+    if [ "${#paths[@]}" -eq 0 ]; then
+        msgbox "$(i18n wsq_inspect_title)" "$(i18n wsq_inspect_existing_empty)"
+        return 0
+    fi
+    if [ "${#paths[@]}" -eq 1 ]; then
+        wsq_inspect_save_destination "${paths[0]}"
+        return $?
+    fi
+    while true; do
+        choice="$(menu_select "$(i18n wsq_inspect_existing_save)" \
+            "$(i18n wsq_inspect_existing_select)" "${items[@]}" back "$(i18n back)")" || return 0
+        case "$choice" in ''|back|*[!0-9]*) return 0 ;; esac
+        [ "$choice" -ge 1 ] && [ "$choice" -lt "$idx" ] || continue
+        wsq_inspect_save_destination "${paths[$((choice-1))]}" || true
+    done
+}
+
 wsq_update_review_save() {
-    local metadata="$1" savedir savefiles choice legacy original_save
+    local metadata="$1" savedir savefiles choice legacy
     savedir="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" savedir)" || return 1
     savefiles="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" savefiles)" || return 1
     legacy="$(python3 "$WSQ_UPDATE_HELPER" legacy-summary "$metadata")" || return 1
-    original_save="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" original_save)" || return 1
     if [ -z "$savedir$savefiles" ] && [ -n "$legacy" ]; then
         while true; do
             choice="$(menu_select "$(i18n wsq_update_save_title)" \
                 "$(i18n wsq_update_links_prompt "$(wsq_display_path "$legacy")")" \
                 keep "$(i18n wsq_update_links_keep)" \
+                inspect-existing "$(i18n wsq_inspect_existing_save)" \
                 detect "$(i18n wsq_update_save_detect)" \
                 browse "$(i18n wsq_browser_title)" \
                 retry "$(i18n wsq_no_save_retry)" \
@@ -422,6 +449,7 @@ wsq_update_review_save() {
             case "$choice" in
                 keep)
                     WSQ_SAVE_KIND=legacy; WSQ_SELECTED_SAVE=""; return 0 ;;
+                inspect-existing) wsq_update_inspect_existing_save "$metadata" || true ;;
                 detect)
                 wsq_select_save_candidate "$prefix" "$snapshot" && return 0
                 [ -s "$WSQ_STATE_FILE" ] || return 1 ;;
@@ -448,7 +476,7 @@ wsq_update_review_save() {
         case "$choice" in
             keep)
                 WSQ_SAVE_KIND=existing; WSQ_SELECTED_SAVE="$savedir"; return 0 ;;
-            inspect-existing) wsq_inspect_save_destination "$original_save" || true ;;
+            inspect-existing) wsq_update_inspect_existing_save "$metadata" || true ;;
             inspect)
                 local normalized
                 normalized="$(python3 - "$savedir" <<'PYCODE'
@@ -488,6 +516,7 @@ wsq_update_final_choice() {
 
 wsq_resume_update() {
     # prefix/game_name/snapshot/exe_rel/runner are local to wsq_resume_build.
+    local game_name="$game_name"
     local metadata phase save_rel save_kind test_save archive staged backup log original_name prepared_save final_mode="" new_archive=0
     local ready_review ready_kind skip_save_prepare=0
     local -a commit_args=()
@@ -516,7 +545,8 @@ wsq_resume_update() {
             # Choose the archive action before save transfers or detachment:
             # Back can then revisit save review without replaying mutations.
             final_mode="$(wsq_update_final_choice "$archive" "$new_archive")" || continue
-            if [ "$ready_review" = 1 ] && [ "$save_kind" = existing ] && [ "$ready_kind" = existing ]; then
+            if [ "$ready_review" = 1 ] && [ "$save_kind" = "$ready_kind" ] &&
+               { [ "$save_kind" = existing ] || [ "$save_kind" = legacy ]; }; then
                 skip_save_prepare=1
                 break
             fi

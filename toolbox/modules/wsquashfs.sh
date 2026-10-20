@@ -657,6 +657,17 @@ wsq_cancel_pending() {
 }
 
 wsq_retry_pending() {
+    if [ "$(wsq_state_value mode)" = update ] &&
+       { [ "$(wsq_state_value save_review_ready)" = 1 ] || [ "$(wsq_state_value phase)" = ready ]; }; then
+        local metadata log prepared
+        metadata="$(wsq_state_value metadata)"; log="$(wsq_state_value update_log)"
+        prepared="$WSQ_SAVE_ROOT/$(basename "$prefix" .wine).validated"
+        python3 "$WSQ_UPDATE_HELPER" retest "$metadata" --prepared-save "$prepared" >> "$log" 2>&1 || {
+            msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"
+            return 1
+        }
+        wsq_update_state phase testing save_review_ready 0 save_ready_kind "" || return 1
+    fi
     wsq_request_game_launch "$prefix" || return 1
     wsq_restart_emulationstation_deferred || return 1
     exit 0
@@ -1531,15 +1542,21 @@ wsq_resume_build() {
     }
 
     if [ "$(wsq_state_value mode)" = update ]; then
+        local review_update_launch=0
         while true; do
-            if [ "$(wsq_state_value phase)" = testing ]; then
+            if [ "$(wsq_state_value phase)" = testing ] || [ "$review_update_launch" -eq 1 ]; then
+                review_update_launch=0
                 wsq_review_launch || return 12
             fi
             wsq_resume_update
             navigation_rc=$?
             [ "$navigation_rc" -ne 13 ] || continue
             if [ "$navigation_rc" -eq 12 ] && [ -s "$WSQ_STATE_FILE" ] &&
-               [ "$(wsq_state_value phase)" = testing ]; then continue; fi
+               { [ "$(wsq_state_value phase)" = testing ] ||
+                 [ "$(wsq_state_value save_review_ready)" = 1 ]; }; then
+                review_update_launch=1
+                continue
+            fi
             return "$navigation_rc"
         done
     fi

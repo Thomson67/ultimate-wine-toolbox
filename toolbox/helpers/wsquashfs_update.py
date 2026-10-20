@@ -553,6 +553,102 @@ def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False):
         shutil.rmtree(embedded)
 
 
+def existing_save_locations(manifest):
+    """Read-only locations; a shared-root link requires choosing a child folder."""
+    data = json.loads(manifest.read_text())
+    base = Path(data['save_root']).resolve()
+    excluded = {Path(data['test_save']).resolve(),
+                base / (Path(data['prefix']).stem + '.validated')}
+    candidates = [Path(data['original_save'])]
+    for link in data.get('save_links', []):
+        target = Path(link['target'])
+        if target.resolve() == base:
+            candidates.extend(base.iterdir())
+        else:
+            candidates.append(target if link['directory'] else target.parent)
+    locations = set()
+    for path in candidates:
+        real = path.resolve()
+        if (not path.is_symlink() and path.is_dir() and real != base
+                and real.is_relative_to(base) and real not in excluded
+                and not path.name.startswith('.uwt-')):
+            locations.add(real)
+    return sorted(locations, key=lambda path: str(path).casefold())
+
+
+def prepare_retest(manifest, prepared=None):
+    """Rebind a prepared prefix to test saves before another game launch."""
+    from wsquashfs_builder import safe_save_dir
+    data = json.loads(manifest.read_text())
+    root = Path(data['prefix']).resolve()
+    base = Path(data['save_root']).resolve()
+    test = Path(data['test_save'])
+    expected = '.uwt-test-' + manifest.stem if data.get('same_rom_name') else Path(data['prefix']).stem
+    if (data.get('committed') or test.is_symlink() or test.parent.resolve() != base
+            or test.name != expected or not test.is_dir()):
+        raise ValueError('invalid test-save location for relaunch')
+    if prepared is not None:
+        if (prepared.is_symlink() or prepared.parent.resolve() != base
+                or prepared.name != Path(data['prefix']).stem + '.validated'):
+            raise ValueError('invalid prepared save copy')
+        if prepared.is_dir():
+            shutil.copytree(prepared, test, symlinks=False, dirs_exist_ok=True)
+    _, rules = directives(root)
+    savedir, savefiles = rules.get('SAVEDIR', ''), rules.get('SAVEFILES', '')
+    if savedir:
+        relative = relative_path(savedir)
+        location = root / relative
+        if savefiles:
+            if not location.resolve().is_relative_to(root):
+                raise ValueError('SAVEFILES parent escapes the prefix')
+            for pattern in savefiles.split(';'):
+                if not pattern.strip(): continue
+                relative_path(pattern)
+                for entry in location.glob(pattern):
+                    if not entry.is_file(): continue
+                    target = test / entry.relative_to(location)
+                    if entry.resolve() != target.resolve():
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(entry, target)
+                        entry.unlink()
+                        entry.symlink_to(target)
+        else:
+            safe_save_dir(root, str(relative), save_root=base)
+            if location.is_symlink():
+                location.unlink()
+            else:
+                shutil.copytree(location, test, symlinks=False, dirs_exist_ok=True)
+                shutil.rmtree(location)
+            location.symlink_to(test, target_is_directory=True)
+        if data.get('same_rom_name'):
+            rewrite_save_rules(root, '', '')
+    for link in custom_links(data):
+        path = root / relative_path(link['path'])
+        target = Path(link['target']).resolve()
+        if not target.is_relative_to(base) or not path.parent.resolve().is_relative_to(root):
+            raise ValueError('invalid legacy test-save link')
+        replacement = base if target == base else test / '.legacy-shared' / target.relative_to(base)
+        if target != base and not replacement.exists() and target.exists():
+            replacement.parent.mkdir(parents=True, exist_ok=True)
+            if target.is_dir(): shutil.copytree(target, replacement, symlinks=False)
+            else: shutil.copy2(target, replacement)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.is_symlink(): path.unlink()
+        elif path.is_dir(): path.rmdir()
+        elif path.exists():
+            raise ValueError('legacy save link contains unexpected data')
+        path.symlink_to(replacement, target_is_directory=link['directory'])
+    for name in data.get('test_scripts', []):
+        path = root / relative_path(name)
+        if path.is_symlink() or not path.resolve().is_relative_to(root):
+            raise ValueError('test script escapes the working prefix')
+        if path.is_file():
+            text = path.read_text(encoding='utf-8', errors='surrogateescape')
+            for original, replacement in data['script_replacements']:
+                text = text.replace(original, replacement)
+            path.write_text(text, encoding='utf-8', errors='surrogateescape')
+
+
 def finish_game(manifest):
     data = json.loads(manifest.read_text())
     if data.get('game_backup_removed'):
@@ -730,6 +826,10 @@ def main():
     a.add_argument('--savedir'); a.add_argument('--savefiles')
     a = sp.add_parser('detach')
     a.add_argument('prefix', type=Path); a.add_argument('save', type=Path)
+    a = sp.add_parser('retest')
+    a.add_argument('manifest', type=Path); a.add_argument('--prepared-save', type=Path)
+    a = sp.add_parser('save-locations')
+    a.add_argument('manifest', type=Path)
     a = sp.add_parser('config')
     a.add_argument('conf', type=Path); a.add_argument('source'); a.add_argument('dest')
     a.add_argument('--backup-dir', type=Path); a.add_argument('--preserve-existing', action='store_true')
@@ -763,6 +863,10 @@ def main():
             removed = cleanup_runtime_bottles(a.root, a.archive_name)
             print('\n'.join(removed) if removed else f'No runtime bottle found for {a.archive_name}')
         elif a.action == 'profiles': ensure_root_alias(a.prefix)
+        elif a.action == 'retest': prepare_retest(a.manifest, a.prepared_save)
+        elif a.action == 'save-locations':
+            for path in existing_save_locations(a.manifest):
+                sys.stdout.write(str(path) + '\0')
         elif a.action == 'exe': print(launch_executable(a.prefix))
         elif a.action == 'root-link':
             data = json.loads(a.manifest.read_text())

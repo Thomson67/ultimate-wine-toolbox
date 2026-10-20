@@ -14,6 +14,8 @@ Keep existing save rules or select another location. Tests normally use a separa
 
 “Inspect existing saves” shows the path, filenames, sizes and dates in the existing Batocera save folder without modifying it. The test prefix contents remain separately accessible. Back from the final archive choice returns to save review before preparation. Resuming after a compression failure also allows save review; retaining the same existing rules reuses the prepared copy without repeating its transfer.
 
+Inspection is also available for legacy save links. When a link targets the shared saves/windows root, select the game's subfolder to inspect. Back from save selection returns to game settings; the operation remains resumable if left at this step. Relaunching restores test-save links before starting the game, while preserving the special case of legacy links targeting the shared root.
+
 4. COMPRESS AND FINALIZE
 Choose to back up the old archive before replacement or replace it directly. After compression, run the proposed full check or skip it. Cancel at this stage does not replace the archive. Skipped checks can be run later from WSquashFS Management.
 

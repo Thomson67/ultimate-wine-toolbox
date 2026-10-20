@@ -51,6 +51,68 @@ class UpdateTests(unittest.TestCase):
         update.ensure_root_alias(self.prefix)
         self.assertEqual(kept.stat().st_ino, inode)
 
+    def test_shared_root_inspection_lists_children_and_excludes_test_and_external_links(self):
+        self.prepare()
+        data=json.loads(self.manifest.read_text())
+        data.update(savedir='',savefiles='',save_links=[dict(target=str(self.saves),directory=True)])
+        self.manifest.write_text(json.dumps(data))
+        (self.saves/'SMG').mkdir()
+        external=self.base/'external';external.mkdir()
+        (self.saves/'escape').symlink_to(external,target_is_directory=True)
+        (self.saves/(self.prefix.stem+'.validated')).mkdir()
+        self.assertEqual(update.existing_save_locations(self.manifest),
+                         [self.original_save,self.saves/'SMG'])
+
+    def test_retest_of_prepared_native_prefix_keeps_progress_isolated(self):
+        self.prefix.rename(self.base/'Game.wine');self.prefix=self.base/'Game.wine'
+        test=self.prepare()
+        (test/'slot').write_text('tested progression')
+        update.detach_saves(self.prefix,test)
+        update.rewrite_save_rules(self.prefix,'drive_c/users/root/Saved','')
+        prepared=self.saves/'Game.validated';prepared.mkdir()
+        (prepared/'slot').write_text('latest prepared progression')
+        update.prepare_retest(self.manifest,prepared)
+        location=self.prefix/'drive_c/users/root/Saved'
+        self.assertTrue(location.is_symlink())
+        self.assertEqual(location.resolve(),test)
+        self.assertEqual((location/'slot').read_text(),'latest prepared progression')
+        self.assertEqual((self.original_save/'slot').read_text(),'original')
+        self.assertFalse(update.directives(self.prefix)[1].get('SAVEDIR'))
+
+    def test_retest_of_legacy_root_link_preserves_shared_root_semantics(self):
+        update.rewrite_save_rules(self.prefix,'','')
+        link=self.game/'SMG';link.symlink_to(self.saves,target_is_directory=True)
+        self.prepare()
+        update.stage_legacy(self.manifest)
+        update.restore_legacy(self.prefix,self.manifest)
+        update.prepare_retest(self.manifest)
+        self.assertEqual(link.resolve(),self.saves)
+        self.assertEqual((self.original_save/'slot').read_text(),'original')
+
+    def test_retest_of_dedicated_legacy_link_uses_test_copy(self):
+        update.rewrite_save_rules(self.prefix,'','')
+        shared=self.saves/'Shared';shared.mkdir();(shared/'slot').write_text('original shared')
+        link=self.prefix/'drive_c/users/root/Custom'
+        link.parent.mkdir(parents=True,exist_ok=True);link.symlink_to(shared,target_is_directory=True)
+        test=self.prepare()
+        (test/'.legacy-shared/Shared/slot').write_text('tested shared')
+        update.stage_legacy(self.manifest)
+        update.restore_legacy(self.prefix,self.manifest)
+        self.assertEqual(link.resolve(),shared)
+        update.prepare_retest(self.manifest)
+        self.assertEqual(link.resolve(),test/'.legacy-shared/Shared')
+        self.assertEqual((link/'slot').read_text(),'tested shared')
+        self.assertEqual((shared/'slot').read_text(),'original shared')
+
+    def test_retest_refuses_redirected_prepared_save_copy(self):
+        self.prepare()
+        outside=self.base/'outside';outside.mkdir()
+        prepared=self.saves/(self.prefix.stem+'.validated')
+        prepared.symlink_to(outside,target_is_directory=True)
+        with self.assertRaisesRegex(ValueError,'prepared save'):
+            update.prepare_retest(self.manifest,prepared)
+        self.assertEqual((self.original_save/'slot').read_text(),'original')
+
     def test_root_only_profile_is_renamed_without_copy(self):
         root = self.prefix / 'drive_c/users/root'; root.mkdir(parents=True)
         file = root / 'profile'; file.write_text('profile')

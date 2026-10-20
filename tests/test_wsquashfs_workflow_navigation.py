@@ -243,7 +243,8 @@ exit 0
     def test_update_existing_save_inspection_uses_original_destination_not_test_prefix(self):
         metadata=self.home/'metadata.json'
         metadata.write_text(json.dumps(dict(savedir='drive_c/game/Saves', savefiles='',
-                            original_save=str(self.saves/'Game'),save_links=[])))
+                            original_save=str(self.saves/'Game'),save_links=[],
+                            save_root=str(self.saves),prefix=str(self.prefix),test_save=str(self.saves/'test'))))
         self.shell(r'''
 menu_select() {
  if [ ! -f "$WT_HOME/inspected" ]; then echo inspect-existing; else echo keep; fi
@@ -254,6 +255,61 @@ wsq_update_review_save "$WT_HOME/metadata.json" || exit 1
 [ "$WSQ_SAVE_KIND" = existing ] || exit 2
 ''')
         self.assertEqual((self.home/'inspected').read_text().strip(), str(self.saves/'Game'))
+
+    def test_legacy_root_link_menu_offers_read_only_inspection_of_selected_child(self):
+        (self.saves/'SMG/LEGO').mkdir(parents=True)
+        slot=self.saves/'SMG/LEGO/slot.sav';slot.write_text('original')
+        metadata=dict(savedir='',savefiles='',original_save=str(self.saves/'Game'),
+                      save_root=str(self.saves),prefix=str(self.prefix),test_save=str(self.saves/'test'),
+                      save_links=[dict(path='drive_c/users/steamuser/AppData/LocalLow/SMG',
+                                       target=str(self.saves),original=str(self.saves),directory=True)])
+        (self.home/'metadata.json').write_text(json.dumps(metadata))
+        self.shell(r'''
+menu_select() {
+ printf '%s\n' "$@" >> "$WT_HOME/options"
+ if [ "$1" = "$(i18n wsq_update_save_title)" ]; then
+  if [ -f "$WT_HOME/inspected" ]; then echo keep; else echo inspect-existing; fi
+ else
+  if [ -f "$WT_HOME/inspected" ]; then echo back; else echo 2; fi
+ fi
+}
+wsq_inspect_folder() { printf '%s\n' "$prefix" > "$WT_HOME/inspected"; }
+wsq_update_review_save "$WT_HOME/metadata.json" || exit 1
+[ "$WSQ_SAVE_KIND" = legacy ] || exit 2
+''')
+        self.assertEqual((self.home/'inspected').read_text().strip(),str(self.saves/'SMG'))
+        self.assertEqual(slot.read_text(),'original')
+        self.assertIn('Inspecter la sauvegarde existante',(self.home/'options').read_text())
+
+    def test_prepared_save_review_back_returns_to_game_review(self):
+        data=json.loads(self.state.read_text())
+        data.update(mode='update',phase='configuring',save_review_ready=1)
+        self.state.write_text(json.dumps(data))
+        self.shell(r'''
+wsq_review_launch() { echo review >> "$WT_HOME/order"; }
+wsq_resume_update() {
+ echo saves >> "$WT_HOME/order"
+ if [ ! -f "$WT_HOME/once" ]; then touch "$WT_HOME/once"; return 12; fi
+ return 0
+}
+wsq_resume_build
+''')
+        self.assertEqual((self.home/'order').read_text().splitlines(),['saves','review','saves'])
+
+    def test_pending_guard_allows_resuming_prepared_save_review(self):
+        metadata=self.home/'metadata.json';metadata.write_text('{}')
+        data=json.loads(self.state.read_text())
+        data.update(mode='update',phase='configuring',save_review_ready=1,metadata=str(metadata))
+        self.state.write_text(json.dumps(data))
+        self.shell(r'''
+menu_select() { printf '%s\n' "$@" > "$WT_HOME/options"; echo resume; }
+wsq_resume_build() { touch "$WT_HOME/resumed"; }
+WSQ_WINDOWS_DIR="$WT_HOME"
+wsq_pending_guard
+[ "$?" -eq 1 ]
+''')
+        self.assertTrue((self.home/'resumed').exists())
+        self.assertIn('Reprendre',(self.home/'options').read_text())
 
     def test_more_locations_only_has_lower_scores_and_back_returns_to_primary(self):
         scores=[120,115,110,105,100,90,90,50,30]
