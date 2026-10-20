@@ -60,6 +60,86 @@ class ReturnProxyTests(unittest.TestCase):
         self.create()
         self.assertEqual(Path(str(rom)+'.keys').read_bytes(), self.keys.read_bytes())
 
+    def rewrite_as_es(self, path, count):
+        root = ET.parse(path).getroot()  # Default parser drops XML comments, like ES.
+        game = root.find('game')
+        for tag, text in {'playcount': str(count), 'lastplayed': '20261020T170943',
+                          'gametime': '53', 'hidden': 'false'}.items():
+            node = game.find(tag)
+            if node is None:
+                node = ET.SubElement(game, tag)
+            node.text = text
+        ET.ElementTree(root).write(path, encoding='utf-8', xml_declaration=True)
+        self.assertNotIn(proxy.MARKER.encode(), path.read_bytes())
+
+    def test_repeated_es_rewrites_preserve_metadata_and_restore_hidden_flags(self):
+        _, rom = self.create()
+        path = Path(rom).parent/'gamelist.xml'
+        for count in range(1, 4):
+            self.rewrite_as_es(path, count)
+            self.assertEqual(self.create()[1], rom)
+            root = ET.parse(path).getroot()
+            self.assertEqual(root.findtext('game/playcount'), str(count))
+            self.assertEqual(root.findtext('game/lastplayed'), '20261020T170943')
+            self.assertEqual(root.findtext('game/gametime'), '53')
+            self.assertEqual(root.findtext('game/hidden'), 'true')
+            self.assertEqual(root.findtext('folder/hidden'), 'true')
+
+    def test_legacy_install_with_comment_removed_is_migrated_automatically(self):
+        _, rom = self.create()
+        runtime = Path(rom).parent
+        (runtime/'gamelist.owner').unlink()
+        self.rewrite_as_es(runtime/'gamelist.xml', 7)
+        # ES may use absolute paths and omit the root-folder entry.
+        root = ET.parse(runtime/'gamelist.xml').getroot()
+        root.remove(root.find('folder'))
+        root.find('game/path').text = rom
+        ET.ElementTree(root).write(runtime/'gamelist.xml')
+        self.create()
+        self.assertEqual((runtime/'gamelist.owner').read_text(), proxy.MARKER)
+        self.assertEqual(ET.parse(runtime/'gamelist.xml').findtext('game/playcount'), '7')
+        self.assertEqual(ET.parse(runtime/'gamelist.xml').findtext('folder/hidden'), 'true')
+
+    def test_fresh_foreign_gamelist_cannot_gain_ownership_from_newly_created_assets(self):
+        runtime = proxy.proxy_launcher(self.home).parent
+        runtime.mkdir(parents=True)
+        path = runtime/'gamelist.xml'
+        path.write_text('<gameList><game><path>./Ultimate Wine Toolbox Return.sh</path></game></gameList>')
+        before = path.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'foreign'):
+            self.create()
+        self.assertEqual(path.read_bytes(), before)
+        self.assertFalse((runtime/'gamelist.owner').exists())
+        self.assertFalse((self.user/proxy.CONFIG_NAME).exists())
+
+    def test_sidecar_never_allows_foreign_entries_to_be_overwritten(self):
+        _, rom = self.create()
+        path = Path(rom).parent/'gamelist.xml'
+        path.write_text('<gameList><game><path>../Other.sh</path></game></gameList>')
+        before = path.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'foreign entry'):
+            self.create()
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_gamelist_symlink_is_not_followed_even_with_owned_sidecar(self):
+        _, rom = self.create()
+        path = Path(rom).parent/'gamelist.xml'
+        external = self.base/'foreign.xml'
+        external.write_text('foreign')
+        path.unlink()
+        path.symlink_to(external)
+        with self.assertRaisesRegex(ValueError, 'foreign'):
+            self.create()
+        self.assertEqual(external.read_text(), 'foreign')
+
+    def test_foreign_sidecar_is_not_overwritten(self):
+        _, rom = self.create()
+        owner = Path(rom).parent/'gamelist.owner'
+        owner.write_text('foreign')
+        with self.assertRaisesRegex(ValueError, 'foreign'):
+            self.create()
+        self.assertEqual(owner.read_text(), 'foreign')
+
     def test_foreign_config_is_never_overwritten(self):
         config = self.user/proxy.CONFIG_NAME; config.write_text('<systemList>foreign</systemList>')
         with self.assertRaisesRegex(ValueError, 'foreign'):
