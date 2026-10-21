@@ -10,19 +10,71 @@ import subprocess
 import tempfile
 
 from winetricks_catalog import valid_verb, pending_components
+from winetricks_games import configured_runner
 
 
-def private_file(path):
+def private_file(path, source=None):
     fd, temporary = tempfile.mkstemp(prefix='.uwt-winetricks-', dir=path.parent)
     os.close(fd)
     try:
-        shutil.copy2(path, temporary)
+        shutil.copy2(source or path, temporary)
         os.replace(temporary, path)
     finally:
         Path(temporary).unlink(missing_ok=True)
 
 
-def prepare(prefix, detach=True):
+def selected_runner_root(prefix):
+    name = os.environ.get('UWT_COMPONENT_ROM_NAME', prefix.name)
+    runner = configured_runner(Path(name), Path('/userdata/system/batocera.conf'))
+    runner = {'__SYSTEM__': 'wine-tkg', 'lutris': 'wine-tkg', 'proton': 'wine-proton'}.get(runner, runner)
+    if runner in ('wine-tkg', 'wine-proton'):
+        return Path('/usr/wine') / runner
+    if not runner or Path(runner).name != runner or runner in ('.', '..'):
+        raise ValueError('Invalid selected runner name')
+    return Path('/userdata/system/wine/custom') / runner
+
+
+def legacy_dx10_source(path, prefix, runner_root=None):
+    """Recover only recognized stale DXVK DX10 links from the chosen runner."""
+    relative = path.relative_to(prefix / 'drive_c/windows')
+    dll = path.name.casefold()
+    if len(relative.parts) != 2 or dll not in ('d3d10.dll', 'd3d10_1.dll', 'd3d10core.dll'):
+        return None
+    folder = relative.parts[0].casefold()
+    if folder == 'syswow64':
+        arch, dxvk, machine = 'i386-windows', 'x32', 0x14c
+    elif folder == 'system32':
+        try:
+            win32 = '#arch=win32' in (prefix / 'system.reg').read_text(errors='replace').splitlines()
+        except FileNotFoundError:
+            win32 = False
+        arch, dxvk, machine = ('i386-windows', 'x32', 0x14c) if win32 else ('x86_64-windows', 'x64', 0x8664)
+    else:
+        return None
+    target = Path(os.readlink(path))
+    if target != Path('/userdata/system/wine/dxvk') / dxvk / path.name:
+        return None
+    runner = (runner_root or selected_runner_root(prefix)).resolve()
+    for layout in ('lib/wine', 'files/lib/wine', 'dist/lib/wine'):
+        candidate = runner / layout / arch / dll
+        resolved = candidate.resolve()
+        if not resolved.is_relative_to(runner) or not candidate.is_file():
+            continue
+        with candidate.open('rb') as stream:
+            header = stream.read(64)
+            if len(header) < 64 or header[:2] != b'MZ':
+                continue
+            offset = int.from_bytes(header[60:64], 'little')
+            if offset < 64 or offset > candidate.stat().st_size - 6:
+                continue
+            stream.seek(offset)
+            pe = stream.read(6)
+        if pe[:4] == b'PE\0\0' and int.from_bytes(pe[4:6], 'little') == machine:
+            return candidate
+    return None
+
+
+def prepare(prefix, detach=True, runner_root=None):
     if prefix.is_symlink() or not prefix.is_dir() or prefix.suffix.casefold() != '.wine':
         raise ValueError('Expected the working .wine prefix')
     root = prefix.resolve()
@@ -66,13 +118,19 @@ def prepare(prefix, detach=True):
     for path in files:
         if path.is_symlink() and not path.resolve().is_relative_to(root):
             if not path.is_file():
-                raise ValueError(f'Missing shared Windows file: {path}')
-            copies.append(path)
+                source = legacy_dx10_source(path, prefix, runner_root)
+                if source is None:
+                    raise ValueError(f'Missing shared Windows file: {path} -> {os.readlink(path)}')
+                copies.append((path, source))
+            else:
+                copies.append((path, None))
         elif path.is_file() and path.stat().st_nlink > 1:
-            copies.append(path)
+            copies.append((path, None))
     if detach:
-        for path in copies:
-            private_file(path)
+        for path, source in copies:
+            private_file(path, source)
+            if source is not None:
+                print(f'winetricks_legacy_dx10_repaired={path} source={source}', flush=True)
 
 
 def installer_file_limit():

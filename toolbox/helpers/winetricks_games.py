@@ -39,7 +39,8 @@ def configured_runner(prefix, conf):
             if '=' in line and not line.lstrip().startswith(('#', ';')):
                 key, value = line.split('=', 1)
                 values[key.strip()] = value.strip()
-    for key in (f'windows["{prefix.name}"].wine-runner', 'windows.wine-runner'):
+    for key in (f'windows["{prefix.name}"].wine-runner', 'windows.wine-runner', 'global.wine-runner',
+                f'windows["{prefix.name}"].core', 'windows.core', 'global.core'):
         value = values.get(key, '')
         if value:
             return value
