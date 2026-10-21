@@ -16,6 +16,69 @@ spec.loader.exec_module(live)
 
 
 class LiveSessionTests(unittest.TestCase):
+    def test_result_receipt_retires_only_antimicrox_request_and_keeps_profile_recoverable(self):
+        for marker in (b'antimicrox\n', b'reshade\n', b''):
+            with self.subTest(marker=marker):
+                data = self.session.prepare(self.rom)
+                self.session.finish('normal')
+                request = self.home/'state/resume-wsq.request'
+                request.write_bytes(marker)
+                self.session.acknowledge_return()
+                self.assertTrue(self.session.read()['return_presented'])
+                self.assertTrue(Path(data['profile']).is_file())
+                self.assertFalse(self.keys.exists())
+                self.assertFalse(self.session.request_return(str(self.rom), data['session_id']))
+                if marker == b'antimicrox\n': self.assertFalse(request.exists())
+                else: self.assertEqual(request.read_bytes(), marker)
+                request.unlink(missing_ok=True)
+                self.session.clear()
+
+    def test_receipt_requires_successful_shortcut_restoration(self):
+        self.session.prepare(self.rom)
+        with self.assertRaises(ValueError):
+            self.session.acknowledge_return()
+        self.assertTrue(self.keys.exists())
+        self.assertNotIn('return_presented', self.session.read())
+
+    def test_old_worker_cannot_request_return_for_a_new_session_or_replace_foreign_request(self):
+        data = self.session.prepare(self.rom)
+        self.session.finish('normal')
+        self.session.clear()
+        new = self.session.prepare(self.rom)
+        self.assertNotEqual(data['session_id'], new['session_id'])
+        self.assertFalse(self.session.request_return(str(self.rom), data['session_id']))
+        request = self.home/'state/resume-wsq.request'
+        request.write_bytes(b'reshade\n')
+        self.assertFalse(self.session.request_return(str(self.rom), new['session_id']))
+        self.assertEqual(request.read_bytes(), b'reshade\n')
+
+    def test_hup_at_finished_menu_does_not_leave_an_automatic_return_pending(self):
+        data = self.session.prepare(self.rom)
+        self.session.finish('normal')
+        request = self.home/'state/resume-wsq.request'
+        request.write_bytes(b'antimicrox\n')
+        fake_root = self.base/'toolbox'
+        (fake_root/'hooks').mkdir(parents=True)
+        (fake_root/'hooks/antimicrox-game-event.sh').write_text('#!/bin/bash\nexit 0\n')
+        script = r'''
+source "$MODULE"
+MAIN_PID=$$
+amx_live_cmd() { python3 "$HELPER" --home "$WT_HOME" "$@"; }
+amx_txt() { printf '%s' "$1"; }
+i18n() { printf '%s' "$1"; }
+menu_select() { touch "$WT_HOME/menu-shown"; kill -HUP "$MAIN_PID"; }
+amx_live_resume
+'''
+        result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=10,
+            env=dict(os.environ, WT_HOME=str(self.home), WT_ROOT=str(fake_root), WT_LANGUAGE='fr',
+                     MODULE=str(ROOT/'toolbox/modules/antimicrox.sh'), HELPER=str(ROOT/'toolbox/helpers/antimicrox_live.py')))
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.home/'menu-shown').exists(), result.stderr)
+        self.assertTrue(self.session.read()['return_presented'])
+        self.assertFalse(request.exists())
+        self.assertTrue(Path(data['profile']).exists())
+        self.assertFalse(self.session.request_return(str(self.rom), data['session_id']))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

@@ -2,7 +2,7 @@ name: Source and regression checks
 
 on:
   push:
-    branches: [test, main]
+    branches: [test, main, fix/antimicrox-return-ack]
     paths: ['**.sh', '**.py', 'VERSION', '.github/workflows/**']
   pull_request:
   workflow_dispatch:

@@ -225,6 +225,31 @@ class LiveSession:
             self.write(data)
             return data
 
+    def acknowledge_return(self):
+        """The result screen owns recovery now, including if its xterm closes."""
+        with self.locked():
+            data = self.read()
+            if not data or data['phase'] != 'finished':
+                raise ValueError('Restore the temporary keys before acknowledging the return.')
+            data['return_presented'] = True
+            self.write(data)
+            request = self.home/'state/resume-wsq.request'
+            if request.exists() and request.read_bytes().strip() == b'antimicrox':
+                request.unlink()
+
+    def request_return(self, rom, session_id):
+        """Serialize late return requests with the result screen's receipt."""
+        with self.locked():
+            data = self.read()
+            if (not data or data['rom'] != rom or data.get('session_id') != session_id
+                    or data.get('return_presented')):
+                return False
+            request = self.home/'state/resume-wsq.request'
+            if request.exists() and request.read_bytes().strip() != b'antimicrox':
+                return False  # A different workflow owns the shared request.
+            atomic(request, b'antimicrox\n')
+            return True
+
     def clear(self):
         with self.locked():
             data = self.read()
@@ -243,6 +268,7 @@ def main():
     finish = sub.add_parser('finish'); finish.add_argument('--rom'); finish.add_argument('--result', default='stopped')
     field = sub.add_parser('field'); field.add_argument('name')
     sub.add_parser('clear')
+    sub.add_parser('presented')
     args = parser.parse_args()
     session = LiveSession(args.home)
     if args.command == 'prepare':
@@ -257,6 +283,8 @@ def main():
         print((session.read() or {}).get(args.name, ''))
     elif args.command == 'clear':
         session.clear()
+    elif args.command == 'presented':
+        session.acknowledge_return()
 
 
 if __name__ == '__main__':

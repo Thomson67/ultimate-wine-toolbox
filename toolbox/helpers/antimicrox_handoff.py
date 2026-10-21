@@ -11,7 +11,7 @@ import urllib.error
 import urllib.request
 import urllib.parse
 
-from antimicrox_live import LiveSession, atomic
+from antimicrox_live import LiveSession
 from es_return_proxy import proxy_launcher
 
 TOOLBOX = '/userdata/roms/ports/Ultimate Wine Toolbox.sh'
@@ -177,7 +177,9 @@ class Handoff:
         while self.clock() < deadline:
             code, path = self.api.running()
             if code in (201, 404):
-                atomic(self.session.home/'state/resume-wsq.request', b'antimicrox\n')
+                if not self.session.request_return(self.rom, self.session_id):
+                    self.log('Return already presented, session changed, or another workflow owns recovery; no relaunch')
+                    return
                 # Import at handoff time: the shared return helper uses EsApi.
                 from toolbox_return import resume
                 try:

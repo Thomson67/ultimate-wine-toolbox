@@ -37,6 +37,30 @@ class Api:
 
 
 class HandoffTests(unittest.TestCase):
+    def test_late_return_after_finished_screen_and_terminal_close_never_reopens_toolbox(self):
+        api = Api([(201, '')])
+        worker = self.worker(api)
+        self.session.finish('normal')
+        self.session.acknowledge_return()
+        worker.resume()
+        self.assertEqual(api.launches, [])
+        self.assertFalse(api.request.exists())
+        self.assertTrue(self.session.state.exists())  # Manual recovery still available.
+
+    def test_receipt_after_request_is_queued_cancels_waiting_return_worker(self):
+        api = Api([(201, '')])
+        worker = self.worker(api)
+        self.session.finish('normal')
+        def shown_before_return(home, parent_pid, **kwargs):
+            self.assertTrue(api.request.exists())
+            self.session.acknowledge_return()
+            return toolbox_return._resume(home, parent_pid, api, self.clock.time, self.clock.sleep,
+                                          lambda pid: False, 1, 1, 1)
+        with patch.object(toolbox_return, 'resume', side_effect=shown_before_return):
+            worker.resume()
+        self.assertEqual(api.launches, [])
+        self.assertFalse(api.request.exists())
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name); root = self.base/'windows'; root.mkdir()

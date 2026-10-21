@@ -440,6 +440,9 @@ amx_live_resume() {
     msgbox AntiMicroX "$(amx_txt 'Restauration du raccourci incomplète. Sauvegarde conservée dans state/antimicrox-live.json :' 'Shortcut restoration incomplete. Backup retained in state/antimicrox-live.json:')\n$(cat /tmp/uwt-amx-live.log)"
     return 1
   fi
+  # A terminal close can bypass every menu action below. Acknowledge before
+  # showing the result so a delayed handoff cannot enqueue another return.
+  amx_live_cmd presented || return 1
   rom="$(amx_live_cmd field rom)"
   if [ -f "$WT_HOME/state/launch-game.request" ] &&
      [ "$(cat "$WT_HOME/state/launch-game.request")" = "$rom" ]; then
