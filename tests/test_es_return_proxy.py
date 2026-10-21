@@ -1,5 +1,7 @@
 """An isolated ES child of Ports preserves controller configuration and grouping."""
 from pathlib import Path
+import shlex
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -10,6 +12,43 @@ import es_return_proxy as proxy
 
 
 class ReturnProxyTests(unittest.TestCase):
+    def test_old_es_launching_group_then_child_opens_toolbox_only_once(self):
+        request = self.home/'state/resume-wsq.request'
+        request.parent.mkdir()
+        trace = self.base/'opened'
+        # Exercise the generated shell, with the same request consumption as
+        # the installed Ports entry before its xterm opens the result screen.
+        self.port.write_text('#!/bin/bash\n'
+                             'cat ' + shlex.quote(str(request)) + ' >> ' + shlex.quote(str(trace)) + '\n'
+                             'rm -- ' + shlex.quote(str(request)) + '\n')
+        _, launcher = self.create()
+        for payload in (b'antimicrox\n', b'reshade\n', b''):
+            with self.subTest(payload=payload):
+                trace.unlink(missing_ok=True)
+                request.write_bytes(payload)
+                first = subprocess.run(['bash', launcher], capture_output=True, text=True)
+                self.assertEqual(first.returncode, 0, first.stderr)
+                self.assertTrue(trace.exists())
+                self.assertEqual(trace.read_bytes(), payload)
+                self.assertFalse(request.exists())
+                # ES 43.1's second queued launch runs after Alt+F4 ends the
+                # first Ports launch. It must not reopen the finished screen.
+                trace.unlink()
+                second = subprocess.run(['bash', launcher], capture_output=True, text=True)
+                self.assertEqual(second.returncode, 0, second.stderr)
+                self.assertIn('duplicate launch skipped', second.stderr)
+                self.assertFalse(trace.exists())
+
+    def test_proxy_without_pending_request_does_not_call_native_port(self):
+        _, launcher = self.create()
+        result = subprocess.run(['bash', launcher], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, '')
+        self.assertIn('no pending return', result.stderr)
+        # Manual opening through Ports remains valid without a return marker.
+        manual = subprocess.run(['bash', str(self.port)], capture_output=True, text=True)
+        self.assertEqual(manual.stdout, 'toolbox\n')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name)

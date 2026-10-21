@@ -156,7 +156,17 @@ def ensure_proxy(home, config_directory=None, system_directory=None, port=None):
     document = ET.Element('systemList')
     document.append(ET.Comment(MARKER))
     document.append(system)
-    wrapper = ('#!/bin/bash\n# ' + MARKER + '\nexec /bin/bash ' + shlex.quote(str(port)) + '\n').encode()
+    # Older ES /launch queues the same child game once through its group and
+    # once through its own system. The first Ports run consumes this request;
+    # the queued duplicate must exit without opening another terminal. Keep
+    # this guard in the technical proxy, not in the normal manual Ports entry.
+    request = home / 'state/resume-wsq.request'
+    wrapper = ('#!/bin/bash\n# ' + MARKER + '\n'
+               'if [ ! -f ' + shlex.quote(str(request)) + ' ]; then\n'
+               '    echo "Toolbox return proxy: no pending return; duplicate launch skipped" >&2\n'
+               '    exit 0\n'
+               'fi\n'
+               'exec /bin/bash ' + shlex.quote(str(port)) + '\n').encode()
     atomic_owned(launcher, wrapper, 0o755)
     # Preserve exactly the installed Pad2Key actions. A separate marker avoids
     # adding nonstandard fields to evmapy's JSON format.
