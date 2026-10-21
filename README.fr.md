@@ -212,6 +212,8 @@ Les noms de DLL ou chargeurs non standard sont listés sans contrôle automatiqu
 
 ## Gestion .NET (expérimentale)
 
+**Outils et compatibilité → Winetricks / Wine Mono / .NET** fonctionne aussi hors création d’archive. Choisissez un jeu `.wine`, `.pc` ou `.wsquashfs`, puis installez des composants Winetricks courants ou saisis manuellement, ou ouvrez le diagnostic, l’installation et la restauration des sauvegardes Wine Mono / .NET. Le runner configuré pour le jeu est proposé ; vous pouvez en choisir un autre avant l’installation. Les changements vont directement dans un préfixe `.wine` ; les `.pc` et `.wsquashfs` utilisent la bouteille persistante du runner. L’archive reste inchangée, sans extraction complète du jeu ; supprimer la bouteille supprime ces composants. Lancez d’abord les jeux `.pc` une fois avec le runner choisi. Une création d’archive en attente est conservée.
+
 Le workflow de test distingue le Wine Mono partagé de Batocera/runners des installations dans le préfixe, propose le MSI Mono stable récent vérifié ou son remplacement par .NET Framework 4.8 Microsoft, et copie le préfixe de travail avant modification. Le dossier du jeu est exclu de la copie. Les états .NET mixtes ou non identifiés sont refusés. Voir le nouveau guide .NET hors ligne ; valider l’installation puis deux lancements avant de finaliser l’archive.
 
 Le test .NET utilise désormais une copie locale hors du dossier des ROMs, préserve les métadonnées de liens TKG et permet de restaurer une copie antérieure après un essai incomplet. Les installations réelles restent à valider sur Batocera.

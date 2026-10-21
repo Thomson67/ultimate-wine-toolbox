@@ -21,7 +21,7 @@ def private_file(path):
 
 
 def prepare(prefix, detach=True):
-    if prefix.is_symlink() or not prefix.is_dir() or prefix.suffix != '.wine':
+    if prefix.is_symlink() or not prefix.is_dir() or prefix.suffix.casefold() != '.wine':
         raise ValueError('Expected the working .wine prefix')
     root = prefix.resolve()
     drive = prefix / 'drive_c'
@@ -90,6 +90,12 @@ def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command
     if not verbs or (not wine_command and any(not re.fullmatch(r'[a-z][a-z0-9_]*', v) for v in verbs)):
         raise ValueError('Use Winetricks component names, without options or shell commands')
     source = launcher.read_text()
+    if os.environ.get('UWT_COMPONENT_ROM_NAME'):
+        source, count = re.subn(r'^ROMGAMENAME=.*$',
+                               'ROMGAMENAME="${UWT_COMPONENT_ROM_NAME}"', source,
+                               count=1, flags=re.MULTILINE)
+        if count != 1:
+            raise ValueError('Unsupported Batocera game settings selection')
     if mono_cleanup:
         if wine_command or not native_runner or verbs != ['remove_mono', 'dotnet48']:
             raise ValueError('Mono cleanup is restricted to the Microsoft .NET workflow')

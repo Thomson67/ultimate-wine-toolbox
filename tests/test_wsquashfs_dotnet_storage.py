@@ -91,6 +91,24 @@ class DotnetStorageTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             storage.stage(self.prefix, self.game, self.prefix / 'bad')
 
+    def test_mounted_prefix_publication_keeps_transaction_inside_mount(self):
+        staged = self.local_stage()
+        (staged / 'system.reg').write_text('new registry')
+        (staged / 'drive_c/windows/new.dll').write_text('installed')
+        original_mkdtemp = tempfile.mkdtemp
+        locations = []
+        def mkdtemp(*args, **kwargs):
+            locations.append(kwargs['dir'])
+            return original_mkdtemp(*args, **kwargs)
+        with patch.dict(os.environ, UWT_COMPONENT_MOUNTED_PREFIX=str(self.prefix)):
+            with patch.object(storage.tempfile, 'mkdtemp', side_effect=mkdtemp):
+                storage.publish(staged, self.prefix, self.game)
+        self.assertEqual(locations, [self.prefix])
+        self.assertEqual((self.prefix / 'system.reg').read_text(), 'new registry')
+        self.assertEqual((self.windows / 'new.dll').read_text(), 'installed')
+        self.assertEqual((self.game / 'game.exe').read_text(), 'GAME MUST STAY')
+        self.assertFalse(list(self.prefix.glob('.uwt-dotnet-commit-*')))
+
     def test_success_publishes_runtime_and_reanchors_tkg_links_without_game_copy(self):
         anchor, front = self.reparse_links()
         staged = self.local_stage()

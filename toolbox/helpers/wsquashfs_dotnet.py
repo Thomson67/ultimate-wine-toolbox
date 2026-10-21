@@ -11,8 +11,19 @@ import tempfile
 import urllib.request
 
 import wsquashfs_winetricks as tricks
-from wsquashfs_update import game_directory
+from wsquashfs_update import game_directory as update_game_directory
 from wsquashfs_dotnet_storage import stage, publish, filesystem, exchange_probe
+
+
+def game_directory(prefix):
+    # .pc content lives outside its Wine bottle. A nonexistent exclusion keeps
+    # the same snapshot/publication machinery without copying the game folder.
+    if os.environ.get('UWT_COMPONENT_PC_BOTTLE') == '1':
+        excluded = prefix / 'drive_c/.uwt-external-pc-game'
+        if excluded.exists() or excluded.is_symlink():
+            raise ValueError('Reserved external game exclusion is occupied')
+        return excluded
+    return update_game_directory(prefix)
 
 
 def microsoft_clr_files(prefix, win32=False):

@@ -80,7 +80,10 @@ def stage(prefix, game, work_root):
 
 def publish(source, prefix, game):
     """Prepare every copy before replacing entries; rollback on promotion errors."""
-    transaction = Path(tempfile.mkdtemp(prefix='.uwt-dotnet-commit-', dir=prefix.parent))
+    # A bind/OverlayFS prefix is a separate filesystem from its parent. Keep
+    # the reversible rename transaction inside that mount to avoid EXDEV.
+    mounted = os.environ.get('UWT_COMPONENT_MOUNTED_PREFIX') == str(prefix)
+    transaction = Path(tempfile.mkdtemp(prefix='.uwt-dotnet-commit-', dir=prefix if mounted else prefix.parent))
     incoming = transaction / 'incoming'
     previous = transaction / 'previous'
     operations = []
@@ -89,7 +92,7 @@ def publish(source, prefix, game):
         shutil.copytree(source, incoming, symlinks=True)
         relocate_links(incoming, source, prefix)
         previous.mkdir()
-        paths = {Path(p.name) for p in prefix.iterdir() if p.name != 'drive_c'}
+        paths = {Path(p.name) for p in prefix.iterdir() if p.name != 'drive_c' and p != transaction}
         paths.update(Path(p.name) for p in incoming.iterdir() if p.name != 'drive_c')
         paths.update(Path('drive_c') / p.name for p in (prefix / 'drive_c').iterdir() if p != game)
         paths.update(Path('drive_c') / p.name for p in (incoming / 'drive_c').iterdir())

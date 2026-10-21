@@ -1,8 +1,19 @@
 #!/bin/bash
 
+wsq_dotnet_command() {
+    local action="$1"
+    shift
+    if [ "${WSQ_COMPONENT_MODE:-}" = standalone ]; then
+        python3 "$WT_ROOT/helpers/winetricks_target.py" --home "$WT_HOME" \
+            --runner "$runner" "$prefix" dotnet "$action" "$@"
+    else
+        python3 "$WT_ROOT/helpers/wsquashfs_dotnet.py" "$action" "$prefix" "$@"
+    fi
+}
+
 wsq_dotnet_report() {
     local data
-    data="$(python3 "$WT_ROOT/helpers/wsquashfs_dotnet.py" inspect "$prefix" \
+    data="$(wsq_dotnet_command inspect \
         --runner-root "${BATOCERA_CUSTOM_WINE:-/userdata/system/wine/custom}/$runner")" || {
         msgbox "$(i18n dotnet_title)" "$data"
         return 1
@@ -62,7 +73,7 @@ wsq_dotnet_apply() {
     printf '\n===== .NET %s | %s | runner=%s | %s =====\n' \
         "$(date -Is)" "$action" "$runner" "$prefix" >> "$log"
     if ! wsq_dotnet_run "$(i18n dotnet_title)" "$(i18n dotnet_wait)" "$log" \
-        python3 "$WT_ROOT/helpers/wsquashfs_dotnet.py" "$action" "$prefix" \
+        wsq_dotnet_command "$action" \
         --backups "$WT_HOME/backups/dotnet" --cache "$WT_HOME/cache/wine-mono"; then
         msgbox "$(i18n dotnet_title)" "$(i18n dotnet_failed "$log" "$(wsq_update_log_detail "$log")")"
         return 1
@@ -73,7 +84,7 @@ wsq_dotnet_apply() {
 wsq_dotnet_restore_menu() {
     local choice name rows log="$WSQ_STATE_DIR/wsquashfs-dotnet.log"
     local -a items=()
-    rows="$(python3 "$WT_ROOT/helpers/wsquashfs_dotnet.py" backups "$prefix" \
+    rows="$(wsq_dotnet_command backups \
         --backups "$WT_HOME/backups/dotnet")" || return 1
     while IFS= read -r name; do
         [ -n "$name" ] || continue
@@ -88,7 +99,7 @@ wsq_dotnet_restore_menu() {
     yesno_default_no "$(i18n dotnet_restore)" "$(i18n dotnet_restore_confirm "$choice")" || return 1
     mkdir -p "$WSQ_STATE_DIR"
     if ! wsq_update_run "$(i18n dotnet_restore)" "$(i18n dotnet_wait)" "$log" \
-        python3 "$WT_ROOT/helpers/wsquashfs_dotnet.py" restore "$prefix" \
+        wsq_dotnet_command restore \
         --backups "$WT_HOME/backups/dotnet" --snapshot "$WT_HOME/backups/dotnet/$choice"; then
         msgbox "$(i18n dotnet_title)" "$(i18n dotnet_failed "$log" "$(wsq_update_log_detail "$log")")"
         return 1

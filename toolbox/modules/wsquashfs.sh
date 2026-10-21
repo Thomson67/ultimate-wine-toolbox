@@ -1361,8 +1361,15 @@ wsq_apply_executable_selection() {
 
 wsq_install_extra_winetricks() {
     local choice selected verb log pretty runner_label
-    local -a verbs=() items=()
-    [ -d "$prefix/drive_c/windows" ] || return 1
+    local context="${1:-creation}" confirm_key=wsq_winetricks_confirm failed_key=wsq_winetricks_failed
+    if [ "$context" = standalone ]; then
+        confirm_key=winetricks_tools_confirm
+        failed_key=winetricks_tools_failed
+    fi
+    local -a verbs=() items=() dotnet_option=()
+    if [ "$context" != standalone ]; then
+        [ -d "$prefix/drive_c/windows" ] || return 1
+    fi
     command -v batocera-wine >/dev/null 2>&1 || {
         msgbox "$(i18n wsq_winetricks_title)" "$(i18n wsq_winetricks_unavailable)"
         return 1
@@ -1371,9 +1378,10 @@ wsq_install_extra_winetricks() {
         msgbox "$(i18n wsq_winetricks_title)" "$(i18n wsq_winetricks_runner_missing "$runner")"
         return 1
     fi
+    [ "$context" = standalone ] || dotnet_option=(dotnet "$(i18n dotnet_title)")
     choice="$(menu_select "$(i18n wsq_winetricks_title)" "$(i18n wsq_winetricks_intro)" \
         common "$(i18n wsq_winetricks_common)" manual "$(i18n wsq_winetricks_manual)" \
-        dotnet "$(i18n dotnet_title)" \
+        "${dotnet_option[@]}" \
         back "$(i18n back)")" || return 1
     case "$choice" in
         common)
@@ -1412,15 +1420,20 @@ wsq_install_extra_winetricks() {
     runner_label="$runner"
     [ "$runner" != __SYSTEM__ ] || runner_label="$(i18n wsq_runner_system)"
     yesno_default_no "$(i18n wsq_winetricks_title)" \
-        "$(i18n wsq_winetricks_confirm "$pretty" "$(wsq_display_path "$prefix")" "$runner_label")" || return 1
+        "$(i18n "$confirm_key" "$pretty" "$(wsq_display_path "$prefix")" "$runner_label")" || return 1
     wsq_set_runner_config "$(basename "$prefix")" "$runner" || return 1
     mkdir -p "$WSQ_STATE_DIR"
     log="${WT_SESSION_LOG:-$WSQ_STATE_DIR/wsquashfs-winetricks.log}"
     wt_log "WSquashFS: Winetricks prefix=$prefix runner=$runner components=$pretty"
+    local -a installer=(python3 "$WT_ROOT/helpers/wsquashfs_winetricks.py" "$prefix")
+    if [ "$context" = standalone ]; then
+        installer=(python3 "$WT_ROOT/helpers/winetricks_target.py" --home "$WT_HOME" \
+            --runner "$runner" "$prefix" tricks)
+    fi
     if ! wsq_update_run "$(i18n wsq_winetricks_title)" "$(i18n wsq_winetricks_installing "$pretty")" \
-        "$log" python3 "$WT_ROOT/helpers/wsquashfs_winetricks.py" "$prefix" "${verbs[@]}"; then
+        "$log" "${installer[@]}" "${verbs[@]}"; then
         msgbox "$(i18n wsq_winetricks_title)" \
-            "$(i18n wsq_winetricks_failed "$log" "$(wsq_update_log_detail "$log")")"
+            "$(i18n "$failed_key" "$log" "$(wsq_update_log_detail "$log")")"
         return 1
     fi
     return 0

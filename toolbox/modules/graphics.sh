@@ -216,6 +216,7 @@ graphics_menu() {
             "2" "$(i18n dxvk_manager)" \
             "3" "$(i18n resh_title)" \
             "4" "AntiMicroX" \
+            "5" "$(i18n winetricks_tools_title)" \
             "0" "$(i18n back)")" || return
 
         case "$choice" in
@@ -223,6 +224,7 @@ graphics_menu() {
             2) dxvk_manager_menu ;;
             3) resh_menu ;;
             4) antimicrox_menu ;;
+            5) winetricks_game_menu ;;
             0|"") return ;;
         esac
     done

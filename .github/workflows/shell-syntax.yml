@@ -14,3 +14,5 @@ jobs:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y squashfs-tools python3-pil
       - run: python3 -m unittest discover -s tests -v
+      - name: Persistent component overlay integration
+        run: sudo env UWT_REQUIRE_MOUNT_TEST=1 python3 -m unittest discover -s tests -p test_winetricks_mount.py -v
