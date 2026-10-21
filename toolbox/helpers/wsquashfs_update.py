@@ -11,6 +11,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from attached_operation import cancellation_signals, defer_cancellation
 from mergerfs_move import MoveRecoveryRequired, rename_in_branches
 
 
@@ -780,10 +781,16 @@ def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
     backup = None
     if keep_archive_backup and not new_archive:
         backup = archive.with_name(archive.stem + '.backup-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + archive.suffix)
+        print(f'update_phase=backup time={datetime.now().isoformat(timespec="seconds")}', file=sys.stderr, flush=True)
         try:
             os.link(archive, backup)
         except OSError:
-            shutil.copy2(archive, backup)
+            print('update_backup_method=full_copy', file=sys.stderr, flush=True)
+            try:
+                shutil.copy2(archive, backup)
+            except BaseException:
+                backup.unlink(missing_ok=True)
+                raise
     original_save = Path(data['original_save'])
     changes = list(data.get('legacy_publish', []))
     if prepared_save is not None:
@@ -792,33 +799,35 @@ def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
         changes.append(dict(target=str(original_save), prepared=str(prepared_save)))
     swapped = []
     save_backup = None
-    try:
-        for change in changes:
-            target = Path(change['target']); prepared = Path(change['prepared'])
-            if target.is_symlink() or prepared.is_symlink() or not prepared.exists():
-                raise ValueError('invalid save transaction path')
-            if target.parent.resolve() != Path(data.get('save_root', original_save.parent)).resolve():
-                raise ValueError('save transaction escapes the save root')
-            backup_path = None
-            if target.exists():
-                backup_path = target.with_name(target.name + '.backup-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
-                target.rename(backup_path)
-            swapped.append((target, prepared, backup_path))
-            prepared.rename(target)
-            save_backup = backup_path or save_backup
-        if new_archive:
-            os.link(staged, archive)  # Atomic no-clobber publication of a new archive.
-        else:
-            os.replace(staged, archive)
-    except Exception:
-        for target, prepared, backup_path in reversed(swapped):
-            if target.exists():
-                target.rename(prepared)
-            if backup_path is not None:
-                backup_path.rename(target)
-        raise
-    data.update(committed=True, archive_backup=str(backup or ''), save_backup=str(save_backup or ''))
-    save_json(manifest, data)
+    print(f'update_phase=publication time={datetime.now().isoformat(timespec="seconds")}', file=sys.stderr, flush=True)
+    with defer_cancellation():
+        try:
+            for change in changes:
+                target = Path(change['target']); prepared = Path(change['prepared'])
+                if target.is_symlink() or prepared.is_symlink() or not prepared.exists():
+                    raise ValueError('invalid save transaction path')
+                if target.parent.resolve() != Path(data.get('save_root', original_save.parent)).resolve():
+                    raise ValueError('save transaction escapes the save root')
+                backup_path = None
+                if target.exists():
+                    backup_path = target.with_name(target.name + '.backup-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
+                    target.rename(backup_path)
+                swapped.append((target, prepared, backup_path))
+                prepared.rename(target)
+                save_backup = backup_path or save_backup
+            if new_archive:
+                os.link(staged, archive)  # Atomic no-clobber publication of a new archive.
+            else:
+                os.replace(staged, archive)
+        except Exception:
+            for target, prepared, backup_path in reversed(swapped):
+                if target.exists():
+                    target.rename(prepared)
+                if backup_path is not None:
+                    backup_path.rename(target)
+            raise
+        data.update(committed=True, archive_backup=str(backup or ''), save_backup=str(save_backup or ''))
+        save_json(manifest, data)
     if new_archive:
         try:
             staged.unlink()
@@ -935,4 +944,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    with cancellation_signals():
+        main()

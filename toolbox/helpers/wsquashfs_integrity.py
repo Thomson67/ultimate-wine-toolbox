@@ -8,24 +8,23 @@ import signal
 import subprocess
 import time
 
+from attached_operation import cancellation_signals, stop_group
+
 
 def run(command, log, cancel):
     with open(os.devnull, 'wb') as sink:
         process = subprocess.Popen(command, stdout=sink, stderr=log, start_new_session=True)
-        while process.poll() is None:
-            if cancel.exists():
-                try:
-                    os.killpg(process.pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-                try:
-                    process.wait(timeout=3)
-                except subprocess.TimeoutExpired:
-                    os.killpg(process.pid, signal.SIGKILL)
-                    process.wait()
-                return 130
-            time.sleep(0.1)
-        return process.returncode
+        try:
+            while process.poll() is None:
+                if cancel.exists():
+                    stop_group(process)
+                    return 130
+                time.sleep(0.1)
+            return process.returncode
+        finally:
+            if process.poll() is None:
+                stop_group(process)
+
 
 
 def check(archive, mode, log_path, cancel, executable='unsquashfs'):
@@ -71,7 +70,8 @@ def main():
     parser.add_argument('cancel', type=Path)
     args = parser.parse_args()
     try:
-        code = check(args.archive, args.mode, args.log, args.cancel)
+        with cancellation_signals():
+            code = check(args.archive, args.mode, args.log, args.cancel)
     except (OSError, subprocess.SubprocessError) as error:
         with args.log.open('a') as log:
             log.write(f'Check could not be completed: {error}\n')

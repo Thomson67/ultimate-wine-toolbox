@@ -114,6 +114,28 @@ class ArchiveEditTests(unittest.TestCase):
             self.edit.cleanup()
         self.assertTrue(self.edit.prefix.is_dir())
 
+    def test_closure_during_publication_finishes_commit_journal(self):
+        import os
+        import signal
+        from attached_operation import cancellation_signals
+        self.prepare()
+        replace = archive.os.replace
+
+        def close_after_rename(source, destination):
+            result = replace(source, destination)
+            if Path(destination) == self.original:
+                os.kill(os.getpid(), signal.SIGTERM)
+            return result
+
+        with patch.object(archive.subprocess, 'run', side_effect=self.command), patch.object(archive, 'check', return_value=0):
+            with patch.object(archive.os, 'replace', side_effect=close_after_rename):
+                with self.assertRaises(InterruptedError), cancellation_signals():
+                    self.edit.build(self.log)
+        self.assertEqual(self.original.read_bytes(), b'new checked archive')
+        self.assertEqual(self.edit.load()['phase'], 'committed')
+        self.edit.cleanup()
+        self.assertFalse(self.edit.workspace.exists())
+
     @unittest.skipUnless(shutil.which('mksquashfs') and shutil.which('unsquashfs'), 'squashfs-tools required')
     def test_real_extract_modify_verify_and_recompress_round_trip(self):
         source = self.root / 'source.wine'

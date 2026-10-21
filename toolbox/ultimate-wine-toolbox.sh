@@ -3,6 +3,8 @@ set -u
 
 WT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 export WT_ROOT
+read -r UWT_SESSION_OWNER _ < /proc/self/stat
+export UWT_SESSION_OWNER
 
 source "$WT_ROOT/lib/common.sh"
 source "$WT_ROOT/lib/github.sh"

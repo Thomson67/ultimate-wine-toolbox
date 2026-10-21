@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/operations.sh"
+
 BOTTLES_ROOT="/userdata/system/wine-bottles/windows"
 WINDOWS_ROMS_DIR="/userdata/roms/windows"
 WT_LOG_DIR="/userdata/system/logs/ultimate-wine-toolbox"
@@ -693,16 +695,18 @@ maintenance_choose_renamed_wsquashfs() {
 
 maintenance_run_progress() {
     local title="$1" body="$2"
+    local UWT_OPERATION_OWNER="${UWT_SESSION_OWNER:-}"
+    [ -n "$UWT_OPERATION_OWNER" ] || read -r UWT_OPERATION_OWNER _ < /proc/self/stat
     shift 2
 
     if have_dialog; then
         wt_clear_tty
 
         if [ -n "${WT_SESSION_LOG:-}" ]; then
-            "$@" 2>>"$WT_SESSION_LOG" | dialog --clear --no-shadow \
+            wt_operation_run "$@" 2>>"$WT_SESSION_LOG" | dialog --clear --no-shadow \
                 --title "$title" --gauge "$body" 10 92 0
         else
-            "$@" 2>/dev/null | dialog --clear --no-shadow \
+            wt_operation_run "$@" 2>/dev/null | dialog --clear --no-shadow \
                 --title "$title" --gauge "$body" 10 92 0
         fi
 
@@ -713,7 +717,7 @@ maintenance_run_progress() {
 
     clear
     printf '==== %s ====\n\n%b\n\n' "$title" "$body"
-    "$@"
+    wt_operation_run "$@"
 }
 
 maintenance_squash_wine() {
@@ -736,7 +740,7 @@ maintenance_squash_wine() {
     case "$validation" in
         ask-quick|ask-full)
             wsq_final_archive_check "$tmp" "${validation#ask-}" "$log" || validation_rc=$? ;;
-        quick) unsquashfs -s "$tmp" >/dev/null 2>&1 || validation_rc=$? ;;
+        quick) wt_operation_run unsquashfs -s "$tmp" >/dev/null 2>&1 || validation_rc=$? ;;
         *) validation_rc=1 ;;
     esac
     if [ "$validation_rc" -ne 0 ]; then
@@ -744,10 +748,12 @@ maintenance_squash_wine() {
         return 1
     fi
 
-    mv -f -- "$tmp" "$dest" || {
-        rm -f -- "$tmp" 2>/dev/null || true
+    if ! maintenance_run_progress "$(i18n squash_progress_title)" \
+        "$(i18n squash_finalizing_body "$(basename "$dest")")" \
+        python3 "$WT_ROOT/helpers/archive_publish.py" "$tmp" "$dest"; then
+        # Retain the completed output if the filesystem refuses atomic rename.
         return 1
-    }
+    fi
 
     return 0
 }

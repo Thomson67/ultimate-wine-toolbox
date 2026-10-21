@@ -1862,7 +1862,7 @@ wsq_integrity_check() {
         [ -n "$path" ] || continue
         idx=$((idx+1))
         start=$SECONDS
-        python3 "$WT_ROOT/helpers/wsquashfs_integrity.py" "$mode" "$path" "$log" "$cancel" &
+        wt_operation_run python3 "$WT_ROOT/helpers/wsquashfs_integrity.py" "$mode" "$path" "$log" "$cancel" &
         pid=$!
         while kill -0 "$pid" 2>/dev/null; do
             elapsed=$((SECONDS-start))

@@ -1,12 +1,16 @@
 #!/bin/bash
 
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/operations.sh"
+
 WSQ_UPDATE_HELPER="$WT_ROOT/helpers/wsquashfs_update.py"
 
 wsq_update_run() {
     local title="$1" body="$2" log="$3" pid start=$SECONDS rc
     have_dialog || printf '%b\n' "$body"
     shift 3
-    "$@" >> "$log" 2>&1 &
+    local UWT_OPERATION_OWNER="${UWT_SESSION_OWNER:-}"
+    [ -n "$UWT_OPERATION_OWNER" ] || read -r UWT_OPERATION_OWNER _ < /proc/self/stat
+    wt_operation_run "$@" >> "$log" 2>&1 &
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do
         if have_dialog; then
@@ -39,7 +43,7 @@ wsq_update_logged_command() {
         fi
         printf 'Extraction open files: soft=%s hard=%s (previous soft=%s)\n' \
             "$(ulimit -Sn)" "$(ulimit -Hn)" "$soft"
-        "$@"
+        wt_operation_run "$@"
     } 2>&1 | tee -a "$log"
     local -a statuses=("${PIPESTATUS[@]}")
     [ "${statuses[0]}" -eq 0 ] || return "${statuses[0]}"
@@ -616,9 +620,11 @@ wsq_resume_update() {
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
     fi
     [ ! -d "$prepared_save" ] || commit_args+=(--prepared-save "$prepared_save")
-    backup="$(python3 "$WSQ_UPDATE_HELPER" commit "$metadata" "$staged" "${commit_args[@]}" 2>> "$log")" || {
+    if ! wsq_update_run "$(i18n wsq_update_title)" "$(i18n wsq_update_finalizing)" "$log" \
+        python3 "$WSQ_UPDATE_HELPER" commit "$metadata" "$staged" "${commit_args[@]}"; then
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
-    }
+    fi
+    backup="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" archive_backup)" || return
     wsq_update_state phase committed archive_backup "$backup" || return
     else
         backup="$(wsq_state_value archive_backup)"

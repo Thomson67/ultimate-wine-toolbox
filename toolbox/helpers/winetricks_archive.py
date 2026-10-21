@@ -12,7 +12,9 @@ import shutil
 import stat
 import subprocess
 import tempfile
+from datetime import datetime
 
+from attached_operation import cancellation_signals, defer_cancellation
 from winetricks_target import ensure_idle
 from winetricks_games import valid_prefix
 from wsquashfs_integrity import check
@@ -113,10 +115,12 @@ class ArchiveEdit:
         data.update(phase='building', output=str(output))
         self.save(data)
         print(f'components_archive_build={output}', flush=True)
+        print(f'components_phase=compression time={datetime.now().isoformat(timespec="seconds")}', flush=True)
         subprocess.run(['mksquashfs', str(self.prefix), str(output), '-noappend', '-comp', 'zstd',
                         '-processors', str(min(4, os.cpu_count() or 1))], check=True)
         cancel = self.workspace / 'integrity.cancel'
         cancel.unlink(missing_ok=True)
+        print(f'components_phase=verification time={datetime.now().isoformat(timespec="seconds")}', flush=True)
         if check(output, 'full', log, cancel) != 0:
             raise ValueError('Full verification failed; original archive and working prefix are preserved')
         self.original_unchanged(data)
@@ -125,11 +129,15 @@ class ArchiveEdit:
         os.chmod(output, stat.S_IMODE(self.archive.stat().st_mode))
         # Fail rather than copy over the destination if a union filesystem
         # cannot perform this rename atomically. The checked output is kept.
-        os.replace(output, self.archive)
-        data.update(phase='committed', published=identity(self.archive))
-        self.save(data)
+        print(f'components_phase=publication time={datetime.now().isoformat(timespec="seconds")}', flush=True)
+        with defer_cancellation():
+            os.replace(output, self.archive)
+            data.update(phase='committed', published=identity(self.archive))
+            self.save(data)
         print(f'components_archive_replaced={self.archive}', flush=True)
+        print(f'components_phase=cleanup time={datetime.now().isoformat(timespec="seconds")}', flush=True)
         self.cleanup()
+        print(f'components_phase=done time={datetime.now().isoformat(timespec="seconds")}', flush=True)
 
     def cleanup(self):
         data = self.load()
@@ -152,7 +160,7 @@ def main():
         if args.action == 'path':
             print(edit.prefix)
             return 0
-        with edit.locked():
+        with edit.locked(), cancellation_signals():
             if args.action == 'prepare':
                 edit.prepare()
             elif args.action == 'cleanup':
