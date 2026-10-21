@@ -2,7 +2,7 @@ name: Source and regression checks
 
 on:
   push:
-    branches: [test, main, fix/antimicrox-return-ack]
+    branches: [test, main, fix/antimicrox-return-ack, fix/wsquashfs-per-game-matching]
     paths: ['**.sh', '**.py', 'VERSION', '.github/workflows/**']
   pull_request:
   workflow_dispatch:

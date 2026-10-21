@@ -45,14 +45,16 @@ def update_listing(directory, kind, preferred='', exclude=''):
     candidates = [entry for entry in candidates if entry.path != exclude]
     reference_names = {game_name(preferred)} if kind == 'sources' else names
     reference_names.discard('')
-    first_words = {name.split()[0] for name in reference_names}
-    use_first_word = not any(game_name(entry.name) in reference_names for entry in candidates)
+    candidate_names = {game_name(entry.name) for entry in candidates}
+    # An exact match only suppresses suggestions for that reference game.
+    # Unrelated exact matches must not hide other games' update folders.
+    first_words = {name.split()[0] for name in reference_names - candidate_names}
 
     def rank(entry):
         name = game_name(entry.name)
         if name and name in reference_names:
             return 0
-        if use_first_word and name and name.split()[0] in first_words:
+        if name and name.split()[0] in first_words:
             return 1
         return 2
 
