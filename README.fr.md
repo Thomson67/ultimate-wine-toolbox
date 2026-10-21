@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.6.4](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.6.4).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS reste en bêta.
+**Version stable : [v0.7.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.7.0).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS reste en bêta.
 
 ## Fonctionnalités
 
@@ -33,13 +33,16 @@ Créée par **Thomsonito**.
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
 
-## Nouveautés de la v0.6.4
+## Nouveautés de la v0.7.0
 
-- Correction d'une seconde ouverture de la Toolbox après fermeture de son écran de retour, notamment sous Batocera 43.1/Xorg.
-- Protection commune aux retours WSquashFS, ReShade et AntiMicroX.
-- Accusé de réception du retour AntiMicroX avant affichage du bilan, avec reprise manuelle conservée.
+- Winetricks / Wine Mono / .NET disponibles dans Outils et compatibilité, pour les jeux `.wine`, `.pc` et `.wsquashfs`.
+- Catalogue Winetricks complet, sélection multiple et composants déjà installés ignorés individuellement.
+- WSquashFS : choix entre installation dans la bouteille et extraction → installation → recompression.
+- Runners Batocera disponibles au choix et suggestions de jeux mieux classées lors des mises à jour.
+- Correction des anciens liens graphiques cassés, dont DirectX 12 et NVAPI.
+- Finalisation visible, arrêt des tâches avec la session et journaux limités à 20 par catégorie.
 
-[Notes de la v0.6.4](release-notes/v0.6.4.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
+[Notes de la v0.7.0](release-notes/v0.7.0.md) · [Historique des releases](https://github.com/Thomson67/ultimate-wine-toolbox/releases)
 
 ## Installation
 
