@@ -5,7 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'toolbox/helpers'))
@@ -14,6 +14,32 @@ import wsquashfs_dotnet as dotnet
 
 
 class ComponentTargetTests(unittest.TestCase):
+    def test_native_namespace_setup_does_not_require_an_external_command(self):
+        libc = Mock()
+        libc.unshare.return_value = 0
+        libc.mount.return_value = 0
+        with patch.object(target.ctypes, 'CDLL', return_value=libc), patch.object(target.subprocess, 'run') as run:
+            target.enter_private_namespace()
+        libc.unshare.assert_called_once_with(0x00020000)
+        libc.mount.assert_called_once_with(None, b'/', None, 0x44000, None)
+        run.assert_not_called()
+
+    def test_namespace_failure_does_not_change_propagation_or_start_mounting(self):
+        libc = Mock()
+        libc.unshare.return_value = -1
+        with patch.object(target.ctypes, 'CDLL', return_value=libc), patch.object(target.ctypes, 'get_errno', return_value=1):
+            with self.assertRaisesRegex(OSError, 'private mount namespace'):
+                target.enter_private_namespace()
+        libc.mount.assert_not_called()
+
+    def test_propagation_failure_stops_before_any_component_mount(self):
+        libc = Mock()
+        libc.unshare.return_value = 0
+        libc.mount.return_value = -1
+        with patch.object(target.ctypes, 'CDLL', return_value=libc), patch.object(target.ctypes, 'get_errno', return_value=1):
+            with self.assertRaisesRegex(OSError, 'propagation private'):
+                target.enter_private_namespace()
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)

@@ -2,6 +2,7 @@
 """Edit game components in Batocera's persistent prefix, without running a game."""
 import argparse
 from contextlib import contextmanager
+import ctypes
 import errno
 import fcntl
 import hashlib
@@ -17,6 +18,22 @@ from winetricks_games import valid_game
 from reshade_diagnostic import prefix_matches, targets
 from reshade_manager import runner_for
 import wsquashfs_winetricks as tricks
+
+
+def enter_private_namespace():
+    """Keep component mounts private without requiring the unshare executable."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.unshare.argtypes = [ctypes.c_int]
+    libc.unshare.restype = ctypes.c_int
+    if libc.unshare(0x00020000) != 0:  # CLONE_NEWNS
+        error = ctypes.get_errno()
+        raise OSError(error, 'Cannot create a private mount namespace: ' + os.strerror(error))
+    libc.mount.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p,
+                           ctypes.c_ulong, ctypes.c_void_p]
+    libc.mount.restype = ctypes.c_int
+    if libc.mount(None, b'/', None, 0x4000 | 0x40000, None) != 0:  # MS_REC | MS_PRIVATE
+        error = ctypes.get_errno()
+        raise OSError(error, 'Cannot make mount propagation private: ' + os.strerror(error))
 
 
 def bottle_for(rom, runner, launcher, bottles):
@@ -133,7 +150,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--home', type=Path, required=True)
     parser.add_argument('--runner', default='__SYSTEM__')
-    parser.add_argument('--private', action='store_true')
     parser.add_argument('rom', type=Path)
     parser.add_argument('mode', choices=('tricks', 'dotnet'))
     parser.add_argument('arguments', nargs=argparse.REMAINDER)
@@ -147,12 +163,10 @@ def main():
             rom, args.runner, launcher, Path('/userdata/system/wine-bottles/windows'))
         if bottle.is_symlink() or bottle.parent.is_symlink():
             raise ValueError('The persistent bottle must not be a symbolic link')
-        if rom.suffix.casefold() != '.wine' and not args.private:
+        if rom.suffix.casefold() != '.wine':
             # Mounts are isolated from EmulationStation and cleaned up by the
             # kernel even if this helper is killed. The upper bottle persists.
-            return subprocess.run(['unshare', '--mount', '--propagation', 'private',
-                                   sys.executable, str(Path(__file__).resolve()),
-                                   '--private', *sys.argv[1:]]).returncode
+            enter_private_namespace()
         ident = hashlib.sha256(os.fsencode(str(rom))).hexdigest()[:24]
         lockdir = args.home / 'state/component-locks'
         lockdir.mkdir(parents=True, exist_ok=True)
