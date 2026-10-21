@@ -53,6 +53,7 @@ winetricks_game_menu() {
                     original_archive="$prefix"
                     mkdir -p "$WT_LOG_DIR" || return 1
                     archive_log="$(mktemp "$WT_LOG_DIR/components-archive-XXXXXX.log")" || return 1
+                    wsq_integrity_rotate_logs "$archive_log" 'components-archive-*.log' || true
                     if ! wsq_update_run "$(i18n winetricks_tools_title)" "$(i18n winetricks_archive_extract)" "$archive_log" \
                         python3 "$WT_ROOT/helpers/winetricks_archive.py" --home "$WT_HOME" prepare "$original_archive"; then
                         msgbox "$(i18n winetricks_tools_title)" "$(i18n winetricks_archive_failed "$archive_log")"

@@ -1805,14 +1805,14 @@ wsq_final_archive_check() {
 }
 
 wsq_integrity_rotate_logs() {
-    python3 - "$WT_LOG_DIR" "$1" <<'PY'
+    python3 - "$WT_LOG_DIR" "$1" "${2:-wsquashfs-integrity-*.log}" <<'PY'
 from pathlib import Path
 import sys
 
 directory = Path(sys.argv[1])
 current = Path(sys.argv[2])
 logs = []
-for path in directory.glob("wsquashfs-integrity-*.log"):
+for path in directory.glob(sys.argv[3]):
     try:
         if path.is_file() and not path.is_symlink() and path != current:
             logs.append((path.stat().st_mtime_ns, path.name, path))
