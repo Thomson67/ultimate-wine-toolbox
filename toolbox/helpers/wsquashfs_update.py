@@ -48,17 +48,30 @@ def update_listing(directory, kind, preferred='', exclude=''):
     candidate_names = {game_name(entry.name) for entry in candidates}
     # An exact match only suppresses suggestions for that reference game.
     # Unrelated exact matches must not hide other games' update folders.
-    first_words = {name.split()[0] for name in reference_names - candidate_names}
+    fallback_prefixes = set()
+    for name in reference_names - candidate_names:
+        words = name.split()
+        fallback_prefixes.update(tuple(words[:length]) for length in range(1, len(words) + 1))
+
+    def similarity(entry):
+        words = game_name(entry.name).split()
+        score = 0
+        for length in range(1, len(words) + 1):
+            if tuple(words[:length]) not in fallback_prefixes:
+                break
+            score = length
+        return score
 
     def rank(entry):
         name = game_name(entry.name)
         if name and name in reference_names:
             return 0
-        if name and name.split()[0] in first_words:
+        if similarity(entry):
             return 1
         return 2
 
-    candidates.sort(key=lambda entry: (rank(entry), entry.name.casefold(), entry.path))
+    candidates.sort(key=lambda entry: (rank(entry), -similarity(entry) if rank(entry) == 1 else 0,
+                                       entry.name.casefold(), entry.path))
     return [(entry.path, rank(entry) < 2) for entry in candidates]
 
 

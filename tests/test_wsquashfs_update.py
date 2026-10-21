@@ -832,6 +832,31 @@ wsq_update_select_source
         rows = update.update_listing(roms, 'sources', 'Ravenswatch.wsquashfs')
         self.assertEqual([Path(path).name for path, matched in rows if matched], ['Ravenswatch'])
 
+    def test_suggestions_prefer_longest_shared_word_prefix(self):
+        roms = self.base / 'similarity'; roms.mkdir()
+        for name in ('Little Misfortune', 'Little Nightmares', 'Little Nightmares II',
+                     'Little Nightmares III', 'Littleness', 'Exact'):
+            (roms / (name + '.wsquashfs')).write_bytes(b'no archive inspection')
+        (roms / 'Little Nightmares III The Shores').mkdir()
+        (roms / 'Exact').mkdir()
+        for kind in ('archives', 'bases'):
+            with self.subTest(kind=kind):
+                rows = update.update_listing(roms, kind)
+                self.assertEqual([Path(path).name for path, matched in rows if matched],
+                                 ['Exact.wsquashfs', 'Little Nightmares III.wsquashfs',
+                                  'Little Nightmares II.wsquashfs', 'Little Nightmares.wsquashfs',
+                                  'Little Misfortune.wsquashfs'])
+        for name in ('little NIGHTMARES iii Extra', 'Little Misfortune Update',
+                     'Little Nightmares II Update'):
+            (roms / name).mkdir()
+        rows = update.update_listing(roms, 'sources', 'Little Nightmares III[Wine].wsquashfs')
+        self.assertEqual([Path(path).name for path, matched in rows if matched],
+                         ['little NIGHTMARES iii Extra', 'Little Nightmares III The Shores',
+                          'Little Nightmares II Update', 'Little Misfortune Update'])
+        (roms / 'Little Nightmares III').mkdir()
+        rows = update.update_listing(roms, 'sources', 'Little Nightmares III.wsquashfs')
+        self.assertEqual([Path(path).name for path, matched in rows if matched], ['Little Nightmares III'])
+
     def test_update_moves_game_without_copying_and_retains_bak_until_validation(self):
         inode = (self.source / 'new.exe').stat().st_ino
         (self.game / 'start.bat').write_text('original launcher')
