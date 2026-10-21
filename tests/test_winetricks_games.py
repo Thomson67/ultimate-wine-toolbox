@@ -96,3 +96,42 @@ winetricks_game_menu
         result = subprocess.run(['bash', '-uc', script], capture_output=True, text=True,
                                 env=dict(os.environ, WT_ROOT=str(ROOT / 'toolbox'), TEST_ROOT=str(self.root)))
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_archive_mode_routes_working_prefix_and_original_game_settings_then_rebuilds(self):
+        roms = self.root / 'roms'; roms.mkdir()
+        rom = roms / 'Archive.wsquashfs'; rom.write_bytes(b'original')
+        script = r'''
+source "$WT_ROOT/modules/winetricks.sh"
+WSQ_WINDOWS_DIR="$TEST_ROOT/roms"
+WSQ_CONF="$TEST_ROOT/conf"
+WT_LOG_DIR="$TEST_ROOT/logs"
+menu_select() {
+    local step=0
+    [ ! -f "$TEST_ROOT/step" ] || read -r step < "$TEST_ROOT/step"
+    echo "$((step+1))" > "$TEST_ROOT/step"
+    case "$step" in 0) echo 1 ;; 1) echo archive ;; 2) echo components ;;
+        3) echo dotnet ;; 4) echo rebuild ;; *) echo back ;; esac
+}
+python3() {
+    if [[ "$1" = */winetricks_archive.py ]]; then
+        local action arg
+        for arg in "$@"; do case "$arg" in path|prepare|build) action="$arg" ;; esac; done
+        if [ "$action" = path ]; then echo "$TEST_ROOT/extracted.wine";
+        else echo "$action" >> "$TEST_ROOT/archive-actions"; fi
+    else command python3 "$@"; fi
+}
+i18n() { printf '%s' "$1"; }
+msgbox() { :; }
+yesno_default_no() { return 0; }
+wsq_update_run() { shift 3; "$@"; }
+wsq_install_extra_winetricks() { printf '%s|%s\n' "$prefix" "$WSQ_COMPONENT_SETTINGS_ROM" >> "$TEST_ROOT/calls"; }
+wsq_dotnet_menu() { printf '%s|%s\n' "$prefix" "$WSQ_COMPONENT_SETTINGS_ROM" >> "$TEST_ROOT/calls"; }
+winetricks_game_menu
+'''
+        result = subprocess.run(['bash', '-uc', script], capture_output=True, text=True,
+                                env=dict(os.environ, WT_ROOT=str(ROOT / 'toolbox'), WT_HOME=str(self.root), TEST_ROOT=str(self.root)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.root / 'calls').read_text().splitlines(),
+                         [f'{self.root}/extracted.wine|Archive.wsquashfs'] * 2)
+        self.assertEqual((self.root / 'archive-actions').read_text().splitlines(), ['prepare', 'build'])
+        self.assertEqual(rom.read_bytes(), b'original')

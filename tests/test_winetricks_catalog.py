@@ -1,5 +1,6 @@
 """Dynamic catalogue and mixed selections with already installed components."""
 import json
+import io
 import os
 from pathlib import Path
 import subprocess
@@ -88,6 +89,31 @@ class CatalogueTests(unittest.TestCase):
         (custom / 'winetricks').write_text('custom script')
         self.assertEqual(catalogue.script_for(self.root, '__SYSTEM__', system, custom), system / 'winetricks')
         self.assertEqual(catalogue.script_for(self.root, 'GE-Proton-UMU', system, custom), custom / 'winetricks')
+
+    def test_official_generated_list_is_cached_without_executing_a_script(self):
+        with patch.object(catalogue.urllib.request, 'urlopen', return_value=io.BytesIO(LISTING.encode())) as download:
+            with patch.object(catalogue.subprocess, 'run') as run:
+                first = catalogue.official_catalogue(self.root)
+                self.assertEqual(catalogue.official_catalogue(self.root), first)
+        self.assertEqual(download.call_count, 1)
+        run.assert_not_called()
+
+    def test_offline_catalogue_uses_previous_successful_list(self):
+        cached = self.root / 'cache/winetricks/catalog.json'
+        cached.parent.mkdir(parents=True)
+        entries = catalogue.parse_catalog(LISTING)
+        cached.write_text(json.dumps(dict(source='official-all', fetched=0, entries=entries)))
+        with patch.object(catalogue.urllib.request, 'urlopen', side_effect=OSError('offline')):
+            self.assertEqual(catalogue.official_catalogue(self.root), entries)
+
+    def test_missing_online_list_falls_back_to_local_list_all(self):
+        with patch.object(sys, 'argv', ['catalogue', '--home', str(self.root)]):
+            with patch.object(catalogue, 'official_catalogue', side_effect=OSError('offline')):
+                with patch.object(catalogue, 'script_for', return_value=Path('/installed/winetricks')):
+                    with patch.object(catalogue, 'catalogue', return_value=catalogue.parse_catalog(LISTING)) as fallback:
+                        with patch.object(sys, 'stdout', new=io.StringIO()):
+                            self.assertEqual(catalogue.main(), 0)
+        fallback.assert_called_once_with(Path('/installed/winetricks'), self.root / 'cache/winetricks/catalog.json')
 
     def test_installed_components_skipped_but_settings_reapplied(self):
         (self.prefix / 'winetricks.log').write_text('corefonts\nrenderer=gl\nwin10\n')

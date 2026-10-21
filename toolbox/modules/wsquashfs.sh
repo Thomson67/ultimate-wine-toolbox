@@ -1441,14 +1441,14 @@ wsq_install_extra_winetricks() {
     [ "$runner" != __SYSTEM__ ] || runner_label="$(i18n wsq_runner_system)"
     yesno_default_no "$(i18n wsq_winetricks_title)" \
         "$(i18n "$confirm_key" "$pretty" "$(wsq_display_path "$prefix")" "$runner_label")" || return 1
-    wsq_set_runner_config "$(basename "$prefix")" "$runner" || return 1
+    wsq_set_runner_config "${WSQ_COMPONENT_SETTINGS_ROM:-$(basename "$prefix")}" "$runner" || return 1
     mkdir -p "$WSQ_STATE_DIR"
     log="${WT_SESSION_LOG:-$WSQ_STATE_DIR/wsquashfs-winetricks.log}"
     wt_log "WSquashFS: Winetricks prefix=$prefix runner=$runner components=$pretty"
     local -a installer=(python3 "$WT_ROOT/helpers/wsquashfs_winetricks.py" "$prefix")
     if [ "$context" = standalone ]; then
         installer=(python3 "$WT_ROOT/helpers/winetricks_target.py" --home "$WT_HOME" \
-            --runner "$runner" "$prefix" tricks)
+            --runner "$runner" --settings-rom-name "${WSQ_COMPONENT_SETTINGS_ROM:-}" "$prefix" tricks)
     fi
     if ! wsq_update_run "$(i18n wsq_winetricks_title)" "$(i18n wsq_winetricks_installing "$pretty")" \
         "$log" "${installer[@]}" "${verbs[@]}"; then

@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 
 VERB = re.compile(r'[a-z0-9][a-z0-9_+-]*(?:=[a-zA-Z0-9_.+-]*)?')
@@ -95,6 +96,37 @@ def catalogue(script, cache):
     return entries
 
 
+def official_catalogue(home):
+    """Use upstream's generated list first; keep list-all as offline fallback."""
+    cache = home / 'cache/winetricks/catalog.json'
+    previous = None
+    try:
+        previous = json.loads(cache.read_text())
+        if previous.get('source') == 'official-all' and time.time() - previous.get('fetched', 0) < 86400:
+            return previous['entries']
+    except (OSError, ValueError, KeyError):
+        pass
+    try:
+        request = urllib.request.Request(
+            'https://raw.githubusercontent.com/Winetricks/winetricks/master/files/verbs/all.txt',
+            headers={'User-Agent': 'Ultimate-Wine-Toolbox'})
+        with urllib.request.urlopen(request, timeout=15) as response:
+            entries = parse_catalog(response.read().decode('utf-8'))
+    except (OSError, ValueError):
+        if previous and previous.get('entries'):
+            return previous['entries']
+        raise
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix='.catalog-', dir=cache.parent)
+    try:
+        with os.fdopen(fd, 'w') as output:
+            json.dump(dict(source='official-all', fetched=time.time(), entries=entries), output)
+        os.replace(name, cache)
+    finally:
+        Path(name).unlink(missing_ok=True)
+    return entries
+
+
 def pending_components(prefix, verbs, catalog=None):
     try:
         installed = set((prefix / 'winetricks.log').read_text().split())
@@ -124,8 +156,12 @@ def main():
     parser.add_argument('--runner', default='__SYSTEM__')
     args = parser.parse_args()
     try:
-        script = script_for(args.home, args.runner)
-        for item in catalogue(script, args.home / 'cache/winetricks/catalog.json'):
+        try:
+            entries = official_catalogue(args.home)
+        except (OSError, ValueError):
+            script = script_for(args.home, args.runner)
+            entries = catalogue(script, args.home / 'cache/winetricks/catalog.json')
+        for item in entries:
             print(item['verb'] + '\t[' + item['category'] + '] ' + item['description'])
         return 0
     except (OSError, ValueError, subprocess.SubprocessError) as error:

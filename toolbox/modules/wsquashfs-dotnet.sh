@@ -5,7 +5,7 @@ wsq_dotnet_command() {
     shift
     if [ "${WSQ_COMPONENT_MODE:-}" = standalone ]; then
         python3 "$WT_ROOT/helpers/winetricks_target.py" --home "$WT_HOME" \
-            --runner "$runner" "$prefix" dotnet "$action" "$@"
+            --runner "$runner" --settings-rom-name "${WSQ_COMPONENT_SETTINGS_ROM:-}" "$prefix" dotnet "$action" "$@"
     else
         python3 "$WT_ROOT/helpers/wsquashfs_dotnet.py" "$action" "$prefix" "$@"
     fi
@@ -68,7 +68,7 @@ wsq_dotnet_apply() {
     local action="$1" log="$WSQ_STATE_DIR/wsquashfs-dotnet.log"
     yesno_default_no "$(i18n dotnet_title)" \
         "$(i18n dotnet_confirm "$(i18n "dotnet_$action")" "$runner" "$WT_HOME/backups/dotnet")" || return 1
-    wsq_set_runner_config "$(basename "$prefix")" "$runner" || return 1
+    wsq_set_runner_config "${WSQ_COMPONENT_SETTINGS_ROM:-$(basename "$prefix")}" "$runner" || return 1
     mkdir -p "$WSQ_STATE_DIR"
     printf '\n===== .NET %s | %s | runner=%s | %s =====\n' \
         "$(date -Is)" "$action" "$runner" "$prefix" >> "$log"

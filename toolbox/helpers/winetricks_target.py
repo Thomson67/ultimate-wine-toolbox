@@ -117,12 +117,12 @@ def mounted_prefix(rom, bottle, runtime):
             shutil.rmtree(work)
 
 
-def invoke(prefix, mode, arguments, rom, launcher):
+def invoke(prefix, mode, arguments, rom, launcher, settings_rom_name=''):
     # Preserve the original ROM's per-game settings through staging and bind
     # mounts. Settings still come from Batocera; no system launcher is edited.
     previous = {key: os.environ.get(key) for key in (
         'UWT_COMPONENT_ROM_NAME', 'UWT_COMPONENT_PC_BOTTLE', 'UWT_COMPONENT_MOUNTED_PREFIX')}
-    os.environ['UWT_COMPONENT_ROM_NAME'] = rom.name
+    os.environ['UWT_COMPONENT_ROM_NAME'] = settings_rom_name or rom.name
     if rom.suffix.casefold() == '.pc':
         os.environ['UWT_COMPONENT_PC_BOTTLE'] = '1'
     else:
@@ -150,6 +150,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--home', type=Path, required=True)
     parser.add_argument('--runner', default='__SYSTEM__')
+    parser.add_argument('--settings-rom-name', default='')
     parser.add_argument('rom', type=Path)
     parser.add_argument('mode', choices=('tricks', 'dotnet'))
     parser.add_argument('arguments', nargs=argparse.REMAINDER)
@@ -177,7 +178,7 @@ def main():
                 raise ValueError('Another component operation is already using this game')
             ensure_idle(rom, bottle)
             if rom.suffix.casefold() == '.wine':
-                return invoke(rom, args.mode, args.arguments, rom, launcher)
+                return invoke(rom, args.mode, args.arguments, rom, launcher, args.settings_rom_name)
             bottle_id = hashlib.sha256(os.fsencode(str(bottle))).hexdigest()[:24]
             with mounted_prefix(rom, bottle, args.home / 'runtime/component-mounts' / bottle_id) as prefix:
                 return invoke(prefix, args.mode, args.arguments, rom, launcher)
