@@ -1,5 +1,6 @@
 #!/bin/bash
 BATOCERA_CUSTOM_WINE="/userdata/system/wine/custom"
+BATOCERA_SYSTEM_WINE="/usr/wine"
 BATOCERA_PORTS="/userdata/roms/ports"
 
 batocera_version() {

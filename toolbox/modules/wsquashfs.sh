@@ -372,27 +372,54 @@ wsq_write_autorun() {
     mv -f -- "$tmp" "$prefix/autorun.cmd"
 }
 
+wsq_runner_root() {
+    local selected="$1"
+    if [ "$selected" = __SYSTEM__ ]; then
+        selected="$(python3 "$WT_ROOT/helpers/winetricks_games.py" runner "$prefix" --conf "$WSQ_CONF")" || return 1
+    fi
+    case "$selected" in
+        __SYSTEM__|lutris) selected=wine-tkg ;;
+        proton) selected=wine-proton ;;
+    esac
+    case "$selected" in
+        wine-tkg|wine-proton) printf '%s/%s' "${BATOCERA_SYSTEM_WINE:-/usr/wine}" "$selected" ;;
+        *) printf '%s/%s' "${BATOCERA_CUSTOM_WINE:-/userdata/system/wine/custom}" "$selected" ;;
+    esac
+}
+
+wsq_runner_usable() {
+    local root="$1"
+    [ -x "$root/bin/wine" ] || [ -x "$root/lib/wine/i386-unix/wine" ]
+}
+
 wsq_runner_candidates() {
     local path name
     printf 'system\t__SYSTEM__\n'
-    if [ -d "/userdata/system/wine/custom" ]; then
+    for name in wine-tkg wine-proton; do
+        path="${BATOCERA_SYSTEM_WINE:-/usr/wine}/$name"
+        if [ -d "$path" ] && wsq_runner_usable "$path"; then
+            printf 'builtin\t%s\n' "$name"
+        fi
+    done
+    if [ -d "${BATOCERA_CUSTOM_WINE:-/userdata/system/wine/custom}" ]; then
         while IFS= read -r path; do
             [ -d "$path" ] || continue
             name="$(basename "$path")"
+            case "$name" in wine-tkg|wine-proton) continue ;; esac
             case "$name" in
                 *-UMU|*-umu) printf 'umu\t%s\n' "$name" ;;
             esac
-        done < <(find /userdata/system/wine/custom -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | sort -f)
+        done < <(find "${BATOCERA_CUSTOM_WINE:-/userdata/system/wine/custom}" -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | sort -f)
     fi
-    if [ -d "/userdata/system/wine/custom" ]; then
+    if [ -d "${BATOCERA_CUSTOM_WINE:-/userdata/system/wine/custom}" ]; then
         while IFS= read -r path; do
             [ -d "$path" ] || continue
             name="$(basename "$path")"
             case "$name" in
-                *-UMU|*-umu) continue ;;
+                wine-tkg|wine-proton|*-UMU|*-umu) continue ;;
             esac
             printf 'custom\t%s\n' "$name"
-        done < <(find /userdata/system/wine/custom -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | sort -f)
+        done < <(find "${BATOCERA_CUSTOM_WINE:-/userdata/system/wine/custom}" -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | sort -f)
     fi
 }
 
@@ -403,6 +430,8 @@ wsq_select_runner() {
         [ -n "$name" ] || continue
         if [ "$name" = "__SYSTEM__" ]; then
             label="$(i18n wsq_runner_system)"
+        elif [ "$kind" = builtin ]; then
+            label="$name  [Batocera]"
         elif [ "$kind" = "umu" ]; then
             label="$name  [UMU]"
         else
@@ -1375,7 +1404,7 @@ wsq_install_extra_winetricks() {
         msgbox "$(i18n wsq_winetricks_title)" "$(i18n wsq_winetricks_unavailable)"
         return 1
     }
-    if [ "$runner" != __SYSTEM__ ] && [ ! -x "$BATOCERA_CUSTOM_WINE/$runner/bin/wine" ]; then
+    if [ "$runner" != __SYSTEM__ ] && ! wsq_runner_usable "$(wsq_runner_root "$runner")"; then
         msgbox "$(i18n wsq_winetricks_title)" "$(i18n wsq_winetricks_runner_missing "$runner")"
         return 1
     fi

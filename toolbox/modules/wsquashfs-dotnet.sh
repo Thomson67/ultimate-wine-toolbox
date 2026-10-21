@@ -12,9 +12,10 @@ wsq_dotnet_command() {
 }
 
 wsq_dotnet_report() {
-    local data
+    local data runner_root
+    runner_root="$(wsq_runner_root "$runner")" || return 1
     data="$(wsq_dotnet_command inspect \
-        --runner-root "${BATOCERA_CUSTOM_WINE:-/userdata/system/wine/custom}/$runner")" || {
+        --runner-root "$runner_root")" || {
         msgbox "$(i18n dotnet_title)" "$data"
         return 1
     }
