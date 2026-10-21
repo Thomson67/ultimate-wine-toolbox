@@ -170,3 +170,63 @@ shift 3
             self.dll(name, 'x86_64-windows', 0x8664)
         tricks.prepare(self.prefix, runner_root=self.runner)
         self.assertFalse(link.is_symlink())
+
+    def test_nvapi_and_optical_flow_use_matching_runner_components(self):
+        for name, folder, dxvk, arch, machine in (
+                ('nvapi.dll', 'syswow64', 'x32', 'i386-windows', 0x14c),
+                ('nvapi64.dll', 'system32', 'x64', 'x86_64-windows', 0x8664),
+                ('nvofapi64.dll', 'system32', 'x64', 'x86_64-windows', 0x8664)):
+            with self.subTest(name=name):
+                link = self.link(name, folder, dxvk)
+                source = self.dll(name, arch, machine, 'files/lib/wine/nvapi')
+                original = source.read_bytes()
+                tricks.prepare(self.prefix, runner_root=self.runner)
+                self.assertFalse(link.is_symlink())
+                self.assertEqual(link.read_bytes(), original)
+                self.assertFalse(os.path.samefile(link, source))
+                self.assertEqual(source.read_bytes(), original)
+
+    def test_nvapi_can_use_valid_stock_bundle_when_runner_has_no_nvapi(self):
+        link = self.link('nvapi64.dll')
+        stock = self.root / 'stock-dxvk'
+        source = self.dll('nvapi64.dll', 'x86_64-windows', 0x8664)
+        target = stock / 'x64/nvapi64.dll'
+        target.parent.mkdir(parents=True)
+        source.rename(target)
+        with patch.object(tricks, 'DXVK_ROOTS', (Path('/userdata/system/wine/dxvk'), stock)):
+            tricks.prepare(self.prefix, runner_root=self.runner)
+        self.assertEqual(link.read_bytes(), target.read_bytes())
+        self.assertFalse(os.path.samefile(link, target))
+
+    def test_absent_optional_nvapi_links_do_not_block_winetricks(self):
+        links = [self.link('nvapi.dll', 'syswow64', 'x32'),
+                 self.link('nvapi64.dll'), self.link('nvofapi64.dll')]
+        tricks.prepare(self.prefix, detach=False, runner_root=self.runner)
+        self.assertTrue(all(path.is_symlink() for path in links))
+        tricks.prepare(self.prefix, runner_root=self.runner)
+        self.assertTrue(all(not path.is_symlink() and not path.exists() for path in links))
+
+    def test_absent_nvapi_removal_waits_for_complete_preflight(self):
+        link = self.link('nvapi64.dll')
+        (self.windows / 'system32/unknown.dll').symlink_to('/missing/unknown.dll')
+        with self.assertRaises(ValueError):
+            tricks.prepare(self.prefix, runner_root=self.runner)
+        self.assertTrue(link.is_symlink())
+
+    def test_nvapi_wrong_folder_or_unknown_target_remains_refused(self):
+        link = self.link('nvapi64.dll', 'syswow64', 'x32')
+        with self.assertRaises(ValueError):
+            tricks.prepare(self.prefix, runner_root=self.runner)
+        self.assertTrue(link.is_symlink())
+        link.unlink()
+        link.symlink_to('/unrecognized/nvapi64.dll')
+        with self.assertRaises(ValueError):
+            tricks.prepare(self.prefix, runner_root=self.runner)
+        self.assertTrue(link.is_symlink())
+
+    def test_nvapi_rejects_wrong_pe_architecture(self):
+        link = self.link('nvapi64.dll')
+        self.dll('nvapi64.dll', 'x86_64-windows', 0x14c, 'lib/nvapi')
+        tricks.prepare(self.prefix, runner_root=self.runner)
+        self.assertFalse(link.exists())
+        self.assertFalse(link.is_symlink())

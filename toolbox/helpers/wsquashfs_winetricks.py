@@ -34,11 +34,15 @@ def selected_runner_root(prefix):
     return Path('/userdata/system/wine/custom') / runner
 
 
-def legacy_dxvk_source(path, prefix, runner_root=None):
-    """Recover only recognized stale DXVK links from the chosen runner."""
+NVAPI_DLLS = {'nvapi.dll': 0x14c, 'nvapi64.dll': 0x8664, 'nvofapi64.dll': 0x8664}
+DXVK_ROOTS = (Path('/userdata/system/wine/dxvk'), Path('/usr/wine/dxvk'))
+
+
+def legacy_dxvk_link(path, prefix):
+    """Recognize Batocera graphics links, including optional NVAPI DLLs."""
     relative = path.relative_to(prefix / 'drive_c/windows')
     dll = path.name.casefold()
-    if len(relative.parts) != 2 or dll not in ('d3d8.dll', 'd3d9.dll', 'd3d10.dll', 'd3d10_1.dll', 'd3d10core.dll', 'd3d11.dll', 'd3d12.dll', 'd3d12core.dll', 'dxgi.dll', 'ddraw.dll'):
+    if len(relative.parts) != 2 or dll not in ('d3d8.dll', 'd3d9.dll', 'd3d10.dll', 'd3d10_1.dll', 'd3d10core.dll', 'd3d11.dll', 'd3d12.dll', 'd3d12core.dll', 'dxgi.dll', 'ddraw.dll', *NVAPI_DLLS):
         return None
     folder = relative.parts[0].casefold()
     if folder == 'syswow64':
@@ -52,14 +56,33 @@ def legacy_dxvk_source(path, prefix, runner_root=None):
     else:
         return None
     target = Path(os.readlink(path))
-    if target not in (Path(base) / dxvk / path.name for base in
-                      ('/userdata/system/wine/dxvk', '/usr/wine/dxvk')):
+    if target not in (base / dxvk / path.name for base in DXVK_ROOTS):
         return None
+    if dll in NVAPI_DLLS and machine != NVAPI_DLLS[dll]:
+        return None
+    return dll, arch, dxvk, machine
+
+
+def legacy_dxvk_source(path, prefix, runner_root=None):
+    """Find a same-architecture replacement for a recognized graphics link."""
+    recognized = legacy_dxvk_link(path, prefix)
+    if recognized is None:
+        return None
+    dll, arch, dxvk, machine = recognized
     runner = (runner_root or selected_runner_root(prefix)).resolve()
-    for layout in ('lib/wine', 'files/lib/wine', 'dist/lib/wine'):
-        candidate = runner / layout / arch / dll
+    candidates = [(runner / layout / arch / dll, runner)
+                  for layout in ('lib/wine', 'files/lib/wine', 'dist/lib/wine')]
+    if dll in NVAPI_DLLS:
+        # NVAPI is an optional native component, usually outside Wine's DLL tree.
+        for base in (runner, runner / 'files', runner / 'dist'):
+            for lib in ('lib/wine', 'lib64/wine', 'lib32/wine', 'lib', 'lib64', 'lib32'):
+                for component in ('nvapi', 'dxvk-nvapi'):
+                    candidates.extend((directory / dll, runner) for directory in
+                                      (base / lib / component / arch, base / lib / component))
+        candidates.extend((base / dxvk / dll, base.resolve()) for base in DXVK_ROOTS)
+    for candidate, allowed_root in candidates:
         resolved = candidate.resolve()
-        if not resolved.is_relative_to(runner) or not candidate.is_file():
+        if not resolved.is_relative_to(allowed_root) or not candidate.is_file():
             continue
         with candidate.open('rb') as stream:
             header = stream.read(64)
@@ -116,11 +139,19 @@ def prepare(prefix, detach=True, runner_root=None):
     # Detach shared files atomically before an installer can overwrite them.
     # User profiles and save links are deliberately outside this traversal.
     copies = []
+    obsolete_nvapi = []
     for path in files:
         if path.is_symlink() and not path.resolve().is_relative_to(root):
             if not path.is_file():
                 source = legacy_dxvk_source(path, prefix, runner_root)
                 if source is None:
+                    recognized = legacy_dxvk_link(path, prefix)
+                    if recognized is not None and recognized[0] in NVAPI_DLLS:
+                        # Batocera links optional NVAPI/Optical Flow DLLs even when
+                        # the installed bundle lacks them. A broken link supplies
+                        # no implementation; do not block unrelated installers.
+                        obsolete_nvapi.append(path)
+                        continue
                     raise ValueError(f'Missing shared Windows file: {path} -> {os.readlink(path)}')
                 copies.append((path, source))
             else:
@@ -128,6 +159,10 @@ def prepare(prefix, detach=True, runner_root=None):
         elif path.is_file() and path.stat().st_nlink > 1:
             copies.append((path, None))
     if detach:
+        for path in obsolete_nvapi:
+            target = os.readlink(path)
+            path.unlink()
+            print(f'winetricks_obsolete_nvapi_link_removed={path} target={target}', flush=True)
         for path, source in copies:
             private_file(path, source)
             if source is not None:
