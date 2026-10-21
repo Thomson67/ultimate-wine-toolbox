@@ -1,4 +1,4 @@
-"""Repair stale DXVK DX10 links using private, same-architecture runner DLLs."""
+"""Repair stale DXVK links using private, same-architecture runner DLLs."""
 import os
 from pathlib import Path
 import sys
@@ -12,7 +12,7 @@ import wsquashfs_winetricks as tricks
 from winetricks_games import configured_runner
 
 
-class LegacyDX10Tests(unittest.TestCase):
+class LegacyDXVKTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
@@ -38,7 +38,7 @@ class LegacyDX10Tests(unittest.TestCase):
         return link
 
     def test_repairs_both_architectures_without_changing_runner_files(self):
-        for name in ('d3d10core.dll', 'd3d10.dll', 'd3d10_1.dll'):
+        for name in ('d3d8.dll', 'd3d9.dll', 'd3d10.dll', 'd3d10_1.dll', 'd3d10core.dll', 'd3d11.dll', 'dxgi.dll'):
             for folder, dxvk, arch, machine in (
                     ('system32', 'x64', 'x86_64-windows', 0x8664),
                     ('syswow64', 'x32', 'i386-windows', 0x14c)):
@@ -116,9 +116,9 @@ class LegacyDX10Tests(unittest.TestCase):
             tricks.prepare(self.prefix, runner_root=self.runner)
         self.assertTrue(link.is_symlink())
 
-    def test_install_skips_vcrun_repairs_dll_then_runs_corefonts(self):
-        link = self.link()
-        self.dll('d3d10core.dll', 'x86_64-windows', 0x8664)
+    def test_install_skips_vcrun_repairs_d3d11_then_runs_corefonts(self):
+        link = self.link('d3d11.dll')
+        self.dll('d3d11.dll', 'x86_64-windows', 0x8664)
         (self.prefix / 'winetricks.log').write_text('vcrun2022\n')
         launcher = self.root / 'batocera-wine'
         launcher.write_text('''#!/bin/bash
@@ -139,8 +139,26 @@ shift 3
     def test_existing_external_dll_is_kept_instead_of_using_runner_replacement(self):
         shared = self.root / 'existing-dxvk.dll'; shared.write_bytes(b'original working DXVK')
         link = self.windows / 'system32/d3d10core.dll'; link.symlink_to(shared)
-        with patch.object(tricks, 'legacy_dx10_source') as fallback:
+        with patch.object(tricks, 'legacy_dxvk_source') as fallback:
             tricks.prepare(self.prefix)
         fallback.assert_not_called()
         self.assertFalse(link.is_symlink())
         self.assertEqual(link.read_bytes(), b'original working DXVK')
+
+    def test_unknown_dll_in_dxvk_directory_is_not_accepted(self):
+        link = self.link('other.dll')
+        self.dll('other.dll', 'x86_64-windows', 0x8664)
+        with self.assertRaises(ValueError):
+            tricks.prepare(self.prefix, runner_root=self.runner)
+        self.assertTrue(link.is_symlink())
+
+    def test_entire_dxvk_batch_is_repaired_together(self):
+        links = []
+        for name in ('d3d8.dll', 'd3d9.dll', 'd3d10.dll', 'd3d10_1.dll', 'd3d10core.dll', 'd3d11.dll', 'dxgi.dll'):
+            for folder, dxvk, arch, machine in (
+                    ('system32', 'x64', 'x86_64-windows', 0x8664),
+                    ('syswow64', 'x32', 'i386-windows', 0x14c)):
+                links.append(self.link(name, folder, dxvk))
+                self.dll(name, arch, machine)
+        tricks.prepare(self.prefix, runner_root=self.runner)
+        self.assertTrue(all(path.is_file() and not path.is_symlink() for path in links))

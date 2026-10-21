@@ -34,11 +34,11 @@ def selected_runner_root(prefix):
     return Path('/userdata/system/wine/custom') / runner
 
 
-def legacy_dx10_source(path, prefix, runner_root=None):
-    """Recover only recognized stale DXVK DX10 links from the chosen runner."""
+def legacy_dxvk_source(path, prefix, runner_root=None):
+    """Recover only recognized stale DXVK links from the chosen runner."""
     relative = path.relative_to(prefix / 'drive_c/windows')
     dll = path.name.casefold()
-    if len(relative.parts) != 2 or dll not in ('d3d10.dll', 'd3d10_1.dll', 'd3d10core.dll'):
+    if len(relative.parts) != 2 or dll not in ('d3d8.dll', 'd3d9.dll', 'd3d10.dll', 'd3d10_1.dll', 'd3d10core.dll', 'd3d11.dll', 'dxgi.dll'):
         return None
     folder = relative.parts[0].casefold()
     if folder == 'syswow64':
@@ -118,7 +118,7 @@ def prepare(prefix, detach=True, runner_root=None):
     for path in files:
         if path.is_symlink() and not path.resolve().is_relative_to(root):
             if not path.is_file():
-                source = legacy_dx10_source(path, prefix, runner_root)
+                source = legacy_dxvk_source(path, prefix, runner_root)
                 if source is None:
                     raise ValueError(f'Missing shared Windows file: {path} -> {os.readlink(path)}')
                 copies.append((path, source))
@@ -130,7 +130,7 @@ def prepare(prefix, detach=True, runner_root=None):
         for path, source in copies:
             private_file(path, source)
             if source is not None:
-                print(f'winetricks_legacy_dx10_repaired={path} source={source}', flush=True)
+                print(f'winetricks_legacy_dxvk_repaired={path} source={source}', flush=True)
 
 
 def installer_file_limit():
