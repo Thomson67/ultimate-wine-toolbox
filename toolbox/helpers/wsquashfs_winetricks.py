@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import tempfile
 
+from winetricks_catalog import valid_verb, pending_components
+
 
 def private_file(path):
     fd, temporary = tempfile.mkstemp(prefix='.uwt-winetricks-', dir=path.parent)
@@ -87,8 +89,13 @@ def installer_file_limit():
 
 
 def install(prefix, verbs, launcher=Path('/usr/bin/batocera-wine'), wine_command=False, native_runner=False, unattended=True, mono_cleanup=False):
-    if not verbs or (not wine_command and any(not re.fullmatch(r'[a-z][a-z0-9_]*', v) for v in verbs)):
+    if not verbs or (not wine_command and any(not valid_verb(v) for v in verbs)):
         raise ValueError('Use Winetricks component names, without options or shell commands')
+    if not wine_command and not mono_cleanup:
+        verbs = pending_components(prefix, verbs, os.environ.get('UWT_WINETRICKS_CATALOG'))
+        if not verbs:
+            print('winetricks_all_selected_components_already_installed=1', flush=True)
+            return 0
     source = launcher.read_text()
     if os.environ.get('UWT_COMPONENT_ROM_NAME'):
         source, count = re.subn(r'^ROMGAMENAME=.*$',

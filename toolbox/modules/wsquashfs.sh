@@ -1360,7 +1360,8 @@ wsq_apply_executable_selection() {
 }
 
 wsq_install_extra_winetricks() {
-    local choice selected verb log pretty runner_label
+    local choice selected verb log pretty runner_label catalog_rows description
+    local -x UWT_WINETRICKS_CATALOG="$WT_HOME/cache/winetricks/catalog.json"
     local context="${1:-creation}" confirm_key=wsq_winetricks_confirm failed_key=wsq_winetricks_failed
     if [ "$context" = standalone ]; then
         confirm_key=winetricks_tools_confirm
@@ -1380,7 +1381,7 @@ wsq_install_extra_winetricks() {
     fi
     [ "$context" = standalone ] || dotnet_option=(dotnet "$(i18n dotnet_title)")
     choice="$(menu_select "$(i18n wsq_winetricks_title)" "$(i18n wsq_winetricks_intro)" \
-        common "$(i18n wsq_winetricks_common)" manual "$(i18n wsq_winetricks_manual)" \
+        common "$(i18n wsq_winetricks_common)" catalogue "$(i18n wsq_winetricks_catalogue)" \
         "${dotnet_option[@]}" \
         back "$(i18n back)")" || return 1
     case "$choice" in
@@ -1395,22 +1396,41 @@ wsq_install_extra_winetricks() {
                 [ -z "$verb" ] || verbs+=("$verb")
             done <<< "$selected" ;;
         dotnet) wsq_dotnet_menu; return $? ;;
-        manual)
-            selected="$(input_text "$(i18n wsq_winetricks_title)" \
-                "$(i18n wsq_winetricks_manual_prompt)" "")" || return 1
-            read -r -a verbs <<< "$selected" ;;
+        catalogue)
+            mkdir -p "$WSQ_STATE_DIR" || return 1
+            log="$WSQ_STATE_DIR/winetricks-catalog.log"
+            if have_dialog; then
+                dialog --no-shadow --title "$(i18n wsq_winetricks_title)" --infobox \
+                    "$(i18n wsq_winetricks_catalogue_loading)" 8 90
+            else
+                printf '%s\n' "$(i18n wsq_winetricks_catalogue_loading)" >&2
+            fi
+            if ! catalog_rows="$(python3 "$WT_ROOT/helpers/winetricks_catalog.py" \
+                --home "$WT_HOME" --runner "$runner" 2> "$log")"; then
+                msgbox "$(i18n wsq_winetricks_title)" \
+                    "$(i18n wsq_winetricks_catalogue_failed "$log" "$(wsq_update_log_detail "$log")")"
+                return 1
+            fi
+            while IFS=$'\t' read -r verb description; do
+                [ -z "$verb" ] || items+=("$verb" "$description" off)
+            done <<< "$catalog_rows"
+            selected="$(checklist_select "$(i18n wsq_winetricks_catalogue)" \
+                "$(i18n wsq_winetricks_catalogue_prompt)" "${items[@]}")" || return 1
+            while IFS= read -r verb; do
+                [ -z "$verb" ] || verbs+=("$verb")
+            done <<< "$selected" ;;
         *) return 1 ;;
     esac
     [ "${#verbs[@]}" -gt 0 ] || return 1
     for verb in "${verbs[@]}"; do
-        [[ "$verb" =~ ^[a-z][a-z0-9_]*$ ]] || {
+        [[ "$verb" =~ ^[a-z0-9][a-z0-9_+-]*(=[a-zA-Z0-9_.+-]*)?$ ]] || {
             msgbox "$(i18n wsq_winetricks_title)" "$(i18n wsq_winetricks_invalid)"
             return 1
         }
     done
     pretty="${verbs[*]}"
-    # Keep .NET replacement on the diagnosed, backed-up path even when typed
-    # manually. Other manual Winetricks components retain their usual handling.
+    # Keep .NET replacement on the diagnosed, backed-up path even when chosen
+    # from the complete catalogue.
     for verb in "${verbs[@]}"; do
         if [ "$verb" = dotnet48 ]; then
             msgbox "$(i18n dotnet_title)" "$(i18n dotnet_manual)"
