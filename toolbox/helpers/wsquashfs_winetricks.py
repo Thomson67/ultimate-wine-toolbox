@@ -38,7 +38,7 @@ def legacy_dxvk_source(path, prefix, runner_root=None):
     """Recover only recognized stale DXVK links from the chosen runner."""
     relative = path.relative_to(prefix / 'drive_c/windows')
     dll = path.name.casefold()
-    if len(relative.parts) != 2 or dll not in ('d3d8.dll', 'd3d9.dll', 'd3d10.dll', 'd3d10_1.dll', 'd3d10core.dll', 'd3d11.dll', 'dxgi.dll'):
+    if len(relative.parts) != 2 or dll not in ('d3d8.dll', 'd3d9.dll', 'd3d10.dll', 'd3d10_1.dll', 'd3d10core.dll', 'd3d11.dll', 'd3d12.dll', 'd3d12core.dll', 'dxgi.dll', 'ddraw.dll'):
         return None
     folder = relative.parts[0].casefold()
     if folder == 'syswow64':
@@ -52,7 +52,8 @@ def legacy_dxvk_source(path, prefix, runner_root=None):
     else:
         return None
     target = Path(os.readlink(path))
-    if target != Path('/userdata/system/wine/dxvk') / dxvk / path.name:
+    if target not in (Path(base) / dxvk / path.name for base in
+                      ('/userdata/system/wine/dxvk', '/usr/wine/dxvk')):
         return None
     runner = (runner_root or selected_runner_root(prefix)).resolve()
     for layout in ('lib/wine', 'files/lib/wine', 'dist/lib/wine'):

@@ -38,7 +38,7 @@ class LegacyDXVKTests(unittest.TestCase):
         return link
 
     def test_repairs_both_architectures_without_changing_runner_files(self):
-        for name in ('d3d8.dll', 'd3d9.dll', 'd3d10.dll', 'd3d10_1.dll', 'd3d10core.dll', 'd3d11.dll', 'dxgi.dll'):
+        for name in ('d3d8.dll', 'd3d9.dll', 'd3d10.dll', 'd3d10_1.dll', 'd3d10core.dll', 'd3d11.dll', 'd3d12.dll', 'd3d12core.dll', 'dxgi.dll', 'ddraw.dll'):
             for folder, dxvk, arch, machine in (
                     ('system32', 'x64', 'x86_64-windows', 0x8664),
                     ('syswow64', 'x32', 'i386-windows', 0x14c)):
@@ -154,7 +154,7 @@ shift 3
 
     def test_entire_dxvk_batch_is_repaired_together(self):
         links = []
-        for name in ('d3d8.dll', 'd3d9.dll', 'd3d10.dll', 'd3d10_1.dll', 'd3d10core.dll', 'd3d11.dll', 'dxgi.dll'):
+        for name in ('d3d8.dll', 'd3d9.dll', 'd3d10.dll', 'd3d10_1.dll', 'd3d10core.dll', 'd3d11.dll', 'd3d12.dll', 'd3d12core.dll', 'dxgi.dll', 'ddraw.dll'):
             for folder, dxvk, arch, machine in (
                     ('system32', 'x64', 'x86_64-windows', 0x8664),
                     ('syswow64', 'x32', 'i386-windows', 0x14c)):
@@ -162,3 +162,11 @@ shift 3
                 self.dll(name, arch, machine)
         tricks.prepare(self.prefix, runner_root=self.runner)
         self.assertTrue(all(path.is_file() and not path.is_symlink() for path in links))
+
+    def test_stock_dxvk_path_also_supports_directx12(self):
+        for name in ('d3d12.dll', 'd3d12core.dll'):
+            link = self.windows / 'system32' / name
+            link.symlink_to('/usr/wine/dxvk/x64/' + name)
+            self.dll(name, 'x86_64-windows', 0x8664)
+        tricks.prepare(self.prefix, runner_root=self.runner)
+        self.assertFalse(link.is_symlink())
