@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - VERSION
+      - README.md
+      - README.fr.md
+      - release-notes/**
       - .github/workflows/release.yml
   workflow_dispatch:
 

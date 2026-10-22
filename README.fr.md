@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.7.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.7.0).** Le workflow de mise à jour WSquashFS est validé ; la création WSquashFS reste en bêta.
+**Version stable : [v0.7.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.7.0).**
 
 ## Fonctionnalités
 
@@ -24,7 +24,7 @@ Créée par **Thomsonito**.
 - maintenance des Wine bottles et détection des bottles orphelines
 - diagnostics des runners et de DXVK / VKD3D
 - outils de squash / unsquash `.wine` / `.wsquashfs`
-- création guidée de WSquashFS (bêta) et mise à jour d’archives existantes, tests du jeu et reprise des opérations
+- création guidée de WSquashFS et mise à jour d’archives existantes, tests du jeu et reprise des opérations
 - sauvegardes externalisées via `SAVEDIR` / `SAVEFILES` et composants Winetricks supplémentaires pendant la création
 - suppression de jeux Windows
 - analyse, nettoyage, organisation et restauration sécurisés de `batocera.conf`
@@ -130,7 +130,7 @@ Les runners Wine/UMU, les jeux, les sauvegardes et les Wine bottles sont conserv
 
 Le menu principal **Documentation** regroupe les guides de création et de mise à jour WSquashFS, les modèles de préfixes Wine, MangoHud, DXVK/VKD3D et ReShade. Les textes sont disponibles hors ligne, en français et en anglais, dans un lecteur avec défilement. Le guide des modèles précise leur rôle, leur emplacement et le format attendu.
 
-## Créer un WSquashFS (bêta)
+## Créer un WSquashFS
 
 Le workflow guidé prépare un préfixe Wine, demande l’exécutable **avant le premier lancement**, puis permet de tester le jeu, les manettes et les sauvegardes. Au retour, **Vérifier / modifier le choix de l’exécutable du jeu** permet de corriger le lancement. Après un échec, **Installer des Winetricks supplémentaires** ajoute des composants dans le préfixe de travail, avec le runner choisi, avant de retester.
 

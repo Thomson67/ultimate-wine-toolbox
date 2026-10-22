@@ -6,7 +6,7 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.7.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.7.0).** WSquashFS updates are validated; WSquashFS creation remains in beta.
+**Stable version: [v0.7.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.7.0).**
 
 ## Features
 
@@ -24,7 +24,7 @@ Created by **Thomsonito**.
 - Wine bottle maintenance and orphan detection
 - runner and DXVK / VKD3D diagnostics
 - `.wine` / `.wsquashfs` squash and unsquash tools
-- guided WSquashFS creation (beta) and existing-archive updates, game testing and operation resume
+- guided WSquashFS creation and existing-archive updates, game testing and operation resume
 - external saves through `SAVEDIR` / `SAVEFILES` and additional Winetricks components during creation
 - Windows game removal
 - safe `batocera.conf` analysis, cleanup, organization and restore
@@ -128,7 +128,7 @@ Wine/UMU runners, games, saves and bottles are preserved.
 
 The main **Documentation** menu groups WSquashFS creation and update guides, Wine prefix templates, MangoHud, DXVK/VKD3D and ReShade. Guides are available offline in French and English in a scrolling reader. The templates guide explains their purpose, location and expected format.
 
-## Create a WSquashFS (beta)
+## Create a WSquashFS
 
 The guided workflow prepares a Wine prefix and selects the executable **before the first launch**, then lets you test the game, controller and saves. On return, **Review / change the game executable** can correct the launch choice. After a failure, **Install additional Winetricks** adds components to the working prefix with the selected runner before another test.
 
