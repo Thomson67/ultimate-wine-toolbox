@@ -692,7 +692,7 @@ wsq_retry_pending() {
         metadata="$(wsq_state_value metadata)"; log="$(wsq_state_value update_log)"
         prepared="$WSQ_SAVE_ROOT/$(basename "$prefix" .wine).validated"
         python3 "$WSQ_UPDATE_HELPER" retest "$metadata" --prepared-save "$prepared" >> "$log" 2>&1 || {
-            msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"
+            msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"
             return 1
         }
         wsq_update_state phase testing save_review_ready 0 save_ready_kind "" || return 1

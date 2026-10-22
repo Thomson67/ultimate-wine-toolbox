@@ -101,10 +101,13 @@ def run(command, owner):
                 print('operation_interrupted=Toolbox session closed; stopping owned workers',
                       file=sys.stderr, flush=True)
                 stop_group(process)
+                print('operation_exit_code=130', file=sys.stderr, flush=True)
                 return 130
             result = process.poll()
             if result is not None:
-                return result if result >= 0 else 128 - result
+                result = result if result >= 0 else 128 - result
+                print(f'operation_exit_code={result}', file=sys.stderr, flush=True)
+                return result
             time.sleep(0.05)
     finally:
         if process is not None and process.poll() is None:

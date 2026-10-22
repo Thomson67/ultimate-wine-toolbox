@@ -12,3 +12,14 @@ wt_operation_run() {
             --owner "$owner" -- "$@"
     fi
 }
+
+# Preserve the worker status as well as failures while writing the report.
+# stdout remains available to dialog's progress gauge.
+wt_operation_logged_command() {
+    local log="$1"
+    shift
+    wt_operation_run "$@" 2>&1 | tee -a "$log"
+    local -a statuses=("${PIPESTATUS[@]}")
+    [ "${statuses[0]}" -eq 0 ] || return "${statuses[0]}"
+    return "${statuses[1]}"
+}

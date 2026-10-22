@@ -720,17 +720,30 @@ maintenance_run_progress() {
     wt_operation_run "$@"
 }
 
+maintenance_logged_progress() {
+    local title="$1" body="$2" log="$3" phase="$4" rc=0 start=$SECONDS
+    shift 4
+    {
+        printf '\n[%s] %s started\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$phase"
+        printf 'Command:'; printf ' %q' "$@"; printf '\n'
+    } >> "$log" || return 1
+    maintenance_run_progress "$title" "$body" wt_operation_logged_command "$log" "$@" || rc=$?
+    printf '\n%s exit=%s elapsed_seconds=%s\n' "$phase" "$rc" "$((SECONDS-start))" >> "$log" || return 1
+    return "$rc"
+}
+
 maintenance_squash_wine() {
     local source="$1" dest="$2" validation="${3:-quick}" log="${4:-}" tmp
+    local operation_log="${4:-${WT_SESSION_LOG:-/dev/null}}"
     [ -d "$source" ] || return 1
     [ -n "$dest" ] || return 1
 
     tmp="$dest.tmp-$$"
     rm -f -- "$tmp" 2>/dev/null || true
 
-    if ! maintenance_run_progress \
+    if ! maintenance_logged_progress \
         "$(i18n squash_progress_title)" \
-        "$(i18n squash_progress_body "$(basename "$source")")" \
+        "$(i18n squash_progress_body "$(basename "$source")")" "$operation_log" Compression \
         mksquashfs "$source" "$tmp" -comp zstd -percentage; then
         rm -f -- "$tmp" 2>/dev/null || true
         return 1
@@ -740,7 +753,7 @@ maintenance_squash_wine() {
     case "$validation" in
         ask-quick|ask-full)
             wsq_final_archive_check "$tmp" "${validation#ask-}" "$log" || validation_rc=$? ;;
-        quick) wt_operation_run unsquashfs -s "$tmp" >/dev/null 2>&1 || validation_rc=$? ;;
+        quick) wt_operation_logged_command "$operation_log" unsquashfs -s "$tmp" >/dev/null || validation_rc=$? ;;
         *) validation_rc=1 ;;
     esac
     if [ "$validation_rc" -ne 0 ]; then
@@ -748,8 +761,8 @@ maintenance_squash_wine() {
         return 1
     fi
 
-    if ! maintenance_run_progress "$(i18n squash_progress_title)" \
-        "$(i18n squash_finalizing_body "$(basename "$dest")")" \
+    if ! maintenance_logged_progress "$(i18n squash_progress_title)" \
+        "$(i18n squash_finalizing_body "$(basename "$dest")")" "$operation_log" Publication \
         python3 "$WT_ROOT/helpers/archive_publish.py" "$tmp" "$dest"; then
         # Retain the completed output if the filesystem refuses atomic rename.
         return 1

@@ -65,12 +65,22 @@ wsq_update_extract() {
 wsq_update_log_detail() {
     python3 - "$1" <<'PY'
 from pathlib import Path
+import re
 import sys
 try:
     lines = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace").splitlines()
 except OSError:
     lines = []
-detail = "\n".join(lines[-4:])[-700:]
+# Focus on the last attempt: do not surface an older failure after a retry.
+starts = [i for i, line in enumerate(lines)
+          if line.startswith('operation_started=') or re.match(r'^\[.*\] .* started$', line)]
+if starts:
+    lines = lines[starts[-1]:]
+lines = [line for line in lines if line.strip() and not line.strip().isdigit()]
+errors = [line for line in lines if re.search(
+    r'error|fatal|failed|no space|cannot|not enough|killed|interrupt|erreur|impossible|'
+    r'exit(?:_code)?[=:]\s*[1-9][0-9]*', line, re.I)]
+detail = "\n".join(errors[-3:] if errors else lines[-4:])[-900:]
 print(detail or "No additional detail was written to the log.")
 PY
 }
@@ -370,7 +380,7 @@ wsq_update_new() {
     phase=extracting
     [ "$reuse_prefix" -eq 0 ] || phase=preparing
     wsq_begin_update_state "$prefix" "$game_name" "$snapshot" "$archive" "$metadata" "$log" "$phase" || {
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
     }
     if [ "$reuse_prefix" -eq 0 ]; then
     if ! wsq_update_extract "$(i18n wsq_update_title)" "$(i18n wsq_update_extract)" "$log" \
@@ -391,16 +401,16 @@ wsq_update_new() {
     fi
     # Keep the autorun executable selected in the archive; review or change it after testing.
     exe_rel="$(python3 "$WSQ_UPDATE_HELPER" exe "$prefix")" || {
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
     }
     wsq_update_state phase configuring || return
     runner="$(python3 "$WSQ_UPDATE_HELPER" config "$WSQ_CONF" "$(basename "$archive")" "$(basename "$prefix")" \
         --backup-dir "$WSQ_STATE_DIR/config-backups" --preserve-existing 2>> "$log")" || {
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
     }
     wsq_update_state phase snapshotting || return
     python3 "$WSQ_HELPER" snapshot "$prefix" "$snapshot" >> "$log" 2>&1 || {
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
     }
     wsq_save_state "$prefix" "$game_name" "$snapshot" "$exe_rel" "$runner" || return
     wsq_update_state mode update archive "$archive" metadata "$metadata" phase testing update_log "$log" || return
@@ -541,7 +551,7 @@ wsq_resume_update() {
         # wsq_resume_build has already validated the game launch at this point.
         if ! wsq_update_run "$(i18n wsq_update_title)" "$(i18n wsq_update_remove_old)" "$log" \
             python3 "$WSQ_UPDATE_HELPER" finish-game "$metadata"; then
-            msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
+            msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
         fi
         while true; do
             wsq_update_review_save "$metadata" || return $?
@@ -593,7 +603,7 @@ wsq_resume_update() {
         if [ "$skip_save_prepare" -eq 0 ] && [ "$save_kind" != legacy ]; then
         python3 "$WSQ_UPDATE_HELPER" restore-scripts "$metadata" >> "$log" 2>&1 || return
         python3 "$WSQ_UPDATE_HELPER" detach "$prefix" "$test_save" >> "$log" 2>&1 || {
-            msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
+            msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
         }
         if [ "$save_kind" = existing ]; then
             python3 "$WSQ_UPDATE_HELPER" restore-custom "$metadata" >> "$log" 2>&1 || return
@@ -617,12 +627,12 @@ wsq_resume_update() {
     [ "$final_mode" != replace ] || commit_args+=(--replace)
     staged="$archive.update-tmp-$$"
     if ! maintenance_squash_wine "$prefix" "$staged" ask-full "$log"; then
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
     fi
     [ ! -d "$prepared_save" ] || commit_args+=(--prepared-save "$prepared_save")
     if ! wsq_update_run "$(i18n wsq_update_title)" "$(i18n wsq_update_finalizing)" "$log" \
         python3 "$WSQ_UPDATE_HELPER" commit "$metadata" "$staged" "${commit_args[@]}"; then
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
     fi
     backup="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" archive_backup)" || return
     wsq_update_state phase committed archive_backup "$backup" || return
@@ -637,7 +647,7 @@ wsq_resume_update() {
     save_backup="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" save_backup)"
     [ -z "$save_backup" ] || msgbox "$(i18n wsq_save_title)" "$(i18n wsq_save_backup_done "$save_backup")"
     python3 "$WSQ_UPDATE_HELPER" cleanup-test "$metadata" >> "$log" 2>&1 || {
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log")"; return
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
     }
     python3 "$WSQ_UPDATE_HELPER" cleanup-bottles \
         "/userdata/system/wine-bottles/windows" "$(basename "$archive")" >> "$log" 2>&1 || {
