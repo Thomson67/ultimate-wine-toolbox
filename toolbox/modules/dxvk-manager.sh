@@ -463,6 +463,7 @@ dxvk_set_game_bundle() {
 dxvk_list_games() {
     [ -d "/userdata/roms/windows" ] || return 0
     find "/userdata/roms/windows" -mindepth 1 \
+        \( -name '.*' -prune \) -o \
         \( -type d \( -iname '*.pc' -o -iname '*.wine' \) -print -prune \) -o \
         \( -type f \( -iname '*.wsquashfs' -o -iname '*.wtgz' \) -print \) \
         2>/dev/null | sort -f

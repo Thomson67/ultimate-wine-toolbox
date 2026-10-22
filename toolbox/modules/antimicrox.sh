@@ -58,7 +58,7 @@ amx_choose_game() {
   local rom selected id
   while IFS= read -r rom; do
     [ -n "$rom" ] || continue
-    case "$rom" in *.wine|*.pc|*.wsquashfs) ;; *) continue ;; esac
+    case "${rom,,}" in *.wine|*.pc|*.wsquashfs) ;; *) continue ;; esac
     games+=("$rom")
     options+=("${#games[@]}" "$(basename "$rom")")
   done < <(mangohud_list_games)
@@ -173,7 +173,7 @@ amx_convert_pad2key() {
   case "$choice" in
     game)
       rom="$(amx_choose_game)" || return 0
-      case "$rom" in *.wine|*.pc) source="$rom/padto.keys" ;; *) source="$rom.keys" ;; esac
+      case "${rom,,}" in *.wine|*.pc) source="$rom/padto.keys" ;; *) source="$rom.keys" ;; esac
       [ -f "$source" ] || source="$(amx_pad2key_source "$(dirname "$rom")/")" || return 0 ;;
     file) source="$(amx_pad2key_source)" || return 0 ;;
     *) return 0 ;;

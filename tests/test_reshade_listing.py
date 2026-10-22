@@ -42,6 +42,8 @@ class ReShadeListingTests(unittest.TestCase):
             paths[1].mkdir()
             paths[2].mkdir(parents=True)
             (games / 'Unsupported.wtgz').touch()
+            (games / '.uwt-components-test/Working.wine').mkdir(parents=True)
+            (games / '.Hidden.pc').mkdir()
             home = base / 'home'
             r.save_json(home / 'reshade/games' / (r.key(paths[0]) + '.json'), {'enabled': True})
             r.save_json(home / 'reshade/games' / (r.key(paths[1]) + '.json'), {'enabled': False})

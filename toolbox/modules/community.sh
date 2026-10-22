@@ -181,7 +181,7 @@ community_pick_game() {
   local -a games=() items=()
   while true; do
     if ! rows="$(community_cmd games --query "$query" --prefer "$preferred" 2>&1)"; then
-      msgbox "$title" "$(community_txt 'Impossible de lire la liste des jeux Windows d’ES. Vérifiez que le jeu est référencé dans ES.' 'Unable to read the ES Windows game list. Check that ES has indexed the game.')
+      msgbox "$title" "$(community_txt 'Impossible de lire la liste des jeux Windows. Vérifiez leur présence dans /userdata/roms/windows.' 'Unable to read the Windows game list. Check the games under /userdata/roms/windows.')
 $rows"; return 1
     fi
     games=(); items=()
@@ -190,7 +190,7 @@ $rows"; return 1
       games+=("$path"$'\t'"$name")
       items+=("${#games[@]}" "$name — ${path##*/}")
     done <<< "$rows"
-    choice="$(menu_select "$title" "$(community_txt 'Choisir le jeu dans la liste d’EmulationStation' 'Choose the game from the EmulationStation list')" \
+    choice="$(menu_select "$title" "$(community_txt 'Choisir le jeu Windows (.wine, .pc ou .wsquashfs)' 'Choose a Windows game (.wine, .pc or .wsquashfs)')" \
       search "$(community_txt 'Rechercher un jeu' 'Search for a game')" "${items[@]}" back "$(i18n back)")" || return 1
     case "$choice" in
       search) query="$(input_text "$title" "$(community_txt 'Nom du jeu à rechercher' 'Game name to search for')" "$query")" || return 1 ;;

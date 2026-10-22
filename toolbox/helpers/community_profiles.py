@@ -20,6 +20,7 @@ REPOSITORY = 'Thomson67/ultimate-wine-toolbox-community'
 REF = 'main'
 LIMIT = 2*1024*1024
 ES_LIMIT = 32*1024*1024
+WINDOWS_ROMS = Path('/userdata/roms/windows')
 KINDS = {'antimicrox': '.amgp', 'reshade': '.ini'}
 MODES = {'keyboard', 'mousebutton', 'mousemovement', 'pause', 'hold', 'cycle', 'distance',
          'release', 'mousespeedmod', 'keypress', 'delay', 'setchange', 'textentry', 'mix'}
@@ -152,22 +153,60 @@ def game_key(value):
     return ''.join(char.casefold() for char in unicodedata.normalize('NFKD', game_title(value)) if char.isalnum())
 
 
-def es_games():
-    # Read ES's actual in-memory gamelist, not a scan of the ROM directory.
-    with urllib.request.urlopen('http://127.0.0.1:1234/systems/windows/games', timeout=3) as response:
-        if response.status != 200: raise ValueError('ES game list is unavailable')
-        data = response.read(ES_LIMIT+1)
-    if len(data) > ES_LIMIT: raise ValueError('ES game list exceeds 32 MiB')
-    values = json.loads(data)
-    if not isinstance(values, list): raise ValueError('Invalid ES game list')
+def local_windows_games():
+    """Include directory games omitted from some ES API game listings."""
     result = {}
-    for value in values:
-        if not isinstance(value, dict): continue
-        path = value.get('path', '')
-        if not isinstance(path, str) or any(ord(char) < 32 or ord(char) == 127 for char in path): continue
-        if not path.startswith('/userdata/roms/windows/') or Path(path).suffix.lower() not in ('.wine', '.pc', '.wsquashfs'): continue
-        name = game_title(value.get('name') or Path(path).name)
-        if name: result[path] = name
+    for folder, dirs, files in os.walk(WINDOWS_ROMS, followlinks=False):
+        retained = []
+        for name in dirs:
+            path = Path(folder) / name
+            if name.startswith('.') or path.is_symlink():
+                continue
+            if path.suffix.casefold() in ('.wine', '.pc'):
+                if not any(ord(char) < 32 or ord(char) == 127 for char in str(path)):
+                    result[str(path)] = game_title(name)
+            else:
+                retained.append(name)
+        dirs[:] = retained  # Never descend into prefixes or game contents.
+        for name in files:
+            path = Path(folder) / name
+            if (not name.startswith('.') and path.suffix.casefold() == '.wsquashfs'
+                    and not path.is_symlink() and path.is_file()
+                    and not any(ord(char) < 32 or ord(char) == 127 for char in str(path))):
+                result[str(path)] = game_title(name)
+    return result
+
+
+def es_games():
+    # Keep ES display names; supplement them with native Windows game paths.
+    # Directory games must remain assignable even if ES omits them or is idle.
+    result = local_windows_games()
+    try:
+        with urllib.request.urlopen('http://127.0.0.1:1234/systems/windows/games', timeout=3) as response:
+            if response.status != 200:
+                raise ValueError('ES game list is unavailable')
+            data = response.read(ES_LIMIT+1)
+        if len(data) > ES_LIMIT:
+            raise ValueError('ES game list exceeds 32 MiB')
+        values = json.loads(data)
+        if not isinstance(values, list):
+            raise ValueError('Invalid ES game list')
+        for value in values:
+            if not isinstance(value, dict):
+                continue
+            path = value.get('path', '')
+            if (not isinstance(path, str) or any(ord(char) < 32 or ord(char) == 127 for char in path)
+                    or '..' in Path(path).parts or not Path(path).is_relative_to(WINDOWS_ROMS)
+                    or Path(path).suffix.casefold() not in ('.wine', '.pc', '.wsquashfs')):
+                continue
+            if any(part.startswith('.') for part in Path(path).relative_to(WINDOWS_ROMS).parts):
+                continue
+            name = game_title(value.get('name') or Path(path).name)
+            if name:
+                result[path] = name
+    except (OSError, ValueError):
+        if not result:
+            raise
     return sorted(result.items(), key=lambda item: item[1].casefold())
 
 

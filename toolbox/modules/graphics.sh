@@ -62,6 +62,7 @@ mangohud_set_game_override() {
 mangohud_list_games() {
     [ -d "$WINDOWS_ROMS" ] || return 0
     find "$WINDOWS_ROMS" -mindepth 1 \
+        \( -name '.*' -prune \) -o \
         \( -type d \( -iname '*.pc' -o -iname '*.wine' \) -print -prune \) -o \
         \( -type f \( -iname '*.wsquashfs' -o -iname '*.wtgz' \) -print \) \
         2>/dev/null | sort -f
