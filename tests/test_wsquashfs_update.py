@@ -332,7 +332,7 @@ wsq_apply_executable_selection drive_c/game/new.exe
         self.assertEqual((self.original_save / 'slot').read_text(), 'original')
         self.assertEqual((prepared / 'slot').read_text(), 'new save')
 
-    def test_shell_compression_failure_can_resume_without_touching_original_saves(self, final_mode="backup", navigate_back=0):
+    def test_shell_compression_failure_can_resume_without_touching_original_saves(self, final_mode="backup", navigate_back=0, deleted_original=False):
         test_save = self.prepare()
         (test_save / 'slot').write_text('tested save')
         root = Path(__file__).resolve().parents[1]
@@ -387,6 +387,7 @@ assert json.loads(Path(sys.argv[3]).read_text())['phase'] == 'ready'
 CHECK
 [ "$?" = 0 ] || exit 3
 maintenance_squash_wine() {{ printf 'new archive' > "$2"; }}
+{("rm -- " + q(str(self.archive))) if deleted_original else ":"}
 wsq_resume_build
 """
         result = subprocess.run(['bash', '-c', script], env=dict(os.environ, PATH=str(tools) + ':' + os.environ['PATH']), capture_output=True, text=True)
@@ -394,7 +395,7 @@ wsq_resume_build
         self.assertFalse(state.exists())
         self.assertEqual(self.archive.read_bytes(), b'new archive')
         self.assertEqual((self.original_save / 'slot').read_text(), 'tested save')
-        self.assertEqual(len(list(self.base.glob('Game.backup-*.wsquashfs'))), 1 if final_mode == 'backup' else 0)
+        self.assertEqual(len(list(self.base.glob('Game.backup-*.wsquashfs'))), 1 if final_mode == 'backup' and not deleted_original else 0)
         if navigate_back in (1, 2):
             self.assertEqual((self.base/'navigation').read_text().splitlines()[:4],
                              ['review', 'final', 'review', 'final'])
@@ -402,6 +403,52 @@ wsq_resume_build
             self.assertEqual((self.base/'navigation').read_text().splitlines(),
                              ['review', 'final', 'final', 'review', 'final'])
             self.assertEqual(list(self.saves.glob('*.validated.backup-*')), [])
+
+    def test_ready_update_can_resume_after_original_archive_was_deleted(self):
+        self.test_shell_compression_failure_can_resume_without_touching_original_saves(deleted_original=True)
+
+    def test_deleted_original_is_recreated_with_saves_and_without_archive_backup(self, keep_backup=True):
+        self.prepare()
+        self.archive.unlink()
+        staged = self.base / 'validated.wsquashfs'; staged.write_bytes(b'validated new archive')
+        prepared = self.saves / 'validated'; prepared.mkdir(); (prepared / 'slot').write_text('new save')
+        result = update.commit(self.manifest, staged, prepared, keep_archive_backup=keep_backup)
+        self.assertEqual(result, '')
+        self.assertEqual(self.archive.read_bytes(), b'validated new archive')
+        self.assertEqual((self.original_save / 'slot').read_text(), 'new save')
+        data = json.loads(self.manifest.read_text())
+        self.assertTrue(data['committed'])
+        self.assertEqual(data['archive_backup'], '')
+        self.assertEqual((Path(data['save_backup']) / 'slot').read_text(), 'original')
+        self.assertFalse(staged.exists())
+        self.assertFalse(list(self.base.glob('Game.backup-*.wsquashfs')))
+
+    def test_deleted_original_is_recreated_in_direct_replacement_mode(self):
+        self.test_deleted_original_is_recreated_with_saves_and_without_archive_backup(keep_backup=False)
+
+    def test_deleted_original_reappearing_during_commit_is_not_overwritten(self):
+        self.prepare(); self.archive.unlink()
+        staged = self.base / 'validated.wsquashfs'; staged.write_bytes(b'validated')
+        prepared = self.saves / 'validated'; prepared.mkdir(); (prepared / 'slot').write_text('new save')
+        def competing_archive(source, target):
+            Path(target).write_bytes(b'concurrent archive')
+            raise FileExistsError('destination appeared during commit')
+        with patch.object(update.os, 'link', side_effect=competing_archive):
+            with self.assertRaises(FileExistsError): update.commit(self.manifest, staged, prepared)
+        self.assertEqual(self.archive.read_bytes(), b'concurrent archive')
+        self.assertEqual((self.original_save / 'slot').read_text(), 'original')
+        self.assertEqual((prepared / 'slot').read_text(), 'new save')
+        self.assertTrue(staged.exists())
+        self.assertFalse(json.loads(self.manifest.read_text()).get('committed', False))
+
+    def test_broken_archive_symlink_is_not_treated_as_a_deleted_original(self):
+        self.prepare(); self.archive.unlink()
+        self.archive.symlink_to(self.base / 'missing-target')
+        staged = self.base / 'validated.wsquashfs'; staged.write_bytes(b'validated')
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            update.commit(self.manifest, staged)
+        self.assertTrue(self.archive.is_symlink())
+        self.assertTrue(staged.exists())
 
     def test_update_final_menu_back_revisits_existing_save_rules_before_preparing_data(self):
         self.test_shell_compression_failure_can_resume_without_touching_original_saves(navigate_back=1)

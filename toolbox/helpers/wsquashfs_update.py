@@ -774,12 +774,17 @@ def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
     if new_archive:
         if archive.exists() or archive.is_symlink():
             raise ValueError('new archive destination appeared since preparation; creation refused')
-    elif archive.is_symlink() or signature(archive) != data['archive_signature']:
+    archive_missing = not archive.exists() and not archive.is_symlink()
+    create_archive = new_archive or archive_missing
+    if not create_archive and (archive.is_symlink() or signature(archive) != data['archive_signature']):
         raise ValueError('original archive changed since preparation; replacement refused')
     if staged.is_symlink() or not staged.is_file() or staged.parent.resolve() != archive.parent.resolve() or staged == archive:
         raise ValueError('validated replacement must be a distinct adjacent file')
     backup = None
-    if keep_archive_backup and not new_archive:
+    if archive_missing and not new_archive:
+        print('update_original_archive_missing=1; publishing the validated replacement without an archive backup',
+              file=sys.stderr, flush=True)
+    if keep_archive_backup and not create_archive:
         backup = archive.with_name(archive.stem + '.backup-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + archive.suffix)
         print(f'update_phase=backup time={datetime.now().isoformat(timespec="seconds")}', file=sys.stderr, flush=True)
         try:
@@ -815,7 +820,7 @@ def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
                 swapped.append((target, prepared, backup_path))
                 prepared.rename(target)
                 save_backup = backup_path or save_backup
-            if new_archive:
+            if create_archive:
                 os.link(staged, archive)  # Atomic no-clobber publication of a new archive.
             else:
                 os.replace(staged, archive)
@@ -828,7 +833,7 @@ def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
             raise
         data.update(committed=True, archive_backup=str(backup or ''), save_backup=str(save_backup or ''))
         save_json(manifest, data)
-    if new_archive:
+    if create_archive:
         try:
             staged.unlink()
         except OSError as exc:

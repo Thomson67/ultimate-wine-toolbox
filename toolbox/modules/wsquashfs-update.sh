@@ -511,7 +511,7 @@ PYCODE
 
 wsq_update_final_choice() {
     local archive="$1" new_archive="$2" choice
-    if [ "$new_archive" -eq 1 ]; then
+    if [ "$new_archive" -eq 1 ] || { [ ! -e "$archive" ] && [ ! -L "$archive" ]; }; then
         yesno_default_no "$(i18n wsq_update_title)" \
             "$(i18n wsq_update_new_archive "$(wsq_display_path "$archive")")" || return 10
         printf replace
@@ -539,6 +539,7 @@ wsq_resume_update() {
     [ -s "$metadata" ] || { msgbox "$(i18n wsq_update_title)" "$(i18n wsq_pending_invalid)"; return; }
     archive="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" archive)" || return
     [ "$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" archive_signature)" != None ] || new_archive=1
+    if [ ! -e "$archive" ] && [ ! -L "$archive" ]; then new_archive=1; fi
     test_save="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" test_save)" || return
     original_name="$game_name"
     game_name="$(basename "$prefix" .wine).validated"
