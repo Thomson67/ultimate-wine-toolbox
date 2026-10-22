@@ -12,8 +12,10 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import uuid
 from datetime import datetime
 
+from archive_storage import prepare as prepare_archive_storage
 from attached_operation import cancellation_signals, defer_cancellation
 from winetricks_target import ensure_idle
 from winetricks_games import valid_prefix
@@ -109,9 +111,8 @@ class ArchiveEdit:
                     or output.suffix != '.tmp' or output.is_symlink()):
                 raise ValueError('Invalid retained archive output path')
         else:
-            fd, name = tempfile.mkstemp(prefix='.uwt-components-' + self.key + '-', suffix='.tmp', dir=self.archive.parent)
-            os.close(fd)
-            output = Path(name)
+            output = self.archive.parent / ('.uwt-components-' + self.key + '-' + uuid.uuid4().hex + '.tmp')
+        prepare_archive_storage(self.prefix, output, replace_existing=bool(data.get('output')))
         data.update(phase='building', output=str(output))
         self.save(data)
         print(f'components_archive_build={output}', flush=True)

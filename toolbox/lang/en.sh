@@ -812,3 +812,5 @@ declare -gA I18N=(
 )
 
 I18N[resh_community]='Community presets'
+
+I18N[squash_storage_body]="Checking free space on each disk and selecting the archive location…"

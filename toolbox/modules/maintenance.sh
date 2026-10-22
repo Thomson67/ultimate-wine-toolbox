@@ -741,10 +741,16 @@ maintenance_squash_wine() {
     tmp="$dest.tmp-$$"
     rm -f -- "$tmp" 2>/dev/null || true
 
+    if ! maintenance_logged_progress "$(i18n squash_progress_title)" \
+        "$(i18n squash_storage_body)" "$operation_log" Storage \
+        python3 "$WT_ROOT/helpers/archive_storage.py" "$source" "$tmp"; then
+        return 1
+    fi
+
     if ! maintenance_logged_progress \
         "$(i18n squash_progress_title)" \
         "$(i18n squash_progress_body "$(basename "$source")")" "$operation_log" Compression \
-        mksquashfs "$source" "$tmp" -comp zstd -percentage; then
+        mksquashfs "$source" "$tmp" -noappend -comp zstd -percentage; then
         rm -f -- "$tmp" 2>/dev/null || true
         return 1
     fi
