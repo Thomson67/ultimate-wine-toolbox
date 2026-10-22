@@ -780,7 +780,7 @@ maintenance_squash_wine() {
 maintenance_delete_wine_dir_symlink_safe() {
     local source="$1"
 
-    python3 - "$WINDOWS_ROMS_DIR" "$source" <<'PY'
+    wt_operation_run python3 - "$WINDOWS_ROMS_DIR" "$source" <<'PY'
 import os
 import sys
 
@@ -788,10 +788,13 @@ root = os.path.abspath(sys.argv[1])
 path = os.path.abspath(sys.argv[2])
 
 if os.path.dirname(path) != root:
+    print(f'Source cleanup refused: expected a direct child of {root}, got {path}', file=sys.stderr)
     raise SystemExit(2)
 if not path.casefold().endswith(".wine"):
+    print(f"Source cleanup refused: not a .wine directory: {path}", file=sys.stderr)
     raise SystemExit(2)
 if not os.path.isdir(path) or os.path.islink(path):
+    print(f"Source cleanup refused: not a real directory: {path}", file=sys.stderr)
     raise SystemExit(2)
 
 def remove_tree_no_follow(current):
@@ -808,20 +811,30 @@ def remove_tree_no_follow(current):
 
 remove_tree_no_follow(path)
 os.rmdir(path)
+print(f'source_cleanup_done={path}', flush=True)
 PY
 }
 
 maintenance_offer_source_deletion() {
-    local source="$1"
+    local source="$1" log="${2:-${WT_SESSION_LOG:-/dev/null}}" announce="${3:-1}"
+    [ -e "$source" ] || [ -L "$source" ] || return 0
 
     yesno_default_no "$(i18n squash_delete_source_title)" \
         "$(i18n squash_delete_source_confirm "$(basename "$source")")" || return 0
 
-    if maintenance_delete_wine_dir_symlink_safe "$source"; then
-        msgbox "$(i18n squash_delete_source_title)" "$(i18n squash_delete_source_done "$(basename "$source")")"
+    if maintenance_logged_progress "$(i18n squash_delete_source_title)" \
+        "$(i18n squash_delete_source_progress "$(basename "$source")")" "$log" SourceCleanup \
+        maintenance_delete_wine_dir_symlink_safe "$source"; then
+        if [ "$announce" != 0 ]; then
+            msgbox "$(i18n squash_delete_source_title)" "$(i18n squash_delete_source_done "$(basename "$source")")"
+        fi
     else
-        msgbox "$(i18n squash_delete_source_title)" "$(i18n squash_delete_source_failed "$(basename "$source")")"
+        local detail="$(i18n squash_delete_source_failed "$(basename "$source")")"
+        [ "$log" = /dev/null ] || detail+="\n\n$log"
+        msgbox "$(i18n squash_delete_source_title)" "$detail"
+        return 1
     fi
+    return 0
 }
 
 maintenance_detect_wsquashfs_type() {

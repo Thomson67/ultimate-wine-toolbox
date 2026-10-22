@@ -655,16 +655,16 @@ wsq_resume_update() {
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_bottles_cleanup_failed "$log")"
         return
     }
+    maintenance_offer_source_deletion "$prefix" "$log" 0 || return 1
     rm -f -- "$snapshot" "$WSQ_STATE_FILE" "$metadata" "$WSQ_STATE_DIR/wsq-launch-result"
+    local completed_prefix="$prefix"
+    [ -d "$prefix" ] || completed_prefix="$(i18n squash_delete_source_done "$(basename "$prefix")")"
     if [ "$new_archive" -eq 1 ]; then
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_done_new "$archive" "$prefix")"
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_done_new "$archive" "$completed_prefix")"
     elif [ -n "$backup" ]; then
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_done "$archive" "$backup" "$prefix")"
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_done "$archive" "$backup" "$completed_prefix")"
     else
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_done_replace "$archive" "$prefix")"
-    fi
-    if yesno_default_no "$(i18n squash_delete_source_title)" "$(i18n squash_delete_source_confirm "$(basename "$prefix")")"; then
-        maintenance_delete_wine_dir_symlink_safe "$prefix" || true
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_done_replace "$archive" "$completed_prefix")"
     fi
     wsq_restart_emulationstation_deferred || true
     game_name="$original_name"

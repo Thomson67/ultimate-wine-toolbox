@@ -814,3 +814,5 @@ declare -gA I18N=(
 I18N[resh_community]='Community presets'
 
 I18N[squash_storage_body]="Checking free space on each disk and selecting the archive location…"
+
+I18N[squash_delete_source_progress]="Removing the source .wine directory: %s\n\nCleanup is still running. Please wait for the completion message."

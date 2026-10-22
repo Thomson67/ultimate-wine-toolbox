@@ -69,6 +69,34 @@ wt_clear_tty() { :; }; clear() { :; }; i18n() { printf '%s' "$1"; }
         self.assertEqual(self.original.read_bytes(), b'original archive')
         self.assertFalse(self.done.exists())
 
+    def test_source_cleanup_stops_when_toolbox_session_is_closed(self):
+        self.tool('python3', """import os, sys, time, json
+from pathlib import Path
+if sys.argv[1] != '-':
+    os.execv(sys.executable, [sys.executable, *sys.argv[1:]])
+code = sys.stdin.read()
+original_unlink = os.unlink
+def slow_unlink(*args, **kwargs):
+    Path(os.environ['WORKER_PID']).write_text(json.dumps(dict(pid=os.getpid(), proc=int(Path('/proc/self/stat').read_text().split()[0]))))
+    time.sleep(60)
+    Path(os.environ['DONE']).touch()
+    return original_unlink(*args, **kwargs)
+os.unlink = slow_unlink
+sys.argv = sys.argv[1:]
+exec(compile(code, '<cleanup>', 'exec'))
+""")
+        source = self.root / 'Game.wine'; source.mkdir()
+        (source / 'game.data').write_bytes(b'working game')
+        external = self.root / 'saves'; external.mkdir()
+        (external / 'slot').write_bytes(b'save')
+        (source / 'Saved').symlink_to(external, target_is_directory=True)
+        owner = self.launch('WINDOWS_ROMS_DIR=' + shlex.quote(str(self.root)) +
+                            '; yesno_default_no() { return 0; }; msgbox() { :; }; '
+                            'maintenance_offer_source_deletion ' + shlex.quote(str(source)) + ' ' + shlex.quote(str(self.log)))
+        self.stop_session_and_check(owner, signal.SIGKILL)
+        self.assertTrue(source.exists())
+        self.assertEqual((external / 'slot').read_bytes(), b'save')
+
     def test_compression_stops_even_when_session_is_killed_without_a_trap(self):
         self.tool('mksquashfs', '''import os, sys, time
 from pathlib import Path

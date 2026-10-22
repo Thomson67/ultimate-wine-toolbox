@@ -1598,7 +1598,18 @@ wsq_resume_build() {
     exe_rel="$(wsq_state_value exe_rel)"
     runner="$(wsq_state_value runner)"
 
-    [ -d "$prefix" ] && [ -s "$snapshot" ] || {
+    # A committed update can have removed its prefix just before the session
+    # closed. Resume the final cleanup without rebuilding an already published ROM.
+    local cleanup_only=0 committed_metadata committed_archive
+    if [ "$(wsq_state_value mode)" = update ] && [ "$(wsq_state_value phase)" = committed ]; then
+        committed_metadata="$(wsq_state_value metadata)"
+        if [ -s "$committed_metadata" ] &&
+           [ "$(python3 "$WSQ_UPDATE_HELPER" value "$committed_metadata" committed)" = True ]; then
+            committed_archive="$(python3 "$WSQ_UPDATE_HELPER" value "$committed_metadata" archive)"
+            if [ -f "$committed_archive" ] && [ ! -L "$committed_archive" ]; then cleanup_only=1; fi
+        fi
+    fi
+    { [ -d "$prefix" ] || [ "$cleanup_only" -eq 1 ]; } && [ -s "$snapshot" ] || {
         wsq_recover_invalid_pending
         return
     }
@@ -1754,10 +1765,7 @@ wsq_resume_build() {
                     "$(i18n wsq_archive_backup_done "$WSQ_LAST_ARCHIVE_BACKUP")"
             fi
 
-            if yesno_default_no "$(i18n squash_delete_source_title)" \
-                "$(i18n squash_delete_source_confirm "$(basename "$prefix")")"; then
-                maintenance_delete_wine_dir_symlink_safe "$prefix" || true
-            fi
+            maintenance_offer_source_deletion "$prefix" "${WT_SESSION_LOG:-/dev/null}" 0 || return 1
             msgbox "$(i18n wsq_create_title)" "$(i18n wsq_build_done "$archive" "$WSQ_SAVE_ROOT/$final_game_name")"
             wsq_restart_emulationstation_deferred || true
             wsq_post_build_menu

@@ -814,3 +814,5 @@ declare -gA I18N=(
 I18N[resh_community]='Presets communautaires'
 
 I18N[squash_storage_body]="Analyse de l’espace disponible sur les disques et choix de l’emplacement de compression…"
+
+I18N[squash_delete_source_progress]="Suppression du dossier .wine source : %s\n\nLe nettoyage est encore en cours. Patientez jusqu’au message de fin."

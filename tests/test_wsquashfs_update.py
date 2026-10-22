@@ -332,7 +332,7 @@ wsq_apply_executable_selection drive_c/game/new.exe
         self.assertEqual((self.original_save / 'slot').read_text(), 'original')
         self.assertEqual((prepared / 'slot').read_text(), 'new save')
 
-    def test_shell_compression_failure_can_resume_without_touching_original_saves(self, final_mode="backup", navigate_back=0, deleted_original=False):
+    def test_shell_compression_failure_can_resume_without_touching_original_saves(self, final_mode="backup", navigate_back=0, deleted_original=False, delete_source=False, cleanup_failure=False):
         test_save = self.prepare()
         (test_save / 'slot').write_text('tested save')
         root = Path(__file__).resolve().parents[1]
@@ -349,13 +349,22 @@ wsq_apply_executable_selection drive_c/game/new.exe
         script = f"""
 WT_ROOT={q(str(root / 'toolbox'))}
 WT_HOME={q(str(self.base))}
+source "$WT_ROOT/modules/maintenance.sh"
+WINDOWS_ROMS_DIR={q(str(self.base))}
 source "$WT_ROOT/modules/wsquashfs.sh"
 WSQ_STATE_DIR={q(str(state_dir))}; WSQ_STATE_FILE={q(str(state))}
 WSQ_SAVE_ROOT={q(str(self.saves))}; WSQ_CONF={q(str(self.base / 'batocera.conf'))}
 have_dialog() {{ return 1; }}
 wt_clear_tty() {{ :; }}
 i18n() {{ printf '%s' "$1"; }}
-msgbox() {{ :; }}
+msgbox() {{
+    case "$2" in wsq_update_done*)
+        [ {int(delete_source)} -eq 0 ] || [ ! -e {q(str(self.prefix))} ] || exit 84
+        [ ! -e "$WSQ_STATE_FILE" ] || exit 85 ;;
+    esac
+    echo "$2" >> "$WT_HOME/messages"
+}}
+clear() {{ :; }}
 menu_select() {{
     echo final >> "$WT_HOME/navigation"
     if [ {navigate_back} -ne 0 ] && [ ! -f "$WT_HOME/back-once" ] &&
@@ -373,7 +382,7 @@ menu_select() {{
 }}
 wsq_review_launch() {{ :; }}
 wsq_update_review_save() {{ echo review >> "$WT_HOME/navigation"; WSQ_SAVE_KIND=existing; WSQ_SELECTED_SAVE=drive_c/users/root/Saved; }}
-yesno_default_no() {{ [ "$1" != squash_delete_source_title ]; }}
+yesno_default_no() {{ [ "$1" != squash_delete_source_title ] || [ {int(delete_source)} -eq 1 ]; }}
 wsq_restart_emulationstation_deferred() {{ :; }}
 wsq_post_build_menu() {{ :; }}
 maintenance_squash_wine() {{ return 1; }}
@@ -387,11 +396,25 @@ assert json.loads(Path(sys.argv[3]).read_text())['phase'] == 'ready'
 CHECK
 [ "$?" = 0 ] || exit 3
 maintenance_squash_wine() {{ printf 'new archive' > "$2"; }}
+if [ {int(cleanup_failure)} -eq 1 ]; then
+    maintenance_delete_wine_dir_symlink_safe() {{ echo 'cleanup test: Permission denied' >&2; return 7; }}
+fi
 {("rm -- " + q(str(self.archive))) if deleted_original else ":"}
 wsq_resume_build
 """
         result = subprocess.run(['bash', '-c', script], env=dict(os.environ, PATH=str(tools) + ':' + os.environ['PATH']), capture_output=True, text=True)
+        if cleanup_failure:
+            self.assertNotEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(self.archive.read_bytes(), b'new archive')
+            self.assertEqual(json.loads(state.read_text())['phase'], 'committed')
+            self.assertTrue(self.prefix.exists())
+            self.assertIn('SourceCleanup exit=7', log.read_text())
+            self.assertIn('Permission denied', log.read_text())
+            self.assertIn('squash_delete_source_failed', (self.base / 'messages').read_text())
+            self.assertNotIn('wsq_update_done', (self.base / 'messages').read_text())
+            return
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.prefix.exists(), not delete_source)
         self.assertFalse(state.exists())
         self.assertEqual(self.archive.read_bytes(), b'new archive')
         self.assertEqual((self.original_save / 'slot').read_text(), 'tested save')
@@ -403,6 +426,42 @@ wsq_resume_build
             self.assertEqual((self.base/'navigation').read_text().splitlines(),
                              ['review', 'final', 'final', 'review', 'final'])
             self.assertEqual(list(self.saves.glob('*.validated.backup-*')), [])
+
+    def test_replace_and_delete_source_finishes_only_after_cleanup(self):
+        self.test_shell_compression_failure_can_resume_without_touching_original_saves(
+            final_mode='replace', delete_source=True)
+        self.assertIn('SourceCleanup exit=0', (self.base / 'update.log').read_text())
+
+    def test_failed_source_cleanup_retains_committed_state_and_reports_failure(self):
+        self.test_shell_compression_failure_can_resume_without_touching_original_saves(
+            final_mode='replace', delete_source=True, cleanup_failure=True)
+
+    def test_cleanup_retry_does_not_recompress_committed_archive(self, source_already_gone=False):
+        self.test_failed_source_cleanup_retains_committed_state_and_reports_failure()
+        if source_already_gone:
+            shutil.rmtree(self.prefix)
+        root = Path(__file__).resolve().parents[1]; q = shlex.quote
+        script = f"""
+WT_ROOT={q(str(root / 'toolbox'))}; WT_HOME={q(str(self.base))}
+source "$WT_ROOT/modules/maintenance.sh"
+WINDOWS_ROMS_DIR={q(str(self.base))}
+source "$WT_ROOT/modules/wsquashfs.sh"
+WSQ_SAVE_ROOT={q(str(self.saves))}; WSQ_CONF={q(str(self.base / 'batocera.conf'))}
+have_dialog() {{ return 1; }}; wt_clear_tty() {{ :; }}; clear() {{ :; }}
+i18n() {{ printf '%s' "$1"; }}; msgbox() {{ :; }}; yesno_default_no() {{ return 0; }}
+maintenance_squash_wine() {{ echo forbidden-recompression >&2; exit 92; }}
+wsq_restart_emulationstation_deferred() {{ :; }}; wsq_post_build_menu() {{ :; }}
+wsq_resume_build
+"""
+        result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('forbidden-recompression', result.stderr)
+        self.assertEqual(self.archive.read_bytes(), b'new archive')
+        self.assertFalse(self.prefix.exists())
+        self.assertFalse((self.base / 'state/wsquashfs-builder.json').exists())
+
+    def test_cleanup_can_finish_when_prefix_was_already_removed_before_session_closed(self):
+        self.test_cleanup_retry_does_not_recompress_committed_archive(source_already_gone=True)
 
     def test_ready_update_can_resume_after_original_archive_was_deleted(self):
         self.test_shell_compression_failure_can_resume_without_touching_original_saves(deleted_original=True)
