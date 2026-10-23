@@ -930,7 +930,8 @@ maintenance_unsquash_game() {
 maintenance_select_and_squash() {
     local -a items=()
     local rows="" path selected id idx=1 created=0 replaced=0 renamed=0 skipped=0 failed=0
-    local dest choice target success=0
+    local dest choice target success=0 cleanup_failed=0
+    local operation_log="${WT_SESSION_LOG:-/dev/null}"
 
     command -v mksquashfs >/dev/null 2>&1 && command -v unsquashfs >/dev/null 2>&1 || {
         msgbox "$(i18n squash_title)" "$(i18n squash_tools_missing)"
@@ -975,7 +976,7 @@ maintenance_select_and_squash() {
             continue
         fi
         target="$WSQ_ARCHIVE_TARGET"
-        if maintenance_squash_wine "$path" "$target"; then
+        if maintenance_squash_wine "$path" "$target" quick "$operation_log"; then
             case "$WSQ_ARCHIVE_ACTION" in
                 rename) renamed=$((renamed+1)) ;;
                 replace|backup) replaced=$((replaced+1)) ;;
@@ -987,12 +988,16 @@ maintenance_select_and_squash() {
             fi
         else
             failed=$((failed+1))
+            msgbox "$(i18n squash_title)" \
+                "$(i18n wsq_update_failed "$path" "$operation_log" "$(wsq_update_log_detail "$operation_log")")"
         fi
 
-        [ "$success" -eq 1 ] && maintenance_offer_source_deletion "$path"
+        if [ "$success" -eq 1 ]; then
+            maintenance_offer_source_deletion "$path" "$operation_log" 0 || cleanup_failed=$((cleanup_failed+1))
+        fi
     done <<< "$selected"
 
-    msgbox "$(i18n squash_title)" "$(i18n squash_result "$created" "$replaced" "$renamed" "$skipped" "$failed")"
+    msgbox "$(i18n squash_title)" "$(i18n squash_result "$created" "$replaced" "$renamed" "$skipped" "$failed" "$cleanup_failed")"
 }
 
 maintenance_select_and_unsquash() {
