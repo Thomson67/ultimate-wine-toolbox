@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.7.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.7.0).**
+**Version stable : [v0.7.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.7.1).**
 
 ## Fonctionnalités
 
@@ -32,6 +32,14 @@ Créée par **Thomsonito**.
 - sauvegarde automatique avant les opérations destructives sur `batocera.conf`
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
+
+## Nouveautés de la v0.7.1
+
+- Affectation des profils AntiMicroX existants aux jeux locaux `.wine` et `.pc`.
+- Contrôle de l’espace par disque et choix de l’emplacement de compression avec mergerfs.
+- Reprise des MAJ sans l’archive originale, rapports d’erreur plus clairs et nettoyage final avant le message de réussite.
+
+[Notes de la v0.7.1](release-notes/v0.7.1.md)
 
 ## Nouveautés de la v0.7.0
 
