@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shlex
 import stat
 import tempfile
 import uuid
@@ -149,11 +150,20 @@ class LiveSession:
             if not valid_profile(profile):
                 raise ValueError('Invalid AntiMicroX XML profile.')
             action, switch_fr, switch_en = switch_for(profile, self.home, actions)
+            session_id = uuid.uuid4().hex
+            if action:
+                # Activate the owned editor/game windows directly. Alt+Tab may
+                # omit the editor from labwc's cycling list on Batocera 44.
+                helper = self.home/'toolbox/helpers/antimicrox_focus.py'
+                log = '/userdata/system/logs/ultimate-wine-toolbox/antimicrox.log'
+                command = shlex.join(['python3', str(helper), 'toggle', '--home',
+                                      str(self.home), '--session-id', session_id])
+                action = dict(action, type='exec', target=command+' >> '+shlex.quote(log)+' 2>&1')
             displaced = [item for item in actions if action and trigger(item) == trigger(action)]
             config['actions_player1'] = ([action] if action else []) + [item for item in actions if not action or trigger(item) != trigger(action)]
             injected = (json.dumps(config, ensure_ascii=False, indent=2)+'\n').encode()
             mode = stat.S_IMODE(keys.stat().st_mode) if keys.exists() else 0o644
-            data = {'session_id': uuid.uuid4().hex, 'rom': str(rom), 'profile': str(profile), 'phase': 'preparing',
+            data = {'session_id': session_id, 'rom': str(rom), 'profile': str(profile), 'phase': 'preparing',
                     'keys': str(keys), 'original': base64.b64encode(original).decode() if original is not None else None,
                     'mode': mode, 'injected_sha256': digest(injected), 'displaced': displaced,
                     'result': '', 'error': '', 'action': action,

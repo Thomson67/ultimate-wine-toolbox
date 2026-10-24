@@ -123,6 +123,12 @@ class XWindows:
                 return window
         return 0
 
+    def editor_window(self, editor_pid):
+        for window in reversed(self.cardinals(self.root, '_NET_CLIENT_LIST_STACKING', 4096)):
+            if self.cardinal(window, '_NET_WM_PID') == editor_pid:
+                return window
+        return 0
+
     def activate(self, window):
         # EWMH client message: ask labwc/X11 WM, without injecting Alt+Tab/keys.
         class Message(C.Structure):
@@ -166,6 +172,62 @@ class Returns:
         return None
 
 
+def toggle_window(owner, windows, api=None):
+    """Switch only within the active live session, without synthetic Alt+Tab."""
+    if not owner.active():
+        return False
+    current = windows.current(owner.pid)
+    if current[0] == 'editor':
+        target = windows.game_window(owner.pid)
+    elif current[0] == 'game':
+        target = windows.editor_window(owner.pid)
+    else:
+        return False  # Do not raise over an unrelated foreground application.
+    if not target or (api or EsApi()).running() != (200, owner.rom):
+        return False
+    if not owner.active() or windows.current(owner.pid) != current:
+        return False
+    windows.activate(target)
+    print(f'AntiMicroX live direct switch from={current[0]} target={target}', flush=True)
+    return True
+
+
+def toggle(home, session_id):
+    home = Path(home)
+    # Serialize controller duplicates and refuse stale shortcuts from an older
+    # session, including after its ROM is launched again.
+    with (home/'state/antimicrox/toggle.lock').open('a+') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return False
+        data = json.loads((home/'state/antimicrox-live.json').read_text())
+        if data.get('session_id') != session_id:
+            return False
+        rom, pid, stamp = (home/'state/antimicrox/session').read_text().strip().split('\t')
+        owner = Owner(home, rom, int(pid), stamp)
+        if owner.session_id != session_id or not owner.active():
+            return False
+        now = time.monotonic()
+        lock.seek(0)
+        previous = lock.read().strip().split('\t')
+        if len(previous) == 2 and previous[0] == session_id and now-float(previous[1]) < .4:
+            return False
+        os.environ.setdefault('DISPLAY', ':0')
+        os.environ.setdefault('XAUTHORITY', '/var/lib/.Xauthority')
+        windows = XWindows()
+        try:
+            switched = toggle_window(owner, windows)
+            if switched:
+                lock.seek(0)
+                lock.truncate()
+                lock.write(f'{session_id}\t{now}\n')
+                lock.flush()
+            return switched
+        finally:
+            windows.close()
+
+
 def introduction(owner, windows, api, clock=time.monotonic, sleep=time.sleep,
                  run=subprocess.run, timeout=120):
     """Give the game initial focus once; later user switches remain untouched."""
@@ -190,10 +252,10 @@ def introduction(owner, windows, api, clock=time.monotonic, sleep=time.sleep,
                     except OSError:
                         language = 'fr' if os.environ.get('LANG', '').startswith('fr') else 'en'
                     shortcut = owner.read().get('switch_fr' if language == 'fr' else 'switch_en', 'Alt+Tab')
-                    message = (f'Configurer avec AntiMicroX : Alt+Tab — {shortcut}'
+                    message = (f'Configurer avec AntiMicroX : {shortcut}'
                                '\nRelâchez les boutons après la bascule. Enregistrez le profil avant de quitter.'
                                if language == 'fr' else
-                               f'Configure with AntiMicroX: Alt+Tab — {shortcut}'
+                               f'Configure with AntiMicroX: {shortcut}'
                                '\nRelease the buttons after switching. Save the profile before quitting.')
                     try:
                         result = run([sys.executable, str(Path(__file__).with_name('antimicrox_notice.py')), message],
@@ -228,12 +290,23 @@ def watch(owner, windows, api=None, clock=time.monotonic, sleep=time.sleep,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('mode', choices=('spawn', 'run'))
-    parser.add_argument('rom')
-    parser.add_argument('pid', type=int)
-    parser.add_argument('stamp')
+    parser.add_argument('mode', choices=('spawn', 'run', 'toggle'))
+    parser.add_argument('rom', nargs='?')
+    parser.add_argument('pid', nargs='?', type=int)
+    parser.add_argument('stamp', nargs='?')
     parser.add_argument('--home', default=os.environ.get('WT_HOME', '/userdata/system/ultimate-wine-toolbox'))
+    parser.add_argument('--session-id')
     args = parser.parse_args()
+    if args.mode == 'toggle':
+        if not args.session_id:
+            parser.error('toggle requires --session-id')
+        try:
+            toggle(args.home, args.session_id)
+        except (OSError, ValueError, RuntimeError) as exc:
+            print(f'AntiMicroX live direct switch unavailable: {exc}', flush=True)
+        return
+    if args.rom is None or args.pid is None or args.stamp is None:
+        parser.error('spawn/run require rom, pid and stamp')
     if args.mode == 'spawn':
         subprocess.Popen([sys.executable, str(Path(__file__).resolve()), 'run',
                           args.rom, str(args.pid), args.stamp, '--home', args.home],

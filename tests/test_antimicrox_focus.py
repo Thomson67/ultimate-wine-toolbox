@@ -10,6 +10,68 @@ sys.path.insert(0, str(HELPERS))
 import antimicrox_focus as focus
 
 
+class DirectSwitchTests(unittest.TestCase):
+    def setUp(self):
+        self.owner = Mock(pid=42, rom='/userdata/roms/windows/Game.wine')
+        self.owner.active.return_value = True
+        self.windows = Mock()
+        self.windows.current.return_value = ('game', 20)
+        self.windows.game_window.return_value = 20
+        self.windows.editor_window.return_value = 10
+        self.api = Mock()
+        self.api.running.return_value = (200, self.owner.rom)
+
+    def switch(self):
+        return focus.toggle_window(self.owner, self.windows, self.api)
+
+    def test_direct_activation_reaches_editor_without_alt_tab(self):
+        self.assertTrue(self.switch())
+        self.windows.activate.assert_called_once_with(10)
+
+    def test_same_shortcut_returns_from_editor_to_game(self):
+        self.windows.current.return_value = ('editor', 10)
+        self.assertTrue(self.switch())
+        self.windows.activate.assert_called_once_with(20)
+
+    def test_other_foreground_apps_or_unknown_focus_are_not_interrupted(self):
+        for kind in ('other', 'unknown'):
+            self.windows.current.return_value = (kind, 30)
+            self.assertFalse(self.switch())
+        self.windows.activate.assert_not_called()
+
+    def test_wrong_rom_or_missing_target_is_not_activated(self):
+        self.api.running.return_value = (200, '/another/game.wine')
+        self.assertFalse(self.switch())
+        self.api.running.return_value = (200, self.owner.rom)
+        self.windows.editor_window.return_value = 0
+        self.assertFalse(self.switch())
+        self.windows.activate.assert_not_called()
+
+    def test_session_or_focus_change_during_api_call_cancels_activation(self):
+        self.owner.active.side_effect = [True, False]
+        self.assertFalse(self.switch())
+        self.owner.active.side_effect = None
+        self.windows.current.side_effect = [('game', 20), ('other', 30)]
+        self.assertFalse(self.switch())
+        self.windows.activate.assert_not_called()
+
+    def test_stale_session_token_and_duplicate_controller_events_are_ignored(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder); state = home/'state'; (state/'antimicrox').mkdir(parents=True)
+            data = {'rom': self.owner.rom, 'phase': 'running', 'session_id': 'current'}
+            (state/'antimicrox-live.json').write_text(json.dumps(data))
+            (state/'antimicrox/session').write_text(f'{self.owner.rom}\t42\t123\n')
+            with patch.object(focus, 'process_start', return_value='123'), \
+                 patch.object(focus, 'XWindows', return_value=self.windows) as factory, \
+                 patch.object(focus, 'EsApi', return_value=self.api):
+                self.assertFalse(focus.toggle(home, 'previous'))
+                factory.assert_not_called()
+                self.assertTrue(focus.toggle(home, 'current'))
+                self.assertFalse(focus.toggle(home, 'current'))
+                self.windows.activate.assert_called_once_with(10)
+                self.windows.close.assert_called_once()
+
+
 class FocusTests(unittest.TestCase):
     def test_initial_game_and_other_apps_do_not_trigger(self):
         tracker = focus.Returns()
@@ -133,7 +195,7 @@ class IntroductionTests(unittest.TestCase):
         command = self.run.call_args.args[0]
         self.assertEqual(Path(command[1]).name, 'antimicrox_notice.py')
         self.assertNotIn('batocera-flash-screen', command)
-        self.assertIn('Alt+Tab', command[2]); self.assertIn('Hotkey + Select', command[2])
+        self.assertIn('Hotkey + Select', command[2])
 
     def test_already_foreground_game_only_shows_popup_once_in_english(self):
         (self.owner.home/'config/language').write_text('en\n')
