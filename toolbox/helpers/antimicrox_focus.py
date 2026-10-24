@@ -2,6 +2,7 @@
 import argparse
 import ctypes as C
 import ctypes.util
+from datetime import datetime
 import fcntl
 import json
 import os
@@ -11,6 +12,11 @@ import sys
 import time
 
 from antimicrox_handoff import EsApi
+
+
+def switch_log(message):
+    print(f'[{datetime.now().astimezone().isoformat(timespec="milliseconds")}] '
+          f'AntiMicroX live direct switch {message}', flush=True)
 
 
 def process_start(pid):
@@ -43,6 +49,18 @@ class Owner:
                 and data.get('phase') == 'running'
                 and owned == [self.rom, str(self.pid), self.stamp]
                 and process_start(self.pid) == self.stamp)
+
+    def user_switched(self):
+        """A pending or completed explicit switch takes priority over startup."""
+        try:
+            with (self.home/'state/antimicrox/toggle.lock').open() as lock:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    return True
+                return lock.read().split('\t', 1)[0] == self.session_id
+        except OSError:
+            return False
 
 
 class XWindows:
@@ -178,7 +196,7 @@ class Returns:
 def toggle_window(owner, windows, api=None):
     """Switch only within the active live session, without synthetic Alt+Tab."""
     def skipped(reason):
-        print(f'AntiMicroX live direct switch skipped: {reason}', flush=True)
+        switch_log(f'skipped: {reason}')
         return False
 
     if not owner.active():
@@ -207,7 +225,7 @@ def toggle_window(owner, windows, api=None):
     if fallback and (current[1] in windows.client_windows() or not windows.game_window(owner.pid)):
         return skipped('foreground became managed or game window disappeared')
     windows.activate(target)
-    print(f'AntiMicroX live direct switch from={current[0]} target={target}', flush=True)
+    switch_log(f'from={current[0]} source={current[1]} target={target}')
     return True
 
 
@@ -231,6 +249,7 @@ def toggle(home, session_id):
         lock.seek(0)
         previous = lock.read().strip().split('\t')
         if len(previous) == 2 and previous[0] == session_id and now-float(previous[1]) < .4:
+            switch_log('skipped: duplicate request within 400 ms')
             return False
         os.environ.setdefault('DISPLAY', ':0')
         os.environ.setdefault('XAUTHORITY', '/var/lib/.Xauthority')
@@ -253,12 +272,15 @@ def introduction(owner, windows, api, clock=time.monotonic, sleep=time.sleep,
     deadline = clock()+timeout
     candidate, since, requested = 0, 0, False
     while owner.active() and clock() < deadline:
+        if owner.user_switched():
+            print('AntiMicroX live introduction cancelled: manual switch takes priority', flush=True)
+            return
         kind, current = windows.current(owner.pid)
         target = current if kind == 'game' else windows.game_window(owner.pid)
         if target != candidate:
             candidate, since = target, clock()
         if candidate and clock()-since >= 1 and kind in ('editor', 'game'):
-            if api.running() == (200, owner.rom) and owner.active():
+            if api.running() == (200, owner.rom) and owner.active() and not owner.user_switched():
                 # Recheck after the HTTP call; never raise over another app.
                 observed = windows.current(owner.pid)
                 if observed[0] == 'editor' and not requested:
@@ -292,6 +314,15 @@ def watch(owner, windows, api=None, clock=time.monotonic, sleep=time.sleep,
     api, returns = api or EsApi(), Returns()
     if show_intro:
         introduction(owner, windows, api, clock, sleep, run)
+    data = owner.read()
+    action = data.get('action') if isinstance(data, dict) else None
+    if isinstance(action, dict) and action.get('type') == 'exec':
+        # The direct shortcut already requests activation from the compositor.
+        # Opening a flash window after each return creates another focus change
+        # and can hand focus back to the editor. Keep this legacy workaround
+        # only for older sessions that still synthesize Alt+Tab.
+        print('AntiMicroX live direct mode: automatic focus refresh disabled', flush=True)
+        return
     while owner.active():
         target = returns.observe(windows.current(owner.pid), clock())
         if target:

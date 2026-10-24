@@ -108,6 +108,26 @@ class DirectSwitchTests(unittest.TestCase):
 
 
 class FocusTests(unittest.TestCase):
+    def test_direct_mode_never_opens_a_refresh_window_after_returns(self):
+        owner = Mock(pid=42, rom='/game')
+        owner.read.return_value = {'action': {'type': 'exec'}}
+        windows, run = Mock(), Mock()
+        focus.watch(owner, windows, run=run, show_intro=False)
+        windows.current.assert_not_called()
+        run.assert_not_called()
+
+    def test_user_switch_marker_is_scoped_to_this_session(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder); state = home/'state'; (state/'antimicrox').mkdir(parents=True)
+            (state/'antimicrox-live.json').write_text(json.dumps({'session_id': 'current'}))
+            owner = focus.Owner(home, '/game', 42, '123')
+            self.assertFalse(owner.user_switched())
+            marker = state/'antimicrox/toggle.lock'
+            marker.write_text('old\t1.0\n')
+            self.assertFalse(owner.user_switched())
+            marker.write_text('current\t2.0\n')
+            self.assertTrue(owner.user_switched())
+
     def test_initial_game_and_other_apps_do_not_trigger(self):
         tracker = focus.Returns()
         for kind, now in [('game', 0), ('game', 1), ('editor', 2),
@@ -205,6 +225,7 @@ class IntroductionTests(unittest.TestCase):
         (home/'config/language').write_text('fr\n')
         self.owner = Mock(pid=42, rom='/userdata/roms/windows/Game.wsquashfs', home=home)
         self.owner.active.return_value = True
+        self.owner.user_switched.return_value = False
         self.owner.read.return_value = {'switch_fr': 'Hotkey + Select', 'switch_en': 'Hotkey + R1 / RB'}
         self.now = 0
         self.windows = Mock()
@@ -275,3 +296,19 @@ class IntroductionTests(unittest.TestCase):
         self.intro()
         self.run.assert_called_once()
         self.assertTrue(self.owner.active())
+
+    def test_manual_switch_cancels_delayed_startup_activation(self):
+        self.windows.game_window.return_value = 2
+        self.intro(lambda now: setattr(self.owner.user_switched, 'return_value', now >= .5))
+        self.windows.activate.assert_not_called()
+        self.run.assert_not_called()
+
+    def test_manual_switch_during_es_check_prevents_startup_activation(self):
+        self.windows.game_window.return_value = 2
+        def running():
+            self.owner.user_switched.return_value = True
+            return 200, self.owner.rom
+        self.api.running.side_effect = running
+        self.intro()
+        self.windows.activate.assert_not_called()
+        self.run.assert_not_called()
