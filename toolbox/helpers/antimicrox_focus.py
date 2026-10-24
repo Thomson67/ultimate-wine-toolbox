@@ -117,14 +117,17 @@ class XWindows:
         self.kinds[identity] = kind
         return kind
 
+    def client_windows(self):
+        return self.cardinals(self.root, '_NET_CLIENT_LIST_STACKING', 4096)
+
     def game_window(self, editor_pid):
-        for window in reversed(self.cardinals(self.root, '_NET_CLIENT_LIST_STACKING', 4096)):
+        for window in reversed(self.client_windows()):
             if self.kind(window, editor_pid) == 'game':
                 return window
         return 0
 
     def editor_window(self, editor_pid):
-        for window in reversed(self.cardinals(self.root, '_NET_CLIENT_LIST_STACKING', 4096)):
+        for window in reversed(self.client_windows()):
             if self.cardinal(window, '_NET_WM_PID') == editor_pid:
                 return window
         return 0
@@ -174,19 +177,35 @@ class Returns:
 
 def toggle_window(owner, windows, api=None):
     """Switch only within the active live session, without synthetic Alt+Tab."""
-    if not owner.active():
+    def skipped(reason):
+        print(f'AntiMicroX live direct switch skipped: {reason}', flush=True)
         return False
+
+    if not owner.active():
+        return skipped('session inactive')
     current = windows.current(owner.pid)
+    fallback = False
     if current[0] == 'editor':
         target = windows.game_window(owner.pid)
     elif current[0] == 'game':
         target = windows.editor_window(owner.pid)
     else:
-        return False  # Do not raise over an unrelated foreground application.
-    if not target or (api or EsApi()).running() != (200, owner.rom):
-        return False
+        # labwc may leave _NET_ACTIVE_WINDOW pointing at an unlisted window
+        # while the game is visible. Recover only when a Wine game window is
+        # still listed; keep refusing a real unrelated managed application.
+        if current[1] in windows.client_windows() or not windows.game_window(owner.pid):
+            return skipped(f'unrelated or unavailable foreground {current}')
+        fallback = True
+        target = windows.editor_window(owner.pid)
+    if not target:
+        return skipped('target window missing')
+    running = (api or EsApi()).running()
+    if running != (200, owner.rom):
+        return skipped(f'ES no longer runs this game: {running}')
     if not owner.active() or windows.current(owner.pid) != current:
-        return False
+        return skipped('session or foreground changed during switch')
+    if fallback and (current[1] in windows.client_windows() or not windows.game_window(owner.pid)):
+        return skipped('foreground became managed or game window disappeared')
     windows.activate(target)
     print(f'AntiMicroX live direct switch from={current[0]} target={target}', flush=True)
     return True

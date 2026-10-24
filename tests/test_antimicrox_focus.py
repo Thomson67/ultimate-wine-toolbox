@@ -18,6 +18,7 @@ class DirectSwitchTests(unittest.TestCase):
         self.windows.current.return_value = ('game', 20)
         self.windows.game_window.return_value = 20
         self.windows.editor_window.return_value = 10
+        self.windows.client_windows.return_value = [10, 20, 30]
         self.api = Mock()
         self.api.running.return_value = (200, self.owner.rom)
 
@@ -37,6 +38,40 @@ class DirectSwitchTests(unittest.TestCase):
         for kind in ('other', 'unknown'):
             self.windows.current.return_value = (kind, 30)
             self.assertFalse(self.switch())
+        self.windows.activate.assert_not_called()
+
+    def test_unlisted_active_window_does_not_block_editor_activation(self):
+        self.windows.current.return_value = ('other', 2097157)
+        self.assertTrue(self.switch())
+        self.windows.activate.assert_called_once_with(10)
+
+    def test_no_active_x11_window_can_recover_editor_when_game_is_present(self):
+        self.windows.current.return_value = ('unknown', 0)
+        self.assertTrue(self.switch())
+        self.windows.activate.assert_called_once_with(10)
+
+    def test_unlisted_focus_requires_game_editor_and_matching_es_session(self):
+        self.windows.current.return_value = ('other', 2097157)
+        self.windows.game_window.return_value = 0
+        self.assertFalse(self.switch())
+        self.windows.game_window.return_value = 20
+        self.windows.editor_window.return_value = 0
+        self.assertFalse(self.switch())
+        self.windows.editor_window.return_value = 10
+        self.api.running.return_value = (200, '/another/game.wine')
+        self.assertFalse(self.switch())
+        self.windows.activate.assert_not_called()
+
+    def test_foreign_window_becoming_managed_during_es_check_cancels_recovery(self):
+        self.windows.current.return_value = ('other', 2097157)
+        self.windows.client_windows.side_effect = [[10, 20], [10, 20, 2097157]]
+        self.assertFalse(self.switch())
+        self.windows.activate.assert_not_called()
+
+    def test_game_window_disappearing_during_es_check_cancels_recovery(self):
+        self.windows.current.return_value = ('other', 2097157)
+        self.windows.game_window.side_effect = [20, 0]
+        self.assertFalse(self.switch())
         self.windows.activate.assert_not_called()
 
     def test_wrong_rom_or_missing_target_is_not_activated(self):
