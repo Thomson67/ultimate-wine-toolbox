@@ -92,6 +92,47 @@ class TraceEventTests(unittest.TestCase):
         self.assertEqual(snapshot['active'], '0x0')
         window.x.XSendEvent.assert_not_called()
 
+    def test_explicit_focus_probe_sends_protocol_to_game_with_server_timestamp(self):
+        window = self.window([])
+        window.atoms['WM_PROTOCOLS'] = 12
+        window.x.XInternAtom.return_value = 55
+        window.cardinals = Mock(return_value=[55])
+        window.server_time = Mock(return_value=123456)
+        window.x.XSendEvent.return_value = 1
+        sent = []
+        def capture(display, target, propagate, mask, pointer):
+            event = trace.Event()
+            C.memmove(C.byref(event), pointer, C.sizeof(event))
+            sent.append((target, mask, event.message.message_type, list(event.message.data)))
+            return 1
+        window.x.XSendEvent.side_effect = capture
+        self.assertTrue(window.offer_focus(0x10))
+        self.assertEqual(sent, [(0x10, 0, 12, [55, 123456, 0, 0, 0])])
+        window.x.XSetInputFocus.assert_not_called()
+
+    def test_focus_probe_refuses_clients_without_the_protocol(self):
+        window = self.window([])
+        window.x.XInternAtom.return_value = 55
+        window.cardinals = Mock(return_value=[])
+        with self.assertRaises(RuntimeError):
+            window.offer_focus(0x10)
+        window.x.XSendEvent.assert_not_called()
+
+    def test_timestamp_window_is_never_mapped_and_is_destroyed(self):
+        window = self.window([])
+        window.root = 1
+        window.x.XCreateSimpleWindow.return_value = 99
+        def timestamp(display, target, mask, pointer):
+            event = trace.Event()
+            event.property.type = 28; event.property.time = 654321
+            C.memmove(pointer, C.byref(event), C.sizeof(event))
+            return 0
+        window.x.XWindowEvent.side_effect = timestamp
+        self.assertEqual(window.server_time(), 654321)
+        window.x.XDestroyWindow.assert_called_once_with(1, 99)
+        window.x.XMapWindow.assert_not_called()
+        window.x.XMapRaised.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,4 +1,4 @@
-"""Read-only X11/XWayland focus trace for an active AntiMicroX live session."""
+"""X11/XWayland live-session trace; optional, explicit WM_TAKE_FOCUS probe."""
 import argparse
 import ctypes as C
 from datetime import datetime
@@ -33,9 +33,15 @@ class ConfigureEvent(C.Structure):
         ('above', C.c_ulong), ('override_redirect', C.c_int)]
 
 
+class ClientMessageEvent(C.Structure):
+    _fields_ = HEAD + [('window', C.c_ulong), ('message_type', C.c_ulong),
+                      ('format', C.c_int), ('data', C.c_long*5)]
+
+
 class Event(C.Union):
     _fields_ = [('type', C.c_int), ('focus', FocusEvent), ('property', PropertyEvent),
                 ('structure', StructureEvent), ('configure', ConfigureEvent),
+                ('message', ClientMessageEvent),
                 ('pad', C.c_long*24)]
 
 
@@ -74,6 +80,41 @@ class TraceWindows(XWindows):
             return C.string_at(value).decode(errors='replace')
         finally:
             self.x.XFree(value)
+
+    def server_time(self):
+        """Obtain an actual X timestamp from an unmapped scratch window."""
+        self.x.XCreateSimpleWindow.argtypes = [C.c_void_p, C.c_ulong, C.c_int, C.c_int,
+                                              C.c_uint, C.c_uint, C.c_uint, C.c_ulong, C.c_ulong]
+        self.x.XCreateSimpleWindow.restype = C.c_ulong
+        self.x.XChangeProperty.argtypes = [C.c_void_p, C.c_ulong, C.c_ulong, C.c_ulong,
+                                           C.c_int, C.c_int, C.c_void_p, C.c_int]
+        self.x.XWindowEvent.argtypes = [C.c_void_p, C.c_ulong, C.c_long, C.POINTER(Event)]
+        self.x.XDestroyWindow.argtypes = [C.c_void_p, C.c_ulong]
+        window = self.x.XCreateSimpleWindow(self.display, self.root, 0, 0, 1, 1, 0, 0, 0)
+        if not window:
+            raise RuntimeError('Cannot obtain X11 server timestamp')
+        try:
+            self.x.XSelectInput(self.display, window, 1 << 22)
+            atom = self.x.XInternAtom(self.display, b'_UWT_FOCUS_TIMESTAMP', 0)
+            value = C.c_ubyte(1)
+            self.x.XChangeProperty(self.display, window, atom, 19, 8, 0, C.byref(value), 1)
+            event = Event()
+            self.x.XWindowEvent(self.display, window, 1 << 22, C.byref(event))
+            return event.property.time
+        finally:
+            self.x.XDestroyWindow(self.display, window)
+
+    def offer_focus(self, window):
+        """Explicit diagnostic probe: ask the client to take focus via ICCCM."""
+        protocol = self.x.XInternAtom(self.display, b'WM_TAKE_FOCUS', 0)
+        if protocol not in self.cardinals(window, 'WM_PROTOCOLS', 32):
+            raise RuntimeError('The game does not advertise WM_TAKE_FOCUS')
+        event = Event()
+        event.message = ClientMessageEvent(33, 0, 1, self.display, window,
+            self.atoms['WM_PROTOCOLS'], 32, (C.c_long*5)(protocol, self.server_time(), 0, 0, 0))
+        sent = self.x.XSendEvent(self.display, window, 0, 0, C.byref(event))
+        self.x.XFlush(self.display)
+        return bool(sent)
 
     def title(self, window):
         value = C.c_void_p()
@@ -175,6 +216,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--home', type=Path, default=Path('/userdata/system/ultimate-wine-toolbox'))
     parser.add_argument('--seconds', type=int, default=45)
+    parser.add_argument('--request-focus', action='store_true',
+                        help='Explicitly send WM_TAKE_FOCUS to the already active game (diagnostic test)')
     args = parser.parse_args()
     if not 5 <= args.seconds <= 120:
         parser.error('--seconds must be between 5 and 120')
@@ -191,14 +234,28 @@ def main():
     source = logdir/'antimicrox.log'
     position = source.stat().st_size if source.exists() else 0
     print(f'Trace pendant {args.seconds} s : {path}', flush=True)
-    print('Faire 2 ou 3 allers-retours Hotkey+R1. Si les touches bloquent, attendre 2 s puis appuyer sur E ou Échap.', flush=True)
+    if args.request_focus:
+        print('Test du protocole de focus sur le jeu actif, sans injection de touches.', flush=True)
+    else:
+        print('Faire 2 ou 3 allers-retours Hotkey+R1. Si les touches bloquent, attendre 2 s puis appuyer sur E ou Échap.', flush=True)
     with path.open('x', encoding='utf-8') as output:
         os.chmod(path, 0o600)
         recorder = Recorder(output)
         recorder.write('start', rom=rom, editor_pid=int(pid), session_id=owner.session_id,
-                       backend='X11/XWayland', watched_keys=['E', 'Escape'])
+                       backend='X11/XWayland', watched_keys=['E', 'Escape'],
+                       request_focus=args.request_focus)
         deadline, next_api = time.monotonic()+args.seconds, 0
         try:
+            if args.request_focus:
+                recorder.snapshot(windows.snapshot(owner.pid))
+                kind, game = windows.current(owner.pid)
+                if kind != 'game' or not owner.active() or api.running() != (200, rom):
+                    raise RuntimeError('Focus probe requires this live game to be in the foreground')
+                if windows.current(owner.pid) != ('game', game) or not owner.active():
+                    raise RuntimeError('Foreground changed; focus probe cancelled')
+                sent = windows.offer_focus(game)
+                recorder.write('focus_probe', window=hex(game), sent=sent)
+                print(f'WM_TAKE_FOCUS envoyé au jeu : {sent}. Tester les déplacements.', flush=True)
             while time.monotonic() < deadline and recorder.count < 10000:
                 recorder.snapshot(windows.snapshot(owner.pid))
                 for event in windows.events():
