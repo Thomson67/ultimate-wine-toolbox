@@ -10,6 +10,44 @@ sys.path.insert(0, str(HELPERS))
 import antimicrox_focus as focus
 
 
+class ReleaseTests(unittest.TestCase):
+    def setUp(self):
+        self.now = 0
+
+    def sleep(self, delay):
+        self.now += delay
+
+    def wait(self, devices, valid=lambda: True, timeout=2):
+        return focus.wait_controller_release(valid, devices, lambda: self.now, self.sleep, timeout)
+
+    def test_waits_until_hotkey_and_r1_are_both_released(self):
+        device = Mock()
+        device.active_keys.side_effect = lambda: ([316, 311] if self.now < .2 else
+                                                  [316] if self.now < .5 else [])
+        self.assertTrue(self.wait([device]))
+        self.assertGreaterEqual(self.now, .62)
+        device.grab.assert_not_called()
+
+    def test_repress_resets_the_quiet_period_and_second_controller_is_observed(self):
+        first, second = Mock(), Mock()
+        first.active_keys.return_value = []
+        second.active_keys.side_effect = lambda: [311] if .06 <= self.now < .2 else []
+        self.assertTrue(self.wait([first, second]))
+        self.assertGreaterEqual(self.now, .32)
+
+    def test_session_or_foreground_change_cancels_wait(self):
+        device = Mock(); device.active_keys.return_value = [311]
+        self.assertFalse(self.wait([device], valid=lambda: self.now < .1))
+        self.assertLess(self.now, .2)
+
+    def test_missing_disconnected_or_stuck_controllers_cancel_switch(self):
+        self.assertFalse(self.wait([]))
+        device = Mock(); device.active_keys.side_effect = OSError('disconnected')
+        self.assertFalse(self.wait([device]))
+        device.active_keys.side_effect = None; device.active_keys.return_value = [311]
+        self.assertFalse(self.wait([device], timeout=.2))
+
+
 class DirectSwitchTests(unittest.TestCase):
     def setUp(self):
         self.owner = Mock(pid=42, rom='/userdata/roms/windows/Game.wine')
@@ -105,6 +143,24 @@ class DirectSwitchTests(unittest.TestCase):
                 self.assertFalse(focus.toggle(home, 'current'))
                 self.windows.activate.assert_called_once_with(10)
                 self.windows.close.assert_called_once()
+
+    def test_release_wait_is_opt_in_and_never_activates_after_cancel(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder); state = home/'state'; (state/'antimicrox').mkdir(parents=True)
+            (state/'antimicrox-live.json').write_text(json.dumps({
+                'rom': self.owner.rom, 'phase': 'running', 'session_id': 'current'}))
+            (state/'antimicrox/session').write_text(f'{self.owner.rom}\t42\t123\n')
+            (state/'antimicrox-wait-release.enabled').touch()
+            with patch.object(focus, 'process_start', return_value='123'), \
+                 patch.object(focus, 'XWindows', return_value=self.windows), \
+                 patch.object(focus, 'EsApi', return_value=self.api), \
+                 patch.object(focus, 'wait_controller_release', return_value=False) as wait:
+                self.assertFalse(focus.toggle(home, 'current'))
+                self.windows.activate.assert_not_called()
+                wait.assert_called_once()
+                wait.return_value = True
+                self.assertTrue(focus.toggle(home, 'current'))
+                self.windows.activate.assert_called_once_with(10)
 
 
 class FocusTests(unittest.TestCase):

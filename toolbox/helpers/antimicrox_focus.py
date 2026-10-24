@@ -229,6 +229,59 @@ def toggle_window(owner, windows, api=None):
     return True
 
 
+def wait_controller_release(valid, devices=None, clock=time.monotonic, sleep=time.sleep, timeout=10):
+    """Read controller key state without grabbing devices or injecting events.
+
+    Experimental: wait for all controller buttons, including Guide/Hotkey,
+    then leave 120 ms for AntiMicroX to process its own release events.
+    """
+    opened = []
+    started = clock()
+    quiet = None
+    try:
+        if devices is None:
+            from evdev import InputDevice, ecodes, list_devices
+            for path in list_devices():
+                device = InputDevice(path)
+                try:
+                    keys = device.capabilities().get(ecodes.EV_KEY, [])
+                    gamepad = any(0x120 <= key < 0x140 for key in keys)
+                except BaseException:
+                    device.close()
+                    raise
+                if gamepad:
+                    opened.append(device)
+                else:
+                    device.close()
+            devices = opened
+        if not devices:
+            switch_log('release wait cancelled: no controller can be observed')
+            return False
+        switch_log(f'waiting for controller release devices={len(devices)}')
+        while clock()-started < timeout:
+            if not valid():
+                switch_log('release wait cancelled: session or foreground changed')
+                return False
+            pressed = [key for device in devices for key in device.active_keys()]
+            now = clock()
+            if pressed:
+                quiet = None
+            elif quiet is None:
+                quiet = now
+            elif now-quiet >= .12:
+                switch_log(f'controller release confirmed after {now-started:.3f}s')
+                return True
+            sleep(.02)
+        switch_log('release wait cancelled: buttons still held after 10 seconds')
+        return False
+    except (OSError, ImportError) as exc:
+        switch_log(f'release wait cancelled: {exc}')
+        return False
+    finally:
+        for device in opened:
+            device.close()
+
+
 def toggle(home, session_id):
     home = Path(home)
     # Serialize controller duplicates and refuse stale shortcuts from an older
@@ -255,11 +308,15 @@ def toggle(home, session_id):
         os.environ.setdefault('XAUTHORITY', '/var/lib/.Xauthority')
         windows = XWindows()
         try:
+            if (home/'state/antimicrox-wait-release.enabled').exists():
+                initial = windows.current(owner.pid)
+                if not wait_controller_release(lambda: owner.active() and windows.current(owner.pid) == initial):
+                    return False
             switched = toggle_window(owner, windows)
             if switched:
                 lock.seek(0)
                 lock.truncate()
-                lock.write(f'{session_id}\t{now}\n')
+                lock.write(f'{session_id}\t{time.monotonic()}\n')
                 lock.flush()
             return switched
         finally:
