@@ -47,6 +47,54 @@ class ReleaseTests(unittest.TestCase):
         device.active_keys.side_effect = None; device.active_keys.return_value = [311]
         self.assertFalse(self.wait([device], timeout=.2))
 
+    def test_sysfs_discovery_opens_only_gamepads_with_sparse_bitmap_words(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for name, codes in [('event0', [30, 57]), ('event1', [304, 316]),
+                                ('event2', [272]), ('event3', [288])]:
+                mask = sum(1 << code for code in codes)
+                bits = focus.C.sizeof(focus.C.c_ulong)*8
+                words = []
+                while mask:
+                    words.append(format(mask & ((1 << bits)-1), 'x'))
+                    mask >>= bits
+                path = root/name/'device/capabilities/key'
+                path.parent.mkdir(parents=True)
+                path.write_text(' '.join(reversed(words)))
+            factory = Mock()
+            devices = focus.controller_devices(root, factory)
+            self.assertEqual(len(devices), 2)
+            self.assertEqual([c.args[0] for c in factory.call_args_list],
+                             ['/dev/input/event1', '/dev/input/event3'])
+
+    def test_failed_discovery_closes_previously_opened_controllers(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for name in ['event1', 'event2']:
+                path = root/name/'device/capabilities/key'
+                path.parent.mkdir(parents=True)
+                path.write_text('1'+'0'*72)  # BTN_JOYSTICK = bit 288.
+            first = Mock()
+            with self.assertRaises(OSError):
+                focus.controller_devices(root, Mock(side_effect=[first, OSError('removed')]))
+            first.close.assert_called_once()
+
+    def test_key_state_ioctl_includes_guide_and_only_reads_state(self):
+        def ioctl(fd, request, buffer, mutate):
+            self.assertEqual(fd, 42)
+            self.assertEqual(request, 0x80604518)
+            self.assertTrue(mutate)
+            for key in [172, 311, 316]:
+                buffer[key//8] |= 1 << (key % 8)
+        with patch.object(focus.os, 'open', return_value=42) as opened, \
+             patch.object(focus.fcntl, 'ioctl', side_effect=ioctl), \
+             patch.object(focus.os, 'close') as closed:
+            device = focus.ControllerKeys('/dev/input/event1')
+            self.assertEqual(device.active_keys(), [172, 311, 316])
+            self.assertEqual(opened.call_args.args[1] & focus.os.O_ACCMODE, focus.os.O_RDONLY)
+            device.close()
+            closed.assert_called_once_with(42)
+
 
 class DirectSwitchTests(unittest.TestCase):
     def setUp(self):

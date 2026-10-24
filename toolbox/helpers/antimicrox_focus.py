@@ -229,6 +229,43 @@ def toggle_window(owner, windows, api=None):
     return True
 
 
+class ControllerKeys:
+    """Only EVIOCGKEY: no device-name queries, event reads, or exclusive grabs."""
+    def __init__(self, path):
+        self.fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
+
+    def active_keys(self):
+        keys = bytearray(96)  # Linux KEY_MAX = 0x2ff, including Guide buttons.
+        request = (2 << 30) | (len(keys) << 16) | (ord('E') << 8) | 0x18
+        fcntl.ioctl(self.fd, request, keys, True)
+        return [index*8+bit for index, value in enumerate(keys)
+                for bit in range(8) if value & (1 << bit)]
+
+    def close(self):
+        os.close(self.fd)
+
+
+def controller_devices(sysroot=Path('/sys/class/input'), factory=ControllerKeys):
+    """Filter sysfs key bitmaps before opening only joystick/gamepad devices."""
+    opened = []
+    word_bits = C.sizeof(C.c_ulong)*8
+    try:
+        for event in sorted(sysroot.glob('event*')):
+            try:
+                words = (event/'device/capabilities/key').read_text().split()
+            except FileNotFoundError:
+                continue  # Hot unplug during discovery.
+            mask = sum(int(word, 16) << (word_bits*index)
+                       for index, word in enumerate(reversed(words)))
+            if any(mask & (1 << key) for key in range(0x120, 0x140)):
+                opened.append(factory('/dev/input/'+event.name))
+        return opened
+    except BaseException:
+        for device in opened:
+            device.close()
+        raise
+
+
 def wait_controller_release(valid, devices=None, clock=time.monotonic, sleep=time.sleep, timeout=10):
     """Read controller key state without grabbing devices or injecting events.
 
@@ -240,24 +277,12 @@ def wait_controller_release(valid, devices=None, clock=time.monotonic, sleep=tim
     quiet = None
     try:
         if devices is None:
-            from evdev import InputDevice, ecodes, list_devices
-            for path in list_devices():
-                device = InputDevice(path)
-                try:
-                    keys = device.capabilities().get(ecodes.EV_KEY, [])
-                    gamepad = any(0x120 <= key < 0x140 for key in keys)
-                except BaseException:
-                    device.close()
-                    raise
-                if gamepad:
-                    opened.append(device)
-                else:
-                    device.close()
+            opened = controller_devices()
             devices = opened
         if not devices:
             switch_log('release wait cancelled: no controller can be observed')
             return False
-        switch_log(f'waiting for controller release devices={len(devices)}')
+        switch_log(f'waiting for controller release devices={len(devices)} discovery={clock()-started:.3f}s')
         while clock()-started < timeout:
             if not valid():
                 switch_log('release wait cancelled: session or foreground changed')
@@ -274,7 +299,7 @@ def wait_controller_release(valid, devices=None, clock=time.monotonic, sleep=tim
             sleep(.02)
         switch_log('release wait cancelled: buttons still held after 10 seconds')
         return False
-    except (OSError, ImportError) as exc:
+    except (OSError, ValueError) as exc:
         switch_log(f'release wait cancelled: {exc}')
         return False
     finally:
