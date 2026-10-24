@@ -100,8 +100,24 @@ else
   mkdir -p "$XDG_CONFIG_HOME"
   args=(--hidden --no-tray --eventgen uinput --log-level info --profile "$real")
 fi
-"$binary" "${args[@]}" >> "$LOG" 2>&1 9>&- &
-pid=$!
+# Batocera 44 waits for captured hook pipes to reach EOF. A parent wrapper
+# can retain duplicates beyond stdout/stderr; a shell background launch keeps
+# those open for the editor's lifetime. Close every inherited nonstandard FD
+# and give AMX its own session, stdin and log before returning to configgen.
+if ! pid="$(python3 - "$binary" "$LOG" "${args[@]}" 9>&- <<'PY'
+import subprocess
+import sys
+
+with open(sys.argv[2], 'ab', buffering=0) as log:
+    process = subprocess.Popen([sys.argv[1], *sys.argv[3:]],
+                               stdin=subprocess.DEVNULL, stdout=log,
+                               stderr=subprocess.STDOUT, close_fds=True,
+                               start_new_session=True)
+print(process.pid)
+PY
+)"; then
+  live_error "Failed to detach AntiMicroX"; exit 0
+fi
 sleep 1
 kill -0 "$pid" 2>/dev/null || { live_error "AntiMicroX exited early"; exit 0; }
 stamp="$(proc_start "$pid")"
