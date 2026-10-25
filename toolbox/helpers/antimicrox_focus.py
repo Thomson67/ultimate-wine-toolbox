@@ -1,4 +1,4 @@
-"""Refresh Wine focus after returning from the managed live profile editor."""
+"""Manage native Alt+Tab and controller switching for the live profile editor."""
 import argparse
 import ctypes as C
 import ctypes.util
@@ -152,6 +152,9 @@ class XWindows:
 
     def activate(self, window):
         # EWMH client message: ask labwc/X11 WM, without injecting Alt+Tab/keys.
+        self.request(window, '_NET_ACTIVE_WINDOW', (2, 0, 0, 0, 0))
+
+    def request(self, window, name, values):
         class Message(C.Structure):
             _fields_ = [('type', C.c_int), ('serial', C.c_ulong), ('send_event', C.c_int),
                         ('display', C.c_void_p), ('window', C.c_ulong),
@@ -160,9 +163,30 @@ class XWindows:
             _fields_ = [('message', Message), ('pad', C.c_long*24)]
         event = Event()
         event.message = Message(33, 0, 1, self.display, window,
-                                self.atoms['_NET_ACTIVE_WINDOW'], 32, (C.c_long*5)(2, 0, 0, 0, 0))
+                                self.atoms[name], 32, (C.c_long*5)(*values))
         self.x.XSendEvent(self.display, self.root, 0, (1 << 20) | (1 << 19), C.byref(event))
         self.x.XFlush(self.display)
+
+    def editor_switcher(self, editor_pid):
+        # Upstream 3.6.1 marks MainWindow as WindowModal. labwc excludes
+        # modal views from Alt+Tab. Request a WM state change, rather than
+        # changing the property behind the compositor's cached state.
+        for name in ('WM_TRANSIENT_FOR', '_NET_WM_STATE', '_NET_WM_STATE_MODAL',
+                     '_NET_WM_WINDOW_TYPE', '_NET_WM_WINDOW_TYPE_NORMAL'):
+            if name not in self.atoms:
+                self.atoms[name] = self.x.XInternAtom(self.display, name.encode(), 0)
+        for window in self.client_windows():
+            if (self.cardinal(window, '_NET_WM_PID') != editor_pid
+                    or self.cardinal(window, 'WM_TRANSIENT_FOR')
+                    or self.atoms['_NET_WM_WINDOW_TYPE_NORMAL'] not in
+                    self.cardinals(window, '_NET_WM_WINDOW_TYPE', 64)):
+                continue
+            if self.atoms['_NET_WM_STATE_MODAL'] in self.cardinals(window, '_NET_WM_STATE', 64):
+                self.request(window, '_NET_WM_STATE',
+                             (0, self.atoms['_NET_WM_STATE_MODAL'], 0, 2, 0))
+                switch_log(f'enabled native Alt+Tab for editor window={window}')
+            return window
+        return 0
 
     def close(self):
         self.x.XCloseDisplay(self.display)
@@ -269,7 +293,7 @@ def controller_devices(sysroot=Path('/sys/class/input'), factory=ControllerKeys)
 def wait_controller_release(valid, devices=None, clock=time.monotonic, sleep=time.sleep, timeout=10):
     """Read controller key state without grabbing devices or injecting events.
 
-    Experimental: wait for all controller buttons, including Guide/Hotkey,
+    Wait for all controller buttons, including Guide/Hotkey,
     then leave 120 ms for AntiMicroX to process its own release events.
     """
     opened = []
@@ -333,10 +357,9 @@ def toggle(home, session_id):
         os.environ.setdefault('XAUTHORITY', '/var/lib/.Xauthority')
         windows = XWindows()
         try:
-            if (home/'state/antimicrox-wait-release.enabled').exists():
-                initial = windows.current(owner.pid)
-                if not wait_controller_release(lambda: owner.active() and windows.current(owner.pid) == initial):
-                    return False
+            initial = windows.current(owner.pid)
+            if not wait_controller_release(lambda: owner.active() and windows.current(owner.pid) == initial):
+                return False
             switched = toggle_window(owner, windows)
             if switched:
                 lock.seek(0)
@@ -346,6 +369,15 @@ def toggle(home, session_id):
             return switched
         finally:
             windows.close()
+
+
+def prepare_switcher(owner, windows, clock=time.monotonic, sleep=time.sleep, timeout=10):
+    deadline = clock()+timeout
+    while owner.active() and clock() < deadline:
+        if windows.editor_switcher(owner.pid):
+            return True
+        sleep(.1)
+    return False
 
 
 def introduction(owner, windows, api, clock=time.monotonic, sleep=time.sleep,
@@ -376,10 +408,10 @@ def introduction(owner, windows, api, clock=time.monotonic, sleep=time.sleep,
                         language = 'fr' if os.environ.get('LANG', '').startswith('fr') else 'en'
                     shortcut = owner.read().get('switch_fr' if language == 'fr' else 'switch_en', 'Alt+Tab')
                     message = (f'Configurer avec AntiMicroX : {shortcut}'
-                               '\nRelâchez les boutons après la bascule. Enregistrez le profil avant de quitter.'
+                               '\nAppuyez puis relâchez les boutons pour basculer. Enregistrez le profil avant de quitter.'
                                if language == 'fr' else
                                f'Configure with AntiMicroX: {shortcut}'
-                               '\nRelease the buttons after switching. Save the profile before quitting.')
+                               '\nPress and release the buttons to switch. Save the profile before quitting.')
                     try:
                         result = run([sys.executable, str(Path(__file__).with_name('antimicrox_notice.py')), message],
                                      timeout=9, check=False, stdin=subprocess.DEVNULL)
@@ -459,6 +491,7 @@ def main():
                 return
             windows = XWindows()
             print('AntiMicroX live XWayland focus observer started', flush=True)
+            prepare_switcher(owner, windows)
             watch(owner, windows)
         except (OSError, RuntimeError) as exc:
             print(f'AntiMicroX live focus observer unavailable: {exc}', flush=True)

@@ -184,7 +184,8 @@ class DirectSwitchTests(unittest.TestCase):
             (state/'antimicrox/session').write_text(f'{self.owner.rom}\t42\t123\n')
             with patch.object(focus, 'process_start', return_value='123'), \
                  patch.object(focus, 'XWindows', return_value=self.windows) as factory, \
-                 patch.object(focus, 'EsApi', return_value=self.api):
+                 patch.object(focus, 'EsApi', return_value=self.api), \
+                 patch.object(focus, 'wait_controller_release', return_value=True):
                 self.assertFalse(focus.toggle(home, 'previous'))
                 factory.assert_not_called()
                 self.assertTrue(focus.toggle(home, 'current'))
@@ -192,13 +193,12 @@ class DirectSwitchTests(unittest.TestCase):
                 self.windows.activate.assert_called_once_with(10)
                 self.windows.close.assert_called_once()
 
-    def test_release_wait_is_opt_in_and_never_activates_after_cancel(self):
+    def test_release_wait_is_automatic_and_never_activates_after_cancel(self):
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder); state = home/'state'; (state/'antimicrox').mkdir(parents=True)
             (state/'antimicrox-live.json').write_text(json.dumps({
                 'rom': self.owner.rom, 'phase': 'running', 'session_id': 'current'}))
             (state/'antimicrox/session').write_text(f'{self.owner.rom}\t42\t123\n')
-            (state/'antimicrox-wait-release.enabled').touch()
             with patch.object(focus, 'process_start', return_value='123'), \
                  patch.object(focus, 'XWindows', return_value=self.windows), \
                  patch.object(focus, 'EsApi', return_value=self.api), \
@@ -209,6 +209,40 @@ class DirectSwitchTests(unittest.TestCase):
                 wait.return_value = True
                 self.assertTrue(focus.toggle(home, 'current'))
                 self.windows.activate.assert_called_once_with(10)
+
+
+class NativeSwitcherTests(unittest.TestCase):
+    def test_only_owned_main_window_loses_modal_state_via_wm_request(self):
+        windows = focus.XWindows.__new__(focus.XWindows)
+        names = ['WM_TRANSIENT_FOR', '_NET_WM_STATE', '_NET_WM_STATE_MODAL',
+                 '_NET_WM_WINDOW_TYPE', '_NET_WM_WINDOW_TYPE_NORMAL']
+        windows.atoms = dict(zip(names, range(1, 6)))
+        windows.client_windows = Mock(return_value=[10, 20, 30, 40])
+        # Foreign app, real modal dialog, utility window, owned main window.
+        windows.cardinal = Mock(side_effect=lambda w, n:
+            (99 if w == 10 else 42) if n == '_NET_WM_PID' else (40 if w == 20 else 0))
+        windows.cardinals = Mock(side_effect=lambda w, n, limit:
+            ([6] if w == 30 else [5]) if n == '_NET_WM_WINDOW_TYPE' else [3, 77])
+        windows.request = Mock()
+        self.assertEqual(windows.editor_switcher(42), 40)
+        windows.request.assert_called_once_with(40, '_NET_WM_STATE', (0, 3, 0, 2, 0))
+        windows.request.reset_mock()
+        windows.cardinals.side_effect = lambda w, n, limit: [5] if n == '_NET_WM_WINDOW_TYPE' else [77]
+        self.assertEqual(windows.editor_switcher(42), 30)
+        windows.request.assert_not_called()
+
+    def test_startup_waits_for_editor_to_map_and_stops_when_session_ends(self):
+        owner, windows = Mock(pid=42), Mock()
+        now = [0.]
+        def sleep(delay):
+            now[0] += delay
+        windows.editor_switcher.side_effect = [0, 0, 40]
+        self.assertTrue(focus.prepare_switcher(owner, windows, lambda: now[0], sleep))
+        self.assertEqual(windows.editor_switcher.call_count, 3)
+        owner.active.return_value = False
+        windows.editor_switcher.reset_mock()
+        self.assertFalse(focus.prepare_switcher(owner, windows))
+        windows.editor_switcher.assert_not_called()
 
 
 class FocusTests(unittest.TestCase):
