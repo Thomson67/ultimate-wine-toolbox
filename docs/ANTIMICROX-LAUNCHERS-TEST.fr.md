@@ -106,6 +106,11 @@ Dans **Mes jeux et leurs profils**, choisir le jeu puis :
 - **Partager la configuration complète avec la communauté** : envoi pour validation.
 - **Exporter la configuration complète dans un ZIP** : création locale sans publication.
 
+Ces deux actions sont aussi accessibles directement dans **Télécharger ou partager
+des profils** : **Partager la configuration d’un jeu (profils et règles launcher)**
+et **Exporter la configuration d’un jeu dans un ZIP**. Elles demandent le jeu à
+transférer et récupèrent son profil associé et ses règles automatiquement.
+
 Sur l’autre machine, installer cette version de test ou une version ultérieure
 compatible, puis télécharger le partage ou ouvrir **Télécharger ou partager des
 profils > Importer un paquet ZIP**. Choisir ensuite le jeu cible et l’option

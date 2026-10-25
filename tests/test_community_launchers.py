@@ -196,5 +196,49 @@ community_share antimicrox AntiMicroX /userdata/roms/windows/Game.wine /userdata
         self.assertEqual((self.home/'export-command').read_bytes().decode().split('\0')[-3:-1], ['--rom', '/userdata/roms/windows/Game.wine'])
 
 
+    def test_community_menu_exposes_complete_sharing_and_offline_export_in_both_languages(self):
+        for language in ('fr', 'en'):
+            for action, destination in [('share_game', 'community'), ('export', 'local')]:
+                with self.subTest(language=language, action=action), tempfile.TemporaryDirectory() as folder:
+                    home = Path(folder)
+                    script = r'''
+source "$ROOT/toolbox/modules/community.sh"
+i18n() { echo Back; }
+menu_select() {
+  if [ -f "$WT_HOME/asked" ]; then echo back;
+  else touch "$WT_HOME/asked"; printf '%s\0' "$@" > "$WT_HOME/options"; echo "$ACTION"; fi
+}
+amx_choose_game() { echo /userdata/roms/windows/Launcher.wine; }
+amx_current_profile() { printf '%s' "$1" > "$WT_HOME/selected"; echo /userdata/launcher.amgp; }
+community_share() { printf '%s\0' "$@" > "$WT_HOME/shared"; }
+community_menu antimicrox
+'''
+                    result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=5,
+                        env=dict(os.environ, ROOT=str(ROOT), WT_HOME=str(home), WT_LANGUAGE=language, ACTION=action))
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    options = (home/'options').read_bytes().decode().split('\0')
+                    self.assertIn('share_game', options[2:-1:2])
+                    self.assertIn('export', options[2:-1:2])
+                    args = (home/'shared').read_bytes().decode().split('\0')[:-1]
+                    self.assertEqual(args[0], 'antimicrox')
+                    self.assertEqual(args[2:], ['/userdata/roms/windows/Launcher.wine', '/userdata/launcher.amgp', destination])
+                    self.assertEqual((home/'selected').read_text(), '/userdata/roms/windows/Launcher.wine')
+
+    def test_game_configuration_share_does_not_fall_back_to_an_unrelated_profile(self):
+        script = r'''
+source "$ROOT/toolbox/modules/community.sh"
+amx_choose_game() { echo /userdata/roms/windows/Unconfigured.wine; }
+amx_current_profile() { :; }
+msgbox() { echo "$2"; }
+community_share() { touch "$WT_HOME/unwanted-share"; }
+community_share_game_config AntiMicroX
+'''
+        result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=5,
+            env=dict(os.environ, ROOT=str(ROOT), WT_HOME=str(self.home), WT_LANGUAGE='fr'))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('pas encore de profil', result.stdout)
+        self.assertFalse((self.home/'unwanted-share').exists())
+
+
 if __name__ == '__main__':
     unittest.main()

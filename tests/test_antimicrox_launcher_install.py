@@ -154,5 +154,18 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertNotIn('portable launcher packages', (self.home/'toolbox/helpers/community_profiles.py').read_text())
 
 
+    def test_upgrade_from_complete_package_test_adds_community_menu_actions(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        module = self.source/'toolbox/modules/community.sh'
+        module.write_bytes(module.read_bytes()+b'\n# complete game menu actions\n')
+        with patch.object(installer, 'COMPLETE_PACKAGE_HASHES', hashes):
+            backup = self.install()
+        self.assertIn('complete game menu actions', (self.home/'toolbox/modules/community.sh').read_text())
+        installer.restore(backup)
+        self.assertNotIn('complete game menu actions', (self.home/'toolbox/modules/community.sh').read_text())
+
+
 if __name__ == '__main__':
     unittest.main()

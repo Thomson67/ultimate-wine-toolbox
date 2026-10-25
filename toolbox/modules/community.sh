@@ -345,6 +345,18 @@ The $asset_en and these details will be sent to the community service for review
   community_send_package "$title" "${output%%$'\n'*}" "$kind"
 }
 
+
+community_share_game_config() {
+  local title="$1" rom="${2:-}" destination="${3:-community}" profile
+  [ -n "$rom" ] || rom="$(amx_choose_game)" || return
+  profile="$(amx_current_profile "$rom")"
+  if [ -z "$profile" ]; then
+    msgbox "$title" "$(community_txt 'Ce jeu n’a pas encore de profil associé. Configurez-le dans « Créer ou modifier un profil en jeu » avant de partager sa configuration.' 'This game has no assigned profile yet. Configure it in “Create or edit a profile in game” before sharing its configuration.')"
+    return
+  fi
+  community_share antimicrox "$title" "$rom" "$profile" "$destination"
+}
+
 community_import_package() {
   local kind="$1" title="$2" rom="${3:-}" package path
   if command -v yad >/dev/null 2>&1; then
@@ -461,6 +473,7 @@ community_menu() {
   local kind="$1" rom="${2:-}" title choice query="" rows id label selected details path output share_label empty_label count_label search_prompt
   local -a items=()
   local browse_label intro
+  local -a config_options=()
   if [ "$kind" = antimicrox ]; then title="AntiMicroX — $(community_txt 'Profils communautaires' 'Community profiles')"; else title="ReShade — $(community_txt 'Presets communautaires' 'Community presets')"; fi
   if [ "$kind" = reshade ]; then
     share_label="$(community_txt 'Partager mon preset ReShade' 'Share my ReShade preset')"
@@ -471,6 +484,8 @@ community_menu() {
     search_prompt="$(community_txt 'Jeu, nom du preset ReShade ou auteur' 'Game, ReShade preset title or author')"
   else
     share_label="$(community_txt 'Partager mon profil de manette' 'Share my controller profile')"
+    config_options=(share_game "$(community_txt 'Partager la configuration d’un jeu (profils et règles launcher)' 'Share a game configuration (profiles and launcher rules)')"
+      export "$(community_txt 'Exporter la configuration d’un jeu dans un ZIP' 'Export a game configuration to a ZIP')")
     browse_label="$(community_txt 'Voir les profils disponibles' 'Browse available profiles')"
     intro="$(community_txt 'Un profil contient les commandes de la manette pour un jeu. Téléchargez ceux d’autres joueurs ou partagez les vôtres. Un modérateur valide les partages avant publication.' 'A profile contains controller mappings for a game. Download profiles from other players or share yours. A moderator reviews submissions before publication.')"
     empty_label="$(community_txt 'Aucun profil AntiMicroX trouvé. Actualisez le catalogue ou partagez votre profil.' 'No AntiMicroX profile found. Refresh the catalogue or share your profile.')"
@@ -482,6 +497,7 @@ community_menu() {
       browse "$browse_label" \
       search "$(community_txt 'Rechercher un jeu ou un auteur' 'Search for a game or author')" \
       refresh "$(community_txt 'Mettre à jour la liste' 'Refresh the list')" \
+      "${config_options[@]}" \
       share "$share_label" \
       import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')" \
       validate "$(community_txt 'Valider les partages (modérateurs)' 'Review submissions (moderators)')" \
@@ -491,6 +507,8 @@ community_menu() {
         if output="$(community_cmd refresh --kind "$kind" 2>&1)"; then msgbox "$title" "$(community_txt "Catalogue actualisé : $output $count_label." "Catalogue refreshed: $output $count_label.")"; else msgbox "$title" "$(community_txt 'Actualisation impossible ; le cache précédent reste disponible.' 'Refresh failed; the previous cache remains available.')
 $output"; fi
         continue ;;
+      share_game) community_share_game_config "$title" "$rom" community; continue ;;
+      export) community_share_game_config "$title" "$rom" local; continue ;;
       share) community_share "$kind" "$title" "$rom"; continue ;;
       import) community_import_package "$kind" "$title" "$rom"; continue ;;
       validate) community_validate "$kind" "$title"; continue ;;
