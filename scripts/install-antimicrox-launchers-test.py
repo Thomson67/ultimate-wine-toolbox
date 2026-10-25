@@ -20,6 +20,7 @@ BASE_HASHES = {
 HELPER = 'toolbox/helpers/antimicrox_launcher.py'
 PREVIOUS_TEST_HASHES = {'toolbox/helpers/antimicrox_live.py': '5777f847f8246a60f83f40e0a8c9a7318c6a8edeba201abb21519e0747f03fc2', 'toolbox/modules/antimicrox.sh': 'de4dd8b409a83f3ad143198af0a81a4e29a3a542051410c0217fd656091a6943', 'toolbox/hooks/antimicrox-game-event.sh': 'fa10f1c767aa62c10ab86f62210f8386ff8a955c28a0afd43e2e3bea90e65e63', 'toolbox/helpers/antimicrox_launcher.py': '3383d6fb3e686f51679eff304e3b0b5f17449f514154721b2ca4b82f8dc0a76e'}
 
+RETEST_TEST_HASHES = {'toolbox/helpers/antimicrox_live.py': '9b4d42ba3a8c644d8ceee981128c43793fded6f703dc38b5d432c8b7576bcc67', 'toolbox/modules/antimicrox.sh': '999cfc3009ff435840bbbbc032612c684843974d853c86a3bd51e0d8f7f05f72', 'toolbox/hooks/antimicrox-game-event.sh': 'e64e2d83ee294f5335fc2b98db599d4993b7c2164d9b497bd43978d6ff058f55', 'toolbox/helpers/antimicrox_launcher.py': '5dbef12ca5f2005127c9122d37b36db2e3be4c25a64380d206b4e0d29f5ce974'}
 
 def sha(data):
     return hashlib.sha256(data).hexdigest()
@@ -51,7 +52,16 @@ def install(home, hook, ref, source=None):
     targets = [(home/path, path) for path in BASE_HASHES]
     targets += [(home/HELPER, HELPER), (hook, 'toolbox/hooks/antimicrox-game-event.sh')]
     upgrading = (home/HELPER).exists()
-    expected = PREVIOUS_TEST_HASHES if upgrading else BASE_HASHES
+    expected = BASE_HASHES
+    if upgrading:
+        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES):
+            if all(not target.is_symlink() and target.is_file() and
+                   sha(target.read_bytes()) == candidate.get(source_path)
+                   for target, source_path in targets):
+                expected = candidate
+                break
+        else:
+            raise ValueError('Version de test inconnue ou code modifié : aucun fichier modifié.')
     for target, source_path in targets:
         if target.is_symlink():
             raise ValueError('Chemin symbolique inattendu : '+str(target))
@@ -104,7 +114,7 @@ def install(home, hook, ref, source=None):
             else:
                 replace(target, (backup/entry['original']).read_bytes(), entry['mode'])
         raise
-    print('Test launchers installé. Ouvrez la Toolbox > AntiMicroX > 10.')
+    print('Test launchers installé. Ouvrez AntiMicroX > Créer ou modifier un profil en jeu > Jeu avec launcher.')
     print('Vos archives, profils et réglages Sunshine restent inchangés.')
     print('Pour retirer le test (fermer le jeu et la Toolbox) :')
     import shlex

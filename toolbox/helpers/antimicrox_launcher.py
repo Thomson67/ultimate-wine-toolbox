@@ -315,10 +315,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--home', default=os.environ.get('WT_HOME', '/userdata/system/ultimate-wine-toolbox'))
     sub = parser.add_subparsers(dest='command', required=True)
-    for name in ('show', 'disable', 'learn', 'observations', 'initial', 'prepare-test', 'is-test'):
+    for name in ('show', 'disable', 'learn', 'observations', 'initial', 'prepare-test', 'is-test',
+                 'configured', 'game-profile'):
         p = sub.add_parser(name)
         p.add_argument('rom')
-        if name in ('initial', 'prepare-test'):
+        if name in ('initial', 'prepare-test', 'configured', 'game-profile'):
             p.add_argument('assigned')
     p = sub.add_parser('save')
     p.add_argument('rom'); p.add_argument('mode', choices=('launcher', 'profiles'))
@@ -363,6 +364,16 @@ def main():
     elif args.command == 'initial':
         if store.load(args.rom, args.assigned):
             print(store.empty())
+    elif args.command == 'configured':
+        value = read_json(store.path(args.rom), {})
+        if (isinstance(value, dict) and value.get('rom') == args.rom
+                and value.get('launcher_profile')
+                and Path(value['launcher_profile']).resolve() == Path(args.assigned).resolve()):
+            print('1')
+    elif args.command == 'game-profile':
+        value = store.load(args.rom, args.assigned)
+        if value and value['mode'] == 'profiles':
+            print(value['game_profile'])
     elif args.command == 'prepare-test':
         config = store.load(args.rom, args.assigned)
         if config is None:

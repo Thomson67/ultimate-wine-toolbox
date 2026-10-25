@@ -114,6 +114,16 @@ class LauncherInstallTests(unittest.TestCase):
         for name, content in previous.items():
             self.assertEqual((self.home/name).read_bytes(), content)
 
+    def test_upgrade_also_accepts_the_retest_version(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        module = self.source/'toolbox/modules/antimicrox.sh'
+        module.write_bytes(module.read_bytes()+b'\n# integrated menus\n')
+        with patch.object(installer, 'RETEST_TEST_HASHES', hashes):
+            self.install()
+        self.assertIn('integrated menus', (self.home/'toolbox/modules/antimicrox.sh').read_text())
+
 
 if __name__ == '__main__':
     unittest.main()

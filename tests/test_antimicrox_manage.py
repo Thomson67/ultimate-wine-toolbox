@@ -194,7 +194,7 @@ amx_manage_game "$GAME"
 
 class MainMenuRouteTests(unittest.TestCase):
     def test_numbered_choices_launch_the_expected_actions_in_both_languages(self):
-        expected=['live','manage','assign','community:antimicrox','convert','editor','controllers','delete','install','launchers']
+        expected=['live','manage','assign','community:antimicrox','convert','editor','controllers','delete','install']
         for language in ('fr','en'):
             for number, action in enumerate(expected,1):
                 with self.subTest(language=language,choice=number), tempfile.TemporaryDirectory() as folder:
@@ -226,5 +226,5 @@ antimicrox_menu
                     self.assertEqual(result.returncode,0,result.stderr)
                     self.assertEqual((home/'route').read_text().strip(),action)
                     args=(home/'menu').read_bytes().decode().split('\0')[:-1]
-                    self.assertEqual(args[2::2],[str(n) for n in range(1,11)]+['0'])
+                    self.assertEqual(args[2::2],[str(n) for n in range(1,10)]+['0'])
                     self.assertNotIn('/dev/uinput',args[1])

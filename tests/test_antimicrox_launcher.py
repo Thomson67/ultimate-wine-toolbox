@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -83,6 +84,17 @@ class LauncherTests(unittest.TestCase):
         self.config()
         self.assertIsNotNone(self.store.load(self.rom, str(self.launcher)))
         self.assertIsNone(self.store.load(self.rom, str(self.game)))
+
+    def test_management_recognizes_launcher_even_if_secondary_profile_is_missing(self):
+        self.config('profiles')
+        self.game.unlink()
+        script = Path(launcher.__file__)
+        for assigned, expected in [(str(self.launcher), '1'), (str(self.game), '')]:
+            result = subprocess.run([sys.executable, str(script), '--home', str(self.home),
+                                     'configured', self.rom, assigned],
+                                    text=True, capture_output=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), expected)
 
     def test_invalid_profile_and_missing_secondary_profile_are_refused(self):
         self.game.write_text('<not-a-profile/>')

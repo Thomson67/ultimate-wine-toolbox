@@ -325,6 +325,10 @@ amx_manage_game() {
   while true; do
     profile="$(amx_current_profile "$rom")"
     [ -n "$profile" ] || return 0
+    if [ "$(amx_launcher_cmd configured "$rom" "$profile" 2>/dev/null)" = 1 ]; then
+      amx_manage_launcher_game "$rom"
+      return
+    fi
     status=""
     [ -e "$rom" ] || status="$(amx_txt 'Jeu introuvable : association conservée.' 'Game missing: association retained.')\n"
     [ -f "$profile" ] || status+="$(amx_txt 'Fichier profil introuvable.' 'Profile file missing.')\n"
@@ -413,7 +417,7 @@ amx_live_start_for() {
   fi
   exit 0
 }
-amx_live_choose() {
+amx_live_choose_standard() {
   local rom current choice profile
   local -a options=()
   amx_ensure_installed || return 1
@@ -431,6 +435,16 @@ amx_live_choose() {
     *) return ;;
   esac
   amx_live_start_for "$rom" "$profile"
+}
+amx_live_choose() {
+  local choice
+  choice="$(menu_select AntiMicroX "$(amx_txt 'Quel type de configuration souhaitez-vous créer ou modifier ?' 'Which type of configuration do you want to create or edit?')" \
+    standard "$(amx_txt 'Profil classique pour le jeu' 'Standard game profile')" \
+    launcher "$(amx_txt 'Jeu avec launcher : profils et fenêtres' 'Game with a launcher: profiles and windows')" back "$(i18n back)")" || return
+  case "$choice" in
+    standard) amx_live_choose_standard ;;
+    launcher) amx_launchers_menu ;;
+  esac
 }
 amx_live_resume() {
   local rom profile result error choice
@@ -577,17 +591,10 @@ amx_launcher_setup() {
   fi
   mode="$(menu_select AntiMicroX "$(basename "$rom")\n\n$(amx_txt 'Comportement du mapping aux prochains lancements :' 'Mapping behavior for future launches:')" \
     launcher "$(amx_txt 'Launcher uniquement, puis commandes natives du jeu' 'Launcher only, then native game controls')" \
-    profiles "$(amx_txt 'Un profil launcher et un profil jeu distinct' 'Separate launcher and game profiles')" \
-    session "$(amx_txt 'Même profil pour toute la session' 'Same profile for the whole session')" back "$(i18n back)")" || return
-  case "$mode" in launcher|profiles|session) ;; *) return ;; esac
+    profiles "$(amx_txt 'Un profil launcher et un profil jeu distinct' 'Separate launcher and game profiles')" back "$(i18n back)")" || return
+  case "$mode" in launcher|profiles) ;; *) return ;; esac
   [ -n "$profile" ] || profile="$(amx_profile_file "$(amx_current_profile "$rom")")" || return
   profile="$(amx_validate_profile "$profile")" || return
-  if [ "$mode" = session ]; then
-    amx_set_profile "$rom" "$profile" || return 1
-    amx_launcher_cmd disable "$rom" || return 1
-    msgbox AntiMicroX "$(amx_txt 'Profil actif pendant toute la session. Règles launcher désactivées.' 'Profile active throughout the session. Launcher rules disabled.')"
-    return
-  fi
   launcher_rule="$(amx_launcher_rule "$rom" "$(amx_txt 'Fenêtre du launcher' 'Launcher window')")" || return
   if [ "$mode" = profiles ]; then
     msgbox AntiMicroX "$(amx_txt 'Choisissez maintenant le profil à appliquer dans le jeu.' 'Now choose the profile to apply in the game.')"
@@ -621,38 +628,87 @@ amx_launcher_setup() {
   [ "$choice" != test ] || amx_launcher_test_start "$rom"
 }
 
+amx_manage_launcher_game() {
+  local rom="$1" profile game_profile choice output
+  local -a items=()
+  while true; do
+    profile="$(amx_current_profile "$rom")"
+    [ -n "$profile" ] || return
+    game_profile="$(amx_launcher_cmd game-profile "$rom" "$profile" 2>/dev/null)" || game_profile=""
+    items=(test "$(amx_txt 'Retester la bascule launcher / jeu' 'Retest launcher / game switching')"
+      rules "$(amx_txt 'Modifier les fenêtres, le mode ou les profils associés' 'Edit windows, mode or assigned profiles')"
+      edit_launcher "$(amx_txt 'Modifier les commandes du profil launcher' 'Edit launcher profile controls')")
+    [ -z "$game_profile" ] || items+=(edit_game "$(amx_txt 'Modifier les commandes du profil jeu' 'Edit game profile controls')")
+    items+=(learn "$(amx_txt 'Configurer en jeu et refaire le relevé des fenêtres' 'Configure in game and record windows again')"
+      info "$(amx_txt 'Voir les règles et les profils' 'View rules and profiles')"
+      classic "$(amx_txt 'Désactiver les règles launcher (garder le profil)' 'Disable launcher rules (keep the profile)')"
+      remove "$(amx_txt 'Désactiver AntiMicroX pour ce jeu (garder les profils)' 'Disable AntiMicroX for this game (keep profiles)')"
+      back "$(i18n back)")
+    choice="$(menu_select AntiMicroX "$(basename "$rom")\n\n$(amx_txt 'Jeu avec launcher' 'Game with a launcher')\n$(amx_txt 'Profil launcher :' 'Launcher profile:') $profile${game_profile:+\n$(amx_txt 'Profil jeu :' 'Game profile:') $game_profile}" "${items[@]}")" || return
+    case "$choice" in
+      test) amx_launcher_test_start "$rom" ;;
+      rules) amx_launcher_setup "$rom" ;;
+      edit_launcher) amx_editor "$profile" ;;
+      edit_game) [ -z "$game_profile" ] || amx_editor "$game_profile" ;;
+      learn) amx_launcher_learn_for "$rom"; return ;;
+      info)
+        output="$(amx_launcher_cmd show "$rom" 2>&1)"
+        msgbox AntiMicroX "$output"
+        amx_profile_info "$profile"
+        [ -z "$game_profile" ] || amx_profile_info "$game_profile" ;;
+      classic)
+        if amx_running; then msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX.' 'Close the game and AntiMicroX.')"; continue; fi
+        if yesno AntiMicroX "$(amx_txt 'Désactiver les règles launcher et conserver le profil classique pour ce jeu ?' 'Disable launcher rules and keep the standard profile for this game?')"; then
+          amx_launcher_cmd disable "$rom" || continue
+          amx_manage_game "$rom"
+          return
+        fi ;;
+      remove)
+        if amx_running; then msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX.' 'Close the game and AntiMicroX.')"; continue; fi
+        if yesno AntiMicroX "$(amx_txt 'Retirer les règles et l’association de ce jeu ? Les fichiers profils seront conservés.' 'Remove rules and this game assignment? Profile files will be kept.')"; then
+          amx_launcher_cmd disable "$rom" || continue
+          amx_set_profile "$rom" "" && return
+        fi ;;
+      *) return ;;
+    esac
+  done
+}
+
+amx_launcher_learn_for() {
+  local rom="$1" profile choice
+  if amx_running; then
+    msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX avant l’apprentissage.' 'Close the game and AntiMicroX before learning.')"; return
+  fi
+  profile="$(amx_current_profile "$rom")"
+  if [ -n "$profile" ]; then
+    choice="$(menu_select AntiMicroX "$(amx_txt 'Profil pour configurer le launcher :' 'Profile for configuring the launcher:')" \
+      current "$(amx_txt 'Modifier le profil actuel' 'Edit the current profile')" \
+      new "$(amx_txt 'Créer un nouveau profil' 'Create a new profile')" \
+      existing "$(amx_txt 'Choisir un profil enregistré' 'Choose a saved profile')" back "$(i18n back)")" || return
+  else
+    choice="$(menu_select AntiMicroX "$(amx_txt 'Profil pour configurer le launcher :' 'Profile for configuring the launcher:')" \
+      new "$(amx_txt 'Créer un nouveau profil' 'Create a new profile')" \
+      existing "$(amx_txt 'Choisir un profil enregistré' 'Choose a saved profile')" back "$(i18n back)")" || return
+  fi
+  case "$choice" in current) ;; new) profile="" ;; existing) profile="$(amx_profile_file)" || return ;; *) return ;; esac
+  amx_launcher_cmd learn "$rom" || return
+  msgbox AntiMicroX "$(amx_txt 'Le relevé démarre avec le jeu.\n\nAffichez le launcher, configurez et enregistrez son mapping dans AntiMicroX, puis passez dans le jeu quelques secondes. Quittez normalement. Au retour, choisissez « Configurer les règles launcher / jeu ».\n\nHotkey+R1 et Alt+Tab gardent leur fonctionnement habituel.' 'Recording starts with the game.\n\nShow the launcher, configure and save its mapping in AntiMicroX, then enter the game for a few seconds. Quit normally. On return, choose “Configure launcher / game rules”.\n\nHotkey+R1 and Alt+Tab keep their usual behavior.')"
+  amx_live_start_for "$rom" "$profile"
+}
+
 amx_launchers_menu() {
   local rom="${1:-}" choice profile output
   amx_ensure_installed || return
   [ -n "$rom" ] || rom="$(amx_choose_game)" || return
   while true; do
-    choice="$(menu_select AntiMicroX "$(basename "$rom")\n\n$(amx_txt 'Gestion des launchers — version de test Xorg / XWayland.\n\nApprenez les fenêtres pendant une configuration en jeu, puis choisissez les règles au retour. Les jeux existants ne sont pas migrés automatiquement.' 'Launcher management — Xorg / XWayland test version.\n\nLearn windows during live editing, then choose rules on return. Existing games are not migrated automatically.')" \
+    choice="$(menu_select AntiMicroX "$(basename "$rom")\n\n$(amx_txt 'Jeu avec launcher\n\nConfigurez les commandes et relevez les fenêtres, puis choisissez quand chaque profil doit être actif.' 'Game with a launcher\n\nConfigure controls and record windows, then choose when each profile should be active.')" \
       learn "$(amx_txt 'Apprendre les fenêtres et configurer le mapping en jeu' 'Learn windows and configure mappings in game')" \
       setup "$(amx_txt 'Configurer les profils et les règles' 'Configure profiles and rules')" \
       test "$(amx_txt 'Retester les règles enregistrées' 'Retest saved rules')" \
       show "$(amx_txt 'Voir les règles enregistrées' 'View saved rules')" \
       disable "$(amx_txt 'Désactiver les règles (garder le profil associé)' 'Disable rules (keep the assigned profile)')" back "$(i18n back)")" || return
     case "$choice" in
-      learn)
-        if amx_running; then
-          msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX avant l’apprentissage.' 'Close the game and AntiMicroX before learning.')"; continue
-        fi
-        profile="$(amx_current_profile "$rom")"
-        if [ -n "$profile" ]; then
-          choice="$(menu_select AntiMicroX "$(amx_txt 'Profil pour configurer le launcher :' 'Profile for configuring the launcher:')" \
-            current "$(amx_txt 'Modifier le profil actuel' 'Edit the current profile')" \
-            new "$(amx_txt 'Créer un nouveau profil' 'Create a new profile')" \
-            existing "$(amx_txt 'Choisir un profil enregistré' 'Choose a saved profile')" back "$(i18n back)")" || continue
-        else
-          choice="$(menu_select AntiMicroX "$(amx_txt 'Profil pour configurer le launcher :' 'Profile for configuring the launcher:')" \
-            new "$(amx_txt 'Créer un nouveau profil' 'Create a new profile')" \
-            existing "$(amx_txt 'Choisir un profil enregistré' 'Choose a saved profile')" back "$(i18n back)")" || continue
-        fi
-        case "$choice" in current) ;; new) profile="" ;; existing) profile="$(amx_profile_file)" || continue ;; *) continue ;; esac
-        amx_launcher_cmd learn "$rom" || continue
-        msgbox AntiMicroX "$(amx_txt 'Le relevé démarre avec le jeu.\n\nAffichez le launcher, configurez et enregistrez son mapping dans AntiMicroX, puis passez dans le jeu quelques secondes. Quittez normalement. Au retour, choisissez « Configurer les règles launcher / jeu ».\n\nHotkey+R1 et Alt+Tab gardent leur fonctionnement habituel.' 'Recording starts with the game.\n\nShow the launcher, configure and save its mapping in AntiMicroX, then enter the game for a few seconds. Quit normally. On return, choose “Configure launcher / game rules”.\n\nHotkey+R1 and Alt+Tab keep their usual behavior.')"
-        amx_live_start_for "$rom" "$profile"
-        return ;;
+      learn) amx_launcher_learn_for "$rom"; return ;;
       setup) amx_launcher_setup "$rom" ;;
       test) amx_launcher_test_start "$rom" ;;
       show)
@@ -685,10 +741,8 @@ antimicrox_menu() {
       7 "$(amx_txt 'Voir les manettes détectées' 'View detected controllers')" \
       8 "$(amx_txt 'Supprimer un profil enregistré' 'Delete a saved profile')" \
       9 "$(amx_txt 'Installer ou mettre à jour AntiMicroX' 'Install or update AntiMicroX')" \
-      10 "$(amx_txt 'Configurer un jeu avec launcher (test)' 'Configure a game with a launcher (test)')" \
       0 "$(i18n back)")" || return
     case "$choice" in
-      10|launchers) amx_launchers_menu ;;
       1) amx_live_choose ;;
       2) amx_manage_associations ;;
       3) amx_assign_existing ;;

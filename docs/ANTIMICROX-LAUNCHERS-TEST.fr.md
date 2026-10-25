@@ -15,7 +15,8 @@ restauration, conservée avec sa sauvegarde sous `state/backups`.
 
 ## Premier essai
 
-1. Toolbox → AntiMicroX → **10. Configurer un jeu avec launcher (test)**.
+1. Toolbox → AntiMicroX → **Créer ou modifier un profil en jeu** →
+   **Jeu avec launcher : profils et fenêtres**.
 2. Choisir le jeu, puis **Apprendre les fenêtres et configurer le mapping en jeu**.
 3. Créer un profil ou choisir un profil existant. La configuration en direct
    utilise toujours un profil manuel, sans bascule automatique. Hotkey+R1,
@@ -42,14 +43,26 @@ Un jeu peut aussi être lancé directement depuis ES pour vérifier les règles.
 Le mode **Profils distincts** permet ensuite de choisir un profil jeu existant
 et sa propre règle. L'option conseillée limite ce profil à une fenêtre de jeu
 identifiée ; l'autre option l'applique à toute autre fenêtre Wine reconnue de
-la même session. **Même profil pour toute la session** revient au comportement
-classique en retirant les règles de ce jeu.
+la même session. Il n'y a pas de mode « même profil pour toute la session » dans
+les règles launcher : cela correspond à l'association classique d'un profil.
+
+## Retrouver et modifier un jeu déjà configuré
+
+Dans **Mes jeux et leurs profils**, sélectionner un jeu ayant des règles
+launcher actives ouvre directement son menu spécifique : retester la bascule,
+modifier les fenêtres/mode/profils associés, éditer les commandes du launcher
+ou du profil jeu lorsqu'il existe, et refaire l'apprentissage en jeu.
+
+**Désactiver les règles launcher (garder le profil)** revient au menu classique
+du même jeu. **Désactiver AntiMicroX pour ce jeu** retire les règles et
+l'association, sans supprimer les fichiers profils. Modifier le profil jeu ne
+réaffecte pas ce profil à la place du profil launcher.
 
 Le menu de test permet aussi de consulter ou désactiver les règles. Aucun
 nom de jeu ou suffixe `[L]` n'active cette fonctionnalité automatiquement.
 
-L'installateur accepte également les fichiers exacts du premier test launchers
-pour une mise à jour sur place. Les profils et règles déjà enregistrés sont
+L'installateur accepte également les fichiers exacts des deux premiers tests
+launchers pour une mise à jour sur place. Les profils et règles déjà enregistrés sont
 conservés ; un fichier de code modifié manuellement est refusé.
 
 ## Limites à vérifier sur Batocera
