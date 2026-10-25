@@ -23,7 +23,7 @@ restauration, conservée avec sa sauvegarde sous `state/backups`.
    Alt+Tab et l'exclusion temporaire d'ES restent ceux de la v0.7.2.
 4. Afficher le launcher, enregistrer son mapping dans AntiMicroX. Afficher
    ensuite le jeu quelques secondes, puis quitter le jeu normalement.
-5. Au retour, choisir **Configurer les règles launcher / jeu (test)**.
+5. Au retour, la configuration des fenêtres et des règles s’ouvre directement, sans étape « Activer / Réessayer ».
 6. Pour commencer, choisir **Launcher uniquement** puis le titre exact de la
    fenêtre du launcher dans la liste enregistrée. La classe ou l'exécutable
    peuvent servir lorsque leur identité est plus stable. Un titre partiel

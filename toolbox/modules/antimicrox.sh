@@ -387,7 +387,7 @@ amx_manage_associations() {
 }
 amx_live_cmd() { python3 "$WT_ROOT/helpers/antimicrox_live.py" --home "$WT_HOME" "$@"; }
 amx_live_start_for() {
-  local rom="$1" profile="${2:-}" selected switch_label
+  local rom="$1" profile="${2:-}" learning="${3:-}" selected switch_label
   local -a options=()
   amx_ensure_installed || return 1
   [ -w /dev/uinput ] || {
@@ -400,6 +400,7 @@ amx_live_start_for() {
     msgbox AntiMicroX "$(amx_txt 'Fermez l’éditeur AntiMicroX avant de lancer cette session.' 'Close the AntiMicroX editor before starting this session.')"; return 1;
   fi
   [ -z "$profile" ] || options=(--profile "$profile")
+  [ "$learning" != learning ] || options+=(--launcher-learning)
   if ! selected="$(amx_live_cmd prepare "$rom" "${options[@]}" 2>/tmp/uwt-amx-live.log)"; then
     msgbox AntiMicroX "$(amx_txt 'Préparation impossible :' 'Preparation failed:')\n$(cat /tmp/uwt-amx-live.log)"
     return 1
@@ -474,6 +475,13 @@ amx_live_resume() {
     amx_launcher_test_resume "$rom" "$result" "$error"
     return
   fi
+  if [ "$(amx_live_cmd field launcher_learning)" = True ]; then
+    amx_live_cmd clear || return 1
+    [ -z "$error" ] || msgbox AntiMicroX "$result\n$error"
+    amx_launcher_setup "$rom" "$profile"
+    amx_launchers_menu "$rom"
+    return
+  fi
   while true; do
     choice="$(menu_select AntiMicroX "$(amx_txt "Session terminée : $(basename "$rom")\nProfil : $profile\nRésultat : $result\n$error\nRaccourci temporaire retiré.\nJournal : /userdata/system/logs/ultimate-wine-toolbox/antimicrox.log" "Session finished: $(basename "$rom")\nProfile: $profile\nResult: $result\n$error\nTemporary shortcut removed.\nLog: /userdata/system/logs/ultimate-wine-toolbox/antimicrox.log")" \
       activate "$(amx_txt 'Utiliser ce profil aux prochains lancements' 'Use this profile whenever this game starts')" \
@@ -539,7 +547,7 @@ amx_launcher_test_resume() {
         amx_live_cmd clear || return 1
         profile="$(amx_current_profile "$rom")"
         amx_launcher_cmd learn "$rom" || return 1
-        amx_live_start_for "$rom" "$profile"
+        amx_live_start_for "$rom" "$profile" learning
         return ;;
       *) amx_live_cmd clear; return ;;
     esac
@@ -692,8 +700,8 @@ amx_launcher_learn_for() {
   fi
   case "$choice" in current) ;; new) profile="" ;; existing) profile="$(amx_profile_file)" || return ;; *) return ;; esac
   amx_launcher_cmd learn "$rom" || return
-  msgbox AntiMicroX "$(amx_txt 'Le relevé démarre avec le jeu.\n\nAffichez le launcher, configurez et enregistrez son mapping dans AntiMicroX, puis passez dans le jeu quelques secondes. Quittez normalement. Au retour, choisissez « Configurer les règles launcher / jeu ».\n\nHotkey+R1 et Alt+Tab gardent leur fonctionnement habituel.' 'Recording starts with the game.\n\nShow the launcher, configure and save its mapping in AntiMicroX, then enter the game for a few seconds. Quit normally. On return, choose “Configure launcher / game rules”.\n\nHotkey+R1 and Alt+Tab keep their usual behavior.')"
-  amx_live_start_for "$rom" "$profile"
+  msgbox AntiMicroX "$(amx_txt 'Le relevé démarre avec le jeu.\n\nAffichez le launcher, configurez et enregistrez son mapping dans AntiMicroX, puis passez dans le jeu quelques secondes. Quittez normalement. Au retour, la sélection des fenêtres et des règles s’ouvrira directement.\n\nHotkey+R1 et Alt+Tab gardent leur fonctionnement habituel.' 'Recording starts with the game.\n\nShow the launcher, configure and save its mapping in AntiMicroX, then enter the game for a few seconds. Quit normally. Window and rule selection will open directly on return.\n\nHotkey+R1 and Alt+Tab keep their usual behavior.')"
+  amx_live_start_for "$rom" "$profile" learning
 }
 
 amx_launchers_menu() {

@@ -125,5 +125,16 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertIn('integrated menus', (self.home/'toolbox/modules/antimicrox.sh').read_text())
 
 
+    def test_upgrade_accepts_integrated_menus_version(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        module = self.source/'toolbox/modules/antimicrox.sh'
+        module.write_bytes(module.read_bytes()+b'\n# direct learning return\n')
+        with patch.object(installer, 'INTEGRATED_MENUS_HASHES', hashes):
+            self.install()
+        self.assertIn('direct learning return', (self.home/'toolbox/modules/antimicrox.sh').read_text())
+
+
 if __name__ == '__main__':
     unittest.main()

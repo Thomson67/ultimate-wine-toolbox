@@ -17,6 +17,32 @@ spec.loader.exec_module(live)
 
 
 class LiveSessionTests(unittest.TestCase):
+    def test_launcher_learning_returns_directly_to_rules_without_classic_result_menu(self):
+        data = self.session.prepare(self.rom, launcher_learning=True)
+        self.assertTrue(data['launcher_learning'])
+        self.session.finish('normal')
+        fake_root = self.base/'toolbox'
+        (fake_root/'hooks').mkdir(parents=True)
+        (fake_root/'hooks/antimicrox-game-event.sh').write_text('#!/bin/bash\nexit 0\n')
+        script = r'''
+source "$MODULE"
+amx_live_cmd() { python3 "$HELPER" --home "$WT_HOME" "$@"; }
+amx_launcher_setup() { printf '%s\n%s' "$1" "$2" > "$WT_HOME/setup"; }
+amx_launchers_menu() { printf '%s' "$1" > "$WT_HOME/launcher-menu"; }
+menu_select() { touch "$WT_HOME/unwanted-classic-menu"; echo back; }
+amx_live_resume
+'''
+        result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=10,
+            env=dict(os.environ, WT_HOME=str(self.home), WT_ROOT=str(fake_root), WT_LANGUAGE='fr',
+                     MODULE=str(ROOT/'toolbox/modules/antimicrox.sh'), HELPER=str(ROOT/'toolbox/helpers/antimicrox_live.py')))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.home/'setup').read_text(), str(self.rom)+'\n'+data['profile'])
+        self.assertEqual((self.home/'launcher-menu').read_text(), str(self.rom))
+        self.assertFalse((self.home/'unwanted-classic-menu').exists())
+        self.assertFalse(self.session.state.exists())
+        self.assertFalse(self.keys.exists())
+        self.assertTrue(Path(data['profile']).is_file())
+
     def test_runtime_rules_test_uses_return_lifecycle_without_editor_shortcut(self):
         data = self.session.prepare(self.rom, runtime_test=True)
         self.assertTrue(data['runtime_test'])
