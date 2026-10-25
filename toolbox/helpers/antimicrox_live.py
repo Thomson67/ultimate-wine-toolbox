@@ -118,6 +118,8 @@ class LiveSession:
         with self.locked():
             if self.state.exists():
                 raise ValueError('A previous live session must be recovered first.')
+            from antimicrox_switcher import update_scope
+            update_scope(self.home, 'restore')
             rom = Path(rom).absolute()
             if '..' in rom.parts or not rom.is_relative_to(self.rom_root) or not rom.exists():
                 raise ValueError('Select an existing Windows ROM.')
@@ -199,12 +201,17 @@ class LiveSession:
                 if error:
                     data['error'] = error
                 self.write(data)
+                if phase == 'running':
+                    from antimicrox_switcher import update_scope
+                    update_scope(self.home, 'hide', data['session_id'])
 
     def finish(self, result='stopped', rom=None):
         with self.locked():
             data = self.read()
             if not data or (rom is not None and data['rom'] != rom):
                 return data
+            from antimicrox_switcher import update_scope
+            update_scope(self.home, 'restore', data.get('session_id'))
             if data['phase'] == 'finished':
                 return data
             keys = Path(data['keys'])
@@ -265,6 +272,8 @@ class LiveSession:
             data = self.read()
             if data and data['phase'] != 'finished':
                 raise ValueError('Restore the temporary keys before clearing the session.')
+            from antimicrox_switcher import update_scope
+            update_scope(self.home, 'restore', (data or {}).get('session_id'))
             self.state.unlink(missing_ok=True)
 
 
