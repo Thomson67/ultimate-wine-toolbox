@@ -150,6 +150,28 @@ cat "$AMX_OVERRIDES"
                     try: os.kill(pid, 9)
                     except ProcessLookupError: pass
 
+    def test_hook_releases_captured_pipe_duplicated_by_parent_wrapper(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder); hook, rom = self.hook_fixture(base)
+            env = dict(os.environ, WT_HOME=folder)
+            # Model a wrapper retaining a duplicate of the hook's captured
+            # stdout. Redirecting only fd 1/2 leaves this pipe open in AMX.
+            process = subprocess.Popen(
+                ['bash', '-c', 'exec 7>&1; exec "$@"', 'wrapper',
+                 'bash', str(hook), 'gameStart', 'windows', '', '', rom],
+                env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            try:
+                out, err = process.communicate(timeout=5)
+                self.assertEqual(process.returncode, 0, err)
+                session = base/'state/antimicrox/session'
+                self.assertTrue(session.exists())
+                pid = int(session.read_text().split('\t')[1])
+                os.kill(pid, 0)  # The hook completed while AMX remains alive.
+            finally:
+                subprocess.run(['bash', str(hook), 'gameStop', 'windows', '', '', rom],
+                               env=env, capture_output=True, timeout=8)
+                process.communicate(timeout=5)
+
     def test_live_hook_opens_one_visible_instance_without_no_tray(self):
         with tempfile.TemporaryDirectory() as folder:
             base = Path(folder); hook, rom = self.hook_fixture(base)

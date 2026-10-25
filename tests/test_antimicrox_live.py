@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -92,7 +93,12 @@ amx_live_resume
     def test_new_session_creates_profile_and_temporary_shortcut_then_removes_keys(self):
         data = self.session.prepare(self.rom)
         self.assertTrue(live.valid_profile(data['profile']))
-        self.assertEqual(json.loads(self.keys.read_text())['actions_player1'], [live.ACTION])
+        self.assertEqual(json.loads(self.keys.read_text())['actions_player1'], [data['action']])
+        self.assertEqual(data['action']['type'], 'exec')
+        self.assertEqual(data['action']['trigger'], live.ACTION['trigger'])
+        command = shlex.split(data['action']['target'])
+        self.assertEqual(command[:7], ['python3', str(self.home/'toolbox/helpers/antimicrox_focus.py'),
+                                      'toggle', '--home', str(self.home), '--session-id', data['session_id']])
         self.assertEqual(self.session.profile(str(self.rom)), data['profile'])
         self.session.finish('normal')
         self.assertFalse(self.keys.exists())
@@ -112,8 +118,8 @@ amx_live_resume
     def test_same_chord_is_overridden_without_duplicates_and_restored(self):
         old = {'trigger': ['pagedown', 'hotkey'], 'type': 'key', 'target': []}
         self.keys.write_text(json.dumps({'actions_player1': [old]}))
-        self.session.prepare(self.rom)
-        self.assertEqual(json.loads(self.keys.read_text())['actions_player1'], [live.ACTION])
+        data = self.session.prepare(self.rom)
+        self.assertEqual(json.loads(self.keys.read_text())['actions_player1'], [data['action']])
         self.session.finish()
         self.assertEqual(json.loads(self.keys.read_text())['actions_player1'], [old])
 
@@ -133,6 +139,18 @@ amx_live_resume
         self.keys.write_text(json.dumps({'actions_player1': [replacement]}))
         self.session.finish()
         self.assertEqual(json.loads(self.keys.read_text())['actions_player1'], [replacement])
+
+    def test_direct_switch_command_quotes_home_and_has_a_new_session_token(self):
+        home = self.base/"home with spaces ' $(echo bad)"
+        session = live.LiveSession(home, self.rom_root)
+        first = session.prepare(self.rom)
+        command = shlex.split(first['action']['target'])
+        self.assertEqual(command[1], str(home/'toolbox/helpers/antimicrox_focus.py'))
+        self.assertEqual(command[4], str(home))
+        self.assertEqual(command[6], first['session_id'])
+        session.finish(); session.clear()
+        second = session.prepare(self.rom)
+        self.assertNotEqual(first['session_id'], second['session_id'])
 
     def test_invalid_existing_json_is_not_overwritten(self):
         self.keys.write_text('broken json')
