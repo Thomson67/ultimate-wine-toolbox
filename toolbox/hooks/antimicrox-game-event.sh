@@ -77,7 +77,11 @@ live_error() {
 [ -n "$profile" ] || exit 0
 LAUNCHER_HELPER="$ROOT/toolbox/helpers/antimicrox_launcher.py"
 launcher_runtime=0
-if [ "$live" -eq 0 ] && [ -f "$LAUNCHER_HELPER" ]; then
+runtime_test=0
+if [ "$live" -eq 1 ] && [ -f "$LAUNCHER_HELPER" ]; then
+  [ "$(python3 "$LAUNCHER_HELPER" --home "$ROOT" is-test "$rom" 2>> "$LOG")" != 1 ] || runtime_test=1
+fi
+if { [ "$live" -eq 0 ] || [ "$runtime_test" -eq 1 ]; } && [ -f "$LAUNCHER_HELPER" ]; then
   if ! initial="$(python3 "$LAUNCHER_HELPER" --home "$ROOT" initial "$rom" "$profile" 2>> "$LOG")"; then
     live_error "Invalid launcher configuration; mapping launch refused"
     exit 0
@@ -98,7 +102,7 @@ if pgrep -x antimicrox >/dev/null 2>&1 ||
    pgrep -f "^$ROOT/tools/antimicrox/squashfs-root/(AppRun|usr/bin/antimicrox)([[:space:]]|$)" >/dev/null 2>&1; then
   live_error "AntiMicroX already running outside this game session; launch refused"; exit 0
 fi
-if [ "$live" -eq 1 ]; then
+if [ "$live" -eq 1 ] && [ "$runtime_test" -eq 0 ]; then
   # One visible editing instance for this game, with an isolated settings home.
   export XDG_CONFIG_HOME="$STATE/live-config"
   rm -rf -- "$XDG_CONFIG_HOME"
@@ -136,7 +140,7 @@ stamp="$(proc_start "$pid")"
 [ -n "$stamp" ] || exit 0
 printf '%s\t%s\t%s\n' "$rom" "$pid" "$stamp" > "$session"
 if [ -f "$LAUNCHER_HELPER" ]; then
-  if [ "$live" -eq 1 ]; then
+  if [ "$live" -eq 1 ] && [ "$runtime_test" -eq 0 ]; then
     python3 "$LAUNCHER_HELPER" --home "$ROOT" spawn "$rom" "$pid" "$stamp" --learning >> "$LOG" 2>&1 9>&- || true
   elif [ "$launcher_runtime" -eq 1 ]; then
     python3 "$LAUNCHER_HELPER" --home "$ROOT" spawn "$rom" "$pid" "$stamp" >> "$LOG" 2>&1 9>&- || true
@@ -144,9 +148,9 @@ if [ -f "$LAUNCHER_HELPER" ]; then
 fi
 if [ "$live" -eq 1 ]; then
   python3 "$LIVE_HELPER" --home "$ROOT" mark "$rom" --phase running >> "$LOG" 2>&1 || true
-  if [ -f "$ROOT/toolbox/helpers/antimicrox_focus.py" ] && command -v batocera-flash-screen >/dev/null 2>&1; then
+  if [ "$runtime_test" -eq 0 ] && [ -f "$ROOT/toolbox/helpers/antimicrox_focus.py" ] && command -v batocera-flash-screen >/dev/null 2>&1; then
     python3 "$ROOT/toolbox/helpers/antimicrox_focus.py" spawn "$rom" "$pid" "$stamp" --home "$ROOT" >> "$LOG" 2>&1 9>&- || true
   fi
 fi
-log "started $rom pid=$pid profile=$real live=$live"
+log "started $rom pid=$pid profile=$real live=$live launcher_test=$runtime_test"
 exit 0

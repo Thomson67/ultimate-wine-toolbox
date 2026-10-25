@@ -150,6 +150,50 @@ cat "$AMX_OVERRIDES"
                     try: os.kill(pid, 9)
                     except ProcessLookupError: pass
 
+    def test_runtime_retest_launches_hidden_with_automatic_rules_not_live_editor(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder); hook, rom = self.hook_fixture(base)
+            helpers = base/'toolbox/helpers'; helpers.mkdir(parents=True)
+            profile = base/'My Profile.amgp'
+            empty = base/'empty.amgp'; empty.write_text('<gamecontroller><sets/></gamecontroller>')
+            (base/'state').mkdir(exist_ok=True)
+            (base/'state/antimicrox-live.json').write_text('{}')
+            (helpers/'antimicrox_live.py').write_text('''import os,sys
+from pathlib import Path
+if sys.argv[3]=='profile': print(Path(os.environ['WT_HOME'])/'My Profile.amgp')
+''')
+            (helpers/'antimicrox_launcher.py').write_text('''import os,sys
+from pathlib import Path
+base=Path(os.environ['WT_HOME'])
+if sys.argv[3]=='is-test': print('1')
+elif sys.argv[3]=='initial': print(base/'empty.amgp')
+elif sys.argv[3]=='spawn': (base/'observer-args').write_text(' '.join(sys.argv[4:]))
+''')
+            binary = base/'tools/antimicrox/antimicrox'
+            text = binary.read_text().replace('import os, signal, time', 'import os, signal, time, sys')
+            text = text.replace("base = Path(os.environ['WT_HOME'])", "Path(os.environ['WT_HOME']).joinpath('args').write_text('\\n'.join(sys.argv[1:]))\nbase = Path(os.environ['WT_HOME'])")
+            binary.write_text(text)
+            env = dict(os.environ, WT_HOME=folder)
+            pid = None
+            try:
+                result = subprocess.run(['bash', str(hook), 'gameStart', 'windows', '', '', rom],
+                                        env=env, capture_output=True, timeout=8)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                pid = int((base/'state/antimicrox/session').read_text().split('\t')[1])
+                args = (base/'args').read_text().splitlines()
+                self.assertIn('--hidden', args)
+                self.assertNotIn('--show', args)
+                self.assertEqual(args[args.index('--profile')+1], str(empty))
+                self.assertTrue((base/'observer-args').exists())
+                self.assertNotIn('--learning', (base/'observer-args').read_text())
+                self.assertFalse((base/'state/antimicrox/live-config').exists())
+            finally:
+                subprocess.run(['bash', str(hook), 'gameStop', 'windows', '', '', rom],
+                               env=env, capture_output=True, timeout=8)
+                if pid:
+                    try: os.kill(pid, 9)
+                    except ProcessLookupError: pass
+
     def test_hook_releases_captured_pipe_duplicated_by_parent_wrapper(self):
         with tempfile.TemporaryDirectory() as folder:
             base = Path(folder); hook, rom = self.hook_fixture(base)

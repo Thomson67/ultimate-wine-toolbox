@@ -27,8 +27,17 @@ restauration, conservée avec sa sauvegarde sous `state/backups`.
    fenêtre du launcher dans la liste enregistrée. La classe ou l'exécutable
    peuvent servir lorsque leur identité est plus stable. Un titre partiel
    peut exclure des versions ou compteurs variables.
-7. Enregistrer et lancer le jeu directement depuis ES : le profil launcher
-   doit s'activer sur la fenêtre reconnue et devenir vide en jeu.
+7. Enregistrer puis choisir **Tester maintenant les fenêtres choisies** : le jeu
+   est relancé avec les règles automatiques, sans ouvrir l'éditeur. Le profil
+   launcher doit s'activer sur la fenêtre reconnue et devenir vide en jeu.
+8. Quitter le jeu pour revenir au menu **Retester / Modifier les règles /
+   Refaire l'apprentissage**. La liste des fenêtres relevées reste disponible.
+
+Le menu de gestion du launcher propose également **Retester les règles
+enregistrées**, sans refaire l'apprentissage. Les tests utilisent le même
+cycle de lancement différé et de retour à la Toolbox que l'édition en direct,
+mais sans ouvrir l'éditeur, ajouter Hotkey+R1 ou masquer ES dans Alt+Tab.
+Un jeu peut aussi être lancé directement depuis ES pour vérifier les règles.
 
 Le mode **Profils distincts** permet ensuite de choisir un profil jeu existant
 et sa propre règle. L'option conseillée limite ce profil à une fenêtre de jeu
@@ -38,6 +47,10 @@ classique en retirant les règles de ce jeu.
 
 Le menu de test permet aussi de consulter ou désactiver les règles. Aucun
 nom de jeu ou suffixe `[L]` n'active cette fonctionnalité automatiquement.
+
+L'installateur accepte également les fichiers exacts du premier test launchers
+pour une mise à jour sur place. Les profils et règles déjà enregistrés sont
+conservés ; un fichier de code modifié manuellement est refusé.
 
 ## Limites à vérifier sur Batocera
 

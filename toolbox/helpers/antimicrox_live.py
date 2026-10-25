@@ -114,7 +114,7 @@ class LiveSession:
     def write(self, data):
         atomic(self.state, json.dumps(data, ensure_ascii=False, indent=2).encode())
 
-    def prepare(self, rom, profile=None):
+    def prepare(self, rom, profile=None, runtime_test=False):
         with self.locked():
             if self.state.exists():
                 raise ValueError('A previous live session must be recovered first.')
@@ -152,6 +152,10 @@ class LiveSession:
             if not valid_profile(profile):
                 raise ValueError('Invalid AntiMicroX XML profile.')
             action, switch_fr, switch_en = switch_for(profile, self.home, actions)
+            if runtime_test:
+                # Reuse the proven detached launch/return lifecycle, without
+                # the editor or its temporary controller shortcut.
+                action = None
             session_id = uuid.uuid4().hex
             if action:
                 # Activate the owned editor/game windows directly. Alt+Tab may
@@ -170,6 +174,8 @@ class LiveSession:
                     'mode': mode, 'injected_sha256': digest(injected), 'displaced': displaced,
                     'result': '', 'error': '', 'action': action,
                     'switch_fr': switch_fr, 'switch_en': switch_en}
+            if runtime_test:
+                data['runtime_test'] = True
             # Persist the original before any change, including power-loss recovery.
             self.write(data)
             try:
@@ -201,7 +207,7 @@ class LiveSession:
                 if error:
                     data['error'] = error
                 self.write(data)
-                if phase == 'running':
+                if phase == 'running' and not data.get('runtime_test'):
                     from antimicrox_switcher import update_scope
                     update_scope(self.home, 'hide', data['session_id'])
 

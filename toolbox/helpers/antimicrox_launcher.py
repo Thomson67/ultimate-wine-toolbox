@@ -18,7 +18,7 @@ import time
 
 from antimicrox_focus import XWindows, process_start
 from antimicrox_handoff import EsApi
-from antimicrox_live import atomic, valid_profile
+from antimicrox_live import LiveSession, atomic, valid_profile
 
 
 def log(message):
@@ -315,10 +315,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--home', default=os.environ.get('WT_HOME', '/userdata/system/ultimate-wine-toolbox'))
     sub = parser.add_subparsers(dest='command', required=True)
-    for name in ('show', 'disable', 'learn', 'observations', 'initial'):
+    for name in ('show', 'disable', 'learn', 'observations', 'initial', 'prepare-test', 'is-test'):
         p = sub.add_parser(name)
         p.add_argument('rom')
-        if name == 'initial':
+        if name in ('initial', 'prepare-test'):
             p.add_argument('assigned')
     p = sub.add_parser('save')
     p.add_argument('rom'); p.add_argument('mode', choices=('launcher', 'profiles'))
@@ -363,6 +363,21 @@ def main():
     elif args.command == 'initial':
         if store.load(args.rom, args.assigned):
             print(store.empty())
+    elif args.command == 'prepare-test':
+        config = store.load(args.rom, args.assigned)
+        if config is None:
+            raise ValueError('No active launcher rules for this game')
+        session = LiveSession(args.home)
+        previous = session.read()
+        if previous:
+            if previous.get('phase') != 'finished':
+                raise ValueError('Finish or recover the preceding session before testing')
+            session.clear()
+        print(session.prepare(args.rom, config['launcher_profile'], runtime_test=True)['profile'])
+    elif args.command == 'is-test':
+        data = LiveSession(args.home).read() or {}
+        if data.get('rom') == args.rom and data.get('phase') in ('prepared', 'running') and data.get('runtime_test'):
+            print('1')
     else:
         os.environ.setdefault('DISPLAY', ':0')
         os.environ.setdefault('XAUTHORITY', '/var/lib/.Xauthority')

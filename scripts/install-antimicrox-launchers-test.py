@@ -13,10 +13,12 @@ import tempfile
 import urllib.request
 
 BASE_HASHES = {
+    'toolbox/helpers/antimicrox_live.py': '5777f847f8246a60f83f40e0a8c9a7318c6a8edeba201abb21519e0747f03fc2',
     'toolbox/modules/antimicrox.sh': '866cb6530ddd52efa0bee287988a5f758954cedf4fc13ac8324988c64cbe7c1f',
     'toolbox/hooks/antimicrox-game-event.sh': 'cdc747d6d44f2fc8c264e32521da948c895c59de40e77e710f434f9520a6d252',
 }
 HELPER = 'toolbox/helpers/antimicrox_launcher.py'
+PREVIOUS_TEST_HASHES = {'toolbox/helpers/antimicrox_live.py': '5777f847f8246a60f83f40e0a8c9a7318c6a8edeba201abb21519e0747f03fc2', 'toolbox/modules/antimicrox.sh': 'de4dd8b409a83f3ad143198af0a81a4e29a3a542051410c0217fd656091a6943', 'toolbox/hooks/antimicrox-game-event.sh': 'fa10f1c767aa62c10ab86f62210f8386ff8a955c28a0afd43e2e3bea90e65e63', 'toolbox/helpers/antimicrox_launcher.py': '3383d6fb3e686f51679eff304e3b0b5f17449f514154721b2ca4b82f8dc0a76e'}
 
 
 def sha(data):
@@ -48,13 +50,15 @@ def install(home, hook, ref, source=None):
         raise ValueError('Ce test nécessite la Toolbox v0.7.2.')
     targets = [(home/path, path) for path in BASE_HASHES]
     targets += [(home/HELPER, HELPER), (hook, 'toolbox/hooks/antimicrox-game-event.sh')]
+    upgrading = (home/HELPER).exists()
+    expected = PREVIOUS_TEST_HASHES if upgrading else BASE_HASHES
     for target, source_path in targets:
         if target.is_symlink():
             raise ValueError('Chemin symbolique inattendu : '+str(target))
-        if source_path == HELPER:
+        if source_path == HELPER and not upgrading:
             if target.exists():
                 raise ValueError('Le module de test existe déjà. Restaurer avant réinstallation.')
-        elif sha(target.read_bytes()) != BASE_HASHES[source_path]:
+        elif sha(target.read_bytes()) != expected[source_path]:
             raise ValueError('Fichier modifié ou version différente : '+str(target)+'. Aucun fichier modifié.')
     payloads = {}
     for source_path in [*BASE_HASHES, HELPER]:
@@ -123,7 +127,7 @@ def restore(backup):
             path.unlink()
         else:
             replace(path, (backup/entry['original']).read_bytes(), entry['mode'])
-    print('Code v0.7.2 restauré. Les profils créés pendant le test sont conservés.')
+    print('Code antérieur au test restauré. Les profils créés pendant le test sont conservés.')
 
 
 def main():

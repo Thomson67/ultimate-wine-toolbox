@@ -17,6 +17,20 @@ spec.loader.exec_module(live)
 
 
 class LiveSessionTests(unittest.TestCase):
+    def test_runtime_rules_test_uses_return_lifecycle_without_editor_shortcut(self):
+        data = self.session.prepare(self.rom, runtime_test=True)
+        self.assertTrue(data['runtime_test'])
+        self.assertIsNone(data['action'])
+        self.assertEqual(data['displaced'], [])
+        self.assertNotIn('antimicrox_focus.py', self.keys.read_text())
+        self.session.mark(str(self.rom), phase='running')
+        self.assertFalse((self.home/'state/antimicrox-switcher.json').exists())
+        self.session.finish('normal')
+        self.session.acknowledge_return()
+        self.assertTrue(self.session.read()['return_presented'])
+        self.session.clear()
+        self.assertFalse(self.session.state.exists())
+
     def test_result_receipt_retires_only_antimicrox_request_and_keeps_profile_recoverable(self):
         for marker in (b'antimicrox\n', b'reshade\n', b''):
             with self.subTest(marker=marker):

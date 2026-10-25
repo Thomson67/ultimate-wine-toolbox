@@ -21,8 +21,9 @@ class LauncherInstallTests(unittest.TestCase):
         self.hook = self.root/'scripts/global-hook.sh'
         self.hook.parent.mkdir(); self.hook.write_bytes(b'#!/bin/bash\necho oldhook\n')
         self.hook.chmod(0o755)
-        self.old = {list(installer.BASE_HASHES)[0]: b'#!/bin/bash\necho oldmodule\n',
-                    list(installer.BASE_HASHES)[1]: self.hook.read_bytes()}
+        self.old = {'toolbox/helpers/antimicrox_live.py': b'# old live helper\n',
+                    'toolbox/modules/antimicrox.sh': b'#!/bin/bash\necho oldmodule\n',
+                    'toolbox/hooks/antimicrox-game-event.sh': self.hook.read_bytes()}
         for name, data in self.old.items():
             target = self.home/name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -95,6 +96,23 @@ class LauncherInstallTests(unittest.TestCase):
         for name, data in self.old.items():
             self.assertEqual((self.home/name).read_bytes(), data)
         self.assertFalse((self.home/installer.HELPER).exists())
+
+    def test_upgrade_from_first_test_keeps_rules_and_restores_previous_test(self):
+        self.install()
+        paths = [*self.old, installer.HELPER]
+        previous = {name: (self.home/name).read_bytes() for name in paths}
+        hashes = {name: installer.sha(data) for name, data in previous.items()}
+        rules = self.home/'config/antimicrox-launchers/test.json'
+        rules.parent.mkdir(parents=True); rules.write_text('{"existing":true}')
+        module = self.source/'toolbox/modules/antimicrox.sh'
+        module.write_bytes(module.read_bytes()+b'\n# retest action\n')
+        with patch.object(installer, 'PREVIOUS_TEST_HASHES', hashes):
+            backup = self.install()
+        self.assertIn('retest action', (self.home/'toolbox/modules/antimicrox.sh').read_text())
+        self.assertEqual(rules.read_text(), '{"existing":true}')
+        installer.restore(backup)
+        for name, content in previous.items():
+            self.assertEqual((self.home/name).read_bytes(), content)
 
 
 if __name__ == '__main__':
