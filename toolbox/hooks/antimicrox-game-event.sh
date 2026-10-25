@@ -75,6 +75,18 @@ live_error() {
   [ "$live" -eq 0 ] || python3 "$LIVE_HELPER" --home "$ROOT" mark "$rom" --error "$*" >> "$LOG" 2>&1 || true
 }
 [ -n "$profile" ] || exit 0
+LAUNCHER_HELPER="$ROOT/toolbox/helpers/antimicrox_launcher.py"
+launcher_runtime=0
+if [ "$live" -eq 0 ] && [ -f "$LAUNCHER_HELPER" ]; then
+  if ! initial="$(python3 "$LAUNCHER_HELPER" --home "$ROOT" initial "$rom" "$profile" 2>> "$LOG")"; then
+    live_error "Invalid launcher configuration; mapping launch refused"
+    exit 0
+  fi
+  if [ -n "$initial" ]; then
+    profile="$initial"
+    launcher_runtime=1
+  fi
+fi
 [ -f "$profile" ] || { live_error "profile missing $rom"; exit 0; }
 real="$(readlink -f -- "$profile" 2>/dev/null || true)"
 case "$real" in /userdata/*) ;; *) log "profile refused (outside /userdata)"; exit 0 ;; esac
@@ -123,6 +135,13 @@ kill -0 "$pid" 2>/dev/null || { live_error "AntiMicroX exited early"; exit 0; }
 stamp="$(proc_start "$pid")"
 [ -n "$stamp" ] || exit 0
 printf '%s\t%s\t%s\n' "$rom" "$pid" "$stamp" > "$session"
+if [ -f "$LAUNCHER_HELPER" ]; then
+  if [ "$live" -eq 1 ]; then
+    python3 "$LAUNCHER_HELPER" --home "$ROOT" spawn "$rom" "$pid" "$stamp" --learning >> "$LOG" 2>&1 9>&- || true
+  elif [ "$launcher_runtime" -eq 1 ]; then
+    python3 "$LAUNCHER_HELPER" --home "$ROOT" spawn "$rom" "$pid" "$stamp" >> "$LOG" 2>&1 9>&- || true
+  fi
+fi
 if [ "$live" -eq 1 ]; then
   python3 "$LIVE_HELPER" --home "$ROOT" mark "$rom" --phase running >> "$LOG" 2>&1 || true
   if [ -f "$ROOT/toolbox/helpers/antimicrox_focus.py" ] && command -v batocera-flash-screen >/dev/null 2>&1; then
