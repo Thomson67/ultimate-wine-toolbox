@@ -4,7 +4,7 @@ Open Tools and compatibility → AntiMicroX. An .amgp profile turns controller b
 
 CREATE OR EDIT IN GAME
 1. Choose Create or edit a profile in game, then select the game. Create a profile, use the game's current one or select a saved profile.
-2. The game starts in the foreground. Use the displayed controller shortcut to switch to AntiMicroX and back: it activates the windows directly, even when Alt+Tab omits the editor on v44. Keyboard Alt+Tab remains available when supported by the window manager. The usual shortcut is Hotkey+R1; follow the announced shortcut if the profile requires a different one. Release the buttons after each switch.
+2. The game starts in the foreground. Use the controller shortcut shown on screen to switch between the game and AntiMicroX. The usual shortcut is Hotkey+R1; follow the displayed shortcut if the profile requires another combination. Press and release the buttons to switch: R1 mappings remain usable in the game. Keyboard Alt+Tab is also available; under labwc, ES is excluded from the switcher only during AntiMicroX configuration.
 3. Edit mappings and test them in the game. Save the profile in AntiMicroX BEFORE quitting the game.
 4. Afterwards, choose Use this profile whenever this game starts to enable it, or continue adjusting controls.
 

@@ -4,7 +4,7 @@ Dans Outils et compatibilité → AntiMicroX, un profil .amgp transforme les bou
 
 CRÉER OU MODIFIER EN JEU
 1. Choisir Créer ou modifier un profil en jeu, puis le jeu. Créer un profil, reprendre celui du jeu ou choisir un profil enregistré.
-2. Le jeu démarre au premier plan. Utiliser la combinaison manette indiquée à l’écran pour passer à AntiMicroX et revenir au jeu : elle active directement les fenêtres, même si Alt+Tab omet l’éditeur sous v44. Alt+Tab reste utilisable au clavier lorsque le gestionnaire de fenêtres le permet. La combinaison habituelle est Hotkey+R1 ; suivre celle annoncée si le profil impose une autre combinaison. Relâcher les boutons après chaque bascule.
+2. Le jeu démarre au premier plan. Utiliser la combinaison manette indiquée à l’écran pour passer à AntiMicroX et revenir au jeu. La combinaison habituelle est Hotkey+R1 ; suivre celle annoncée si le profil impose une autre combinaison. Appuyer puis relâcher les boutons pour basculer : les affectations de R1 restent utilisables en jeu. Alt+Tab est aussi disponible au clavier ; sous labwc, ES est exclu du sélecteur uniquement pendant la configuration AntiMicroX.
 3. Modifier les commandes et les tester dans le jeu. Enregistrer le profil dans AntiMicroX AVANT de quitter le jeu.
 4. À la fin, choisir Utiliser ce profil aux prochains lancements pour l’activer, ou continuer les réglages.
 

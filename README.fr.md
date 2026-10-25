@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.7.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.7.1).**
+**Version stable : [v0.7.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.7.2).**
 
 ## Fonctionnalités
 
@@ -32,6 +32,14 @@ Créée par **Thomsonito**.
 - sauvegarde automatique avant les opérations destructives sur `batocera.conf`
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
+
+## Nouveautés de la v0.7.2
+
+- Correction du lancement des jeux avec l’éditeur AntiMicroX ouvert sur Batocera v44.
+- Bascule Hotkey+R1 au relâchement, sans double retour ni perte des commandes liées au mapping de R1.
+- AntiMicroX accessible avec Alt+Tab ; ES retiré du sélecteur uniquement pendant la configuration en jeu.
+
+[Notes de la v0.7.2](release-notes/v0.7.2.md)
 
 ## Nouveautés de la v0.7.1
 
