@@ -92,3 +92,11 @@ conservés ; un fichier de code modifié manuellement est refusé.
 
 Les tests automatisés simulent les fenêtres et l'IPC ; ils ne remplacent pas
 ces vérifications sur le compositeur et AntiMicroX réels.
+
+## Partage communautaire
+
+Les menus d’un jeu proposent le partage direct de son profil, sans nouvelle
+sélection de fichier. Le partage actuel transmet uniquement le `.amgp` choisi :
+les règles launcher et l’éventuel second profil ne sont pas inclus. Un message
+l’indique avant le partage d’un profil launcher. Le destinataire doit donc
+configurer ses règles de fenêtres localement.

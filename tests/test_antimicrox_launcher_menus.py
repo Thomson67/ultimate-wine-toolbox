@@ -103,5 +103,52 @@ amx_launcher_setup /userdata/roms/windows/New.wine
             self.assertEqual(choices, ['launcher', 'profiles', 'back'])
 
 
+    def test_direct_share_passes_current_rom_and_profile_in_both_menus(self):
+        for launcher in (False, True):
+            for accept in (False, True):
+                with self.subTest(launcher=launcher, accept=accept), tempfile.TemporaryDirectory() as folder:
+                    home = Path(folder)
+                    code = r'''
+amx_current_profile() { echo /userdata/Launcher.amgp; }
+amx_launcher_cmd() { :; }
+amx_associations() { :; }
+menu_select() {
+  if [ -f "$WT_HOME/asked" ]; then echo back;
+  else printf '%s\0' "$@" > "$WT_HOME/menu"; touch "$WT_HOME/asked"; echo share; fi
+}
+yesno() { printf '%s' "$2" > "$WT_HOME/notice"; [ "$ACCEPT" = 1 ]; }
+community_share() { printf '%s\0' "$@" > "$WT_HOME/shared"; }
+"$MANAGE" /userdata/roms/windows/New.wine
+'''
+                    result = self.bash(home, code, MANAGE='amx_manage_launcher_game' if launcher else 'amx_manage_game', ACCEPT=str(int(accept)))
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn('share', (home/'menu').read_bytes().decode().split('\0')[2:-1:2])
+                    self.assertEqual((home/'shared').exists(), not launcher or accept)
+                    if (home/'shared').exists():
+                        self.assertEqual((home/'shared').read_bytes().decode().split('\0')[:-1],
+                                         ['antimicrox', 'AntiMicroX', '/userdata/roms/windows/New.wine', '/userdata/Launcher.amgp'])
+                    if launcher:
+                        self.assertIn('ne seront pas transmis', (home/'notice').read_text())
+
+    def test_community_direct_share_does_not_ask_to_select_the_profile_again(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            result = self.bash(home, r'''
+source "$WT_ROOT/modules/community.sh"
+amx_profile_file() { touch "$WT_HOME/unwanted-picker"; return 1; }
+community_share_game() { printf '%s\n%s' "$2" "$4" > "$WT_HOME/context"; echo 'My game'; }
+input_text() { echo 'Example'; }
+yesno() { return 0; }
+community_cmd() { printf '%s\0' "$@" > "$WT_HOME/export"; echo package; }
+community_send_package() { echo "$2" > "$WT_HOME/submitted"; }
+community_share antimicrox AntiMicroX /userdata/roms/windows/New.wine /userdata/Launcher.amgp
+''')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((home/'unwanted-picker').exists())
+            self.assertEqual((home/'context').read_text(), '/userdata/Launcher.amgp\n/userdata/roms/windows/New.wine')
+            self.assertEqual((home/'export').read_bytes().decode().split('\0')[:3], ['share', 'antimicrox', '/userdata/Launcher.amgp'])
+            self.assertEqual((home/'submitted').read_text().strip(), 'package')
+
+
 if __name__ == '__main__':
     unittest.main()

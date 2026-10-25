@@ -274,9 +274,9 @@ community_share_game() {
 }
 
 community_share() {
-  local kind="$1" title="$2" rom="${3:-}" source game="" author name description output selected temporary=""
+  local kind="$1" title="$2" rom="${3:-}" source="${4:-}" game="" author name description output selected temporary=""
   if [ "$kind" = antimicrox ]; then
-    source="$(amx_profile_file '')" || return 0
+    [ -n "$source" ] || source="$(amx_profile_file '')" || return 0
   else
     local share_mode=game
     if [ -z "$rom" ]; then

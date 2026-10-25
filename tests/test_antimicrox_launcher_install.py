@@ -23,7 +23,8 @@ class LauncherInstallTests(unittest.TestCase):
         self.hook.chmod(0o755)
         self.old = {'toolbox/helpers/antimicrox_live.py': b'# old live helper\n',
                     'toolbox/modules/antimicrox.sh': b'#!/bin/bash\necho oldmodule\n',
-                    'toolbox/hooks/antimicrox-game-event.sh': self.hook.read_bytes()}
+                    'toolbox/hooks/antimicrox-game-event.sh': self.hook.read_bytes(),
+                    'toolbox/modules/community.sh': b'#!/bin/bash\necho oldcommunity\n'}
         for name, data in self.old.items():
             target = self.home/name
             target.parent.mkdir(parents=True, exist_ok=True)

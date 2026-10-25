@@ -24,6 +24,12 @@ RETEST_TEST_HASHES = {'toolbox/helpers/antimicrox_live.py': '9b4d42ba3a8c644d8ce
 
 INTEGRATED_MENUS_HASHES = {'toolbox/helpers/antimicrox_live.py': '9b4d42ba3a8c644d8ceee981128c43793fded6f703dc38b5d432c8b7576bcc67', 'toolbox/modules/antimicrox.sh': 'c1504fdccf4f3ff1c125f239f3596ece8b486158d66643b2b695c048ebbd0421', 'toolbox/hooks/antimicrox-game-event.sh': 'e64e2d83ee294f5335fc2b98db599d4993b7c2164d9b497bd43978d6ff058f55', 'toolbox/helpers/antimicrox_launcher.py': 'a3728a24c43000a5fe949b8eec3be3eedf6ce4570ac069301670fd5fea548de5'}
 
+DIRECT_RETURN_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70129bb4b01e05382b793410cfc3d9c227ad6b0c7830791bf', 'toolbox/modules/antimicrox.sh': 'dfa5fd421a1b91840e6168152c093d33c74d01b0097d5b465f630eaa198cc243', 'toolbox/hooks/antimicrox-game-event.sh': 'e64e2d83ee294f5335fc2b98db599d4993b7c2164d9b497bd43978d6ff058f55', 'toolbox/helpers/antimicrox_launcher.py': 'a3728a24c43000a5fe949b8eec3be3eedf6ce4570ac069301670fd5fea548de5', 'toolbox/modules/community.sh': 'b897e257a3fbbed5f97c6d5b1b69dd4192a1258f20d4de948aea6383704f02d0'}
+
+# Older tests did not modify the community module.
+for previous in (BASE_HASHES, PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES):
+    previous['toolbox/modules/community.sh'] = 'b897e257a3fbbed5f97c6d5b1b69dd4192a1258f20d4de948aea6383704f02d0'
+
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -56,7 +62,7 @@ def install(home, hook, ref, source=None):
     upgrading = (home/HELPER).exists()
     expected = BASE_HASHES
     if upgrading:
-        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES):
+        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES):
             if all(not target.is_symlink() and target.is_file() and
                    sha(target.read_bytes()) == candidate.get(source_path)
                    for target, source_path in targets):

@@ -338,12 +338,14 @@ amx_manage_game() {
       live "$(amx_txt 'Modifier les commandes et tester en jeu' 'Edit controls and test in game')" \
       edit "$(amx_txt 'Modifier le profil sans lancer le jeu' 'Edit the profile without starting the game')" \
       info "$(amx_txt 'Voir les commandes et les informations du profil' 'View profile controls and information')" \
+      share "$(amx_txt 'Partager ce profil avec la communauté' 'Share this profile with the community')" \
       replace "$(amx_txt 'Choisir un autre profil pour ce jeu' 'Choose another profile for this game')" \
       remove "$(amx_txt 'Désactiver pour ce jeu (garder le profil)' 'Disable for this game (keep the profile)')" \
       delete "$(amx_txt 'Supprimer ce profil pour tous les jeux' 'Delete this profile for all games')" \
       back "$(i18n back)")" || return
     case "$choice" in
       info) amx_profile_info "$profile" ;;
+      share) community_share antimicrox AntiMicroX "$rom" "$profile" ;;
       delete) amx_delete_profile_for "$profile" ;;
       edit) amx_editor "$profile" ;;
       live)
@@ -647,13 +649,17 @@ amx_manage_launcher_game() {
       rules "$(amx_txt 'Modifier les fenêtres, le mode ou les profils associés' 'Edit windows, mode or assigned profiles')"
       edit_launcher "$(amx_txt 'Modifier les commandes du profil launcher' 'Edit launcher profile controls')")
     [ -z "$game_profile" ] || items+=(edit_game "$(amx_txt 'Modifier les commandes du profil jeu' 'Edit game profile controls')")
-    items+=(learn "$(amx_txt 'Configurer en jeu et refaire le relevé des fenêtres' 'Configure in game and record windows again')"
+    items+=(share "$(amx_txt 'Partager le profil launcher avec la communauté' 'Share the launcher profile with the community')"
+      learn "$(amx_txt 'Configurer en jeu et refaire le relevé des fenêtres' 'Configure in game and record windows again')"
       info "$(amx_txt 'Voir les règles et les profils' 'View rules and profiles')"
       classic "$(amx_txt 'Désactiver les règles launcher (garder le profil)' 'Disable launcher rules (keep the profile)')"
       remove "$(amx_txt 'Désactiver AntiMicroX pour ce jeu (garder les profils)' 'Disable AntiMicroX for this game (keep profiles)')"
       back "$(i18n back)")
     choice="$(menu_select AntiMicroX "$(basename "$rom")\n\n$(amx_txt 'Jeu avec launcher' 'Game with a launcher')\n$(amx_txt 'Profil launcher :' 'Launcher profile:') $profile${game_profile:+\n$(amx_txt 'Profil jeu :' 'Game profile:') $game_profile}" "${items[@]}")" || return
     case "$choice" in
+      share)
+        yesno AntiMicroX "$(amx_txt 'Le partage actuel contient uniquement les commandes du profil launcher. Les règles de fenêtres et le profil jeu éventuel ne seront pas transmis.\n\nPartager uniquement ce profil ?' 'Sharing currently includes only the launcher profile controls. Window rules and the optional game profile will not be included.\n\nShare only this profile?')" || continue
+        community_share antimicrox AntiMicroX "$rom" "$profile" ;;
       test) amx_launcher_test_start "$rom" ;;
       rules) amx_launcher_setup "$rom" ;;
       edit_launcher) amx_editor "$profile" ;;
