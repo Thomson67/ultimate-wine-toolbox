@@ -34,7 +34,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise ValueError('Community service redirects are forbidden')
 
 
-def package_data(path):
+def package_data(path, enforce_service_limit=True):
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         if len(names) != 3 or len(set(names)) != 3 or any(info.file_size > LIMIT for info in archive.infolist()):
@@ -43,7 +43,7 @@ def package_data(path):
         filename = 'profile'+KINDS[metadata['kind']]
         if set(names) != {'metadata.json', filename, 'submission.txt'}: raise ValueError('Unexpected archive members')
         data = archive.read(filename)
-    if len(data) > PROFILE_LIMIT: raise ValueError('Direct sharing accepts profiles up to 64 KiB')
+    if enforce_service_limit and len(data) > PROFILE_LIMIT: raise ValueError('Direct sharing accepts profiles up to 64 KiB; the complete ZIP remains available for offline transfer')
     if hashlib.sha256(data).hexdigest() != metadata['sha256']: raise ValueError('Submission checksum mismatch')
     profile_bytes(metadata['kind'], data)
     return {'metadata': metadata, 'profile': data.decode('utf-8')}
@@ -303,7 +303,17 @@ def main():
             from antimicrox_profiles import report
             with tempfile.TemporaryDirectory(prefix='uwt-review-') as directory:
                 path = Path(directory)/'profile.amgp'; path.write_bytes(data)
-                print(report(path, args.language))
+                from community_profiles import launcher_payload
+                import xml.etree.ElementTree as ET
+                bundle = launcher_payload(ET.fromstring(data))
+                if bundle:
+                    print('Launcher rules / Règles launcher : '+json.dumps({key: bundle[key] for key in ('mode', 'launcher_rule', 'game_rule')}, ensure_ascii=False))
+                    for role in ('launcher', 'game'):
+                        if role+'_data' in bundle:
+                            path.write_bytes(bundle[role+'_data'])
+                            print('\n'+role+' :\n'+report(path, args.language))
+                else:
+                    print(report(path, args.language))
         else: print('\n'+data.decode('utf-8-sig'))
     else:
         result = service.decide(args.kind, args.identifier, args.command, args.checksum)

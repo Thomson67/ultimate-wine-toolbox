@@ -30,6 +30,12 @@ DIRECT_RETURN_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70
 for previous in (BASE_HASHES, PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES):
     previous['toolbox/modules/community.sh'] = 'b897e257a3fbbed5f97c6d5b1b69dd4192a1258f20d4de948aea6383704f02d0'
 
+CONTEXT_SHARE_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70129bb4b01e05382b793410cfc3d9c227ad6b0c7830791bf', 'toolbox/modules/antimicrox.sh': '4eec4ce383fe530c8dec87e3759d42714703a5aaf30b679836d2c355c93629d2', 'toolbox/hooks/antimicrox-game-event.sh': 'e64e2d83ee294f5335fc2b98db599d4993b7c2164d9b497bd43978d6ff058f55', 'toolbox/helpers/antimicrox_launcher.py': 'a3728a24c43000a5fe949b8eec3be3eedf6ce4570ac069301670fd5fea548de5', 'toolbox/modules/community.sh': '5c182a1360513af121d618a9da9a259de4bd3a7c52a0306d2d6922377e291c0f'}
+for previous in (BASE_HASHES, PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES):
+    previous.update({'toolbox/helpers/community_profiles.py': '2a4f7b66b9c1bfbeddaaf898df78770c3b66a22edb76305d0baf810f905ad8d2'})
+
+for previous in (BASE_HASHES, PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES):
+    previous['toolbox/helpers/community_service.py'] = 'da05ae73b4307efc2b51ed6a42e28c48a2a5022a636cc86a4ae0eb6f5b12d675'
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -62,7 +68,7 @@ def install(home, hook, ref, source=None):
     upgrading = (home/HELPER).exists()
     expected = BASE_HASHES
     if upgrading:
-        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES):
+        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES):
             if all(not target.is_symlink() and target.is_file() and
                    sha(target.read_bytes()) == candidate.get(source_path)
                    for target, source_path in targets):

@@ -18,14 +18,20 @@ community_report() {
 }
 
 community_import_actions() {
-  local kind="$1" path="$2" title="$3" rom="${4:-}" choice output details selected
+  local kind="$1" path="$2" title="$3" rom="${4:-}" choice output details selected launcher_notice old_profile
   while true; do
     if [ "$kind" = antimicrox ]; then
+      launcher_notice="$(community_cmd launcher-info "$path" 2>/dev/null)" || launcher_notice=""
+      if [ -n "$launcher_notice" ]; then
+        launcher_notice="$(community_txt 'Configuration launcher complète : règles de fenêtres et profils inclus. Ils seront installés pour le jeu choisi.' 'Complete launcher configuration: window rules and profiles included. They will be installed for the selected game.')"
+      fi
       choice="$(menu_select "$title" "$(community_txt "Profil téléchargé :
 $path
+$launcher_notice
 
 Vérifiez la Hotkey dans l’éditeur avant activation. Le Pad2Key du jeu sera sauvegardé et suspendu lors de l’association." "Profile downloaded:
 $path
+$launcher_notice
 
 Check the Hotkey in the editor before enabling. The game’s Pad2Key will be backed up and suspended on assignment.")" \
         info "$(community_txt 'Voir les commandes de la manette' 'View controller mappings')" \
@@ -47,7 +53,13 @@ Check the Hotkey in the editor before enabling. The game’s Pad2Key will be bac
           yesno "$title" "$(community_txt "Associer ce profil à $(basename "$rom") ?
 Vérifiez ses prérequis et sa Hotkey. Le Pad2Key sera sauvegardé et suspendu." "Assign this profile to $(basename "$rom")?
 Check its requirements and Hotkey. Pad2Key will be backed up and suspended.")" || continue
+          old_profile="$(amx_current_profile "$rom")"
+          if ! output="$(community_cmd launcher-import "$path" "$rom" --check 2>&1)"; then msgbox "$title" "$output"; continue; fi
           amx_set_profile "$rom" "$path" || continue
+          if ! output="$(community_cmd launcher-import "$path" "$rom" 2>&1)"; then
+            amx_set_profile "$rom" "$old_profile" || true
+            msgbox "$title" "$output"; continue
+          fi
           if [ "$choice" = live ]; then amx_live_start_for "$rom" "$path"; else msgbox "$title" "$(community_txt 'Profil associé.' 'Profile assigned.')"; fi
           return 0 ;;
         *) return 0 ;;
@@ -274,7 +286,7 @@ community_share_game() {
 }
 
 community_share() {
-  local kind="$1" title="$2" rom="${3:-}" source="${4:-}" game="" author name description output selected temporary=""
+  local kind="$1" title="$2" rom="${3:-}" source="${4:-}" destination="${5:-community}" game="" author name description output selected temporary=""
   if [ "$kind" = antimicrox ]; then
     [ -n "$source" ] || source="$(amx_profile_file '')" || return 0
   else
@@ -313,6 +325,11 @@ community_share() {
   name="$(input_text "$title" "$name_prompt" "$game")" || { rm -f -- "$temporary"; return 0; }
   author="$(input_text "$title" "$(community_txt 'Votre pseudo public' 'Your public nickname')" '')" || { rm -f -- "$temporary"; return 0; }
   description="$(input_text "$title" "$(community_txt 'Description (commandes ou effets, conseils utiles)' 'Description (controls or effects, useful tips)')" '')" || { rm -f -- "$temporary"; return 0; }
+  if [ "$destination" = local ]; then
+    output="$(community_cmd share "$kind" "$source" --game "$game" --title "$name" --author "$author" --description "$description" --rom "$rom" 2>&1)" || { msgbox "$title" "$output"; return 1; }
+    msgbox "$title" "$(community_txt 'Paquet exporté. Copiez ce ZIP sur l’autre machine, puis utilisez « Importer un paquet ZIP » :' 'Package exported. Copy this ZIP to the other machine, then use “Import a ZIP package”:')\n${output%%$'\n'*}"
+    return 0
+  fi
   if ! yesno "$title" "$(community_txt "Partager « $name » pour $game, sous le pseudo $author ?
 
 Le $asset_fr et ces informations seront envoyés au service communautaire pour validation. Ils deviendront publics après acceptation. Aucun compte GitHub nécessaire." "Share '$name' for $game, credited to $author?
@@ -321,11 +338,22 @@ The $asset_en and these details will be sent to the community service for review
     rm -f -- "$temporary"; return 0
   fi
   output="$(community_cmd share "$kind" "$source" --game "$game" --title "$name" --author "$author" \
-    --description "$description" 2>&1)"
+    --description "$description" --rom "$rom" 2>&1)"
   local status=$?
   [ -z "$temporary" ] || rm -f -- "$temporary"
   if [ "$status" -ne 0 ]; then msgbox "$title" "$output"; return 1; fi
   community_send_package "$title" "${output%%$'\n'*}" "$kind"
+}
+
+community_import_package() {
+  local kind="$1" title="$2" rom="${3:-}" package path
+  if command -v yad >/dev/null 2>&1; then
+    package="$(DISPLAY="${DISPLAY:-:0}" yad --file --title="$title — ZIP" --filename="$WT_HOME/exports/community/$kind/" --file-filter='ZIP | *.zip' 2>/dev/null)" || return
+  else
+    package="$(input_text "$title" "$(community_txt 'Chemin du paquet ZIP à importer :' 'ZIP package path to import:')" "$WT_HOME/exports/community/$kind/")" || return
+  fi
+  if ! path="$(community_cmd import-package "$package" --kind "$kind" 2>&1)"; then msgbox "$title" "$path"; return 1; fi
+  community_import_actions "$kind" "$path" "$title" "$rom"
 }
 
 community_send_package() {
@@ -455,6 +483,7 @@ community_menu() {
       search "$(community_txt 'Rechercher un jeu ou un auteur' 'Search for a game or author')" \
       refresh "$(community_txt 'Mettre à jour la liste' 'Refresh the list')" \
       share "$share_label" \
+      import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')" \
       validate "$(community_txt 'Valider les partages (modérateurs)' 'Review submissions (moderators)')" \
       forget "$(community_txt 'Retirer l’accès modérateur de ce PC' 'Remove moderator access from this PC')" back "$(i18n back)")" || return 0
     case "$choice" in
@@ -463,6 +492,7 @@ community_menu() {
 $output"; fi
         continue ;;
       share) community_share "$kind" "$title" "$rom"; continue ;;
+      import) community_import_package "$kind" "$title" "$rom"; continue ;;
       validate) community_validate "$kind" "$title"; continue ;;
       forget)
         if yesno "$title" "$(community_txt 'Révoquer l’autorisation mémorisée et déconnecter ce Batocera ?' 'Revoke the remembered authorization and sign this Batocera out?')"; then

@@ -24,7 +24,9 @@ class LauncherInstallTests(unittest.TestCase):
         self.old = {'toolbox/helpers/antimicrox_live.py': b'# old live helper\n',
                     'toolbox/modules/antimicrox.sh': b'#!/bin/bash\necho oldmodule\n',
                     'toolbox/hooks/antimicrox-game-event.sh': self.hook.read_bytes(),
-                    'toolbox/modules/community.sh': b'#!/bin/bash\necho oldcommunity\n'}
+                    'toolbox/modules/community.sh': b'#!/bin/bash\necho oldcommunity\n',
+                    'toolbox/helpers/community_profiles.py': b'# old profiles\n',
+                    'toolbox/helpers/community_service.py': b'# old service\n'}
         for name, data in self.old.items():
             target = self.home/name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -135,6 +137,21 @@ class LauncherInstallTests(unittest.TestCase):
         with patch.object(installer, 'INTEGRATED_MENUS_HASHES', hashes):
             self.install()
         self.assertIn('direct learning return', (self.home/'toolbox/modules/antimicrox.sh').read_text())
+
+
+    def test_upgrade_from_contextual_share_updates_all_community_helpers(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        for name in ['toolbox/helpers/community_profiles.py', 'toolbox/helpers/community_service.py']:
+            source = self.source/name
+            source.write_bytes(source.read_bytes()+b'\n# portable launcher packages\n')
+        with patch.object(installer, 'CONTEXT_SHARE_HASHES', hashes):
+            backup = self.install()
+        self.assertIn('portable launcher packages', (self.home/'toolbox/helpers/community_profiles.py').read_text())
+        self.assertIn('portable launcher packages', (self.home/'toolbox/helpers/community_service.py').read_text())
+        installer.restore(backup)
+        self.assertNotIn('portable launcher packages', (self.home/'toolbox/helpers/community_profiles.py').read_text())
 
 
 if __name__ == '__main__':

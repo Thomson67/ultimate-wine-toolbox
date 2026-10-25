@@ -123,12 +123,11 @@ community_share() { printf '%s\0' "$@" > "$WT_HOME/shared"; }
                     result = self.bash(home, code, MANAGE='amx_manage_launcher_game' if launcher else 'amx_manage_game', ACCEPT=str(int(accept)))
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertIn('share', (home/'menu').read_bytes().decode().split('\0')[2:-1:2])
-                    self.assertEqual((home/'shared').exists(), not launcher or accept)
+                    self.assertTrue((home/'shared').exists())
                     if (home/'shared').exists():
                         self.assertEqual((home/'shared').read_bytes().decode().split('\0')[:-1],
                                          ['antimicrox', 'AntiMicroX', '/userdata/roms/windows/New.wine', '/userdata/Launcher.amgp'])
-                    if launcher:
-                        self.assertIn('ne seront pas transmis', (home/'notice').read_text())
+                    self.assertFalse((home/'notice').exists())
 
     def test_community_direct_share_does_not_ask_to_select_the_profile_again(self):
         with tempfile.TemporaryDirectory() as folder:

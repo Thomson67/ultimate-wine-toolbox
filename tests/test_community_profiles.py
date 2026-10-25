@@ -279,6 +279,8 @@ yesno() { return 0; }
 msgbox() { :; }
 amx_running() { return 1; }
 amx_set_profile() { printf '%s' "$2" > "$WT_HOME/assigned"; }
+amx_current_profile() { :; }
+community_cmd() { :; }
 amx_ensure_installed() { return 0; }
 amx_live_start_for() { touch "$WT_HOME/live"; exit 0; }
 community_import_actions antimicrox /userdata/profile.amgp AntiMicroX /userdata/roms/windows/Game.wine

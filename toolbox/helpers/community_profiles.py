@@ -87,6 +87,94 @@ def catalogue(value):
     return {'schema': 1, 'entries': entries}
 
 
+# Launcher packages keep ordinary profiles readable by the existing service.
+# An empty outer mapping makes older clients load no inputs, rather than applying
+# the launcher controls throughout the game. New clients unpack before editing.
+def launcher_payload(root):
+    nodes = root.findall('.//uwt_launcher')
+    if not nodes:
+        return None
+    if len(nodes) != 1 or root.find('uwt_launcher') is not nodes[0]:
+        raise ValueError('Nested or duplicate launcher package')
+    node = nodes[0]
+    if node.attrib != {'version': '1'} or [c.tag for c in root] != ['sets', 'uwt_launcher'] or len(root.find('sets')):
+        raise ValueError('Unsupported launcher package')
+    if [c.tag for c in node] not in (['rules', 'launcher'], ['rules', 'launcher', 'game']):
+        raise ValueError('Unexpected launcher package members')
+    rules = json.loads(node.findtext('rules', ''))
+    if not isinstance(rules, dict) or set(rules) != {'mode', 'launcher_rule', 'game_rule'} or rules['mode'] not in ('launcher', 'profiles'):
+        raise ValueError('Invalid portable launcher rules')
+    from antimicrox_launcher import validate_rule
+    validate_rule(rules['launcher_rule'])
+    if rules['game_rule'] is not None:
+        validate_rule(rules['game_rule'])
+    if (node.find('game') is not None) != (rules['mode'] == 'profiles'):
+        raise ValueError('Missing or unexpected game profile')
+    result = dict(rules)
+    for role in ('launcher', 'game'):
+        member = node.find(role)
+        if member is None:
+            continue
+        if len(member) != 1 or member[0].tag != 'gamecontroller' or member.find('.//uwt_launcher') is not None:
+            raise ValueError('Invalid bundled controller profile')
+        data = ET.tostring(member[0], encoding='utf-8', xml_declaration=True)
+        result[role+'_data'] = profile_bytes('antimicrox', data)
+    return result
+
+
+def launcher_export(home, source, rom=''):
+    from antimicrox_launcher import Store
+    source = Path(source).resolve()
+    if not rom:
+        associations = Path(home)/'config/antimicrox-games.tsv'
+        candidates = []
+        for line in associations.read_text().splitlines() if associations.exists() else []:
+            fields = line.split('\t')
+            if len(fields) == 2 and Path(fields[1]).resolve() == source and Store(home).path(fields[0]).exists():
+                candidates.append(fields[0])
+        if len(candidates) > 1:
+            raise ValueError('Several launcher games use this profile; export from the selected game menu')
+        rom = candidates[0] if candidates else ''
+    config = Store(home).load(rom, str(source)) if rom else None
+    if config is None:
+        imported = imported_launcher(home, source)
+        if imported:
+            config = dict(imported, launcher_profile=str(source))
+        else:
+            return profile_bytes('antimicrox', source.read_bytes(), export=True)
+    root = ET.Element('gamecontroller', configversion='19', appversion='3.6.1')
+    ET.SubElement(root, 'sets')
+    bundle = ET.SubElement(root, 'uwt_launcher', version='1')
+    rules = {key: config[key] for key in ('mode', 'launcher_rule', 'game_rule')}
+    ET.SubElement(bundle, 'rules').text = json.dumps(rules, ensure_ascii=False)
+    for role in ('launcher', 'game'):
+        if role == 'game' and config['mode'] != 'profiles':
+            continue
+        data = profile_bytes('antimicrox', Path(config[role+'_profile']).read_bytes(), export=True)
+        ET.SubElement(bundle, role).append(ET.fromstring(data))
+    return profile_bytes('antimicrox', ET.tostring(root, encoding='utf-8', xml_declaration=True), export=True)
+
+
+def imported_launcher(home, source):
+    registry = Path(home)/'state/community/imports.json'
+    values = json.loads(registry.read_text()) if registry.exists() else {}
+    value = values.get(str(Path(source).resolve()), {}).get('launcher_config')
+    return value
+
+
+def apply_launcher_import(home, source, rom, check=False):
+    config = imported_launcher(home, source)
+    if config is None:
+        return
+    from antimicrox_launcher import Store
+    # Profiles may have been edited since download. Revalidate both before use.
+    profile_bytes('antimicrox', Path(source).read_bytes(), export=True)
+    if config['mode'] == 'profiles':
+        profile_bytes('antimicrox', Path(config['game_profile']).read_bytes(), export=True)
+    Store(home).save(rom, config['mode'], str(source), config['launcher_rule'],
+                     config.get('game_profile', ''), config['game_rule'], validate_only=check)
+
+
 def profile_bytes(kind, data, export=False):
     if kind not in KINDS or len(data) > LIMIT or b'\0' in data: raise ValueError('Invalid or oversized profile')
     text = data.decode('utf-8-sig')
@@ -99,6 +187,7 @@ def profile_bytes(kind, data, export=False):
         for slot in root.findall('.//slot'):
             if slot.findtext('mode', 'keyboard') not in MODES:
                 raise ValueError('External commands/profile loading are not accepted in community profiles')
+        launcher_payload(root)
         if export:
             for parent in root.iter():
                 for node in list(parent):
@@ -126,6 +215,9 @@ def profile_bytes(kind, data, export=False):
 
 def hotkey_name(data):
     root = ET.fromstring(data)
+    bundle = launcher_payload(root)
+    if bundle:
+        root = ET.fromstring(bundle['launcher_data'])
     indices = {node.get('index') for node in root.findall('./sets/set[@index="1"]/button')
                if node.findtext('setselectcondition') == 'while-held'}
     names = {'1': 'A Xbox / Croix PS', '2': 'B Xbox / Rond PS', '3': 'X Xbox / Carré PS',
@@ -339,7 +431,7 @@ class Community:
                 data = path.read_bytes()
                 profile_bytes(item['kind'], data)
             except (OSError, ValueError, ET.ParseError, configparser.Error): continue
-            return path, hashlib.sha256(data).hexdigest() != item['sha256']
+            return path, hashlib.sha256(data).hexdigest() != saved.get('installed_sha256', item['sha256'])
         return None
 
     def fetch(self, kind, identifier):
@@ -348,25 +440,50 @@ class Community:
         data = self.download(self.base+item['file'])
         if hashlib.sha256(data).hexdigest() != item['sha256']: raise ValueError('Profile checksum mismatch; refresh catalogue')
         profile_bytes(kind, data)
+        return self.install_profile(item, data)
+
+    def install_profile(self, item, data):
+        kind, identifier = item['kind'], item['id']
+        profile_bytes(kind, data)
+        bundle = launcher_payload(ET.fromstring(data)) if kind == 'antimicrox' else None
         directory = self.home/'config'/('antimicrox-profiles' if kind == 'antimicrox' else 'reshade-community-presets')
         directory.mkdir(parents=True, exist_ok=True)
         name = 'community-'+identifier+'-'+item['sha256'][:10]
-        path = directory/(name+KINDS[kind]); count = 2
-        while path.exists() or path.is_symlink():
-            if not path.is_symlink() and path.read_bytes() == data: break
-            path = directory/(name+f'-{count}'+KINDS[kind]); count += 1
-        else:
-            with path.open('xb') as stream: stream.write(data)
+        def write_copy(label, payload):
+            path = directory/(label+KINDS[kind]); count = 2
+            while path.exists() or path.is_symlink():
+                if not path.is_symlink() and path.read_bytes() == payload:
+                    return path
+                path = directory/(label+f'-{count}'+KINDS[kind]); count += 1
+            with path.open('xb') as stream: stream.write(payload)
+            return path
+        path = write_copy(name, bundle['launcher_data'] if bundle else data)
+        saved = dict(item)
+        if bundle:
+            config = {key: bundle[key] for key in ('mode', 'launcher_rule', 'game_rule')}
+            if bundle['mode'] == 'profiles':
+                config['game_profile'] = str(write_copy(name+'-game', bundle['game_data']).resolve())
+            saved['launcher_config'] = config
+            saved['installed_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
         imports = self.home/'state/community/imports.json'
         values = json.loads(imports.read_text()) if imports.exists() else {}
-        values[str(path.resolve())] = item
+        values[str(path.resolve())] = saved
         atomic(imports, dump(values))
         return path
 
-    def share(self, kind, source, game, title, author, description='', notes='', tested_on='', requirements=()):
+    def import_package(self, path, kind=None):
+        from community_service import package_data
+        value = package_data(path, enforce_service_limit=False)
+        if kind and value['metadata']['kind'] != kind:
+            raise ValueError('Package belongs to a different tool')
+        return self.install_profile(value['metadata'], value['profile'].encode('utf-8'))
+
+    def share(self, kind, source, game, title, author, description='', notes='', tested_on='', requirements=(), rom=''):
         source = Path(source)
         if source.stat().st_size > LIMIT: raise ValueError('Profile exceeds 2 MiB')
-        data = profile_bytes(kind, source.read_bytes(), export=True)
+        data = launcher_export(self.home, source, rom) if kind == 'antimicrox' else profile_bytes(kind, source.read_bytes(), export=True)
+        if kind == 'antimicrox' and launcher_payload(ET.fromstring(data)):
+            requirements = [*requirements, 'UWT launcher-package-v1']
         identifier = re.sub(r'[^a-z0-9]+', '-', title.casefold()).strip('-')[:65] or 'profile'
         identifier += '-'+uuid.uuid4().hex[:8]
         filename = kind+'/'+identifier+KINDS[kind]
@@ -454,6 +571,10 @@ def main():
     for name in ('game', 'title', 'author'): arg.add_argument('--'+name, required=True)
     for name in ('description', 'notes', 'tested-on'): arg.add_argument('--'+name, default='')
     arg.add_argument('--requirement', action='append', default=[])
+    arg.add_argument('--rom', default='')
+    arg = sub.add_parser('import-package'); arg.add_argument('source'); arg.add_argument('--kind', choices=KINDS)
+    arg = sub.add_parser('launcher-info'); arg.add_argument('source')
+    arg = sub.add_parser('launcher-import'); arg.add_argument('source'); arg.add_argument('rom'); arg.add_argument('--check', action='store_true')
     arg = sub.add_parser('approve'); arg.add_argument('package'); arg.add_argument('--catalog-root', required=True)
     args = parser.parse_args()
     if args.command == 'approve': print(approve(args.package, args.catalog_root)); return
@@ -483,6 +604,12 @@ def main():
         return
     if args.command == 'suggest-game': print(suggest_game(args.home, args.kind, args.source, args.rom)); return
     community = Community(args.home)
+    if args.command == 'import-package': print(community.import_package(args.source, args.kind)); return
+    if args.command == 'launcher-info':
+        if imported_launcher(args.home, args.source): print('launcher-package-v1')
+        return
+    if args.command == 'launcher-import':
+        apply_launcher_import(args.home, args.source, args.rom, args.check); return
     if args.command == 'refresh':
         values = community.refresh()['entries']
         print(sum(1 for item in values if not args.kind or item['kind'] == args.kind))
@@ -502,7 +629,7 @@ def main():
     elif args.command == 'fetch': print(community.fetch(args.kind, args.identifier))
     elif args.command == 'share':
         path, url = community.share(args.kind, args.source, args.game, args.title, args.author,
-                                    args.description, args.notes, args.tested_on, args.requirement)
+                                    args.description, args.notes, args.tested_on, args.requirement, args.rom)
         print(str(path)+'\n'+url)
 
 

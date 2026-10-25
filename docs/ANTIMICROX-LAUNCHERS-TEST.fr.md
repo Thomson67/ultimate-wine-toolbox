@@ -93,10 +93,31 @@ conservés ; un fichier de code modifié manuellement est refusé.
 Les tests automatisés simulent les fenêtres et l'IPC ; ils ne remplacent pas
 ces vérifications sur le compositeur et AntiMicroX réels.
 
-## Partage communautaire
+## Partage et transfert entre machines
 
-Les menus d’un jeu proposent le partage direct de son profil, sans nouvelle
-sélection de fichier. Le partage actuel transmet uniquement le `.amgp` choisi :
-les règles launcher et l’éventuel second profil ne sont pas inclus. Un message
-l’indique avant le partage d’un profil launcher. Le destinataire doit donc
-configurer ses règles de fenêtres localement.
+Le partage d’un jeu avec launcher contient maintenant ses règles de fenêtres,
+son profil launcher et, en mode deux profils, son profil jeu. Les identifiants
+de manette et les chemins locaux ne sont pas transmis. La limite du service
+reste de 64 Kio pour l’ensemble de la configuration. Le transfert local par ZIP
+accepte jusqu’à 2 Mio et ne dépend pas de cette limite du service.
+
+Dans **Mes jeux et leurs profils**, choisir le jeu puis :
+
+- **Partager la configuration complète avec la communauté** : envoi pour validation.
+- **Exporter la configuration complète dans un ZIP** : création locale sans publication.
+
+Sur l’autre machine, installer cette version de test ou une version ultérieure
+compatible, puis télécharger le partage ou ouvrir **Télécharger ou partager des
+profils > Importer un paquet ZIP**. Choisir ensuite le jeu cible et l’option
+**Utiliser ce profil pour un jeu** : les règles sont associées à ce jeu et les deux
+profils sont conservés dans ses dossiers de configuration locaux. Aucun nouvel
+apprentissage des fenêtres n’est nécessaire si les titres/classes/exécutables
+correspondent à la même version du jeu. La langue ou une autre version du launcher
+peut nécessiter d’ajuster une règle.
+
+Les anciens partages sans règles restent utilisables. Les anciennes Toolbox
+ne savent pas importer ce nouveau paquet : elles voient un profil vide, pour
+éviter d’activer les commandes du launcher pendant toute la partie.
+
+Le ZIP reste dans `exports/community/antimicrox/`. Les profils source ne sont pas
+modifiés et aucun jeu, préfixe Wine ou exécutable n’est ajouté au paquet.
