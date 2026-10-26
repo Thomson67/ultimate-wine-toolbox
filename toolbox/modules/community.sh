@@ -291,6 +291,10 @@ community_share_game() {
 
 community_share() {
   local kind="$1" title="$2" rom="${3:-}" source="${4:-}" destination="${5:-community}" game="" author name description output selected temporary=""
+  if [ "$kind" = antimicrox ] && [ "$destination" = local ]; then
+    community_export_configs "$title" "$rom"
+    return
+  fi
   if [ "$kind" = antimicrox ]; then
     [ -n "$source" ] || source="$(amx_profile_file '')" || return 0
   else
@@ -375,8 +379,63 @@ community_choose_profile_game() {
   printf '%s\n' "${games[$((selected-1))]}"
 }
 
+community_export_configs() {
+  local title="$1" rom="${2:-}" profile label selected tag output
+  local -a games=() items=() selected_games=()
+  if [ -n "$rom" ]; then
+    selected_games=("$rom")
+  else
+    while IFS=$'\t' read -r rom profile; do
+      [ -n "$rom" ] && [ -f "$profile" ] || continue
+      games+=("$rom")
+      label="$(basename "$rom")"
+      if [ "$(amx_launcher_cmd configured "$rom" "$profile" 2>/dev/null)" = 1 ]; then label="[Launcher] $label"; fi
+      items+=("${#games[@]}" "$label" off)
+    done < <(amx_associations)
+    if [ "${#games[@]}" -eq 0 ]; then
+      msgbox "$title" "$(community_txt 'Aucun jeu avec un profil associé disponible à exporter.' 'No games with an available assigned profile to export.')"
+      return
+    fi
+    selected="$(checklist_select "$title" "$(community_txt 'Cochez les jeux à exporter. Le ZIP contiendra leurs profils et leurs règles launcher éventuelles.' 'Select games to export. The ZIP will contain their profiles and any launcher rules.')" "${items[@]}")" || return
+    while IFS= read -r tag; do
+      [ -n "$tag" ] || continue
+      [[ "$tag" =~ ^[0-9]+$ ]] && [ "$tag" -ge 1 ] && [ "$tag" -le "${#games[@]}" ] || return 1
+      selected_games+=("${games[$((10#$tag-1))]}")
+    done <<< "$selected"
+    [ "${#selected_games[@]}" -gt 0 ] || return 0
+  fi
+  if ! output="$(community_cmd export-configs "${selected_games[@]}" 2>&1)"; then
+    msgbox "$title" "$output"; return 1
+  fi
+  msgbox "$title" "$(community_txt "Export terminé : ${#selected_games[@]} configuration(s).\n\n$output\n\nCopiez ce ZIP sur l’autre machine et utilisez « Importer un paquet ZIP »." "Export complete: ${#selected_games[@]} configuration(s).\n\n$output\n\nCopy this ZIP to the other machine and use “Import a ZIP package”.")"
+}
+
+community_import_config_batch() {
+  local title="$1" package="$2" rom="${3:-}" rows game source_name profile selected
+  local -a profiles=() items=()
+  local -A WT_MENU_GAME_LABELS=()
+  if ! rows="$(community_cmd import-configs "$package" 2>&1)"; then msgbox "$title" "$rows"; return 1; fi
+  while IFS=$'\t' read -r game source_name profile; do
+    [ -n "$profile" ] || continue
+    profiles+=("$profile")
+    WT_MENU_GAME_LABELS["${#profiles[@]}"]="$game"
+    items+=("${#profiles[@]}" "$game — $source_name")
+  done <<< "$rows"
+  if [ "${#profiles[@]}" -eq 1 ] && [ -n "$rom" ]; then
+    community_import_actions antimicrox "${profiles[0]}" "$title" "$rom"
+    return
+  fi
+  while true; do
+    selected="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt "${#profiles[@]} configuration(s) importée(s). Choisissez une configuration pour l’associer à son jeu sur cette machine." "${#profiles[@]} configuration(s) imported. Choose a configuration to assign it to its game on this machine.")" "${items[@]}" back "$(i18n back)")" || return
+    [[ "$selected" =~ ^[0-9]+$ ]] && [ "$selected" -ge 1 ] && [ "$selected" -le "${#profiles[@]}" ] || return 0
+    community_import_actions antimicrox "${profiles[$((10#$selected-1))]}" "$title"
+  done
+}
+
+
 community_share_game_config() {
   local title="$1" rom="${2:-}" destination="${3:-community}" profile
+  if [ "$destination" = local ]; then community_export_configs "$title" "$rom"; return; fi
   [ -n "$rom" ] || rom="$(community_choose_profile_game "$title")" || return
   profile="$(amx_current_profile "$rom")"
   if [ -z "$profile" ]; then
@@ -387,11 +446,17 @@ community_share_game_config() {
 }
 
 community_import_package() {
-  local kind="$1" title="$2" rom="${3:-}" package path
+  local kind="$1" title="$2" rom="${3:-}" package path package_type
   if command -v yad >/dev/null 2>&1; then
-    package="$(DISPLAY="${DISPLAY:-:0}" yad --file --title="$title — ZIP" --filename="$WT_HOME/exports/community/$kind/" --file-filter='ZIP | *.zip' 2>/dev/null)" || return
+    package="$(DISPLAY="${DISPLAY:-:0}" yad --file --title="$title — ZIP" --filename="$WT_HOME/exports/" --file-filter='ZIP | *.zip' 2>/dev/null)" || return
   else
-    package="$(input_text "$title" "$(community_txt 'Chemin du paquet ZIP à importer :' 'ZIP package path to import:')" "$WT_HOME/exports/community/$kind/")" || return
+    package="$(input_text "$title" "$(community_txt 'Chemin du paquet ZIP à importer :' 'ZIP package path to import:')" "$WT_HOME/exports/")" || return
+  fi
+  if ! package_type="$(community_cmd package-type "$package" 2>&1)"; then msgbox "$title" "$package_type"; return 1; fi
+  if [ "$package_type" = configurations ]; then
+    if [ "$kind" != antimicrox ]; then msgbox "$title" "$(community_txt 'Ce ZIP contient des configurations AntiMicroX.' 'This ZIP contains AntiMicroX configurations.')"; return 1; fi
+    community_import_config_batch "$title" "$package" "$rom"
+    return
   fi
   if ! path="$(community_cmd import-package "$package" --kind "$kind" 2>&1)"; then msgbox "$title" "$path"; return 1; fi
   community_import_actions "$kind" "$path" "$title" "$rom"
@@ -515,7 +580,7 @@ community_menu() {
   else
     share_label="$(community_txt 'Partager mon profil de manette' 'Share my controller profile')"
     config_options=(share_game "$(community_txt 'Partager la configuration d’un jeu (profils et règles launcher)' 'Share a game configuration (profiles and launcher rules)')"
-      export "$(community_txt 'Exporter la configuration d’un jeu dans un ZIP' 'Export a game configuration to a ZIP')")
+      export "$(community_txt 'Exporter des configurations dans un ZIP' 'Export configurations to a ZIP')")
     browse_label="$(community_txt 'Voir les profils disponibles' 'Browse available profiles')"
     intro="$(community_txt 'Un profil contient les commandes de la manette pour un jeu. Téléchargez ceux d’autres joueurs ou partagez les vôtres. Un modérateur valide les partages avant publication.' 'A profile contains controller mappings for a game. Download profiles from other players or share yours. A moderator reviews submissions before publication.')"
     empty_label="$(community_txt 'Aucun profil AntiMicroX trouvé. Actualisez le catalogue ou partagez votre profil.' 'No AntiMicroX profile found. Refresh the catalogue or share your profile.')"

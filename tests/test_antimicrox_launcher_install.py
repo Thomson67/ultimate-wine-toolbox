@@ -298,5 +298,18 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertEqual(self.port.read_bytes(), self.old['toolbox/ports/Ultimate Wine Toolbox.sh'])
 
 
+    def test_upgrade_from_contrast_version_preserves_existing_profiles(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        module = self.source/'toolbox/helpers/community_profiles.py'
+        module.write_bytes(module.read_bytes()+b'\n# bulk configuration export\n')
+        with patch.object(installer, 'CONTRAST_MENU_HASHES', hashes):
+            backup = self.install()
+        self.assertIn('bulk configuration export', (self.home/'toolbox/helpers/community_profiles.py').read_text())
+        installer.restore(backup)
+        self.assertNotIn('bulk configuration export', (self.home/'toolbox/helpers/community_profiles.py').read_text())
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -137,7 +137,7 @@ def launcher_export(home, source, rom=''):
         rom = candidates[0] if candidates else ''
     config = Store(home).load(rom, str(source)) if rom else None
     if config is None:
-        imported = imported_launcher(home, source)
+        imported = imported_launcher(home, source) if not rom else None
         if imported:
             config = dict(imported, launcher_profile=str(source))
         else:
@@ -381,6 +381,110 @@ def prioritize_games(games, preferred):
     return sorted(games, key=score, reverse=True)
 
 
+CONFIG_EXPORT_FORMAT = 'uwt-antimicrox-configs'
+CONFIG_EXPORT_LIMIT = 64*1024*1024
+CONFIG_EXPORT_COUNT = 1000
+
+
+def config_export_type(path):
+    with zipfile.ZipFile(path) as archive:
+        if 'configurations.json' not in archive.namelist():
+            return 'single'
+        member = archive.getinfo('configurations.json')
+        if member.file_size > LIMIT:
+            raise ValueError('Configuration manifest too large')
+        value = json.loads(archive.read(member))
+        if not isinstance(value, dict) or value.get('format') != CONFIG_EXPORT_FORMAT or value.get('version') != 1:
+            raise ValueError('Unsupported configuration archive')
+        return 'configurations'
+
+
+def read_config_export(path):
+    """Validate every member before the importer writes any profile."""
+    with zipfile.ZipFile(path) as archive:
+        members = archive.infolist()
+        names = [member.filename for member in members]
+        if len(names) != len(set(names)) or len(names) > CONFIG_EXPORT_COUNT+1:
+            raise ValueError('Duplicate or excessive archive members')
+        if any(member.file_size > LIMIT for member in members) or sum(member.file_size for member in members) > CONFIG_EXPORT_LIMIT:
+            raise ValueError('Configuration archive too large')
+        value = json.loads(archive.read('configurations.json'))
+        if not isinstance(value, dict) or set(value) != {'format', 'version', 'games'} or value['format'] != CONFIG_EXPORT_FORMAT or value['version'] != 1:
+            raise ValueError('Unsupported configuration archive')
+        games = value['games']
+        if not isinstance(games, list) or not 1 <= len(games) <= CONFIG_EXPORT_COUNT:
+            raise ValueError('Invalid configuration count')
+        expected = {'configurations.json'}
+        result = []
+        for item in games:
+            if not isinstance(item, dict) or set(item) != {'game', 'rom_name', 'file', 'sha256'}:
+                raise ValueError('Invalid configuration entry')
+            if not clean(item['game'], 160) or not clean(item['rom_name'], 512):
+                raise ValueError('Missing game name')
+            if '/' in item['rom_name'] or '\\' in item['rom_name'] or item['rom_name'] in ('.', '..'):
+                raise ValueError('Game name must not contain a local path')
+            name = item['file']
+            if not isinstance(name, str) or not re.fullmatch(r'profiles/[0-9]{4}\.amgp', name) or name in expected:
+                raise ValueError('Invalid configuration member')
+            if not isinstance(item['sha256'], str) or not re.fullmatch('[a-f0-9]{64}', item['sha256']):
+                raise ValueError('Invalid configuration checksum')
+            expected.add(name)
+            data = archive.read(name)
+            if hashlib.sha256(data).hexdigest() != item['sha256']:
+                raise ValueError('Configuration checksum mismatch')
+            profile_bytes('antimicrox', data)
+            result.append((item, data))
+        if set(names) != expected:
+            raise ValueError('Unexpected configuration archive members')
+        return result
+
+
+def export_configs(home, roms):
+    home = Path(home)
+    selected = list(dict.fromkeys(roms))
+    if not 1 <= len(selected) <= CONFIG_EXPORT_COUNT:
+        raise ValueError('Select between 1 and 1000 games')
+    associations = {}
+    for line in (home/'config/antimicrox-games.tsv').read_text().splitlines():
+        fields = line.split('\t')
+        if len(fields) == 2:
+            associations[fields[0]] = fields[1]
+    games, payloads, total = [], {}, 0
+    for index, rom in enumerate(selected, 1):
+        profile = associations.get(rom)
+        if not profile or not Path(profile).is_file():
+            raise ValueError('Game has no available assigned profile: '+Path(rom).name)
+        rom_name = clean(Path(rom).name, 512)
+        if '\\' in rom_name:
+            raise ValueError('Game name contains a nonportable separator')
+        game = game_title(rom_name) or rom_name[:160]
+        data = launcher_export(home, profile, rom)
+        filename = f'profiles/{index:04d}.amgp'
+        total += len(data)
+        if total > CONFIG_EXPORT_LIMIT-LIMIT:
+            raise ValueError('Configuration export exceeds 62 MiB')
+        games.append({'game': game, 'rom_name': rom_name, 'file': filename,
+                      'sha256': hashlib.sha256(data).hexdigest()})
+        payloads[filename] = data
+    manifest = dump({'format': CONFIG_EXPORT_FORMAT, 'version': 1, 'games': games})
+    if len(manifest) > LIMIT:
+        raise ValueError('Configuration manifest too large')
+    directory = home/'exports/antimicrox'; directory.mkdir(parents=True, exist_ok=True)
+    destination = directory/('antimicrox-configs-'+time.strftime('%Y%m%d-%H%M%S')+'-'+uuid.uuid4().hex[:8]+'.zip')
+    fd, temporary = tempfile.mkstemp(prefix='.configs-', dir=directory)
+    try:
+        with os.fdopen(fd, 'wb') as stream, zipfile.ZipFile(stream, 'w', zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr('configurations.json', manifest)
+            for name, data in payloads.items():
+                archive.writestr(name, data)
+        os.chmod(temporary, 0o644)
+        os.replace(temporary, destination)
+    finally:
+        if os.path.exists(temporary): os.unlink(temporary)
+    return destination
+
+
+
 class Community:
     def __init__(self, home, download=None):
         self.home = Path(home)
@@ -470,6 +574,18 @@ class Community:
         values[str(path.resolve())] = saved
         atomic(imports, dump(values))
         return path
+
+    def import_configs(self, path):
+        validated = read_config_export(path)
+        results = []
+        for item, data in validated:
+            identifier = 'offline-'+hashlib.sha256(dump(item)).hexdigest()[:24]
+            metadata = entry({'id': identifier, 'kind': 'antimicrox', 'game': item['game'],
+                              'title': item['game'], 'author': 'Export local',
+                              'file': 'antimicrox/'+identifier+'.amgp', 'sha256': item['sha256']})
+            profile = self.install_profile(metadata, data)
+            results.append((item['game'], item['rom_name'], profile))
+        return results
 
     def import_package(self, path, kind=None):
         from community_service import package_data
@@ -574,6 +690,9 @@ def main():
     for name in ('description', 'notes', 'tested-on'): arg.add_argument('--'+name, default='')
     arg.add_argument('--requirement', action='append', default=[])
     arg.add_argument('--rom', default='')
+    arg = sub.add_parser('export-configs'); arg.add_argument('roms', nargs='+')
+    arg = sub.add_parser('package-type'); arg.add_argument('source')
+    arg = sub.add_parser('import-configs'); arg.add_argument('source')
     arg = sub.add_parser('import-package'); arg.add_argument('source'); arg.add_argument('--kind', choices=KINDS)
     arg = sub.add_parser('launcher-info'); arg.add_argument('source')
     arg = sub.add_parser('launcher-import'); arg.add_argument('source'); arg.add_argument('rom'); arg.add_argument('--check', action='store_true')
@@ -605,7 +724,13 @@ def main():
             if args.query.casefold() in name.casefold(): print(path+'\t'+name)
         return
     if args.command == 'suggest-game': print(suggest_game(args.home, args.kind, args.source, args.rom)); return
+    if args.command == 'export-configs': print(export_configs(args.home, args.roms)); return
+    if args.command == 'package-type': print(config_export_type(args.source)); return
     community = Community(args.home)
+    if args.command == 'import-configs':
+        for game, rom_name, profile in community.import_configs(args.source):
+            print(game+'\t'+rom_name+'\t'+str(profile))
+        return
     if args.command == 'import-package': print(community.import_package(args.source, args.kind)); return
     if args.command == 'launcher-info':
         if imported_launcher(args.home, args.source): print('launcher-package-v1')

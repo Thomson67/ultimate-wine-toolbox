@@ -57,6 +57,8 @@ SELECTIVE_MENU_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f7
 for previous in (BASE_HASHES, PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES, REGULAR_MENU_HASHES, BLACK_MENU_HASHES, SELECTIVE_MENU_HASHES):
     previous['toolbox/ports/Ultimate Wine Toolbox.sh'] = '70335e39badb800485096ac217f0efb5477a8dd3ef6cc95dbbf2262b28ee8c92'
 
+CONTRAST_MENU_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70129bb4b01e05382b793410cfc3d9c227ad6b0c7830791bf', 'toolbox/modules/antimicrox.sh': 'c0b22af085a53be5ca890b27a84e400c4cbeb70535f0ea5d55103b9cbf1ec312', 'toolbox/hooks/antimicrox-game-event.sh': 'e64e2d83ee294f5335fc2b98db599d4993b7c2164d9b497bd43978d6ff058f55', 'toolbox/modules/community.sh': 'c390b104428046775130ffbe80807ea3181849d90490ae8f31f6ace2dba86efe', 'toolbox/helpers/community_profiles.py': 'a56b24e473b9fac81620a6221d65100dd3988f0c91bb0b655ca3362e2ab631d0', 'toolbox/helpers/community_service.py': '354e9d97fd21a283618168029e456cec1dd0f707d7a05bcadc6ccf6264486b6f', 'toolbox/lib/common.sh': 'de35d54563a87794bb14ce8691a969e27fae90c41f8d03062a74e335f7bcf657', 'toolbox/modules/runners.sh': 'afd60bd122e1a4f4ac4ad42412c9a5f4c755fb222f97d479a06e64278dc5a38b', 'toolbox/modules/reshade.sh': '398397c68404ea5cc86c2f4d7b07e0329e55becc7c1021878a2149ad97df7e25', 'toolbox/modules/dxvk-manager.sh': 'cd5391f5101c3e61db6a0ad490a3ce1c2e8fae24f87d4d099ee8a65354aa67fc', 'toolbox/modules/wsquashfs.sh': '267a5c187765bae37d7de431a5ac081015b67a470daf523833b4259808d8a010', 'toolbox/modules/wsquashfs-update.sh': '8994d189bd983d568d31e2128e8d374f9715bbca490a82ce4cc6bab1378e1eec', 'toolbox/modules/wsquashfs-dotnet.sh': '08057c25f4bf437bc6209ac9ea989ea081bf4e3ee0f3208ea62685a3ec5965ec', 'toolbox/modules/batocera-conf-extra.sh': 'cf829b6c84b1700aeb55df4a42a3b3f568c9a2b41d6e776ec8f9738585d7a2bc', 'toolbox/modules/batocera-conf-transfer.sh': 'c2cdd4675ca6312b4309d2c47b1bdb71e3cec28a2a44fd8a3d4f04b65b518f56', 'toolbox/modules/settings.sh': '5855a2516ef6decff2295459306737c6bd5041c6cb57623c1ad008469ca5c785', 'toolbox/ports/Ultimate Wine Toolbox.sh': '0aabfe2fae4431bee99b64e78c2aedfd77a45f9f97147329d5e7948b88247b64', 'toolbox/helpers/antimicrox_launcher.py': 'a3728a24c43000a5fe949b8eec3be3eedf6ce4570ac069301670fd5fea548de5'}
+
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -111,7 +113,7 @@ def install(home, hook, ref, source=None, port=None):
     upgrading = (home/HELPER).exists()
     expected = BASE_HASHES
     if upgrading:
-        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES, REGULAR_MENU_HASHES, BLACK_MENU_HASHES, SELECTIVE_MENU_HASHES):
+        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES, REGULAR_MENU_HASHES, BLACK_MENU_HASHES, SELECTIVE_MENU_HASHES, CONTRAST_MENU_HASHES):
             if all(not target.is_symlink() and target.is_file() and
                    sha(target.read_bytes()) == candidate.get(source_path)
                    for target, source_path in targets):

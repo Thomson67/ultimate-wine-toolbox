@@ -98,34 +98,40 @@ ces vérifications sur le compositeur et AntiMicroX réels.
 Le partage d’un jeu avec launcher contient maintenant ses règles de fenêtres,
 son profil launcher et, en mode deux profils, son profil jeu. Les identifiants
 de manette et les chemins locaux ne sont pas transmis. La limite du service
-reste de 64 Kio pour l’ensemble de la configuration. Le transfert local par ZIP
-accepte jusqu’à 2 Mio et ne dépend pas de cette limite du service.
+reste de 64 Kio pour l’ensemble de la configuration. Le ZIP local accepte plusieurs configurations (2 Mio par configuration, environ
+62 Mio de profils au total) et ne dépend pas de cette limite du service.
 
 Dans **Mes jeux et leurs profils**, choisir le jeu puis :
 
 - **Partager la configuration complète avec la communauté** : envoi pour validation.
 - **Exporter la configuration complète dans un ZIP** : création locale sans publication.
 
-Ces deux actions sont aussi accessibles directement dans **Télécharger ou partager
-des profils** : **Partager la configuration d’un jeu (profils et règles launcher)**
-et **Exporter la configuration d’un jeu dans un ZIP**. Elles affichent uniquement les jeux ayant un profil associé disponible, puis
-récupèrent ce profil et ses règles automatiquement. La mention **[Launcher]**
-repère les jeux dont les règles launcher sont configurées.
+Dans **Télécharger ou partager des profils**, l’action **Exporter des configurations
+dans un ZIP** affiche une liste à cocher limitée aux jeux ayant un profil associé
+disponible. Cochez un ou plusieurs jeux puis validez : un seul ZIP est créé dans
+`exports/antimicrox/`. Les noms sont déduits automatiquement, sans question sur
+le jeu, le pseudo ou la description. La mention **[Launcher]** repère les jeux
+avec des règles configurées. Depuis le menu d’un jeu, l’export est immédiat et
+contient uniquement sa configuration.
 
 Sur l’autre machine, installer cette version de test ou une version ultérieure
 compatible, puis télécharger le partage ou ouvrir **Télécharger ou partager des
-profils > Importer un paquet ZIP**. Choisir ensuite le jeu cible et l’option
+profils > Importer un paquet ZIP**. Pour un export groupé, toutes les configurations
+sont importées et une liste permet de choisir celles à associer aux jeux de
+la nouvelle machine. Choisir ensuite le jeu cible et l’option
 **Utiliser ce profil pour un jeu** : les règles sont associées à ce jeu et les deux
 profils sont conservés dans ses dossiers de configuration locaux. Aucun nouvel
 apprentissage des fenêtres n’est nécessaire si les titres/classes/exécutables
 correspondent à la même version du jeu. La langue ou une autre version du launcher
 peut nécessiter d’ajuster une règle.
 
-Les anciens partages sans règles restent utilisables. Les anciennes Toolbox
-ne savent pas importer ce nouveau paquet : elles voient un profil vide, pour
-éviter d’activer les commandes du launcher pendant toute la partie.
+Les anciens partages sans règles restent utilisables. Les ZIP groupés demandent
+une Toolbox compatible avec cet export. Les anciennes Toolbox qui téléchargent
+un partage launcher `.amgp` voient un profil vide, pour éviter d’activer les
+commandes du launcher pendant toute la partie.
 
-Le ZIP reste dans `exports/community/antimicrox/`. Les profils source ne sont pas
+Les ZIP de partage restent dans `exports/community/antimicrox/`, les exports
+locaux dans `exports/antimicrox/`. Les profils source ne sont pas
 modifiés et aucun jeu, préfixe Wine ou exécutable n’est ajouté au paquet.
 
 ## Lisibilité des menus
