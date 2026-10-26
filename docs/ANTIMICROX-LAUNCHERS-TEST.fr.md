@@ -180,7 +180,7 @@ profil seul, l’export groupé, l’import ZIP et les actions de modération.
 
 ## Désactiver ou supprimer
 
-Les menus des jeux regroupent ces actions dans **Désactiver ou supprimer**.
+Les menus des jeux regroupent ces actions dans **Désactiver ou supprimer un profil / une configuration**.
 Pour un launcher, trois choix sont proposés : retirer uniquement les règles
 en conservant le profil actif, retirer toute la configuration en gardant les
 fichiers profils, ou supprimer la configuration et ses profils non partagés.
@@ -189,6 +189,9 @@ qu’ils sont référencés ailleurs, y compris comme profil jeu d’un autre la
 Le Pad2Key d’origine est restauré s’il avait été suspendu. Un échec annule
 l’opération et conserve les données précédentes.
 
-L’entrée principale **Désactiver ou supprimer** propose les configurations de
-jeux et les fichiers profils. La suppression d’un fichier seul refuse de casser
-une paire launcher/jeu : utiliser alors le menu de suppression de sa configuration.
+L’entrée principale propose **Jeux et leurs configurations** pour désactiver
+ou supprimer une configuration, avec ou sans ses profils. **Profils sans jeu
+associé** permet uniquement de nettoyer les fichiers inutilisés. Les profils
+référencés par un jeu, dans l’un des deux rôles launcher/jeu ou comme dépendance
+d’un paquet importé, restent protégés. Une association ajoutée après l’affichage
+de la liste empêche également la suppression.

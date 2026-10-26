@@ -337,6 +337,19 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertNotIn('preserve launcher references', (self.home/'toolbox/helpers/antimicrox_profiles.py').read_text())
 
 
+    def test_upgrade_from_explicit_removal_version_updates_unused_profile_filter(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        module = self.source/'toolbox/helpers/antimicrox_profiles.py'
+        module.write_bytes(module.read_bytes()+b'\n# unassigned profile filter\n')
+        with patch.object(installer, 'EXPLICIT_REMOVAL_HASHES', hashes):
+            backup = self.install()
+        self.assertIn('unassigned profile filter', (self.home/'toolbox/helpers/antimicrox_profiles.py').read_text())
+        installer.restore(backup)
+        self.assertNotIn('unassigned profile filter', (self.home/'toolbox/helpers/antimicrox_profiles.py').read_text())
+
+
 class PublishedVersionHashesTests(unittest.TestCase):
     def test_deletion_version_keeps_its_updated_profiles_helper_hash(self):
         # Published in 02edb647: this must not inherit the pre-deletion baseline.
@@ -345,6 +358,13 @@ class PublishedVersionHashesTests(unittest.TestCase):
                          '0df93eb827267e25aa54a79b0c40fe91fc3e0f02132d11f35b6728ee64ed97ef')
         self.assertEqual(installer.BASE_HASHES[path],
                          'f048a9cb29bea1cccd5ecc5d441f2b0e45fca0ffd73509b541c01a2b6f2843ce')
+
+
+    def test_explicit_removal_version_keeps_its_published_hashes(self):
+        self.assertEqual(installer.EXPLICIT_REMOVAL_HASHES['toolbox/helpers/antimicrox_profiles.py'],
+                         installer.DELETION_MENU_HASHES['toolbox/helpers/antimicrox_profiles.py'])
+        self.assertEqual(installer.EXPLICIT_REMOVAL_HASHES['toolbox/modules/antimicrox.sh'],
+                         '6e5ab5ad92c0924dd329b9da43558bdd22cf64010f231d77e9be0100a552ada4')
 
 
 if __name__ == '__main__':

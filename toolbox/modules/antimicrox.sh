@@ -248,20 +248,31 @@ amx_profile_info() (
   fi
 )
 amx_delete_profile_for() {
-  local profile="$1" plan token output
+  local profile="$1" unassigned="${2:-0}" plan token output note
+  local -a options=()
+  if [ "$unassigned" = 1 ]; then
+    options=(--unassigned)
+    note="$(amx_txt 'Ce profil n’est associé à aucun jeu.' 'This profile is not assigned to any game.')"
+  else
+    note="$(amx_txt 'Toutes ses associations seront également retirées.' 'All its game assignments will also be removed.')"
+  fi
   if amx_running; then
     msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX avant de supprimer un profil.' 'Close the game and AntiMicroX before deleting a profile.')"
     return 1
   fi
-  plan="$(amx_profiles_cmd plan "$profile" 2>&1)" || {
+  plan="$(amx_profiles_cmd plan "$profile" "${options[@]}" 2>&1)" || {
     msgbox AntiMicroX "$(amx_txt 'Suppression impossible :' 'Cannot delete profile:')\n$plan"; return 1;
   }
   token="${plan%%$'\n'*}"
-  if ! yesno AntiMicroX "$(amx_txt "Supprimer définitivement ce fichier profil ?\n\n${plan#*$'\n'}\n\nToutes ses associations seront également retirées." "Permanently delete this profile file?\n\n${plan#*$'\n'}\n\nAll its game assignments will also be removed.")"; then
+  if ! yesno AntiMicroX "$(amx_txt "Supprimer définitivement ce fichier profil ?\n\n${plan#*$'\n'}\n\n$note" "Permanently delete this profile file?\n\n${plan#*$'\n'}\n\n$note")"; then
     return 0
   fi
-  if output="$(amx_profiles_cmd delete "$profile" "$token" 2>&1)"; then
-    msgbox AntiMicroX "$(amx_txt 'Profil supprimé et associations retirées.' 'Profile deleted and assignments removed.')"
+  if output="$(amx_profiles_cmd delete "$profile" "$token" "${options[@]}" 2>&1)"; then
+    if [ "$unassigned" = 1 ]; then
+      msgbox AntiMicroX "$(amx_txt 'Profil supprimé.' 'Profile deleted.')"
+    else
+      msgbox AntiMicroX "$(amx_txt 'Profil supprimé et associations retirées.' 'Profile deleted and assignments removed.')"
+    fi
   else
     msgbox AntiMicroX "$(amx_txt 'Suppression impossible :' 'Could not delete profile:')\n$output"
     return 1
@@ -272,23 +283,26 @@ amx_delete_profiles() {
   local -a profiles=() options=()
   while true; do
     profiles=(); options=()
-    output="$(amx_profiles_cmd list 2>&1)" || { msgbox AntiMicroX "$output"; return 1; }
+    output="$(amx_profiles_cmd list-unassigned 2>&1)" || { msgbox AntiMicroX "$output"; return 1; }
     while IFS= read -r profile; do
       [ -n "$profile" ] || continue
       profiles+=("$profile")
       options+=("${#profiles[@]}" "$(basename "$profile") — $(dirname "$profile")")
     done <<< "$output"
-    selected="$(WT_MENU_LIST=1 menu_select AntiMicroX "$(amx_txt 'Choisissez le profil à supprimer. Il sera aussi retiré des jeux qui l’utilisent.' 'Choose a profile to delete. It will also be removed from games that use it.')" \
-      "${options[@]}" other "$(amx_txt 'Choisir un autre fichier .amgp' 'Choose another .amgp file')" back "$(i18n back)")" || return 0
+    if [ "${#profiles[@]}" -eq 0 ]; then
+      msgbox AntiMicroX "$(amx_txt 'Aucun profil sans jeu associé à supprimer.' 'No unassigned profiles to delete.')"
+      return 0
+    fi
+    selected="$(WT_MENU_LIST=1 menu_select AntiMicroX "$(amx_txt 'Profils sans jeu associé. Choisissez le fichier à supprimer.' 'Profiles without an assigned game. Choose a file to delete.')" \
+      "${options[@]}" back "$(i18n back)")" || return 0
     case "$selected" in
-      other) profile="$(amx_browse_profile '')" || continue ;;
       back|'') return 0 ;;
       *)
         [[ "$selected" =~ ^[0-9]+$ ]] || return 0
         [ "$selected" -ge 1 ] && [ "$selected" -le "${#profiles[@]}" ] || return 0
         profile="${profiles[$((selected-1))]}" ;;
     esac
-    amx_delete_profile_for "$profile"
+    amx_delete_profile_for "$profile" 1
   done
 }
 amx_delete_launcher_config() {
@@ -359,8 +373,8 @@ amx_deletion_menu() {
   local choice
   while true; do
     choice="$(menu_select AntiMicroX "$(amx_txt 'Désactiver ou supprimer un profil / une configuration' 'Disable or delete a profile / configuration')" \
-      game "$(amx_txt 'Configuration d’un jeu' 'Game configuration')" \
-      profile "$(amx_txt 'Fichier profil enregistré' 'Saved profile file')" back "$(i18n back)")" || return
+      game "$(amx_txt 'Jeux et leurs configurations' 'Games and their configurations')" \
+      profile "$(amx_txt 'Profils sans jeu associé' 'Profiles without an assigned game')" back "$(i18n back)")" || return
     case "$choice" in
       game) amx_remove_game_configuration ;;
       profile) amx_delete_profiles ;;

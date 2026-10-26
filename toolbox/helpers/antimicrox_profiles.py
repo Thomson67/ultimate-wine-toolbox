@@ -175,6 +175,10 @@ def report(profile, language='fr'):
                      if line else '' for line in lines)+'\n'
 
 
+class ProfileInUse(ValueError):
+    """A profile must be managed through the game or bundle that uses it."""
+
+
 class Profiles:
     def __init__(self, home, userdata='/userdata', active=None):
         self.home, self.userdata = Path(home), Path(userdata).resolve()
@@ -214,8 +218,12 @@ class Profiles:
             raise ValueError('Select an .amgp file under /userdata')
         return path
 
-    def plan(self, selected):
+    def plan(self, selected, unassigned=False):
         path = self.validate(selected)
+        raw = self.raw()
+        games, remaining = self.references(path, raw)
+        if unassigned and games:
+            raise ProfileInUse("This profile is assigned to a game. Use its game configuration menu.")
         # Launcher pairs must be removed as a configuration, including secondary
         # references that are not present in the primary-association TSV.
         for config in (self.home/'config/antimicrox-launchers').glob('*.json'):
@@ -225,16 +233,15 @@ class Profiles:
             if not isinstance(value, dict): raise ValueError('Invalid launcher configuration')
             if any(isinstance(value.get(key), str) and value[key] and Path(value[key]).resolve() == path
                    for key in ('launcher_profile', 'game_profile')):
-                raise ValueError('This profile belongs to a launcher configuration. Use its game menu to remove that configuration first.')
+                raise ProfileInUse('This profile belongs to a launcher configuration. Use its game menu to remove that configuration first.')
         imported = Pad2KeyStore(self.home, self.userdata).read(self.home/'state/community/imports.json')
         for owner, metadata in imported.items():
             config = metadata.get('launcher_config') if isinstance(metadata, dict) else None
             if (isinstance(config, dict) and isinstance(config.get('game_profile'), str)
                     and config['game_profile'] and Path(config['game_profile']).resolve() == path
                     and Path(owner).resolve() != path and Path(owner).is_file()):
-                raise ValueError('This profile is used by another stored launcher profile. Remove its configuration or owner profile first.')
-        raw, stat = self.raw(), path.stat()
-        games, remaining = self.references(path, raw)
+                raise ProfileInUse('This profile is used by another stored launcher profile. Remove its configuration or owner profile first.')
+        stat = path.stat()
         sha = hashlib.sha256()
         with path.open('rb') as stream:
             for chunk in iter(lambda: stream.read(65536), b''):
@@ -257,13 +264,23 @@ class Profiles:
                 continue
         return sorted(found)
 
-    def delete(self, selected, token):
+    def list_unassigned(self):
+        found = []
+        for path in self.list():
+            try:
+                self.plan(path, unassigned=True)
+            except ProfileInUse:
+                continue
+            found.append(path)
+        return found
+
+    def delete(self, selected, token, unassigned=False):
         self.cfg.parent.mkdir(parents=True, exist_ok=True)
         with (self.cfg.parent/'antimicrox-games.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             if self.active():
                 raise ValueError('Close the game and AntiMicroX before deleting a profile')
-            path, games, remaining, original, actual = self.plan(selected)
+            path, games, remaining, original, actual = self.plan(selected, unassigned=unassigned)
             if actual != token:
                 raise ValueError('Profile or assignments changed. Select the profile again.')
             store = Pad2KeyStore(self.home, self.userdata)
@@ -300,25 +317,26 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--home', default=os.environ.get('WT_HOME', '/userdata/system/ultimate-wine-toolbox'))
     parser.add_argument('--language', default='fr')
-    parser.add_argument('action', choices=('report', 'list', 'plan', 'delete'))
+    parser.add_argument('--unassigned', action='store_true', help='Refuse profiles used by a game')
+    parser.add_argument('action', choices=('report', 'list', 'list-unassigned', 'plan', 'delete'))
     parser.add_argument('profile', nargs='?')
     parser.add_argument('token', nargs='?')
     args = parser.parse_args()
     profiles = Profiles(args.home)
     if args.action == 'report':
         print(report(args.profile, args.language), end='')
-    elif args.action == 'list':
-        for path in profiles.list():
+    elif args.action in ('list', 'list-unassigned'):
+        for path in (profiles.list_unassigned() if args.action == 'list-unassigned' else profiles.list()):
             print(path)
     elif args.action == 'plan':
-        path, games, _, _, token = profiles.plan(args.profile)
+        path, games, _, _, token = profiles.plan(args.profile, unassigned=args.unassigned)
         print(token)
         print(path)
         print(('Jeux associés' if args.language == 'fr' else 'Assigned games')+f' : {len(games)}')
         for game in games:
             print('  '+game)
     elif args.action == 'delete':
-        profiles.delete(args.profile, args.token)
+        profiles.delete(args.profile, args.token, unassigned=args.unassigned)
 
 
 if __name__ == '__main__':
