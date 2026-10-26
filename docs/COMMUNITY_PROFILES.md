@@ -1,7 +1,10 @@
 # Community profiles
 
-The interface stays inside each tool: **AntiMicroX → Community profiles** and
-**ReShade → Community presets** (also available from a configured ReShade game).
+This guide describes the current source branch, including post-v0.7.2 launcher
+and ZIP-transfer additions; see the [documentation index](README.md).
+
+The interface stays inside each tool: **AntiMicroX → Download or share profiles**
+and **ReShade → Community presets** (also available from a configured ReShade game).
 There is no additional shared entry in the Toolbox main menu.
 
 A single schema-1 JSON catalogue in `Thomson67/ultimate-wine-toolbox-community`
@@ -49,10 +52,11 @@ the downloaded preset. The model screen is skipped when a preset is already
 selected. The standard model screen also offers a searchable community preset
 chooser (with refresh, full details, validation and hash-verified download).
 
-Shader packs are inferred offline from effect sections and `Technique@File.fx`
-references, using the pinned official EffectPackages index mapped to the backend's
-pack IDs and Toolbox retro extras (`toolbox/data/reshade-effect-index.json`).
-TechniqueSorting alone does not pull in inactive effects. Known packs are selected
+Shader packs are inferred offline from active `Techniques=` entries, including
+`Technique@File.fx` references, using the pinned official EffectPackages index
+mapped to backend pack IDs and Toolbox retro extras
+(`toolbox/data/reshade-effect-index.json`). Stored settings sections and
+`TechniqueSorting=` do not pull in inactive effects. Known packs are selected
 automatically; unknown effects and ambiguous pack matches require review of a
 preselected checklist. No URL from a preset controls a shader download. A preset
 contains settings; the backend installs the selected packs and their dependencies.
@@ -73,6 +77,64 @@ Managed ReShade imports first export the previous preset to
 `exports/community-backups/`, then use the existing importer. Disabled managed
 setups are enabled after confirmed import. Cancelling or failing configuration
 does not import the preset. Shader requirements are displayed before download.
+
+## AntiMicroX complete configurations
+
+A configured game's **Share or export** submenu groups complete community
+sharing and a direct local ZIP export. **Download or share profiles → Share and
+transfer profiles** groups full-game sharing, standalone controller-profile
+sharing, batch ZIP export, ZIP import, moderation and removal of moderator access.
+ReShade keeps its own preset-sharing actions; it has no launcher configuration.
+
+Complete-game sharing and ZIP export only list games with an available assigned
+profile. `[Launcher]` marks saved rules. An ordinary configuration contains one
+profile; a launcher configuration includes the launcher mapping, window rules
+and the game mapping when separate profiles are selected. Selecting a specific
+game uses that game's current rules, so disabled rules are not revived from old
+import metadata. A stored unassigned imported bundle can still retain its rules
+when deliberately shared as that profile.
+
+The portable community file remains an `.amgp` with a `gamecontroller` root.
+A version-1 `uwt_launcher` element holds the rules and embedded role profiles;
+top-level `sets` is empty so older clients load an empty mapping instead of
+applying launcher controls throughout the game. Both embedded profiles receive
+the normal validation and identity stripping. Commands, external-profile loads
+and local paths remain forbidden. Schema-1 catalogue entries and the existing
+submission envelope are retained; the 64 KiB service cap covers the entire file.
+
+Download/import materializes ordinary editable local role profiles and records
+the portable rules in `state/community/imports.json`. Choosing **Use this profile
+for a game** validates the roles, performs the normal Pad2Key-aware assignment
+and saves rules for that target ROM. No automatic name-based assignment occurs.
+A different ROM path or `.wine`/`.wsquashfs` format needs explicit target selection;
+no new window recording is needed if titles/classes/executables still match.
+Another game version or language can require rule edits. The `.wine` sharing →
+`.wsquashfs` reassignment path was validated on the user's Batocera machine.
+
+## Local configuration ZIPs
+
+**Export configurations to a ZIP** selects one or several games in a checklist.
+Names are derived automatically; this local export asks for no game-name,
+nickname or description form. Export from a game's submenu directly includes
+that one game. Files go to `exports/antimicrox/`, separately from the community
+submission ZIPs in `exports/community/antimicrox/`.
+
+The version-1 `uwt-antimicrox-configs` format stores `configurations.json` plus
+numbered `profiles/0001.amgp` payloads and their SHA-256 checksums. The manifest
+contains a game label and ROM basename, not its source absolute path. Limits:
+1,000 games, 2 MiB per configuration and manifest, 62 MiB of profile payloads
+(64 MiB total uncompressed content). ZIP member names, duplicates, sizes,
+checksums and profile contents are validated before importing any entry;
+archive contents are not blindly extracted into the filesystem.
+
+**Import a ZIP package** accepts both these batch exports and previous
+single-submission ZIP packages. A batch imports all validated profiles, then
+shows them so the user can select configurations to assign to local games.
+Import alone does not activate mappings, and a multi-game batch is never assigned
+wholesale to the game from which the importer was opened. Each assignment uses
+the normal safety checks. Personal mapping files and game archives are not
+included or modified by export. Files still used by another game or a stored
+launcher bundle are protected by profile/configuration deletion.
 
 ## Export and review
 
@@ -176,4 +238,7 @@ pointing explicitly at the former `community-presets` branch should update this 
 The automated tests simulate catalogue networking, exports, review/import,
 hash/content/path rejection, cache fallback, preservation of local edits,
 menu routing, Pad2Key restoration and ReShade preset backup/application. Real
-controller and game behavior must still be checked on Batocera.
+controller and game behavior is not established by these tests alone. Native
+launcher/game switching, complete community transfer from `.wine` to `.wsquashfs`
+and the Sunshine input workaround have been confirmed on the reported Batocera
+v44/labwc machine; other combinations remain to be checked.

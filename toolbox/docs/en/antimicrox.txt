@@ -1,33 +1,64 @@
 ANTIMICROX: CONTROLLER, KEYBOARD AND MOUSE
 
-Open Tools and compatibility → AntiMicroX. An .amgp profile turns controller buttons and sticks into keyboard/mouse input. Profiles are assigned to each game separately. If AntiMicroX is missing, installation is offered when an action needs it.
+Open Tools and compatibility → AntiMicroX. An .amgp profile turns controller buttons and sticks into keyboard/mouse input. Each .wine, .pc or .wsquashfs game has its own assignment. Installation is offered when an action needs AntiMicroX. Native profiles live outside the Wine prefix, normally in /userdata/system/ultimate-wine-toolbox/config/antimicrox-profiles.
 
 CREATE OR EDIT IN GAME
-1. Choose Create or edit a profile in game, then select the game. Create a profile, use the game's current one or select a saved profile.
-2. The game starts in the foreground. Use the controller shortcut shown on screen to switch between the game and AntiMicroX. The usual shortcut is Hotkey+R1; follow the displayed shortcut if the profile requires another combination. Press and release the buttons to switch: R1 mappings remain usable in the game. Keyboard Alt+Tab is also available; under labwc, ES is excluded from the switcher only during AntiMicroX configuration.
-3. Edit mappings and test them in the game. Save the profile in AntiMicroX BEFORE quitting the game.
-4. Afterwards, choose Use this profile whenever this game starts to enable it, or continue adjusting controls.
+1. Open Create or edit a profile in game, then choose the classic workflow or Game with a launcher: profiles and windows.
+2. For a classic game, choose the game and a new, current or saved profile. EmulationStation starts the game and editor.
+3. Use the displayed shortcut to switch to AntiMicroX and back: normally Hotkey+R1, otherwise Hotkey+Select if available. Press and release. Keyboard Alt+Tab remains available; labwc excludes ES from the switcher only during live editing. If both combinations are occupied, use the keyboard.
+4. Edit and test the mappings. Save the profile in AntiMicroX BEFORE quitting the game.
+5. The classic workflow offers activation for future launches or further adjustments. Launcher recording opens window/rule selection directly, without an Activate/Retry step.
 
-Automatic return uses the same ES mechanism as WSquashFS and ReShade tests, including grouped Ports on v44. It confirms the Toolbox has reopened and keeps recovery pending if ES is busy or unavailable. System grouping remains unchanged.
+Automatic return confirms the Toolbox reopened, including with grouped Ports on v44. If ES is busy or unavailable, recovery remains pending. Closing only the editor does not end the game: quit the game to finish the session.
+
+GAMES WITH A LAUNCHER
+Choose Learn windows and configure mappings in game. Show the launcher, configure and save its controls. Enter the game for a few seconds and quit normally. On return, choose the mode, profiles and windows.
+
+Launcher only: the mapping applies on the recognized launcher and is empty elsewhere. Native gamepad input remains available to the game. Separate profiles: one mapping for the launcher and another for the game. The game mapping can be limited to its window or cover other recognized Wine windows of that session. Unrelated windows receive no mapping.
+
+Rules can match title, class or executable, exactly or partially. Title changes can distinguish launcher/game even with the same process. Windows are listed by first observation, rather than exact creation time: verify the correct window even if the launcher usually appears before the game.
+
+Test the selected windows now relaunches using automatic rules without the editor. On return, retest, change rules or record again. Wine Xorg/XWayland windows are supported; native Wine Wayland windows are not. An [L] filename tag enables nothing automatically. Disable Windows AntiMicroX started by a start.bat to avoid two simultaneous mappers.
 
 USE AN EXISTING PROFILE
-Select a profile from the list or Browse .amgp files, then choose the game. Games with names similar to the profile appear first; all other games remain available. The profile will load the next time the game starts from EmulationStation.
+Choose the profile or Browse .amgp files, then the game. Similar names appear first; other games remain available. The profile loads on the next ES launch. Assigning an imported launcher configuration also restores its rules and second profile for the selected game.
 
-Profiles are normally stored in /userdata/system/ultimate-wine-toolbox/config/antimicrox-profiles. Other locations under /userdata are supported. Open the editor without starting a game also lets you create a profile separately.
+EDIT A CONFIGURED GAME
+My games and their profiles lists assignments even when the ROM or profile is missing. Launcher games open their specific menu. Edit launcher profile controls and Edit game profile controls each offer Edit the profile in game or Edit the profile without starting the game. During live editing, the selected role stays loaded. The primary assignment, other profile and rules are preserved.
 
-MANAGE YOUR PROFILES
-My games and their profiles lets you view mappings, edit, test in game, change an assignment or remove it. Profile information includes Xbox and PlayStation button names for easier reading.
+Edit windows, mode or assigned profiles groups editing with the saved recording and Restart the game and record windows again. Recording again reuses the current launcher profile without asking for another. Retest launcher / game switching checks the saved rules.
 
-Removing an assignment keeps the profile file. Delete a saved profile removes its file and assignments after confirmation. Editing a profile shared by multiple games affects all of them. Close the game and AntiMicroX before changing assignments or deleting profiles.
+Profile information uses Xbox/PlayStation button names. Editing a file shared by several games affects all of them. Save before closing the editor.
+
+DISABLE OR DELETE A PROFILE / CONFIGURATION
+In the main menu, Games and their configurations selects a game to manage. The same entry in a game menu groups its available removal actions.
+
+For a launcher: disable only its rules and keep the profile active; remove the configuration and assignment while keeping files; or delete the configuration and its unshared profiles. Confirmation lists files to delete or keep. Profiles used by other games or stored imported launcher bundles remain protected.
+
+For a classic game: disable its assignment while keeping the profile, or explicitly delete the file and all its assignments. Profiles without an assigned game only cleans unused files; profiles referenced by launcher configurations are excluded. An assignment added since selection blocks deletion. Close the game and AntiMicroX first.
 
 CONVERT PAD2KEY
-Convert a Pad2Key (.keys) file to a profile lets you choose a game or a .keys file. The report lists supported mappings and limitations. Hotkey combinations are supported when their configuration can be identified; Hotkey+Start is not added unless explicitly defined in the source file.
+Convert a Pad2Key (.keys) file to a profile selects a game or .keys file. The report lists supported mappings and limits. Identifiable Hotkey combinations are supported; Hotkey+Start is not added unless explicitly defined in the source.
 
-Conversion leaves the original .keys file intact. Enabling the profile backs up and suspends player-one Pad2Key mapping to avoid duplicate input. Removing the AntiMicroX assignment restores it. If the .keys file has since changed, follow the reconversion message to preserve your edits.
+Conversion preserves the original. Activation backs up and suspends player-one Pad2Key to avoid duplicate mappings. Removing the assignment restores it. If the .keys file changed, follow the reconversion message to keep those changes. Other players do not automatically get separate AntiMicroX profiles.
 
-COMMUNITY PROFILES
-Download or share profiles opens the catalogue. Downloaded marks local copies that are still present; modified marks an edited copy. Local copies can be reused without downloading again. Check mappings and the Hotkey before assigning a profile to a game.
+SHARE AND TRANSFER
+Download or share profiles opens the catalogue. Downloaded marks an available local copy; modified marks an edited copy. Check controls and Hotkey before assignment. Local copies can be reused without another download.
 
-To share, select a profile and confirm the detected game, or choose it from the ES game list. Enter the profile title, public nickname and description. Submissions need moderation before publication; submitting a profile does not require a GitHub account.
+A game's Share or export submenu groups complete community sharing and ZIP export. In the catalogue, Share and transfer profiles groups full-game sharing, standalone-profile sharing, batch export, import and moderation. Complete-sharing and export lists only offer games with an available assigned profile. [Launcher] identifies saved rules.
 
-The validator area uses a pairing code and a browser page. Validators can review submissions and remove published entries. Removing a community entry does not delete profiles already installed by players.
+Complete sharing includes the primary profile, launcher rules and game profile when defined. Confirm the game, then enter a title, public nickname and description. Publication waits for moderation; no GitHub account is required. The service limit is 64 KiB for the entire configuration. Local paths and controller identities are removed.
+
+Export configurations to a ZIP allows selecting several games and creates one file in exports/antimicrox without asking for names, a nickname or a description. Export from a game menu directly includes that game only. Limits: 1,000 games, 2 MiB per configuration and 62 MiB of profile payloads.
+
+Import a ZIP package validates every entry, then lets you choose configurations to assign. Select the target game for each. Older ZIP packages remain accepted. The same game can move from .wine to .wsquashfs: rules are reassigned to its new path, without another recording if its windows still match. Another launcher language or version may require an adjustment. Sharing the game archive alone does not include these native settings.
+
+Moderator access uses a pairing code and browser page. It permits reviewing submissions and removing published entries. Community removal keeps profiles already installed by players.
+
+MOONLIGHT / SUNSHINE
+Connect Moonlight before starting the editor or mapped game. With a Sunshine virtual controller present, the launcher sets SDL_JOYSTICK_HIDAPI=0 for AntiMicroX. This fixes a controller appearing without any button highlighting. Without Sunshine, the inherited SDL setting is preserved. If the virtual controller appears after AntiMicroX starts, close and restart the editor or managed game. This affects all controllers in that AntiMicroX instance, rather than Wine HIDRAW settings.
+
+READABILITY AND TROUBLESHOOTING
+Game and profile lists do not have a red initial. Game names followed by details may be bold. Full text shows the entry without activating it, then returns to the same selection.
+
+Logs: /userdata/system/logs/ultimate-wine-toolbox/antimicrox.log for games, antimicrox-editor.log for the standalone editor, antimicrox-handoff.log for detached launches. An independent running AntiMicroX prevents another managed instance from starting: close it first.

@@ -8,6 +8,10 @@ Batocera v41 fournit un runtime partagé avec Wine TKG (sources : Mono 9.3.0). B
 
 Le diagnostic distingue Mono, indices de .NET Microsoft, état mixte, traces non identifiées et absence de composants identifiés. Une clé NDP ou un numéro Release ne suffit pas à identifier Microsoft : Mono peut créer ces mêmes clés. La détection n’est pas un test d’exécution.
 
+ACCÈS HORS CRÉATION / MISE À JOUR
+
+Dans Outils et compatibilité → Winetricks / Wine Mono / .NET, choisir un jeu .wine, .pc ou .wsquashfs. Le catalogue complet permet une sélection multiple et ignore les composants déjà installés. Les .wine sont modifiés directement ; les .pc utilisent la bottle du runner (lancer le jeu une première fois). Pour un .wsquashfs, choisir la bottle ou extraire → installer → recompresser pour intégrer les composants à l’archive. La copie de travail reste récupérable en cas d’échec et l’archive n’est remplacée qu’après vérification.
+
 DANS LE WORKFLOW
 
 Après l’essai du jeu, ouvrir .NET dans le menu de résultat (création ou mise à jour). En création, cette option est aussi accessible dans les composants Winetricks.
@@ -22,7 +26,7 @@ COPIES DE SÉCURITÉ
 
 Avant installation, une copie du préfixe est conservée dans backups/dotnet sous le dossier de la Toolbox. Le dossier principal du jeu identifié via autorun est exclu ; les liens sont copiés sans suivre les cibles, notamment les sauvegardes externes. L’archive source reste intacte. Ne supprimez pas le dossier du jeu pour restaurer cette copie : elle ne le contient pas. Le journal indique le chemin exact de la copie. En cas d’échec, aucune restauration automatique n’est effectuée.
 
-La fonction reste expérimentale tant que l’installation, la relance et la conservation dans l’archive n’ont pas été validées sur Batocera.
+La fonction reste expérimentale. Après chaque changement, vérifier le diagnostic, la progression et deux lancements du jeu avant de finaliser une archive. Un succès avec un runner ne valide pas tous les autres.
 
 INSTALLATION LOCALE ET RESTAURATION
 

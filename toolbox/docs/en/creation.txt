@@ -16,7 +16,7 @@ The system default runner is offered first. Custom runners follow, with UMU runn
 3. TEST AND CREATE A SAVE
 The game launches for testing. Play long enough to create a real save, then close the game.
 The Toolbox reopens and asks you to confirm the launch. If there is a problem, retry, change the runner or adjust the available options.
-If the controller does not work, select enable HIDRAW and relaunch. DXVK, FPS limit, large address awareness and virtual desktop options can also be adjusted for this game.
+For controller problems, test game options one at a time: HIDRAW, then if needed HIDRAW-to-XInput conversion for PlayStation controllers with a compatible Proton runner (PROTON_SONY_HIDRAW_XINPUT). This is not a universal fix. DXVK/VKD3D/NVAPI, FPS limit, large address awareness and virtual desktop remain available. Review / change the game executable corrects the launch; Install additional Winetricks adds components before retesting.
 
 4. SELECT THE SAVE LOCATION
 B / Back returns to the preceding screen. Abandoning the operation remains a separate action. After externalization, going back does not repeat data transfers.
@@ -26,6 +26,8 @@ Manual search opens a folder picker so you can browse the prefix and choose anot
 Select the game's own save folder, rather than a general folder containing unrelated data.
 If nothing is detected, relaunch to create a save, search manually, use user.reg if the game stores progress there, or leave creation.
 Using user.reg preserves the whole file, which may also contain Wine settings.
+
+For saves beside the executable, select individual files (SAVEFILES), rather than the entire game folder. Files created or changed during the test are suggested but unchecked by default. One selection uses one folder; selected files are copied to Batocera saves and removed from the prefix, and Batocera creates their links at launch.
 
 5. EXTERNALIZE AND COMPRESS
 Confirm externalization to /userdata/saves/windows/<game name>. If saves already exist at that destination, choose to back them up, replace them or keep the existing save. Keeping existing saves discards test data without creating an extra copy. For individual files or registry saves, the required files must already exist in the retained destination.
@@ -40,3 +42,4 @@ Launch the new .wsquashfs and confirm that your progress is restored.
 The integrity entry in WSquashFS management can check the structure or read and decompress all data without extracting files to disk. It does not check whether the game works.
 Simple .wine compression in this menu does not by itself perform the save externalization workflow described here.
 
+With mergerfs, free space is checked per disk and a suitable physical archive location is offered before compression. Total free space does not guarantee one archive fits on a disk. Keep the Toolbox open during compression, verification and finalization: closing it interrupts workers and retains recovery state.

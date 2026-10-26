@@ -396,6 +396,27 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertNotIn(b'Sunshine SDL workaround', wrapper.read_bytes())
 
 
+    def test_offline_guides_install_as_text_without_shell_parsing_or_execution(self):
+        name = 'toolbox/docs/fr/antimicrox.txt'
+        text = 'Profils (launcher / jeu) : 64 Kio.\n$(touch '+str(self.root/'should-not-exist')+')\n'
+        (self.source/name).write_text(text)
+        backup = self.install()
+        self.assertEqual((self.home/name).read_text(), text)
+        self.assertFalse((self.root/'should-not-exist').exists())
+        installer.restore(backup)
+        self.assertEqual((self.home/name).read_bytes(), self.old[name])
+
+    def test_invalid_utf8_guide_is_rejected_before_any_write(self):
+        (self.source/'toolbox/docs/fr/antimicrox.txt').write_bytes(b'\xff')
+        with self.assertRaises(ValueError): self.install()
+        self.assertFalse((self.home/'state/backups').exists())
+
+    def test_embedded_nul_in_guide_is_rejected_before_any_write(self):
+        (self.source/'toolbox/docs/en/creation.txt').write_bytes(b'Guide\0bad')
+        with self.assertRaises(ValueError): self.install()
+        self.assertFalse((self.home/'state/backups').exists())
+
+
 class PublishedVersionHashesTests(unittest.TestCase):
     def test_deletion_version_keeps_its_updated_profiles_helper_hash(self):
         # Published in 02edb647: this must not inherit the pre-deletion baseline.
@@ -418,8 +439,10 @@ class PublishedVersionHashesTests(unittest.TestCase):
                          'a48f52d0cb36c737a28d7d189e36e1d684f53e48d54a3c8f0051f0e85ada77ab')
         self.assertEqual(installer.MOONLIGHT_INPUT_HASHES['toolbox/helpers/antimicrox-launch.sh'],
                          '7da8c0c8a1688a93f7b2fa278c48bd8784cf6cf58504d1f1d57ec06843a0731f')
+        self.assertEqual(installer.PLAIN_GAME_LIST_HASHES['toolbox/helpers/antimicrox-launch.sh'],
+                         installer.MOONLIGHT_INPUT_HASHES['toolbox/helpers/antimicrox-launch.sh'])
         for name, hashes in vars(installer).items():
-            if name.endswith('_HASHES') and name != 'MOONLIGHT_INPUT_HASHES':
+            if name.endswith('_HASHES') and name not in ('MOONLIGHT_INPUT_HASHES', 'PLAIN_GAME_LIST_HASHES'):
                 self.assertEqual(hashes['toolbox/helpers/antimicrox-launch.sh'], 'a5266a0e16eb3aba60beb27dae1810eff4b2c2d239ce8383f75f9bd422aa438b', name)
 
 

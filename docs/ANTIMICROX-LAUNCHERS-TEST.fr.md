@@ -10,8 +10,12 @@ utilisant seulement l'instance native gérée par la Toolbox.
 Fermer le jeu, AntiMicroX et la Toolbox. Lancer l'installateur de cette branche
 avec `--ref` suivi du SHA complet du commit à tester. Il vérifie la v0.7.2 et
 les fichiers d'origine, télécharge et valide les fichiers avant de remplacer
-le module, le helper et les deux copies du hook. Il imprime la commande de
-restauration, conservée avec sa sauvegarde sous `state/backups`.
+les composants concernés, les copies du hook, le lanceur Ports et le wrapper
+AntiMicroX déjà installé. Les aides intégrées FR/EN sont également actualisées.
+Les fichiers exacts des versions de test précédentes connues sont acceptés ;
+une modification manuelle du code reste refusée. Une version déjà installée
+ne crée pas de nouvelle sauvegarde. L’installateur imprime sa commande de
+restauration, conservée avec la sauvegarde sous `state/backups`.
 
 ## Premier essai
 
@@ -27,7 +31,9 @@ restauration, conservée avec sa sauvegarde sous `state/backups`.
 6. Pour commencer, choisir **Launcher uniquement** puis le titre exact de la
    fenêtre du launcher dans la liste enregistrée. La classe ou l'exécutable
    peuvent servir lorsque leur identité est plus stable. Un titre partiel
-   peut exclure des versions ou compteurs variables.
+   peut exclure des versions ou compteurs variables. Les fenêtres sont classées
+   par première observation, pas par date exacte de création : le launcher
+   n’est pas automatiquement la première entrée ni la bonne fenêtre.
 7. Enregistrer puis choisir **Tester maintenant les fenêtres choisies** : le jeu
    est relancé avec les règles automatiques, sans ouvrir l'éditeur. Le profil
    launcher doit s'activer sur la fenêtre reconnue et devenir vide en jeu.
@@ -53,17 +59,18 @@ launcher actives ouvre directement son menu spécifique : retester la bascule,
 modifier les fenêtres/mode/profils associés, éditer les commandes du launcher
 ou du profil jeu lorsqu'il existe, et refaire l'apprentissage en jeu.
 
-**Désactiver les règles launcher (garder le profil)** revient au menu classique
-du même jeu. **Désactiver AntiMicroX pour ce jeu** retire les règles et
-l'association, sans supprimer les fichiers profils. Modifier le profil jeu ne
-réaffecte pas ce profil à la place du profil launcher.
+Dans **Désactiver ou supprimer un profil / une configuration**, **Désactiver
+les règles launcher (garder le profil actif)** revient au menu classique du même
+jeu. **Retirer la configuration de ce jeu (garder les profils)** retire règles
+et association sans supprimer les fichiers. Modifier les commandes du profil
+jeu ne le réaffecte pas à la place du profil launcher.
 
 Le menu de test permet aussi de consulter ou désactiver les règles. Aucun
 nom de jeu ou suffixe `[L]` n'active cette fonctionnalité automatiquement.
 
-L'installateur accepte également les fichiers exacts des deux premiers tests
-launchers pour une mise à jour sur place. Les profils et règles déjà enregistrés sont
-conservés ; un fichier de code modifié manuellement est refusé.
+Une mise à jour reconnue conserve les profils, associations et règles déjà
+enregistrés. Le suffixe `[L]` n’est pas requis. Désactiver l’AntiMicroX Windows
+éventuellement lancé dans un `start.bat` évite deux mappers en parallèle.
 
 ## Limites à vérifier sur Batocera
 
@@ -80,7 +87,18 @@ conservés ; un fichier de code modifié manuellement est refusé.
 - Journal : `/userdata/system/logs/ultimate-wine-toolbox/antimicrox.log`, lignes
   contenant `AntiMicroX launcher`.
 
-## Validation avant publication
+## Validation obtenue et cas restant à vérifier
+
+Sur la machine Batocera v44/labwc de l’utilisateur :
+
+- Profil launcher et profil jeu distincts, avec bascule sur un `.wine` : validé.
+- Partage communautaire complet, puis téléchargement/réimport pour le même jeu
+  en `.wsquashfs` : les deux profils et les règles correctes ont été retrouvés.
+- Mapping natif via Moonlight avec la manette virtuelle Sunshine : validé après
+  le correctif HIDAPI, avec reproduction du défaut sans ce réglage.
+
+Ces résultats ne valident pas toutes les combinaisons de jeux/runners/manettes.
+Pour les autres cas, vérifier notamment :
 
 - Launcher séparé, puis jeu avec commandes natives.
 - Même PID et même fenêtre dont le titre change.
@@ -98,10 +116,10 @@ ces vérifications sur le compositeur et AntiMicroX réels.
 Le partage d’un jeu avec launcher contient maintenant ses règles de fenêtres,
 son profil launcher et, en mode deux profils, son profil jeu. Les identifiants
 de manette et les chemins locaux ne sont pas transmis. La limite du service
-reste de 64 Kio pour l’ensemble de la configuration. Le ZIP local accepte plusieurs configurations (2 Mio par configuration, environ
+reste de 64 Kio pour l’ensemble de la configuration. Le ZIP local accepte jusqu’à 1 000 configurations (2 Mio par configuration,
 62 Mio de profils au total) et ne dépend pas de cette limite du service.
 
-Dans **Mes jeux et leurs profils**, choisir le jeu puis :
+Dans **Mes jeux et leurs profils**, choisir le jeu puis **Partager ou exporter** :
 
 - **Partager la configuration complète avec la communauté** : envoi pour validation.
 - **Exporter la configuration complète dans un ZIP** : création locale sans publication.
@@ -202,8 +220,9 @@ de la liste empêche également la suppression.
 Une manette virtuelle Sunshine peut être visible dans AntiMicroX sans que les
 boutons réagissent. Le lanceur natif détecte les périphériques Sunshine présents
 dans sysfs et définit `SDL_JOYSTICK_HIDAPI=0` uniquement pour AntiMicroX, afin
-d’utiliser la réception evdev validée avec Sunshine/libvirtualhid. Sans manette
-Sunshine, les réglages SDL existants sont conservés. Cette adaptation couvre
+d’utiliser la réception evdev validée avec Sunshine/libvirtualhid. Ce choix
+concerne tous les contrôleurs de cette instance AntiMicroX, pas les réglages
+HIDRAW de Wine. Sans manette Sunshine, les réglages SDL existants sont conservés. Cette adaptation couvre
 l’éditeur, les sessions en jeu et les changements de profil launcher/jeu.
 
 Connecter Moonlight avant de lancer AntiMicroX ou le jeu. Si la manette virtuelle

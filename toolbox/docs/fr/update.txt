@@ -21,7 +21,7 @@ Choisir de sauvegarder l’ancienne archive avant remplacement ou de la remplace
 
 Une opération inachevée peut être reprise depuis le menu. Les erreurs indiquent le préfixe conservé et le journal à consulter. Après réussite, les anciennes bottles du jeu sont nettoyées et la suppression du préfixe de travail est proposée. Vérifier ensuite la progression en lançant le nouveau WSquashFS.
 
-Le matching exact habituel est conservé. Les noms partageant le premier mot sont suggérés uniquement en l’absence de correspondance exacte. Ces suggestions restent à vérifier ; les autres dossiers et Parcourir restent accessibles. Après réussite, « Mettre à jour un autre WSquashFS » permet d’enchaîner une nouvelle mise à jour.
+Les noms exacts sont prioritaires. En l’absence de correspondance exacte, les suggestions sont classées selon le nombre de mots consécutifs communs au début du titre. Ces suggestions restent à vérifier ; les autres dossiers et Parcourir restent accessibles. Après réussite, « Mettre à jour un autre WSquashFS » permet d’enchaîner une nouvelle mise à jour.
 
 Avec mergerfs, si le déplacement direct échoue avec EXDEV, la Toolbox essaie de déplacer chaque partie du dossier sur sa branche physique, sans recopier les fichiers du jeu. Les chemins sont consignés dans le rapport et le manifeste de préparation ; les déplacements sont annulés si une étape échoue. En cas de retour en arrière incomplet, conserver le préfixe, le .bak et le rapport pour récupération.
 
@@ -30,3 +30,5 @@ La liste initiale propose aussi les préfixes .wine contenant system.reg et auto
 
 COMPATIBILITÉ AVEC PORTS REGROUPÉ
 Si l’API ES refuse le groupe Ports, le retour utilise un lanceur technique appartenant au sous-système uwt_return, lui-même rattaché à Ports. La Toolbox crée uniquement es_systems_uwt_return.cfg et ses fichiers dans runtime/es-return-proxy. Le lanceur et son dossier sont marqués cachés. La commande native de Ports et le profil Pad2Key de la Toolbox sont repris. Le réglage global ports.ungroup n’est pas modifié. Si vous aviez activé le dégroupage pour un test, rétablissez le regroupement souhaité depuis les paramètres des collections d’ES.
+
+Avec mergerfs, l’espace est vérifié par disque et un emplacement physique compatible est proposé avant la compression. La place libre totale du partage ne garantit pas qu’une archive puisse tenir sur un seul disque. Garder la Toolbox ouverte pendant compression, vérification et finalisation : fermer sa fenêtre interrompt les tâches et conserve l’état de reprise.

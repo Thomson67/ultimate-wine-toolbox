@@ -1,10 +1,16 @@
 # Compatibilité UMU : chemin direct
 
+Ce guide est un protocole de compatibilité. L’option est configurée par Ultimate
+Wine Toolbox, mais son exécution et les mécanismes de sauvegarde décrits ici
+appartiennent au wrapper d’[UMU Runner Toolbox](https://github.com/Thomson67/umu-runner-toolbox).
+Une mise à jour de la Toolbox seule ne met pas automatiquement ce wrapper à jour.
+Voir aussi l’[index des guides](README.md).
+
 Option facultative dans autorun.cmd : `ENV=UMU_DIRECT_GAME=1`.
 Si ENV existe déjà, ajouter UMU_DIRECT_GAME=1 sur cette ligne.
 Le mode standard reste la valeur par défaut ; supprimer la variable pour revenir au comportement standard.
 
-UMU Runner Toolbox 0.13.7 et Ultimate Wine Toolbox 0.5.4 ou plus sont nécessaires pour le workflow. Après installation de UMU Runner Toolbox, lancer Maintenance > Réparer / mettre à niveau l’intégration UMU afin de mettre à jour les wrappers des runners sains et leurs manifests. Ne pas remplacer directement bin/wine dans un runner protégé.
+Le protocole a été introduit pour UMU Runner Toolbox 0.13.7 et Ultimate Wine Toolbox 0.5.4 ou plus ; ces numéros ne désignent pas les dernières releases. Après installation de UMU Runner Toolbox, lancer Maintenance > Réparer / mettre à niveau l’intégration UMU afin de mettre à jour les wrappers des runners sains et leurs manifests. Ne pas remplacer directement bin/wine dans un runner protégé.
 
 Dans Ultimate Wine Toolbox : création WSquashFS > premier essai > options par jeu > Compatibilité UMU : lancement direct, puis relancer. Le choix est conservé dans l’archive finale et peut aussi être retiré dans ce menu.
 
@@ -31,4 +37,4 @@ Logs attendus : direct_save_copy=1, direct_save_path=..., direct_save_source=...
 
 En cas d’échec de la copie initiale, le lien et les sauvegardes persistantes restent inchangés et le lancement est refusé. En cas d’échec de synchronisation, le vrai dossier de jeu et son lien de secours restent présents pour récupération ; le lancement suivant est refusé afin de ne pas les écraser. Un arrêt forcé du wrapper (SIGKILL, coupure) peut nécessiter une récupération manuelle. Ne pas supprimer ces dossiers ou refaire le packaging avant récupération. Le mode copie nécessite de l’espace libre sur les systèmes de fichiers du jeu et des sauvegardes et ajoute un délai proportionnel à leur taille.
 
-Validation Batocera : relancer Azimuth .wine avec SAVEDIR et vérifier jeu, sauvegarde, fermeture, restauration du lien et relancement ; vérifier ensuite le même comportement en .wsquashfs.
+Contrôle à refaire après changement de wrapper ou runner : relancer Azimuth .wine avec SAVEDIR, vérifier jeu, sauvegarde, fermeture, restauration du lien et relancement ; vérifier ensuite le même comportement en .wsquashfs. La validation générale de lancement/progression ci-dessus ne couvre pas toutes les situations de récupération après interruption.

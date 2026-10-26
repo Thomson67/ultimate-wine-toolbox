@@ -21,7 +21,7 @@ Choose to back up the old archive before replacement or replace it directly. Aft
 
 An unfinished operation can be resumed from the menu. Errors identify the retained prefix and the log to inspect. After success, old game bottles are cleaned and removing the working prefix is offered. Finally, launch the new WSquashFS and verify your progress.
 
-Existing exact-name matching is retained. Names sharing the first word are suggested only when no exact match is available. Verify these suggestions; other folders and Browse remain available. After success, “Update another WSquashFS” starts the next update.
+Exact names have priority. Without an exact match, suggestions rank by the number of consecutive shared words at the start of the title. Verify these suggestions; other folders and Browse remain available. After success, “Update another WSquashFS” starts the next update.
 
 With mergerfs, if direct renaming fails with EXDEV, the Toolbox attempts to rename each physical source directory within its own branch without copying game files. Paths are recorded in the report and preparation manifest; moves are rolled back on failure. If rollback is incomplete, retain the prefix, .bak and report for recovery.
 
@@ -30,3 +30,5 @@ The initial list also offers .wine prefixes containing system.reg and autorun.cm
 
 GROUPED PORTS COMPATIBILITY
 If the ES API skips the Ports group, return uses an owned technical launcher in the uwt_return child system, itself grouped under Ports. The Toolbox creates only es_systems_uwt_return.cfg and its runtime/es-return-proxy assets. The launcher and folder are marked hidden. The native Ports command and Toolbox Pad2Key profile are reused. The global ports.ungroup preference is not modified. If ungrouping was enabled for a test, restore the desired grouping through ES collection settings.
+
+With mergerfs, free space is checked per disk and a suitable physical archive location is offered before compression. Total free space does not guarantee one archive fits on a disk. Keep the Toolbox open during compression, verification and finalization: closing it interrupts workers and retains recovery state.

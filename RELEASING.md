@@ -2,13 +2,14 @@
 
 Ultimate Wine Toolbox uses the following release convention:
 
-- development versions: `X.Y.Z-devN` on the `test` branch
+- integration development versions: `X.Y.Z-devN` on `test`
+- topic branches may retain a stable baseline while testing a scoped patch installer
 - stable versions: `X.Y.Z` on `main`
 - GitHub release tags: `vX.Y.Z`
 
 ## Normal release workflow
 
-1. Develop and validate the next version on `test`.
+1. Develop on `test` or a topic branch, validate it, and integrate the intended changes into `test`.
 2. Set `VERSION` to the final stable version (for example `0.1.1`).
 3. Merge `test` into `main`.
 4. GitHub Actions automatically:
@@ -17,7 +18,25 @@ Ultimate Wine Toolbox uses the following release convention:
    - generates `Ultimate-Wine-Toolbox-vX.Y.Z.zip.sha256`;
    - creates the `vX.Y.Z` GitHub Release, or refreshes its assets if it already exists.
 
-No ZIP or checksum needs to be created manually.
+No ZIP or checksum needs to be created manually. The workflow also runs on
+README/release-note changes pushed to `main` and can replace assets for the
+current version: prepare the intended new VERSION and matching release notes
+before promoting branch-only features. Do not publish launcher/transfer changes
+as if they had been included in the existing v0.7.2 release.
+
+## Documentation and validation before promotion
+
+- Review all eight `toolbox/docs/fr/*.txt` and `toolbox/docs/en/*.txt` topics,
+  both root README files, and relevant technical/community guides.
+- Keep menu paths, file locations, limits and examples consistent with the code.
+  Distinguish local ZIP transfer from a moderated community submission.
+- Record what was actually checked on hardware separately from simulated tests.
+  Preserve historical release notes instead of rewriting their feature scope.
+- Run the shell/Python checks and relevant tests used by the release workflow.
+  For a scoped installer, verify upgrade from the previous published source,
+  repeated installation, copied runtime/hook files and restoration.
+- Keep topic-branch docs and any standalone test installer in that branch until
+  promotion is requested. Updating them alone does not create a stable release.
 
 ## Development installation
 

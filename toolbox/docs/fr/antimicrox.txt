@@ -1,33 +1,64 @@
 ANTIMICROX : MANETTE, CLAVIER ET SOURIS
 
-Dans Outils et compatibilité → AntiMicroX, un profil .amgp transforme les boutons et sticks de la manette en commandes clavier/souris. Il est associé séparément à chaque jeu. Si AntiMicroX manque, son installation est proposée dès qu’une action en a besoin.
+Dans Outils et compatibilité → AntiMicroX, un profil .amgp transforme les boutons et sticks en commandes clavier/souris. L’association est propre à chaque jeu .wine, .pc ou .wsquashfs. Si AntiMicroX manque, son installation est proposée lorsqu’une action en a besoin. Les profils natifs sont conservés hors du préfixe Wine, généralement dans /userdata/system/ultimate-wine-toolbox/config/antimicrox-profiles.
 
 CRÉER OU MODIFIER EN JEU
-1. Choisir Créer ou modifier un profil en jeu, puis le jeu. Créer un profil, reprendre celui du jeu ou choisir un profil enregistré.
-2. Le jeu démarre au premier plan. Utiliser la combinaison manette indiquée à l’écran pour passer à AntiMicroX et revenir au jeu. La combinaison habituelle est Hotkey+R1 ; suivre celle annoncée si le profil impose une autre combinaison. Appuyer puis relâcher les boutons pour basculer : les affectations de R1 restent utilisables en jeu. Alt+Tab est aussi disponible au clavier ; sous labwc, ES est exclu du sélecteur uniquement pendant la configuration AntiMicroX.
-3. Modifier les commandes et les tester dans le jeu. Enregistrer le profil dans AntiMicroX AVANT de quitter le jeu.
-4. À la fin, choisir Utiliser ce profil aux prochains lancements pour l’activer, ou continuer les réglages.
+1. Ouvrir Créer ou modifier un profil en jeu, puis choisir le workflow classique ou Jeu avec launcher : profils et fenêtres.
+2. Pour un jeu classique, choisir le jeu et un profil nouveau, actuel ou enregistré. Le jeu et l’éditeur sont lancés par EmulationStation.
+3. Utiliser la combinaison annoncée pour passer à AntiMicroX et revenir au jeu : habituellement Hotkey+R1, sinon Hotkey+Select si disponible. Appuyer puis relâcher. Alt+Tab reste disponible ; ES est retiré du sélecteur uniquement pendant la configuration en direct sous labwc. Si les deux combinaisons sont occupées, utiliser le clavier.
+4. Modifier et tester les commandes. Enregistrer le profil dans AntiMicroX AVANT de quitter le jeu.
+5. Pour le workflow classique, choisir l’activation aux prochains lancements ou continuer les réglages. Le relevé launcher ouvre directement le choix des fenêtres et règles, sans étape Activer / Réessayer.
 
-Le retour automatique utilise le même mécanisme ES que les essais WSquashFS et ReShade, y compris avec Ports regroupé en v44. Il confirme la réouverture de la Toolbox et conserve la reprise en attente si ES est occupé ou indisponible. Le regroupement des systèmes reste inchangé.
+Le retour automatique confirme la réouverture de la Toolbox, y compris avec Ports regroupé en v44. Si ES est occupé ou indisponible, la reprise est conservée. Fermer seulement l’éditeur ne termine pas le jeu : quitter le jeu pour achever la session.
+
+JEUX AVEC LAUNCHER
+Choisir Apprendre les fenêtres et configurer le mapping en jeu. Afficher le launcher, configurer puis enregistrer ses commandes. Afficher ensuite le jeu quelques secondes et quitter normalement. Au retour, choisir le mode, les profils et les fenêtres.
+
+Launcher uniquement : le profil est actif sur le launcher reconnu et devient vide ailleurs. La manette native du jeu reste disponible. Profils distincts : un profil pour le launcher et un autre pour le jeu. Le profil jeu peut être limité à sa fenêtre ou aux autres fenêtres Wine reconnues de cette session. Les fenêtres étrangères ne reçoivent aucun mapping.
+
+Une règle peut utiliser le titre, la classe ou l’exécutable, avec correspondance exacte ou partielle. Un changement de titre permet de distinguer launcher et jeu même avec le même processus. Les fenêtres sont classées par première observation, pas par date exacte de création : vérifier la bonne fenêtre, même si le launcher apparaît habituellement avant le jeu.
+
+Tester maintenant les fenêtres choisies relance le jeu avec la bascule automatique, sans éditeur. Au retour, retester, modifier les règles ou refaire le relevé. Les fenêtres Wine Xorg/XWayland sont prises en charge ; les fenêtres Wine Wayland natives ne le sont pas. Une balise [L] n’active rien automatiquement. Désactiver un AntiMicroX Windows lancé par un start.bat évite deux mappers simultanés.
 
 UTILISER UN PROFIL EXISTANT
-Choisir le profil dans la liste ou Parcourir les fichiers .amgp, puis choisir le jeu. Les jeux dont le nom ressemble au profil sont proposés en priorité ; les autres restent accessibles. Le profil sera chargé au prochain lancement du jeu depuis EmulationStation.
+Choisir le profil ou Parcourir les fichiers .amgp, puis le jeu. Les noms proches sont proposés en priorité ; les autres jeux restent accessibles. Le profil sera chargé au prochain lancement depuis ES. Une configuration launcher importée rétablit aussi ses règles et son second profil lors de l’association au jeu cible.
 
-Les profils sont généralement enregistrés dans /userdata/system/ultimate-wine-toolbox/config/antimicrox-profiles. Un autre emplacement sous /userdata est possible. Ouvrir l’éditeur sans lancer de jeu permet aussi de créer un profil séparément.
+MODIFIER UN JEU CONFIGURÉ
+Mes jeux et leurs profils liste les associations, même si le jeu ou le profil a disparu. Un jeu avec launcher ouvre son menu spécifique. Modifier les commandes du profil launcher et Modifier les commandes du profil jeu proposent chacun Modifier le profil en jeu ou Modifier le profil sans lancer le jeu. Pendant l’édition en jeu, le rôle choisi reste chargé. L’association principale, l’autre profil et les règles sont conservés.
 
-GÉRER SES PROFILS
-Mes jeux et leurs profils permet de consulter les commandes, modifier le profil, tester en jeu, changer l’association ou la retirer. Les informations utilisent des noms de boutons Xbox et PlayStation pour faciliter la lecture.
+Modifier les fenêtres, le mode ou les profils associés regroupe la modification avec le relevé existant et Relancer le jeu et refaire le relevé des fenêtres. Un nouveau relevé reprend le profil launcher actuel, sans demander un autre profil. Retester la bascule launcher / jeu vérifie les règles enregistrées.
 
-Retirer une association conserve le fichier profil. Supprimer un profil enregistré supprime son fichier et ses associations après confirmation. Si plusieurs jeux utilisent le même fichier, toute modification de ce profil les concerne tous. Fermer le jeu et AntiMicroX avant de changer une association ou de supprimer un profil.
+Les informations de profil affichent des noms de boutons Xbox/PlayStation. Modifier un fichier partagé par plusieurs jeux les concerne tous. Enregistrer avant de quitter l’éditeur.
+
+DÉSACTIVER OU SUPPRIMER UN PROFIL / UNE CONFIGURATION
+Dans le menu principal, Jeux et leurs configurations permet de choisir le jeu à gérer. Dans le menu du jeu, la même entrée regroupe les actions disponibles.
+
+Pour un launcher : désactiver uniquement les règles en gardant le profil actif ; retirer la configuration et l’association en gardant les fichiers ; ou supprimer la configuration et ses profils non partagés. La confirmation indique les fichiers supprimés et conservés. Les profils utilisés par d’autres jeux ou paquets launcher importés restent protégés.
+
+Pour un jeu classique : désactiver son association en gardant le profil, ou supprimer explicitement le fichier et toutes ses associations. Profils sans jeu associé sert uniquement à nettoyer les profils inutilisés ; les profils référencés par les configurations launcher sont exclus. Une association ajoutée depuis la sélection bloque la suppression. Fermer le jeu et AntiMicroX avant ces opérations.
 
 CONVERTIR UN PAD2KEY
-Convertir un Pad2Key (.keys) en profil permet de choisir le jeu ou un fichier .keys. Le bilan indique les commandes convertibles et les limites. Les combinaisons Hotkey sont prises en charge quand elles peuvent être identifiées ; Hotkey+Start n’est pas ajouté sans définition explicite dans le fichier source.
+Convertir un Pad2Key (.keys) en profil permet de choisir le jeu ou un fichier .keys. Le bilan indique les commandes convertibles et les limites. Les combinaisons Hotkey identifiables sont prises en charge ; Hotkey+Start n’est pas ajouté sans définition explicite dans le fichier source.
 
-Le .keys original reste intact pendant la conversion. À l’activation, le mapping Pad2Key du joueur 1 est sauvegardé et suspendu pour éviter le double mapping. Il est restauré quand l’association AntiMicroX est retirée. Si le .keys a été modifié entre-temps, suivre le message de reconversion pour conserver les changements.
+La conversion conserve l’original. À l’activation, le Pad2Key du joueur 1 est sauvegardé et suspendu pour éviter le double mapping. Retirer l’association restaure l’original. Si le .keys a changé, suivre le message de reconversion pour préserver ses modifications. Les autres joueurs ne reçoivent pas automatiquement des profils AntiMicroX distincts.
 
-PROFILS COMMUNAUTAIRES
-Télécharger ou partager des profils donne accès au catalogue. Une mention Téléchargé repère les copies locales encore présentes ; modifié indique une copie retouchée. Une copie locale peut être réutilisée sans nouveau téléchargement. Vérifier les commandes et la Hotkey avant de l’associer à un jeu.
+PARTAGER ET TRANSFÉRER
+Télécharger ou partager des profils donne accès au catalogue. Téléchargé repère une copie locale disponible ; modifié indique une copie retouchée. Vérifier les commandes et la Hotkey avant association. Une copie locale peut être réutilisée sans téléchargement.
 
-Pour partager, choisir le profil et confirmer le jeu identifié, ou le sélectionner dans la liste ES. Renseigner le nom du profil, le pseudo public et une description. Le partage attend une validation avant publication ; aucun compte GitHub n’est nécessaire pour proposer un profil.
+Dans le menu d’un jeu, Partager ou exporter regroupe le partage communautaire complet et l’export ZIP. Dans le catalogue, Partager et transférer des profils regroupe partage d’un jeu, partage d’un profil seul, export groupé, import et modération. Les listes de partage complet et d’export ne proposent que les jeux avec un profil disponible. [Launcher] repère les règles enregistrées.
 
-L’espace validateur utilise un code d’appairage à ouvrir dans un navigateur. Il permet d’examiner les propositions et de retirer un partage publié. Retirer un partage communautaire ne supprime pas les profils déjà installés chez les joueurs.
+Le partage complet contient le profil principal, les règles launcher et le profil jeu si défini. Confirmer le jeu puis renseigner le titre, le pseudo public et la description. La publication attend une validation, sans compte GitHub requis. La limite du service est de 64 Kio pour toute la configuration. Les chemins locaux et identifiants de manette sont retirés.
+
+Exporter des configurations dans un ZIP permet de cocher plusieurs jeux et crée un seul fichier dans exports/antimicrox, sans question sur le nom, le pseudo ou la description. Depuis le menu d’un jeu, l’export est direct pour ce jeu. Limites : 1 000 jeux, 2 Mio par configuration, 62 Mio de profils au total.
+
+Importer un paquet ZIP valide toutes les entrées puis permet de choisir celles à associer. Sélectionner le jeu cible pour chacune. Les anciens ZIP restent acceptés. Un même jeu peut passer de .wine à .wsquashfs : ses règles sont réassociées au nouveau chemin, sans nouveau relevé si ses fenêtres correspondent encore. Une autre langue ou version du launcher peut demander un ajustement. Partager l’archive du jeu seule n’embarque pas ces réglages natifs.
+
+L’espace modérateur utilise un code d’appairage et une page de navigateur. Il permet d’examiner les propositions ou de retirer un partage publié. Retirer une entrée communautaire conserve les profils déjà installés chez les joueurs.
+
+MOONLIGHT / SUNSHINE
+Connecter Moonlight avant de lancer le jeu ou l’éditeur. Lorsqu’une manette virtuelle Sunshine est présente, le lanceur définit SDL_JOYSTICK_HIDAPI=0 pour AntiMicroX. Cela corrige le cas où la manette apparaît mais aucun bouton ne se surligne. Sans Sunshine, le réglage SDL hérité est conservé. Si la manette virtuelle apparaît après le démarrage d’AntiMicroX, fermer puis relancer l’éditeur ou le jeu géré. Cette adaptation concerne toute cette instance AntiMicroX, pas les réglages HIDRAW de Wine.
+
+LISIBILITÉ ET DÉPANNAGE
+Les listes de jeux et profils n’ont pas d’initiale rouge. Les noms suivis d’informations peuvent être en gras. Texte complet affiche la ligne sans déclencher son action, puis revient à la même sélection.
+
+Journaux : /userdata/system/logs/ultimate-wine-toolbox/antimicrox.log pour les jeux, antimicrox-editor.log pour l’éditeur seul, antimicrox-handoff.log pour le lancement différé. Un AntiMicroX indépendant déjà ouvert bloque le lancement d’une autre instance gérée : le fermer avant de recommencer.

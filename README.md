@@ -33,6 +33,28 @@ Created by **Thomsonito**.
 - native Batocera Ports launcher and Pad2Key support
 - update checks at startup and from the toolbox menu
 
+## Changes on this branch
+
+The following changes are present on this source branch after stable v0.7.2;
+this is not an announcement of a new stable release.
+
+- AntiMicroX: launcher-only or separate launcher/game profiles, selected using
+  Xorg/XWayland window titles, classes or executables.
+- Edit each role in game or without launching, record windows again and retest
+  saved rules from the game's menu.
+- Complete community sharing of profiles and rules; export one or several game
+  configurations to one local ZIP and assign them to games on the target machine.
+- Grouped removal: game configurations and unassigned profiles, with protection
+  for profiles still referenced elsewhere.
+- An AntiMicroX-specific Moonlight/Sunshine input workaround and more readable
+  lists without a red initial in game/profile pickers.
+
+The `.wine` → community share → import for the same `.wsquashfs` game workflow,
+and mapping through Moonlight, were validated on the Batocera v44/labwc test
+machine. See the [guide index](docs/README.md),
+[AntiMicroX guide](docs/ANTIMICROX.md) and
+[French launcher walkthrough](docs/ANTIMICROX-LAUNCHERS-TEST.fr.md).
+
 ## New in v0.7.2
 
 - Fixed game launches with the AntiMicroX editor open on Batocera v44.
@@ -142,7 +164,7 @@ Wine/UMU runners, games, saves and bottles are preserved.
 
 ## In-app documentation
 
-The main **Documentation** menu groups WSquashFS creation and update guides, Wine prefix templates, MangoHud, DXVK/VKD3D and ReShade. Guides are available offline in French and English in a scrolling reader. The templates guide explains their purpose, location and expected format.
+The main **Documentation** menu groups WSquashFS creation and update guides, Wine prefix templates, MangoHud, DXVK/VKD3D, ReShade, Winetricks/Wine Mono/.NET and AntiMicroX (including launchers, sharing and transfers). Guides are available offline in French and English in a scrolling reader. The templates guide explains their purpose, location and expected format.
 
 ## Create a WSquashFS
 
@@ -154,7 +176,7 @@ Compression, integrity checks and pending-operation resume are part of the workf
 
 ## Update a WSquashFS
 
-In WSquashFS Management, Update follows Create. Select a Wine-prefix archive and a directory containing the updated game files directly. The source directory is moved into the existing game directory identified from `autorun.cmd` (often `drive_c/game`) of a separate test prefix. `.pc` archives without a Wine prefix are not supported.
+In WSquashFS Management, Update follows Create. Select a Wine-prefix archive, or an existing `.wine` containing `system.reg` and `autorun.cmd`, then a directory containing the updated game files directly. A `.wine` is reused in place; an archive is extracted into a separate test prefix. The source directory is moved into the existing game directory identified from `autorun.cmd` (often `drive_c/game`) of the working prefix. `.pc` archives without a Wine prefix are not supported.
 
 The first test keeps the archive's existing launch command; executable selection is no longer a mandatory step before this test. Check launch, controller input, loading progress and saving again. On return, **Review / change the game executable** lets you correct it and retest. The original runner and game options are copied; testing uses a separate save copy except for shared-root links described below. Then confirm previous save rules or select another location through detection or the graphical browser.
 
@@ -166,7 +188,7 @@ Allow space for extraction, test saves and the new archive. Native `SAVEDIR=` su
 
 Updates retain the launch command from `autorun.cmd`, restoring original `start.bat` scripts at the same relative locations in the replacement folder. Another executable can be selected after the test. Without `SAVEDIR=`, existing links to `/userdata/saves/windows` or its subdirectories are detected, restored in the updated game and offered by default. A link to the shared save root keeps its exact original target throughout testing and in the final archive, without an extra prompt or batch changes; this case uses existing saves directly. On return, keep the links or choose another location.
 
-Before the move, the old game directory is renamed `<name>.bak`. The updated directory retains the original name; the source directory disappears from its former location. The `.bak` remains until the game launch is validated, then is removed before recompression. Save links inside the old game directory are restored at the same locations. The move requires the same filesystem and never falls back to an implicit copy. Keeping existing save rules no longer requires an additional confirmation.
+Before the move, the old game directory is renamed `<name>.bak`. The updated directory retains the original name; the source directory disappears from its former location. The `.bak` remains until the game launch is validated, then is removed before recompression. Save links inside the old game directory are restored at the same locations. The move never falls back to an implicit copy. On mergerfs after EXDEV, the Toolbox can move each source part within its physical branch; steps are recorded and failures attempt rollback. Keeping existing save rules no longer requires an additional confirmation.
 
 The test prefix keeps the exact archive name, replacing `.wsquashfs` with `.wine`, including bracket tags. An existing `.wine` directory triggers replace, choose another name, or quit. WSquashFS ES settings take priority; if it has no game-specific settings, existing Wine settings are reused. `batocera.conf` is backed up before changes. A directory containing the updated source cannot be removed; choose another prefix name instead.
 
@@ -199,7 +221,7 @@ Launch from EmulationStation and press **Home** to open ReShade. New profiles sk
 - Logs: `/userdata/system/logs/ultimate-wine-toolbox/reshade-install-*.log` and `reshade-game-event.log`. Required shared libraries/shaders are exposed to UMU while retaining MangoHud settings.
 - Batocera does not need `git` or `file`: private adapters download GitHub shader snapshots and read Windows PE headers when these tools are absent. Local shader edits are preserved during updates. The ReShade installer is extracted directly with Python, even if an incomplete system `7z` is present. No system tools are installed.
 
-The backend uses unmodified **[ReShadeLinux 1.3.5](https://github.com/asafelobotomy/reshadelinux/tree/v1.3.5)** by asafelobotomy, continuing kevinlekiller's work; it is downloaded from a pinned revision, verified with SHA-256, and retains its GPL-2.0-or-later license. **[ReShade](https://reshade.me/)** is by crosire and its contributors. Shader pack authors are shown in the picker. Actual rendering compatibility depends on the game and runner; initial Batocera/Wayland and UMU play tests are still required.
+The backend uses unmodified **[ReShadeLinux 1.3.5](https://github.com/asafelobotomy/reshadelinux/tree/v1.3.5)** by asafelobotomy, continuing kevinlekiller's work; it is downloaded from a pinned revision, verified with SHA-256, and retains its GPL-2.0-or-later license. **[ReShade](https://reshade.me/)** is by crosire and its contributors. Shader pack authors are shown in the picker. Actual rendering compatibility depends on the game and runner; after changing the API, runner or packs, check rendering and shortcuts in game, including under Wayland and UMU.
 
 ### Lists, presets, templates and API hints
 
@@ -235,4 +257,4 @@ Keep the Toolbox open during compression, verification and finalization. Closing
 
 The test workflow distinguishes shared Batocera/runner Wine Mono from prefix installations, supports a verified latest stable Mono MSI or replacement with Microsoft .NET Framework 4.8, and backs up the working prefix before changing it. The game directory is excluded from the backup. Mixed or unidentified .NET states are refused. See the new offline .NET guide; validate installation and a second game launch before archive finalization.
 
-.NET test installations now use local staging outside the ROM directory, preserve TKG link metadata and offer snapshot recovery after incomplete attempts. Real installer compatibility still requires Batocera validation.
+.NET test installations now use local staging outside the ROM directory, preserve TKG link metadata and offer snapshot recovery after incomplete attempts. After each installation, check diagnostics and two game launches with the selected runner; results remain game- and runner-dependent.

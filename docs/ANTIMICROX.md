@@ -1,6 +1,14 @@
-# AntiMicroX — experimental native integration
+# AntiMicroX — native profiles, launchers and transfers
 
-This branch is a test build, not a validated Batocera release.
+This guide describes the current source branch, including changes after stable
+v0.7.2. It does not announce a new stable release. See the [documentation index](README.md)
+and the [French launcher walkthrough](ANTIMICROX-LAUNCHERS-TEST.fr.md).
+
+On the user's Batocera v44/labwc machine, launcher/game switching was validated
+on a `.wine`; community sharing and reassignment to the same game as a
+`.wsquashfs` restored both profiles and rules. Native mapping through Moonlight
+was also validated after the Sunshine-specific input workaround below. These
+results do not establish compatibility with every game, runner or controller.
 
 ## Runtime and menus
 
@@ -27,12 +35,12 @@ report `Cannot queue arguments` and `Could not open mutex_read_config`, leaving
 a running mapper with no loaded actions. The checked, process-local library
 and its rebuildable source are in `toolbox/compat/antimicrox`. A native queued
 XML regression test passes against the official bundled Qt libraries; actual
-mapping on Batocera remains to be confirmed. Existing profiles are preserved.
+mapping has also been confirmed on the Batocera test machine. Existing profiles are preserved.
 
 1. Open **Outils et compatibilité / Tools and compatibility → AntiMicroX**.
 2. Install AntiMicroX if not already downloaded.
 3. Open the profile editor, save an `.amgp` under `/userdata`, then close it.
-4. Assign the profile to a selected `.wine` or `.wsquashfs` game with the file
+4. Assign the profile to a selected `.wine`, `.pc` or `.wsquashfs` game with the file
    picker (text path fallback when Yad is absent).
 5. Launch that game from EmulationStation, then close it and check the log.
 
@@ -53,7 +61,7 @@ the same managed runtime, not a different system binary.
 
 ## Profiles and lifecycle
 
-**Gérer les jeux avec un profil associé / Manage games with assigned profiles**
+**Mes jeux et leurs profils / My games and their profiles**
 lists only assigned games, including stale associations whose ROM or profile is
 missing. Each game shows full ROM/profile paths and offers profile details
 (all sets and mappings, keyboard combinations, mouse movement/clicks,
@@ -75,14 +83,26 @@ device-specific. Stick directions use AntiMicroX's clockwise 1–8 enum; D-pad
 directions use SDL hat bitmasks. Trigger labels support modern indices 5/6 and
 legacy indices 1/2. Custom button names remain visible.
 
-**Supprimer un profil / Delete a profile** is available both in the main
-AntiMicroX menu and for an assigned game. It lists managed profiles, including
-unassigned ones, plus associated external profiles under `/userdata`; a file
-picker can select another `.amgp`. Confirmation shows the selected file and its
-assigned games. Deletion removes the file and all its assignments, preserving
-other profiles. A running mapper blocks deletion. The file is staged on its
-own filesystem and restored if the configuration write fails. Associations are
-locked during updates; a changed file or TSV invalidates an earlier confirmation.
+**Désactiver ou supprimer un profil / une configuration / Disable or delete a
+profile / configuration** groups removal actions in the main menu and each game.
+The main menu separates **Jeux et leurs configurations / Games and their
+configurations** from **Profils sans jeu associé / Profiles without an assigned
+game**. The latter lists only managed files that are safe to remove independently;
+it excludes game assignments, both launcher roles and secondary profiles still
+needed by an imported launcher bundle. It does not offer an unrestricted file picker.
+
+For a classic game, remove its assignment while keeping the file, or explicitly
+delete the profile and all its assignments. Editing a shared file affects all
+its games. For a launcher game, disable only the rules and keep its primary
+profile active, remove the configuration and assignment while keeping files,
+or remove the configuration and its unshared profiles. The confirmation reports
+which files will be deleted or retained. Other games and imported bundles protect
+the profiles they reference. Removing the assignment restores suspended Pad2Key.
+
+A running mapper or an unfinished managed session can block configuration
+removal. Files and references are checked again before deletion; changed state
+invalidates the confirmation. Updates are locked and failures roll back the
+staged changes. Missing ROMs remain manageable through their saved assignment.
 
 Yad starts in `config/antimicrox-profiles/`, preselecting the current profile
 when it is in that folder. Manual path entry uses the same starting directory.
@@ -161,8 +181,10 @@ handoff. Converted mappings and mouse feel still require Batocera gameplay tests
 
 Associations remain in `config/antimicrox-games.tsv`. Profiles stay at their
 chosen locations under `/userdata`, outside the Wine prefix. This configuration
-is local: sharing a WSquashFS does **not** yet include its mapping. Reassign the
-profile after a game is renamed or compressed to a different ROM path.
+is local: a WSquashFS alone does **not** include the native Toolbox mapping.
+Use a complete community share or local configuration ZIP to transfer it.
+Import and explicitly choose the target game after a rename or conversion to
+a different ROM path; rules are not silently attached to similarly named games.
 
 The Windows `gameStart` hook starts the assigned profile. `gameStop` stops only
 the matching managed session, verifying PID/start time and command line. The
@@ -175,13 +197,15 @@ session and removes its hook.
 
 A missed `gameStop` may leave the mapping running until the next Windows game
 or uninstallation; there is no independent crash watchdog yet. Launcher-only
-mode, title-based profile switching and the WSquashFS post-launch configuration
-shortcut are not implemented in this branch.
+and separate launcher/game profiles are implemented as described below. There
+is no AntiMicroX configuration shortcut inside WSquashFS creation's post-launch
+menu: start that workflow from the AntiMicroX menu.
 
 ## Configure and test in game (experimental)
 
-Choose **Créer ou modifier un profil en jeu / Create or edit a profile in game**, select a
-`.wine`, `.pc` or `.wsquashfs`, then choose the assigned profile, an existing
+Choose **Créer ou modifier un profil en jeu / Create or edit a profile in game**,
+then the classic-game or launcher workflow. For a classic game, select its
+`.wine`, `.pc` or `.wsquashfs` and choose the assigned profile, an existing
 profile, or a new one. New profiles are stored in `config/antimicrox-profiles`
 with a game name and path hash, outside the prefix. An existing unassociated
 profile at that path is reused, never overwritten with an empty profile.
@@ -194,7 +218,7 @@ HTTP 200 alone is not a successful launch. An already-active requested game is
 observed without a duplicate launch. Another active game is not interrupted.
 This fixes the reported black screen where ES still ran the Toolbox port and
 the old monitor mistook that port for the game while waiting for itself to exit.
-The actual display/input handoff remains to be retested on Batocera.
+The display/input handoff has been confirmed on the Batocera test session.
 Its Windows game hook starts one visible AntiMicroX editing instance with that
 profile, uinput, isolated settings and the enlarged window. The editor does not
 use `--no-tray`, avoiding the Settings OK crash.
@@ -245,8 +269,11 @@ Edits apply in memory while AntiMicroX runs. **Click Save in AntiMicroX before
 quitting the game**, using the loaded profile path. The game-stop hook ends the
 managed editor. The Toolbox then restores the shortcut and returns to the
 AntiMicroX menu, where the user can associate the profile for normal launches,
-retry the editing session or return without enabling it. Closing the editor
-early does not close the game; quit the game normally to complete the session.
+retry the editing session or return without enabling it. This activation step
+is for the classic workflow: launcher learning opens rule selection directly,
+and editing one launcher/game role returns to that game's management menu.
+Closing the editor early does not close the game; quit the game normally to
+complete the session.
 
 A launched editing session does not automatically change the normal game
 association. WSquashFS creation/update and ReShade diagnostic return paths are
@@ -268,9 +295,98 @@ This covers XWayland Wine windows; native winewayland windows are not detected
 by this observer. The user has confirmed automatic return recovery and the
 creation/editing workflow on the Batocera test session.
 
-Real Alt+Tab focus, player 1 hotkey handling, full-screen Wine/UMU and possible
-simultaneous button actions remain to be validated on Batocera. Alt+Tab cycles
+Alt+Tab focus and the editing workflow have been confirmed on the reported
+Batocera session. Full-screen behavior, additional controllers and simultaneous
+button actions still need checking for other games/runners. Alt+Tab cycles
 compositor windows; games with additional launcher windows may expose those too.
+
+## Launcher and game profiles
+
+From **Create or edit a profile in game → Game with a launcher: profiles and
+windows**, record the launcher and game windows during a live session. Save the
+launcher mappings, enter the game for a few seconds and quit normally. Return
+opens window/rule selection directly, without a redundant Activate/Retry step.
+Windows are listed in first-observed order; this is not their exact creation
+order and a launcher is not automatically the first or correct entry.
+
+- **Launcher only** applies the launcher mapping on its matching window and an
+  empty mapping elsewhere, leaving native gamepad handling to the game.
+- **Separate profiles** switches between the launcher and game mappings. Select
+  a game-window rule, or allow the game mapping on other owned Wine windows in
+  that session. Unrelated or unrecognized focus gets an empty mapping.
+- Rules match a title, class or executable, exactly or by substring. Executable
+  matching is case-insensitive. A changed title can distinguish launcher/game
+  even when the executable, PID or window stays the same.
+
+Rules live in `config/antimicrox-launchers/<ROM-path-SHA256>.json` and are scoped
+to the running ES game and identifiable Wine prefix/processes. Matching observes
+Xorg/XWayland Wine windows, not native `winewayland` windows. A missing
+`WINEPREFIX` or ambiguous ownership is not guessed. A `[L]` filename marker is
+only a naming convention; it does not enable rules. Embedded Windows AntiMicroX
+instances are not migrated: disable their launch to avoid a second mapper.
+
+**My games and their profiles** opens the launcher menu for a configured game.
+**Edit launcher profile controls** and **Edit game profile controls** each offer
+editing in game or without launching it. During in-game editing, the selected
+role stays loaded; automatic switching resumes on normal launches. Editing the
+game role does not replace the primary launcher assignment.
+
+**Edit windows, mode or assigned profiles** groups edits using the existing
+recording and a new window-recording run. Recording again reuses the current
+launcher profile. Retesting runs the saved rules without opening the editor or
+adding its temporary shortcut. After the test, retest, adjust the rules or record
+again. There is no separate same-profile-for-the-entire-session launcher mode;
+use a classic game assignment for that behavior.
+
+## Share and transfer
+
+A game's **Share or export** submenu sends a complete community configuration
+or directly creates a local ZIP for that game. In **Download or share profiles
+→ Share and transfer profiles**, the full-game sharing and ZIP export pickers
+show only games with an available assigned profile; `[Launcher]` identifies
+saved launcher rules. Standalone controller-profile sharing remains available.
+
+A complete configuration includes its primary profile and, when configured,
+launcher rules and the game profile. Community submission still asks for game
+confirmation, a title, nickname and description and waits for moderation. The
+64 KiB service limit applies to the entire portable launcher payload.
+
+Local ZIP export asks for no public metadata. Select one or several games in a
+checklist; one archive is written to `exports/antimicrox/`. It supports up to
+1,000 games, 2 MiB per configuration and 62 MiB of profile payloads. Import all
+validated entries through **Import a ZIP package**, then choose the target game
+for each configuration you want to enable. Import does not automatically bind
+a batch to one game. Previous single-profile ZIP packages remain accepted.
+
+Controller identities, source ROM paths and local profile paths are not exported.
+The target machine stores new local paths and associates rules with the chosen
+game. Titles/classes/executables must still match its game version and language.
+Sharing a `.wine` configuration and importing it for the same `.wsquashfs` game
+was validated on the user's machine. See [community details](COMMUNITY_PROFILES.md).
+
+## Moonlight / Sunshine input
+
+The wrapper detects Sunshine input devices in `/sys/class/input/event*/device/name`
+and sets `SDL_JOYSTICK_HIDAPI=0` for that AntiMicroX process. With Sunshine's
+libvirtualhid controller, evtest received sticks/buttons while AntiMicroX's
+HIDAPI path showed no button activity; disabling HIDAPI fixed it, and restoring
+the default reproduced it. Normal in-game use through Moonlight was confirmed.
+Without a Sunshine device at launch, the inherited SDL setting is preserved.
+
+Connect Moonlight before starting the editor or mapped game. If the virtual
+controller appears after AntiMicroX starts, restart the managed game/editor so
+startup detection runs again. This changes the SDL input path for all controllers
+in that AntiMicroX instance; it is not a system-wide or Wine HIDRAW setting.
+It does not change Sunshine's display/service configuration.
+
+## Menu readability
+
+Action menus keep their colored accelerator letter. Game/profile/file/version
+pickers and multi-selection lists use normal text without a red initial.
+Only a game name followed by details gets a bold name column; name-only lists
+remain plain. **Full text** opens a wrapped scrollable description and returns
+to the same selected entry without activating it. Titles remain bold, menus use
+the available terminal width and the xterm launcher keeps bold black text black.
 
 ## Logs and validation
 
@@ -292,8 +408,8 @@ ES may still display its own prompt if a scraper or hashing job is running.
 Automated checks cover asset selection, inherited Qt settings, extraction of an
 old download, editor failure reporting, associations, and start/stop locking
 with simulated device/process data. The official AppImage was downloaded and
-extracted for inspection. These checks do not validate real display, controller
-or uinput behavior.
+extracted for inspection. Hardware observations are listed separately at the
+start of this guide; automated checks alone do not validate actual input.
 
 On Batocera, validate the diagnostic version, editor display, DualSense listing,
 profile save/reopen, keyboard/mouse events and dead zones, then game start/stop
@@ -306,6 +422,6 @@ failure logs and an already-running independent AntiMicroX instance.
 The main menu numbers follow their displayed order: create/edit in game, manage
 games and profiles, use an existing profile, download/share community profiles,
 convert Batocera Pad2Key settings, use the standalone editor, view controllers,
-delete a profile, install/update AntiMicroX, then troubleshoot. The introduction
+disable/delete profiles or configurations, install/update AntiMicroX, then troubleshoot. The introduction
 explains what a controller profile does and points to installation if needed.
 Diagnostics retain the technical runtime and input-device information.

@@ -20,4 +20,6 @@ checksum after rebuilding; binary output may vary with toolchain versions.
 Validation used the official bundled Qt libraries and a queued invocation of a
 slot reading a gamecontroller XML document. Without the library, Qt rejects the
 unregistered argument; with it, the receiver thread reads the document. Hardware
-mapping and Wine focus still require testing in Batocera.
+mapping and the editing/focus workflow were subsequently confirmed on the
+Batocera v44/labwc test machine. This validates that tested setup, not every
+controller, game or runner. See [the native integration guide](../../../docs/ANTIMICROX.md).

@@ -16,7 +16,7 @@ Le runner par défaut du système est proposé en premier. Les runners personnal
 3. TESTER ET CRÉER UNE SAUVEGARDE
 Le jeu est lancé pour un test. Jouez suffisamment pour créer une véritable sauvegarde, puis fermez le jeu.
 La Toolbox se relance et vous demande de valider le lancement. En cas de problème, vous pouvez relancer, changer de runner ou ajuster les options proposées.
-Si la manette ne fonctionne pas, choisissez l'activation de HIDRAW puis la relance. Les options DXVK, limiteur de FPS, adresses larges et bureau virtuel peuvent aussi être ajustées pour ce jeu.
+En cas de problème de manette, tester les options par jeu une à une : HIDRAW, puis si nécessaire la conversion HIDRAW en XInput pour les manettes PlayStation avec un runner Proton compatible (PROTON_SONY_HIDRAW_XINPUT). Ce n’est pas un correctif universel. Les options DXVK/VKD3D/NVAPI, limiteur de FPS, adresses larges et bureau virtuel restent disponibles. Vérifier / modifier le choix de l’exécutable du jeu corrige le lancement ; Installer des Winetricks supplémentaires permet d’ajouter des composants avant de retester.
 
 4. CHOISIR L'EMPLACEMENT DES SAUVEGARDES
 Le bouton B / Retour remonte à l’écran précédent. Abandonner l’opération reste une action distincte. Après l’externalisation, un retour ne rejoue pas le déplacement des données.
@@ -26,6 +26,8 @@ La recherche manuelle permet de parcourir le préfixe et de sélectionner un aut
 Choisissez le dossier propre aux sauvegardes du jeu, pas un dossier général contenant d'autres données.
 Si rien n'est détecté, vous pouvez relancer le jeu pour créer une sauvegarde, rechercher manuellement, utiliser user.reg si le jeu y stocke sa progression, ou quitter la création.
 Pour user.reg, le fichier complet est conservé : il peut aussi contenir des réglages Wine.
+
+Pour des sauvegardes à côté de l’exécutable, choisir les fichiers individuels (SAVEFILES), pas tout le dossier du jeu. Les fichiers créés ou modifiés pendant le test sont proposés mais décochés par défaut. Une sélection concerne un seul dossier ; les fichiers sont copiés vers les sauvegardes Batocera puis retirés du préfixe, et Batocera crée leurs liens au lancement.
 
 5. EXTERNALISER ET COMPRESSER
 Validez l'externalisation vers /userdata/saves/windows/<nom du jeu>. Si cette destination contient déjà des sauvegardes, choisissez de les sauvegarder, de les remplacer ou de conserver la sauvegarde existante. En conservant l’existante, les données créées pendant le test sont écartées, sans copie supplémentaire. Pour les fichiers individuels ou le registre, les fichiers attendus doivent déjà être présents dans la destination conservée.
@@ -40,3 +42,4 @@ Lancez le nouveau .wsquashfs et vérifiez que votre progression est retrouvée.
 Le contrôle d'intégrité du menu Gestion des WSquashFS peut vérifier la structure ou lire et décompresser toutes les données sans extraction sur disque. Il ne vérifie pas le fonctionnement du jeu.
 La compression simple d'un .wine dans ce menu ne réalise pas à elle seule le workflow d'externalisation décrit ici.
 
+Avec mergerfs, l’espace est vérifié par disque et un emplacement physique compatible est proposé avant la compression. La place libre totale du partage ne garantit pas qu’une archive puisse tenir sur un seul disque. Garder la Toolbox ouverte pendant compression, vérification et finalisation : fermer sa fenêtre interrompt les tâches et conserve l’état de reprise.

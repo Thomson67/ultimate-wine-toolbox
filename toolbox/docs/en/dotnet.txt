@@ -8,6 +8,10 @@ Batocera v41 sources package shared Mono 9.3.0 with Wine TKG. v43.1 sources pack
 
 Diagnostics distinguish Mono, Microsoft .NET evidence, mixed state, unidentified traces and no identified components. An NDP Release value alone cannot identify Microsoft: Mono may create the same keys. Detection is not an execution test.
 
+ACCESS OUTSIDE CREATION / UPDATE
+
+Open Tools and compatibility → Winetricks / Wine Mono / .NET and select a .wine, .pc or .wsquashfs game. The complete catalogue supports multiple selection and skips installed components. .wine prefixes are edited directly; .pc uses the runner bottle (launch the game once first). For .wsquashfs, choose the bottle or extract → install → recompress to include components in the archive. Failed operations retain the working copy for recovery and archive replacement requires verification.
+
 WORKFLOW
 
 After testing the game, open .NET from the result menu (creation or update). In creation it is also available from Winetricks components.
@@ -22,7 +26,7 @@ SAFETY COPIES
 
 Before installation, a prefix copy is stored under the Toolbox’s backups/dotnet directory. The main game directory identified from autorun is excluded; symlinks are copied without following targets, including external saves. The source archive remains intact. Do not delete the game directory when restoring: the copy does not contain it. The log records the exact backup path. There is no automatic rollback on failure.
 
-Experimental until installation, relaunch and archive persistence have been validated on Batocera.
+This feature remains experimental. After each change, check diagnostics, progress and two game launches before finalizing an archive. Success with one runner does not validate all others.
 
 LOCAL INSTALLATION AND RECOVERY
 

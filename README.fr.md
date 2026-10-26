@@ -33,6 +33,28 @@ Créée par **Thomsonito**.
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
 
+## Évolutions de cette branche
+
+Les changements ci-dessous sont présents sur cette branche, après la release
+stable v0.7.2 ; ils ne sont pas une annonce de nouvelle version stable.
+
+- AntiMicroX : profil launcher seul ou profils launcher/jeu distincts, bascule
+  selon le titre, la classe ou l’exécutable de la fenêtre Xorg/XWayland.
+- Édition de chaque profil en jeu ou sans lancement, nouveau relevé des fenêtres
+  et retest des règles depuis le menu du jeu.
+- Partage communautaire complet des profils et règles ; export local d’un ou
+  plusieurs jeux dans un ZIP, puis association aux jeux de la machine cible.
+- Suppressions regroupées : configurations de jeux et profils sans jeu associé,
+  avec protection des profils encore référencés.
+- Correctif manette Moonlight/Sunshine propre à AntiMicroX et listes plus lisibles
+  sans initiale rouge dans les sélections de jeux/profils.
+
+Le parcours `.wine` → partage communautaire → réimport pour le même jeu en
+`.wsquashfs`, ainsi que le mapping via Moonlight, ont été validés sur la machine
+Batocera v44/labwc de test. Voir l’[index des guides](docs/README.md), le
+[guide AntiMicroX](docs/ANTIMICROX.md) et le
+[parcours launcher en français](docs/ANTIMICROX-LAUNCHERS-TEST.fr.md).
+
 ## Nouveautés de la v0.7.2
 
 - Correction du lancement des jeux avec l’éditeur AntiMicroX ouvert sur Batocera v44.
@@ -144,7 +166,7 @@ Les runners Wine/UMU, les jeux, les sauvegardes et les Wine bottles sont conserv
 
 ## Documentation dans la Toolbox
 
-Le menu principal **Documentation** regroupe les guides de création et de mise à jour WSquashFS, les modèles de préfixes Wine, MangoHud, DXVK/VKD3D et ReShade. Les textes sont disponibles hors ligne, en français et en anglais, dans un lecteur avec défilement. Le guide des modèles précise leur rôle, leur emplacement et le format attendu.
+Le menu principal **Documentation** regroupe les guides de création et de mise à jour WSquashFS, les modèles de préfixes Wine, MangoHud, DXVK/VKD3D, ReShade, Winetricks/Wine Mono/.NET et AntiMicroX (launchers, partage et transferts compris). Les textes sont disponibles hors ligne, en français et en anglais, dans un lecteur avec défilement. Le guide des modèles précise leur rôle, leur emplacement et le format attendu.
 
 ## Créer un WSquashFS
 
@@ -156,7 +178,7 @@ La compression, les contrôles d’intégrité et la reprise des opérations en 
 
 ## Mettre à jour un WSquashFS
 
-Dans Gestion des WSquashFS, l’option suit immédiatement la création. Sélectionnez une archive contenant un préfixe Wine et un dossier contenant directement les fichiers de la nouvelle version du jeu. Le dossier source est déplacé dans le dossier du jeu identifié par `autorun.cmd` (souvent `drive_c/game`) d’un préfixe de test distinct. Les archives de type `.pc` sans préfixe Wine ne sont pas prises en charge.
+Dans Gestion des WSquashFS, l’option suit immédiatement la création. Sélectionnez une archive contenant un préfixe Wine, ou un `.wine` existant avec `system.reg` et `autorun.cmd`, puis un dossier contenant directement les fichiers de la nouvelle version du jeu. Un `.wine` est réutilisé sur place ; une archive est extraite dans un préfixe de test distinct. Le dossier source est déplacé dans le dossier du jeu identifié par `autorun.cmd` (souvent `drive_c/game`) du préfixe de travail. Les archives de type `.pc` sans préfixe Wine ne sont pas prises en charge.
 
 Le premier test conserve le lancement défini dans l’archive ; il n’y a plus de sélection systématique de l’exécutable avant ce test. Vérifiez le lancement, la manette, le chargement de votre progression et une nouvelle sauvegarde. Au retour, **Vérifier / modifier le choix de l’exécutable du jeu** permet de le corriger et de retester. Le runner et les options du jeu sont repris ; le test utilise une copie des sauvegardes, sauf les liens vers la racine partagée décrits ci-dessous. Confirmez ensuite les règles de sauvegarde existantes ou choisissez un autre emplacement avec la détection ou l’explorateur.
 
@@ -168,7 +190,7 @@ Prévoyez de la place pour l’extraction, les sauvegardes de test et la nouvell
 
 La mise à jour propose d’abord le lancement défini dans `autorun.cmd`, y compris les `start.bat` originaux recopiés dans le nouveau dossier aux mêmes emplacements. Vous pouvez choisir un autre exécutable. Sans `SAVEDIR=`, les liens existants vers `/userdata/saves/windows` ou un de ses sous-dossiers sont détectés, restaurés dans le jeu mis à jour et proposés par défaut. Un lien vers la racine `/userdata/saves/windows` conserve exactement sa cible pendant le test et dans l’archive finale, sans fenêtre spéciale ni modification des références batch. Le test utilise donc directement les sauvegardes existantes dans ce cas. Vous pouvez conserver les liens ou sélectionner un autre emplacement au retour.
 
-Avant le déplacement, l’ancien dossier du jeu est renommé en `<nom>.bak`. Le dossier mis à jour reprend le nom exact du dossier original ; le dossier source disparaît donc de son emplacement précédent. Le `.bak` est conservé jusqu’à validation du lancement, puis supprimé avant recompression. Les liens de sauvegarde contenus dans l’ancien dossier sont restaurés aux mêmes emplacements. Le déplacement nécessite un même système de fichiers et ne bascule jamais vers une copie implicite. Le choix de conserver les règles de sauvegarde ne demande plus de confirmation supplémentaire.
+Avant le déplacement, l’ancien dossier du jeu est renommé en `<nom>.bak`. Le dossier mis à jour reprend le nom exact du dossier original ; le dossier source disparaît donc de son emplacement précédent. Le `.bak` est conservé jusqu’à validation du lancement, puis supprimé avant recompression. Les liens de sauvegarde contenus dans l’ancien dossier sont restaurés aux mêmes emplacements. Le déplacement ne bascule jamais vers une copie implicite. Avec mergerfs et une erreur EXDEV, la Toolbox peut déplacer les parties du dossier sur leurs branches physiques respectives ; les étapes sont consignées et un échec tente de les annuler. Le choix de conserver les règles de sauvegarde ne demande plus de confirmation supplémentaire.
 
 Le préfixe de test reprend le nom exact de l’archive en remplaçant `.wsquashfs` par `.wine`, balises comprises. Un dossier `.wine` existant déclenche le choix : remplacer le dossier, choisir un autre nom ou quitter. Les réglages ES du `.wsquashfs` sont prioritaires ; s’il n’a aucun réglage spécifique, ceux du `.wine` existant sont repris. Les réglages de `batocera.conf` sont sauvegardés avant modification. Un dossier contenant la source de mise à jour ne peut pas être supprimé : choisissez alors un autre nom de préfixe.
 
@@ -201,7 +223,7 @@ Lancer ensuite le jeu depuis EmulationStation et appuyer sur **Home** pour ouvri
 - Journaux : `/userdata/system/logs/ultimate-wine-toolbox/reshade-install-*.log` et `reshade-game-event.log`. Les bibliothèques partagées et shaders requis sont rendus accessibles à UMU sans retirer les réglages MangoHud.
 - `git` et `file` ne sont pas requis sur Batocera : des adaptateurs privés téléchargent les archives GitHub des packs et lisent les en-têtes Windows lorsque ces outils sont absents. Les modifications locales des shaders sont préservées lors d'une mise à jour. L’installateur ReShade est extrait directement avec Python, même si un `7z` système est présent mais incomplet. Aucun outil système n'est ajouté.
 
-Le moteur utilise **[ReShadeLinux 1.3.5](https://github.com/asafelobotomy/reshadelinux/tree/v1.3.5)**, par asafelobotomy, continuant le travail de kevinlekiller ; il est téléchargé sans modification depuis une révision précise, avec vérification SHA-256, et conserve sa licence GPL-2.0-or-later. **[ReShade](https://reshade.me/)** est développé par crosire et ses contributeurs. Les auteurs des packs sont affichés dans la sélection. La compatibilité graphique réelle dépend du jeu et du runner ; les premiers essais Batocera/Wayland et UMU restent nécessaires.
+Le moteur utilise **[ReShadeLinux 1.3.5](https://github.com/asafelobotomy/reshadelinux/tree/v1.3.5)**, par asafelobotomy, continuant le travail de kevinlekiller ; il est téléchargé sans modification depuis une révision précise, avec vérification SHA-256, et conserve sa licence GPL-2.0-or-later. **[ReShade](https://reshade.me/)** est développé par crosire et ses contributeurs. Les auteurs des packs sont affichés dans la sélection. La compatibilité graphique réelle dépend du jeu et du runner ; après un changement d’API, de runner ou de packs, vérifier le rendu et les raccourcis en jeu, notamment sous Wayland et UMU.
 
 ### Listes, presets, modèles et aide au choix de l’API
 
@@ -237,4 +259,4 @@ Gardez la Toolbox ouverte pendant la compression, la vérification et la finalis
 
 Le workflow de test distingue le Wine Mono partagé de Batocera/runners des installations dans le préfixe, propose le MSI Mono stable récent vérifié ou son remplacement par .NET Framework 4.8 Microsoft, et copie le préfixe de travail avant modification. Le dossier du jeu est exclu de la copie. Les états .NET mixtes ou non identifiés sont refusés. Voir le nouveau guide .NET hors ligne ; valider l’installation puis deux lancements avant de finaliser l’archive.
 
-Le test .NET utilise désormais une copie locale hors du dossier des ROMs, préserve les métadonnées de liens TKG et permet de restaurer une copie antérieure après un essai incomplet. Les installations réelles restent à valider sur Batocera.
+Le test .NET utilise désormais une copie locale hors du dossier des ROMs, préserve les métadonnées de liens TKG et permet de restaurer une copie antérieure après un essai incomplet. Après chaque installation, vérifier le diagnostic et deux lancements du jeu avec le runner choisi ; le résultat reste dépendant du jeu et du runner.

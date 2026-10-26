@@ -1,9 +1,13 @@
 # Presets ReShade
 
-Cette catégorie attend ses premières contributions de presets de jeu réels.
-Utilisez **ReShade → Presets communautaires → Préparer le partage** dans la
-Toolbox. Le ZIP contient les réglages `.ini` et leurs prérequis ; il ne contient
-ni DLL, ni shader, ni texture.
+Ce dossier de sources contient les exemples initiaux, pas l’état actuel du
+catalogue public. Dans la Toolbox, ouvrir **ReShade → Presets communautaires**
+pour rechercher et télécharger, ou **Partager mon preset ReShade** pour envoyer
+une proposition à validation. Aucun compte GitHub n’est nécessaire.
 
-This category is ready for real game preset contributions. Use the ReShade
-community menu to prepare a submission ZIP with the INI and requirements.
+Le partage contient les réglages `.ini` et leurs prérequis, sans DLL, shader
+ni texture. Installer les effets nécessaires sur le jeu destinataire.
+
+This source seed is not a live catalogue mirror. Use the ReShade community
+menu to download or submit presets through the moderated service. See the
+[community guide](../../docs/COMMUNITY_PROFILES.md).
