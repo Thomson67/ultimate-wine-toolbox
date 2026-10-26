@@ -3,6 +3,8 @@
 import argparse
 import errno
 import fnmatch
+import hashlib
+import stat
 import json
 import os
 import re
@@ -767,6 +769,74 @@ def copy_config(conf, source, dest, backup_dir=None, preserve_existing=False):
     return runners[-1] if runners else '__SYSTEM__'
 
 
+def backup_tree_signature(path):
+    """Identify backup contents without following links or reading save data."""
+    rows, pending = [], [Path(path)]
+    while pending:
+        node = pending.pop()
+        info = node.lstat()
+        rows.append([str(node.relative_to(path)), info.st_dev, info.st_ino,
+                     info.st_mode, info.st_size, info.st_mtime_ns, info.st_ctime_ns,
+                     os.readlink(node) if stat.S_ISLNK(info.st_mode) else ''])
+        if stat.S_ISDIR(info.st_mode):
+            pending.extend(sorted(node.iterdir(), reverse=True))
+    return hashlib.sha256(json.dumps(rows, ensure_ascii=True).encode()).hexdigest()
+
+
+def save_backup_records(data):
+    if not data.get('committed'):
+        raise ValueError('Save backups must be retained until the update is committed')
+    base = Path(data['save_root']).resolve()
+    allowed = {str(Path(data['original_save']))}
+    allowed.update(change['target'] for change in data.get('legacy_publish', []))
+    found, seen = [], set()
+    records = data.get('save_backups', [])
+    if not isinstance(records, list):
+        raise ValueError('Invalid save-backup records')
+    for record in records:
+        if (not isinstance(record, dict) or not all(isinstance(record.get(key), str)
+                and record[key] for key in ('target', 'path', 'signature'))
+                or not isinstance(record.get('target_identity'), list)
+                or len(record['target_identity']) != 2):
+            raise ValueError('Invalid save-backup record')
+        target, backup = Path(record['target']), Path(record['path'])
+        if (str(target) not in allowed or target.parent.resolve() != base
+                or backup.parent.resolve() != base or target == backup
+                or not re.fullmatch(re.escape(target.name)+r'\.backup-[0-9]{8}-[0-9]{6}-[0-9]{6}', backup.name)
+                or str(backup) in seen or backup.is_symlink()):
+            raise ValueError('Invalid save-backup cleanup path')
+        seen.add(str(backup))
+        if not backup.exists():
+            continue  # Already removed; never search for other backup names.
+        if target.is_symlink() or not target.exists():
+            raise ValueError('Active saves are missing or redirected; keep the backup')
+        current = target.stat()
+        if [current.st_dev, current.st_ino] != record['target_identity']:
+            raise ValueError('Active save destination changed; keep the backup')
+        if backup_tree_signature(backup) != record['signature']:
+            raise ValueError('Save backup changed; automatic cleanup refused')
+        found.append(backup)
+    return found
+
+
+def manage_save_backups(manifest, remove=False, keep=False):
+    data = json.loads(manifest.read_text())
+    if keep:
+        if not data.get('committed'):
+            raise ValueError('Save backups must be retained until the update is committed')
+        data['save_backup_choice'] = 'keep'
+        save_json(manifest, data)
+        return []  # Keeping copies must remain possible even if they were edited.
+    backups = save_backup_records(data)  # Validate every entry before deletion.
+    if remove:
+        for path in backups:
+            if path.is_dir(): shutil.rmtree(path)
+            else: path.unlink()
+        data['save_backup_choice'] = 'deleted'
+        save_json(manifest, data)
+    return backups
+
+
 def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
     data = json.loads(manifest.read_text())
     archive = Path(data['archive'])
@@ -803,6 +873,7 @@ def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
             raise ValueError('prepared saves must be a distinct adjacent directory')
         changes.append(dict(target=str(original_save), prepared=str(prepared_save)))
     swapped = []
+    save_backups = []
     save_backup = None
     print(f'update_phase=publication time={datetime.now().isoformat(timespec="seconds")}', file=sys.stderr, flush=True)
     with defer_cancellation():
@@ -820,6 +891,11 @@ def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
                 swapped.append((target, prepared, backup_path))
                 prepared.rename(target)
                 save_backup = backup_path or save_backup
+                if backup_path is not None:
+                    active = target.stat()
+                    save_backups.append(dict(path=str(backup_path), target=str(target),
+                        target_identity=[active.st_dev, active.st_ino],
+                        signature=backup_tree_signature(backup_path)))
             if create_archive:
                 os.link(staged, archive)  # Atomic no-clobber publication of a new archive.
             else:
@@ -831,7 +907,8 @@ def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
                 if backup_path is not None:
                     backup_path.rename(target)
             raise
-        data.update(committed=True, archive_backup=str(backup or ''), save_backup=str(save_backup or ''))
+        data.update(committed=True, archive_backup=str(backup or ''), save_backup=str(save_backup or ''),
+                    save_backups=save_backups)
         save_json(manifest, data)
     if create_archive:
         try:
@@ -866,7 +943,7 @@ def main():
     a.add_argument('manifest', type=Path); a.add_argument('staged', type=Path); a.add_argument('--prepared-save', type=Path); a.add_argument('--replace', action='store_true')
     a = sp.add_parser('cleanup-bottles')
     a.add_argument('root', type=Path); a.add_argument('archive_name')
-    for action in ('cleanup-test', 'profiles', 'restore-save-rules', 'finish-game', 'restore-legacy', 'restore-custom', 'restore-scripts', 'stage-legacy', 'legacy-summary', 'exe', 'game-dir'):
+    for action in ('save-backups', 'cleanup-save-backups', 'keep-save-backups', 'cleanup-test', 'profiles', 'restore-save-rules', 'finish-game', 'restore-legacy', 'restore-custom', 'restore-scripts', 'stage-legacy', 'legacy-summary', 'exe', 'game-dir'):
         a = sp.add_parser(action)
         a.add_argument('prefix' if action in ('exe', 'game-dir', 'profiles') else 'manifest', type=Path)
     a = sp.add_parser('root-link')
@@ -887,6 +964,10 @@ def main():
         elif a.action == 'config': print(copy_config(a.conf, a.source, a.dest, a.backup_dir, a.preserve_existing))
         elif a.action == 'commit': print(commit(a.manifest, a.staged, a.prepared_save, not a.replace))
         elif a.action == 'game-dir': print(game_directory(a.prefix).relative_to(a.prefix).as_posix())
+        elif a.action in ('save-backups', 'cleanup-save-backups', 'keep-save-backups'):
+            for path in manage_save_backups(a.manifest,
+                    remove=a.action == 'cleanup-save-backups', keep=a.action == 'keep-save-backups'):
+                print(path)
         elif a.action == 'cleanup-test': cleanup_test_saves(a.manifest)
         elif a.action == 'cleanup-bottles':
             removed = cleanup_runtime_bottles(a.root, a.archive_name)

@@ -32,3 +32,10 @@ COMPATIBILITÉ AVEC PORTS REGROUPÉ
 Si l’API ES refuse le groupe Ports, le retour utilise un lanceur technique appartenant au sous-système uwt_return, lui-même rattaché à Ports. La Toolbox crée uniquement es_systems_uwt_return.cfg et ses fichiers dans runtime/es-return-proxy. Le lanceur et son dossier sont marqués cachés. La commande native de Ports et le profil Pad2Key de la Toolbox sont repris. Le réglage global ports.ungroup n’est pas modifié. Si vous aviez activé le dégroupage pour un test, rétablissez le regroupement souhaité depuis les paramètres des collections d’ES.
 
 Avec mergerfs, l’espace est vérifié par disque et un emplacement physique compatible est proposé avant la compression. La place libre totale du partage ne garantit pas qu’une archive puisse tenir sur un seul disque. Garder la Toolbox ouverte pendant compression, vérification et finalisation : fermer sa fenêtre interrompt les tâches et conserve l’état de reprise.
+
+COPIES DE SÉCURITÉ DES SAUVEGARDES
+Conserver le lien ou les règles conserve les emplacements de sauvegarde, mais la progression validée pendant le test peut remplacer les fichiers actifs à la publication. L’ancien dossier est alors renommé en <nom>.backup-<date>. Cette copie permanente est distincte du dossier temporaire de test, nettoyé après réussite.
+
+En fin de MAJ réussie, choisir si les copies de sécurité créées par cette opération doivent être supprimées. Non les conserve ; Oui retire seulement les copies affichées, après vérification. Les sauvegardes actives et la sauvegarde éventuelle de l’ancien WSquashFS restent en place. Le choix est mémorisé si la finalisation est reprise. Un backup modifié ou impossible à supprimer est conservé avec un avertissement ; cela n’annule pas la MAJ réussie.
+
+Les backups de MAJ précédentes et les copies explicitement créées lors d’un conflit de destination ne sont pas supprimés par ce choix. Pour une ancienne opération en attente sans la liste complète des backups, les copies sont conservées. Aucun effacement global des dossiers .backup-* n’est effectué.

@@ -816,3 +816,8 @@ I18N[resh_community]='Community presets'
 I18N[squash_storage_body]="Checking free space on each disk and selecting the archive location…"
 
 I18N[squash_delete_source_progress]="Removing the source .wine directory: %s\n\nCleanup is still running. Please wait for the completion message."
+
+I18N[wsq_update_save_cleanup_title]="Save-data backup copies"
+I18N[wsq_update_save_cleanup_body]="The update succeeded. Delete the old save-data backup copies created by this operation?\n\n%s\n\nActive saves and any old WSquashFS archive backup are kept. Backups from earlier updates are not included. Choose No to keep these copies."
+I18N[wsq_update_save_cleanup_progress]="Removing this update’s save-data backup copies…"
+I18N[wsq_update_save_cleanup_failed]="Some save backups could not be verified or deleted. Remaining copies are kept for manual review. The update succeeded and active saves are kept. Log:\n%s"

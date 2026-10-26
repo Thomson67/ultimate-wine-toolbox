@@ -816,3 +816,8 @@ I18N[resh_community]='Presets communautaires'
 I18N[squash_storage_body]="Analyse de l’espace disponible sur les disques et choix de l’emplacement de compression…"
 
 I18N[squash_delete_source_progress]="Suppression du dossier .wine source : %s\n\nLe nettoyage est encore en cours. Patientez jusqu’au message de fin."
+
+I18N[wsq_update_save_cleanup_title]="Copies de sécurité des sauvegardes"
+I18N[wsq_update_save_cleanup_body]="La MAJ a réussi. Supprimer les anciennes copies de sauvegardes créées par cette opération ?\n\n%s\n\nLes sauvegardes actives et la copie éventuelle de l’ancien WSquashFS sont conservées. Les backups des MAJ précédentes ne sont pas concernés. Choisir Non conserve ces copies."
+I18N[wsq_update_save_cleanup_progress]="Suppression des copies de sécurité de cette MAJ…"
+I18N[wsq_update_save_cleanup_failed]="Certaines copies de sauvegardes n’ont pas pu être vérifiées ou supprimées. Les copies restantes sont conservées pour vérification manuelle. La MAJ a réussi et les sauvegardes actives sont conservées. Journal :\n%s"

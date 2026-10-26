@@ -532,6 +532,32 @@ wsq_update_final_choice() {
     esac
 }
 
+wsq_update_manage_save_backups() {
+    local metadata="$1" log="$2" paths decision old_backup
+    decision="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" save_backup_choice)" || return 1
+    case "$decision" in keep|deleted) return 0 ;; esac
+    if ! paths="$(python3 "$WSQ_UPDATE_HELPER" save-backups "$metadata" 2>> "$log")"; then
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_save_cleanup_failed "$log")"
+        python3 "$WSQ_UPDATE_HELPER" keep-save-backups "$metadata" >> "$log" 2>&1
+        return $?
+    fi
+    if [ -z "$paths" ]; then
+        # Old pending manifests do not identify every backup: do not infer paths.
+        old_backup="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" save_backup)"
+        [ -z "$old_backup" ] || msgbox "$(i18n wsq_save_title)" "$(i18n wsq_save_backup_done "$old_backup")"
+        return 0
+    fi
+    if yesno_default_no "$(i18n wsq_update_save_cleanup_title)" "$(i18n wsq_update_save_cleanup_body "$paths")"; then
+        if ! wsq_update_run "$(i18n wsq_update_save_cleanup_title)" "$(i18n wsq_update_save_cleanup_progress)" "$log" \
+            python3 "$WSQ_UPDATE_HELPER" cleanup-save-backups "$metadata"; then
+            msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_save_cleanup_failed "$log")"
+            python3 "$WSQ_UPDATE_HELPER" keep-save-backups "$metadata" >> "$log" 2>&1 || return 1
+        fi
+    else
+        python3 "$WSQ_UPDATE_HELPER" keep-save-backups "$metadata" >> "$log" 2>&1 || return 1
+    fi
+}
+
 wsq_resume_update() {
     # prefix/game_name/snapshot/exe_rel/runner are local to wsq_resume_build.
     local game_name="$game_name"
@@ -648,9 +674,6 @@ wsq_resume_update() {
         --backup-dir "$WSQ_STATE_DIR/config-backups" >> "$log" 2>&1 || {
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_runner_finalize_failed "$archive")"; return
     }
-    local save_backup
-    save_backup="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" save_backup)"
-    [ -z "$save_backup" ] || msgbox "$(i18n wsq_save_title)" "$(i18n wsq_save_backup_done "$save_backup")"
     python3 "$WSQ_UPDATE_HELPER" cleanup-test "$metadata" >> "$log" 2>&1 || {
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
     }
@@ -659,6 +682,7 @@ wsq_resume_update() {
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_bottles_cleanup_failed "$log")"
         return
     }
+    wsq_update_manage_save_backups "$metadata" "$log" || return 1
     maintenance_offer_source_deletion "$prefix" "$log" 0 || return 1
     rm -f -- "$snapshot" "$WSQ_STATE_FILE" "$metadata" "$WSQ_STATE_DIR/wsq-launch-result"
     local completed_prefix="$prefix"
