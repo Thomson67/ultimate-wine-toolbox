@@ -89,13 +89,15 @@ dialog() {
                 ;;
         esac
     done
-    # Keep the current colors and selection background, using regular text.
-    # --create-rc reads the user's current theme; only tuple highlight flags
-    # change in this temporary copy. Never rewrite the user's configuration.
+    # Regular black menu entries, with the original bold title and selection.
+    # With --no-tags, Dialog uses tag_color to draw the entire item label.
+    # Adjust a temporary theme copy; never rewrite the user's configuration.
     if [ "${widget:-}" = --menu ]; then
         theme="$(mktemp /tmp/uwt-menu-theme.XXXXXX)" || theme=""
         if [ -n "$theme" ] && command dialog --create-rc "$theme" 2>/dev/null &&
-           sed -i -E 's/(=[[:space:]]*\([^,]*,[^,]*,)[[:space:]]*ON/\1OFF/' "$theme"; then
+           sed -i -E -e '/^[[:space:]]*title_color[[:space:]]*=/b' \
+               -e 's/(=[[:space:]]*\([^,]*,[^,]*,)[[:space:]]*ON/\1OFF/' \
+               -e 's/^(item_color|tag_color)[[:space:]]*=.*/\1 = dialog_color/' "$theme"; then
             DIALOGRC="$theme" command dialog "${args[@]}"
             rc=$?
             rm -f -- "$theme"
