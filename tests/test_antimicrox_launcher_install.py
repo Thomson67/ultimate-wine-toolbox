@@ -416,8 +416,10 @@ class PublishedVersionHashesTests(unittest.TestCase):
     def test_unassigned_cleanup_version_preserves_its_profile_and_wrapper_hashes(self):
         self.assertEqual(installer.UNASSIGNED_REMOVAL_HASHES['toolbox/helpers/antimicrox_profiles.py'],
                          'a48f52d0cb36c737a28d7d189e36e1d684f53e48d54a3c8f0051f0e85ada77ab')
+        self.assertEqual(installer.MOONLIGHT_INPUT_HASHES['toolbox/helpers/antimicrox-launch.sh'],
+                         '7da8c0c8a1688a93f7b2fa278c48bd8784cf6cf58504d1f1d57ec06843a0731f')
         for name, hashes in vars(installer).items():
-            if name.endswith('_HASHES'):
+            if name.endswith('_HASHES') and name != 'MOONLIGHT_INPUT_HASHES':
                 self.assertEqual(hashes['toolbox/helpers/antimicrox-launch.sh'], 'a5266a0e16eb3aba60beb27dae1810eff4b2c2d239ce8383f75f9bd422aa438b', name)
 
 

@@ -57,7 +57,7 @@ wsq_select_source_game() {
         return 1
     fi
 
-    choice="$(menu_select "$(i18n wsq_create_title)" "$(i18n wsq_credit)\n\n$(i18n wsq_create_purpose)\n\n$(i18n wsq_version_warning)\n\n$(i18n wsq_source_prompt)" "${items[@]}")" || return 1
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n wsq_create_title)" "$(i18n wsq_credit)\n\n$(i18n wsq_create_purpose)\n\n$(i18n wsq_version_warning)\n\n$(i18n wsq_source_prompt)" "${items[@]}")" || return 1
     sed -n "${choice}p" <<< "$rows"
 }
 
