@@ -177,3 +177,18 @@ Dans le menu d’un jeu, **Partager ou exporter** contient le partage communauta
 et l’export ZIP. Dans **Télécharger ou partager des profils**, **Partager et
 transférer des profils** regroupe le partage complet d’un jeu, le partage d’un
 profil seul, l’export groupé, l’import ZIP et les actions de modération.
+
+## Désactiver ou supprimer
+
+Les menus des jeux regroupent ces actions dans **Désactiver ou supprimer**.
+Pour un launcher, trois choix sont proposés : retirer uniquement les règles
+en conservant le profil actif, retirer toute la configuration en gardant les
+fichiers profils, ou supprimer la configuration et ses profils non partagés.
+La confirmation indique les fichiers à supprimer et ceux conservés parce
+qu’ils sont référencés ailleurs, y compris comme profil jeu d’un autre launcher.
+Le Pad2Key d’origine est restauré s’il avait été suspendu. Un échec annule
+l’opération et conserve les données précédentes.
+
+L’entrée principale **Désactiver ou supprimer** propose les configurations de
+jeux et les fichiers profils. La suppression d’un fichier seul refuse de casser
+une paire launcher/jeu : utiliser alors le menu de suppression de sa configuration.

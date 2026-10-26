@@ -120,7 +120,7 @@ amx_manage_associations
             home = Path(folder); first, missing, profile, cfg = self.setup_games(home)
             result = self.bash(home, '''
 i18n() { echo Retour; }
-menu_select() { printf '%s\\n' "$@" > "$WT_HOME/menu"; echo remove; }
+menu_select() { if [ ! -f "$WT_HOME/menu" ]; then printf '%s\\n' "$@" > "$WT_HOME/menu"; fi; echo remove; }
 yesno() { return 0; }
 amx_manage_game "$GAME"
 ''', GAME=str(first))
@@ -216,7 +216,7 @@ community_menu() { echo "community:$1" > "$ROUTE"; }
 amx_convert_pad2key() { echo convert > "$ROUTE"; }
 amx_editor() { echo editor > "$ROUTE"; }
 timeout() { echo controllers > "$ROUTE"; echo 'Fake Controller'; }
-amx_delete_profiles() { echo delete > "$ROUTE"; }
+amx_deletion_menu() { echo delete > "$ROUTE"; }
 amx_launchers_menu() { echo launchers > "$ROUTE"; }
 antimicrox_menu
 '''

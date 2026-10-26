@@ -216,6 +216,23 @@ class Profiles:
 
     def plan(self, selected):
         path = self.validate(selected)
+        # Launcher pairs must be removed as a configuration, including secondary
+        # references that are not present in the primary-association TSV.
+        for config in (self.home/'config/antimicrox-launchers').glob('*.json'):
+            if config.is_symlink() or config.stat().st_size > 1024*1024:
+                raise ValueError('Invalid launcher configuration; use its game menu')
+            value = json.loads(config.read_text())
+            if not isinstance(value, dict): raise ValueError('Invalid launcher configuration')
+            if any(isinstance(value.get(key), str) and value[key] and Path(value[key]).resolve() == path
+                   for key in ('launcher_profile', 'game_profile')):
+                raise ValueError('This profile belongs to a launcher configuration. Use its game menu to remove that configuration first.')
+        imported = Pad2KeyStore(self.home, self.userdata).read(self.home/'state/community/imports.json')
+        for owner, metadata in imported.items():
+            config = metadata.get('launcher_config') if isinstance(metadata, dict) else None
+            if (isinstance(config, dict) and isinstance(config.get('game_profile'), str)
+                    and config['game_profile'] and Path(config['game_profile']).resolve() == path
+                    and Path(owner).resolve() != path and Path(owner).is_file()):
+                raise ValueError('This profile is used by another stored launcher profile. Remove its configuration or owner profile first.')
         raw, stat = self.raw(), path.stat()
         games, remaining = self.references(path, raw)
         sha = hashlib.sha256()

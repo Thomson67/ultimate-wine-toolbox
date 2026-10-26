@@ -159,6 +159,131 @@ class Store:
         return value.get('observations', []) if value.get('rom') == rom else []
 
 
+class ConfigDeletion:
+    """Remove one configuration, retaining every profile referenced elsewhere."""
+    def __init__(self, home, userdata='/userdata', active=None):
+        from antimicrox_pad2key_state import Pad2KeyStore
+        from antimicrox_profiles import Profiles
+        self.home = Path(home)
+        self.store = Store(home)
+        self.pad = Pad2KeyStore(home, userdata)
+        self.profiles = Profiles(home, userdata, active)
+        self.imports = self.home/'state/community/imports.json'
+
+    def profile_path(self, value):
+        if not isinstance(value, str) or not value or any(c in value for c in '\t\r\n'):
+            raise ValueError('Invalid profile path')
+        path = Path(value)
+        if path.is_symlink():
+            raise ValueError('Refusing a symlinked profile')
+        path = path.resolve()
+        if not path.is_relative_to(self.pad.userdata) or path.suffix.lower() != '.amgp':
+            raise ValueError('Profile must remain under /userdata')
+        if path.exists():
+            self.profiles.validate(path)
+        return path
+
+    def plan(self, rom, delete_profiles=False):
+        config_path = self.store.path(rom)
+        value = read_json(config_path)
+        if not isinstance(value, dict) or value.get('rom') != rom or value.get('version') != 1 or value.get('mode') not in ('launcher', 'profiles'):
+            raise ValueError('Launcher configuration not found or invalid')
+        candidates = {self.profile_path(value.get('launcher_profile'))}
+        if value['mode'] == 'profiles':
+            candidates.add(self.profile_path(value.get('game_profile')))
+        watched = {self.pad.cfg, self.pad.state, self.pad.registry, self.imports, self.store.learning, *candidates}
+        refs = {path: set() for path in candidates}
+        assignments = {}
+        for line in self.pad.cfg.read_text().splitlines() if self.pad.cfg.exists() else []:
+            fields = line.split('\t')
+            if len(fields) == 2: assignments[fields[0]] = fields[1]
+        assigned = assignments.get(rom)
+        if assigned and Path(assigned).resolve() != Path(value['launcher_profile']).resolve():
+            raise ValueError('Game assignment changed; reopen its menu')
+        for game, profile in assignments.items():
+            if game != rom and profile and Path(profile).resolve() in refs:
+                refs[Path(profile).resolve()].add(game)
+        for path in sorted(self.store.directory.glob('*.json')):
+            watched.add(path)
+            other = read_json(path)
+            if not isinstance(other, dict): raise ValueError('Invalid launcher configuration: '+str(path))
+            if path == config_path: continue
+            for key in ('launcher_profile', 'game_profile'):
+                target = other.get(key)
+                if isinstance(target, str) and target and Path(target).resolve() in refs:
+                    refs[Path(target).resolve()].add(str(other.get('rom', path.name)))
+        imports = self.pad.read(self.imports)
+        # A retained imported launcher may need its secondary profile on re-export.
+        changed = True
+        while changed:
+            changed = False
+            for owner, metadata in imports.items():
+                if not isinstance(metadata, dict): continue
+                config = metadata.get('launcher_config')
+                if not isinstance(config, dict) or not config.get('game_profile'): continue
+                target = Path(config['game_profile']).resolve()
+                owner_path = Path(owner).resolve()
+                if target in refs and owner_path.exists() and (owner_path not in refs or refs[owner_path]):
+                    reference = 'profil : '+str(owner_path)
+                    if reference not in refs[target]: refs[target].add(reference); changed = True
+        state = self.pad.read(self.pad.state)
+        if rom in state: watched.add(self.pad.keys_path(rom))
+        fingerprint = []
+        for path in sorted(watched):
+            if path.is_symlink(): raise ValueError('Refusing a symlink: '+str(path))
+            if path.exists():
+                stat = path.stat()
+                fingerprint.append([str(path), stat.st_dev, stat.st_ino, stat.st_mtime_ns,
+                                    stat.st_mode, hashlib.sha256(path.read_bytes()).hexdigest()])
+            else: fingerprint.append([str(path), None])
+        profiles = [{'path': str(path), 'action': 'missing' if not path.exists() else
+                     'delete' if delete_profiles and not refs[path] else 'keep',
+                     'references': sorted(refs[path])} for path in sorted(candidates)]
+        token = hashlib.sha256(json.dumps([rom, delete_profiles, fingerprint, profiles], sort_keys=True).encode()).hexdigest()
+        return {'rom': rom, 'profiles': profiles, 'token': token, 'config': str(config_path)}
+
+    def delete(self, rom, token, delete_profiles=False):
+        with self.pad.locked(), self.store.locked(), LiveSession(self.home).locked():
+            if self.profiles.active(): raise ValueError('Close the game and AntiMicroX before deletion')
+            live = LiveSession(self.home).read() or {}
+            if live.get('phase') and live['phase'] != 'finished':
+                raise ValueError('Finish or recover the live editing session before deletion')
+            plan = self.plan(rom, delete_profiles)
+            if plan['token'] != token: raise ValueError('Configuration or profile usage changed; review deletion again')
+            deleted = [Path(item['path']) for item in plan['profiles'] if item['action'] == 'delete']
+            extra = [Path(plan['config']), self.imports, self.store.learning, *deleted]
+            with self.pad.transaction([rom], extra):
+                self.pad.restore([rom])
+                raw = self.pad.cfg.read_text() if self.pad.cfg.exists() else ''
+                remaining = ''.join(line for line in raw.splitlines(keepends=True) if line.rstrip('\r\n').split('\t', 1)[0] != rom)
+                if remaining != raw: atomic(self.pad.cfg, remaining.encode())
+                Path(plan['config']).unlink()
+                learning = read_json(self.store.learning, {})
+                if isinstance(learning, dict) and learning.get('rom') == rom:
+                    self.store.learning.unlink(missing_ok=True)
+                for path in deleted: path.unlink()
+                for registry_path in (self.pad.registry, self.imports):
+                    registry = self.pad.read(registry_path)
+                    updated = {name: data for name, data in registry.items() if Path(name).resolve() not in deleted}
+                    if updated != registry: atomic(registry_path, json.dumps(updated, ensure_ascii=False, indent=2).encode())
+            return plan
+
+
+def deletion_report(plan, language='fr'):
+    fr = language == 'fr'
+    lines = [('Jeu : ' if fr else 'Game: ')+plan['rom'],
+             'À retirer : règles launcher et association de ce jeu.' if fr else 'To remove: launcher rules and this game assignment.']
+    labels = {'delete': 'À supprimer' if fr else 'Delete', 'keep': 'Conservé' if fr else 'Keep',
+              'missing': 'Déjà absent' if fr else 'Already missing'}
+    for item in plan['profiles']:
+        lines.append(labels[item['action']]+' : '+item['path'])
+        for reference in item['references'][:3]:
+            lines.append(('  Utilisé par : ' if fr else '  Used by: ')+reference)
+        if len(item['references']) > 3:
+            lines.append(('  Autres utilisations : ' if fr else '  Other uses: ')+str(len(item['references'])-3))
+    return '\n'.join(lines)
+
+
 class Session:
     def __init__(self, home, rom, pid, stamp):
         self.home, self.rom, self.pid, self.stamp = Path(home), rom, pid, stamp
@@ -314,6 +439,7 @@ def watch(session, windows, baseline, learning=False, api=None, clock=time.monot
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--home', default=os.environ.get('WT_HOME', '/userdata/system/ultimate-wine-toolbox'))
+    parser.add_argument('--language', choices=('fr', 'en'), default='fr')
     sub = parser.add_subparsers(dest='command', required=True)
     for name in ('show', 'disable', 'learn', 'observations', 'initial', 'prepare-test', 'is-test',
                  'configured', 'game-profile'):
@@ -321,6 +447,9 @@ def main():
         p.add_argument('rom')
         if name in ('initial', 'prepare-test', 'configured', 'game-profile'):
             p.add_argument('assigned')
+    for name in ('plan-delete', 'delete-config'):
+        p = sub.add_parser(name); p.add_argument('rom'); p.add_argument('--profiles', action='store_true')
+        if name == 'delete-config': p.add_argument('token')
     p = sub.add_parser('save')
     p.add_argument('rom'); p.add_argument('mode', choices=('launcher', 'profiles'))
     p.add_argument('launcher_profile'); p.add_argument('launcher_rule')
@@ -356,6 +485,11 @@ def main():
     elif args.command == 'disable':
         with store.locked():
             store.path(args.rom).unlink(missing_ok=True)
+    elif args.command == 'plan-delete':
+        plan = ConfigDeletion(args.home).plan(args.rom, args.profiles)
+        print(plan['token']); print(deletion_report(plan, args.language))
+    elif args.command == 'delete-config':
+        ConfigDeletion(args.home).delete(args.rom, args.token, args.profiles)
     elif args.command == 'learn':
         store.learn(args.rom)
     elif args.command == 'observations':

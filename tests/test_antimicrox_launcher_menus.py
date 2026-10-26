@@ -82,8 +82,8 @@ amx_manage_launcher_game /userdata/roms/windows/New.wine
             home = Path(folder)
             result = self.bash(home, '''
 amx_current_profile() { echo /userdata/Launcher.amgp; }
-amx_launcher_cmd() { if [ "$1" = disable ]; then echo "$2" > "$WT_HOME/disabled"; fi; }
-menu_select() { echo classic; }
+amx_launcher_cmd() { if [ "$1" = disable ]; then echo "$2" > "$WT_HOME/disabled"; elif [ "$1" = configured ]; then echo 1; fi; }
+menu_select() { if [ -f "$WT_HOME/asked" ]; then echo classic; else touch "$WT_HOME/asked"; echo remove; fi; }
 yesno() { return 0; }; amx_running() { return 1; }
 amx_manage_game() { echo "$1" > "$WT_HOME/classic-menu"; }
 amx_set_profile() { touch "$WT_HOME/incorrect-reassignment"; }
@@ -220,6 +220,53 @@ amx_launcher_relearn_for /userdata/roms/windows/New.wine
             self.assertFalse((home/'unwanted-picker').exists())
             self.assertEqual((home/'recording').read_bytes().decode().split('\0')[:-1], ['learn', '/userdata/roms/windows/New.wine'])
             self.assertEqual((home/'live').read_bytes().decode().split('\0')[:-1], ['/userdata/roms/windows/New.wine', str(profile), 'learning'])
+
+
+    def test_removal_actions_are_grouped_and_distinguish_rules_profiles_and_files(self):
+        for configured in ('', '1'):
+            with self.subTest(configured=configured), tempfile.TemporaryDirectory() as folder:
+                home = Path(folder)
+                result = self.bash(home, r'''
+amx_launcher_cmd() { printf '%s' "$CONFIGURED"; }
+menu_select() { printf '%s\0' "$@" > "$WT_HOME/options"; echo back; }
+amx_removal_menu /userdata/roms/windows/Game.wine /userdata/Profile.amgp
+''', CONFIGURED=configured)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                options = (home/'options').read_bytes().decode().split('\0')[2:-1:2]
+                self.assertEqual(options, ['classic', 'remove', 'delete', 'back'] if configured else ['remove', 'delete', 'back'])
+
+    def test_configuration_delete_requires_confirmation_and_uses_the_review_token(self):
+        for confirmed in ('0', '1'):
+            with self.subTest(confirmed=confirmed), tempfile.TemporaryDirectory() as folder:
+                home = Path(folder)
+                result = self.bash(home, r'''
+amx_running() { return 1; }
+amx_launcher_cmd() {
+  case "$1" in
+    plan-delete) printf 'review-token\nÀ supprimer : /userdata/Launcher.amgp\nConservé : /userdata/Shared.amgp\n';;
+    delete-config) printf '%s\0' "$@" > "$WT_HOME/deleted";;
+  esac
+}
+yesno() { printf '%s' "$2" > "$WT_HOME/confirmation"; [ "$CONFIRMED" = 1 ]; }
+msgbox() { :; }
+amx_delete_launcher_config /userdata/roms/windows/Game.wine 1
+''', CONFIRMED=confirmed)
+                self.assertEqual(result.returncode, 4 if confirmed == '1' else 0, result.stderr)
+                self.assertIn('/userdata/Shared.amgp', (home/'confirmation').read_text())
+                self.assertEqual((home/'deleted').exists(), confirmed == '1')
+                if confirmed == '1':
+                    self.assertEqual((home/'deleted').read_bytes().decode().split('\0')[:-1],
+                                     ['delete-config', '/userdata/roms/windows/Game.wine', 'review-token', '--profiles'])
+
+    def test_top_level_removal_menu_groups_game_configurations_and_profile_files(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            result = self.bash(home, r'''
+menu_select() { printf '%s\0' "$@" > "$WT_HOME/options"; echo back; }
+amx_deletion_menu
+''')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((home/'options').read_bytes().decode().split('\0')[2:-1:2], ['game', 'profile', 'back'])
 
 
 if __name__ == '__main__':

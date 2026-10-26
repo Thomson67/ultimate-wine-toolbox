@@ -324,5 +324,18 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertNotIn('edit launcher or game role', (self.home/'toolbox/helpers/antimicrox_live.py').read_text())
 
 
+    def test_upgrade_from_grouped_menu_version_updates_deletion_helpers(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        module = self.source/'toolbox/helpers/antimicrox_profiles.py'
+        module.write_bytes(module.read_bytes()+b'\n# preserve launcher references\n')
+        with patch.object(installer, 'GROUPED_MENU_HASHES', hashes):
+            backup = self.install()
+        self.assertIn('preserve launcher references', (self.home/'toolbox/helpers/antimicrox_profiles.py').read_text())
+        installer.restore(backup)
+        self.assertNotIn('preserve launcher references', (self.home/'toolbox/helpers/antimicrox_profiles.py').read_text())
+
+
 if __name__ == '__main__':
     unittest.main()

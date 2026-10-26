@@ -291,6 +291,85 @@ amx_delete_profiles() {
     amx_delete_profile_for "$profile"
   done
 }
+amx_delete_launcher_config() {
+  local rom="$1" delete_profiles="${2:-0}" plan token output
+  local -a options=()
+  if amx_running; then msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX avant la suppression.' 'Close the game and AntiMicroX before deletion.')"; return 1; fi
+  [ "$delete_profiles" != 1 ] || options=(--profiles)
+  if ! plan="$(amx_launcher_cmd plan-delete "$rom" "${options[@]}" 2>&1)"; then msgbox AntiMicroX "$plan"; return 1; fi
+  token="${plan%%$'\n'*}"
+  yesno AntiMicroX "$(amx_txt 'Confirmer la suppression de cette configuration ?' 'Confirm deletion of this configuration?')\n\n${plan#*$'\n'}" || return 0
+  if ! output="$(amx_launcher_cmd delete-config "$rom" "$token" "${options[@]}" 2>&1)"; then msgbox AntiMicroX "$output"; return 1; fi
+  msgbox AntiMicroX "$(amx_txt 'Configuration supprimée. Les profils utilisés ailleurs ont été conservés.' 'Configuration deleted. Profiles used elsewhere were kept.')"
+  return 4
+}
+
+amx_removal_menu() {
+  local rom="$1" profile="$2" configured choice
+  local -a items=()
+  configured="$(amx_launcher_cmd configured "$rom" "$profile" 2>/dev/null)" || configured=""
+  if [ "$configured" = 1 ]; then
+    items=(classic "$(amx_txt 'Désactiver les règles launcher (garder le profil actif)' 'Disable launcher rules (keep the profile active)')"
+      remove "$(amx_txt 'Retirer la configuration de ce jeu (garder les profils)' 'Remove this game configuration (keep profiles)')"
+      delete "$(amx_txt 'Supprimer la configuration et les profils non partagés' 'Delete configuration and unshared profiles')")
+  else
+    items=(remove "$(amx_txt 'Désactiver pour ce jeu (garder le profil)' 'Disable for this game (keep the profile)')"
+      delete "$(amx_txt 'Supprimer le fichier profil et toutes ses associations' 'Delete the profile file and all its assignments')")
+  fi
+  choice="$(menu_select AntiMicroX "$(basename "$rom")\n\n$(amx_txt 'Désactiver ou supprimer' 'Disable or delete')" "${items[@]}" back "$(i18n back)")" || return 0
+  case "$choice" in
+    classic)
+      if amx_running; then msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX.' 'Close the game and AntiMicroX.')"; return 1; fi
+      yesno AntiMicroX "$(amx_txt 'Retirer les règles launcher et conserver ce profil actif pour le jeu ?' 'Remove launcher rules and keep this profile active for the game?')" || return 0
+      amx_launcher_cmd disable "$rom" || return 1
+      return 3 ;;
+    remove)
+      if [ "$configured" = 1 ]; then amx_delete_launcher_config "$rom" 0; return $?; fi
+      if amx_running; then msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX.' 'Close the game and AntiMicroX.')"; return 1; fi
+      yesno AntiMicroX "$(amx_txt 'Retirer l’association de ce jeu ? Le profil sera conservé.' 'Remove this game assignment? The profile will be kept.')" || return 0
+      amx_set_profile "$rom" "" || return 1
+      return 4 ;;
+    delete)
+      if [ "$configured" = 1 ]; then amx_delete_launcher_config "$rom" 1; return $?; fi
+      amx_delete_profile_for "$profile" || return 1
+      [ -n "$(amx_current_profile "$rom")" ] || return 4 ;;
+  esac
+  return 0
+}
+
+amx_remove_game_configuration() {
+  local rom profile selected label
+  local -a games=() profiles=() items=()
+  local -A WT_MENU_GAME_LABELS=()
+  while IFS=$'\t' read -r rom profile; do
+    [ -n "$rom" ] && [ -n "$profile" ] || continue
+    games+=("$rom"); profiles+=("$profile")
+    WT_MENU_GAME_LABELS["${#games[@]}"]="$(basename "$rom")"
+    label="$(basename "$rom") — $(basename "$profile")"
+    if [ "$(amx_launcher_cmd configured "$rom" "$profile" 2>/dev/null)" = 1 ]; then label="[Launcher] $label"; fi
+    items+=("${#games[@]}" "$label")
+  done < <(amx_associations)
+  if [ "${#games[@]}" -eq 0 ]; then msgbox AntiMicroX "$(amx_txt 'Aucune configuration de jeu associée.' 'No assigned game configurations.')"; return 0; fi
+  selected="$(WT_MENU_LIST=1 menu_select AntiMicroX "$(amx_txt 'Choisir la configuration à désactiver ou supprimer' 'Choose a configuration to disable or delete')" "${items[@]}" back "$(i18n back)")" || return 0
+  [[ "$selected" =~ ^[0-9]+$ ]] && [ "$selected" -ge 1 ] && [ "$selected" -le "${#games[@]}" ] || return 0
+  amx_removal_menu "${games[$((10#$selected-1))]}" "${profiles[$((10#$selected-1))]}"
+}
+
+amx_deletion_menu() {
+  local choice
+  while true; do
+    choice="$(menu_select AntiMicroX "$(amx_txt 'Désactiver ou supprimer' 'Disable or delete')" \
+      game "$(amx_txt 'Configuration d’un jeu' 'Game configuration')" \
+      profile "$(amx_txt 'Fichier profil enregistré' 'Saved profile file')" back "$(i18n back)")" || return
+    case "$choice" in
+      game) amx_remove_game_configuration ;;
+      profile) amx_delete_profiles ;;
+      *) return ;;
+    esac
+  done
+}
+
+
 amx_validate_profile() {
   local profile="$1"
   case "$profile" in /userdata/*.amgp) ;; *) msgbox AntiMicroX "$(amx_txt 'Chemin .amgp invalide.' 'Invalid .amgp path.')"; return 1 ;; esac
@@ -321,7 +400,7 @@ amx_associations() {
   awk -F '\t' 'NF==2 && $1!="" {p[$1]=$2} END {for(r in p) if(p[r]!="") print r "\t" p[r]}' "$AMX_OVERRIDES" | LC_ALL=C sort
 }
 amx_manage_game() {
-  local rom="$1" profile choice status shared
+  local rom="$1" profile choice status shared rc
   while true; do
     profile="$(amx_current_profile "$rom")"
     [ -n "$profile" ] || return 0
@@ -340,13 +419,11 @@ amx_manage_game() {
       info "$(amx_txt 'Voir les commandes et les informations du profil' 'View profile controls and information')" \
       sharing "$(amx_txt 'Partager ou exporter' 'Share or export')" \
       replace "$(amx_txt 'Choisir un autre profil pour ce jeu' 'Choose another profile for this game')" \
-      remove "$(amx_txt 'Désactiver pour ce jeu (garder le profil)' 'Disable for this game (keep the profile)')" \
-      delete "$(amx_txt 'Supprimer ce profil pour tous les jeux' 'Delete this profile for all games')" \
+      remove "$(amx_txt 'Désactiver ou supprimer' 'Disable or delete')" \
       back "$(i18n back)")" || return
     case "$choice" in
       info) amx_profile_info "$profile" ;;
       sharing) community_game_share_menu AntiMicroX "$rom" "$profile" ;;
-      delete) amx_delete_profile_for "$profile" ;;
       edit) amx_editor "$profile" ;;
       live)
         if [ ! -e "$rom" ]; then
@@ -356,9 +433,8 @@ amx_manage_game() {
         fi ;;
       replace) amx_assign_profile_for "$rom" ;;
       remove)
-        if yesno AntiMicroX "$(amx_txt "Retirer le profil pour $(basename "$rom") ?\n\nLe fichier .amgp est conservé. Le changement s’appliquera au prochain lancement du jeu." "Remove the profile assignment for $(basename "$rom")?\n\nThe .amgp file is kept. The change takes effect on the next game launch.")"; then
-          amx_set_profile "$rom" "" && return 0
-        fi ;;
+        amx_removal_menu "$rom" "$profile"; rc=$?
+        case "$rc" in 3) amx_manage_game "$rom"; return ;; 4) return ;; esac ;;
       *) return ;;
     esac
   done
@@ -519,7 +595,7 @@ amx_live_resume() {
     esac
   done
 }
-amx_launcher_cmd() { python3 "$WT_ROOT/helpers/antimicrox_launcher.py" --home "$WT_HOME" "$@"; }
+amx_launcher_cmd() { python3 "$WT_ROOT/helpers/antimicrox_launcher.py" --home "$WT_HOME" --language "$WT_LANGUAGE" "$@"; }
 
 amx_launcher_test_start() {
   local rom="$1" profile output
@@ -665,7 +741,7 @@ amx_edit_launcher_profile() {
 }
 
 amx_manage_launcher_game() {
-  local rom="$1" profile game_profile choice output
+  local rom="$1" profile game_profile choice output rc
   local -a items=()
   while true; do
     profile="$(amx_current_profile "$rom")"
@@ -677,8 +753,7 @@ amx_manage_launcher_game() {
     [ -z "$game_profile" ] || items+=(edit_game "$(amx_txt 'Modifier les commandes du profil jeu' 'Edit game profile controls')")
     items+=(sharing "$(amx_txt 'Partager ou exporter' 'Share or export')"
       info "$(amx_txt 'Voir les règles et les profils' 'View rules and profiles')"
-      classic "$(amx_txt 'Désactiver les règles launcher (garder le profil)' 'Disable launcher rules (keep the profile)')"
-      remove "$(amx_txt 'Désactiver AntiMicroX pour ce jeu (garder les profils)' 'Disable AntiMicroX for this game (keep profiles)')"
+      remove "$(amx_txt 'Désactiver ou supprimer' 'Disable or delete')"
       back "$(i18n back)")
     choice="$(menu_select AntiMicroX "$(basename "$rom")\n\n$(amx_txt 'Jeu avec launcher' 'Game with a launcher')\n$(amx_txt 'Profil launcher :' 'Launcher profile:') $profile${game_profile:+\n$(amx_txt 'Profil jeu :' 'Game profile:') $game_profile}" "${items[@]}")" || return
     case "$choice" in
@@ -692,19 +767,9 @@ amx_manage_launcher_game() {
         msgbox AntiMicroX "$output"
         amx_profile_info "$profile"
         [ -z "$game_profile" ] || amx_profile_info "$game_profile" ;;
-      classic)
-        if amx_running; then msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX.' 'Close the game and AntiMicroX.')"; continue; fi
-        if yesno AntiMicroX "$(amx_txt 'Désactiver les règles launcher et conserver le profil classique pour ce jeu ?' 'Disable launcher rules and keep the standard profile for this game?')"; then
-          amx_launcher_cmd disable "$rom" || continue
-          amx_manage_game "$rom"
-          return
-        fi ;;
       remove)
-        if amx_running; then msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX.' 'Close the game and AntiMicroX.')"; continue; fi
-        if yesno AntiMicroX "$(amx_txt 'Retirer les règles et l’association de ce jeu ? Les fichiers profils seront conservés.' 'Remove rules and this game assignment? Profile files will be kept.')"; then
-          amx_launcher_cmd disable "$rom" || continue
-          amx_set_profile "$rom" "" && return
-        fi ;;
+        amx_removal_menu "$rom" "$profile"; rc=$?
+        case "$rc" in 3) amx_manage_game "$rom"; return ;; 4) return ;; esac ;;
       *) return ;;
     esac
   done
@@ -800,7 +865,7 @@ antimicrox_menu() {
       5 "$(amx_txt 'Convertir un Pad2Key (.keys) en profil' 'Convert a Pad2Key (.keys) file to a profile')" \
       6 "$(amx_txt 'Ouvrir l’éditeur sans lancer de jeu' 'Open the editor without starting a game')" \
       7 "$(amx_txt 'Voir les manettes détectées' 'View detected controllers')" \
-      8 "$(amx_txt 'Supprimer un profil enregistré' 'Delete a saved profile')" \
+      8 "$(amx_txt 'Désactiver ou supprimer' 'Disable or delete')" \
       9 "$(amx_txt 'Installer ou mettre à jour AntiMicroX' 'Install or update AntiMicroX')" \
       0 "$(i18n back)")" || return
     case "$choice" in
@@ -815,7 +880,7 @@ antimicrox_menu() {
         bin="$(amx_binary)" || continue
         output="$(timeout 15 "$bin" --list 2>&1)"; rc=$?
         msgbox "AntiMicroX" "$(amx_txt "Manettes détectées (code $rc) :" "Detected controllers (code $rc):")\n$output" ;;
-      8) amx_delete_profiles ;;
+      8) amx_deletion_menu ;;
       9) amx_install && msgbox AntiMicroX "$(amx_txt 'AntiMicroX est installé.' 'AntiMicroX is installed.')" ;;
       0|'') return ;;
     esac
