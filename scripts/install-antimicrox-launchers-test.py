@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import tempfile
 import urllib.request
+import urllib.parse
 
 BASE_HASHES = {
     'toolbox/helpers/antimicrox_live.py': '5777f847f8246a60f83f40e0a8c9a7318c6a8edeba201abb21519e0747f03fc2',
@@ -92,7 +93,7 @@ def install(home, hook, ref, source=None, port=None):
         if source:
             data = (source/source_path).read_bytes()
         else:
-            url = 'https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/'+ref+'/'+source_path
+            url = 'https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/'+ref+'/'+urllib.parse.quote(source_path, safe='/')
             with urllib.request.urlopen(url, timeout=60) as response:
                 data = response.read(1024*1024+1)
         if len(data) > 1024*1024:

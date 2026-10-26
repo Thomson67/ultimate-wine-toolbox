@@ -1,4 +1,7 @@
 import importlib.util
+import http.client
+import io
+import urllib.parse
 from pathlib import Path
 import tempfile
 import unittest
@@ -271,6 +274,28 @@ class LauncherInstallTests(unittest.TestCase):
             self.install()
         self.assertIn('custom launcher', self.port.read_text())
         self.assertFalse((self.home/'state/backups').exists())
+
+
+    def test_remote_install_encodes_spaces_and_downloads_both_launcher_copies(self):
+        ref = 'a'*40
+        prefix = 'https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/'+ref+'/'
+        seen = []
+        def download(url, timeout):
+            seen.append(url)
+            # Exercise the real HTTP request-path validator without opening a socket.
+            http.client.HTTPConnection('example.invalid').putrequest('GET', urllib.parse.urlsplit(url).path)
+            self.assertTrue(url.startswith(prefix))
+            name = urllib.parse.unquote(url[len(prefix):])
+            return io.BytesIO((self.source/name).read_bytes())
+        with patch.object(installer.urllib.request, 'urlopen', side_effect=download):
+            backup = installer.install(self.home, self.hook, ref, port=self.port)
+        self.assertIn(prefix+'toolbox/ports/Ultimate%20Wine%20Toolbox.sh', seen)
+        self.assertTrue(all(' ' not in url for url in seen))
+        expected = (self.source/'toolbox/ports/Ultimate Wine Toolbox.sh').read_bytes()
+        self.assertEqual(self.port.read_bytes(), expected)
+        self.assertEqual((self.home/'toolbox/ports/Ultimate Wine Toolbox.sh').read_bytes(), expected)
+        installer.restore(backup)
+        self.assertEqual(self.port.read_bytes(), self.old['toolbox/ports/Ultimate Wine Toolbox.sh'])
 
 
 if __name__ == '__main__':
