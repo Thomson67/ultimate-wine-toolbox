@@ -337,5 +337,15 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertNotIn('preserve launcher references', (self.home/'toolbox/helpers/antimicrox_profiles.py').read_text())
 
 
+class PublishedVersionHashesTests(unittest.TestCase):
+    def test_deletion_version_keeps_its_updated_profiles_helper_hash(self):
+        # Published in 02edb647: this must not inherit the pre-deletion baseline.
+        path = 'toolbox/helpers/antimicrox_profiles.py'
+        self.assertEqual(installer.DELETION_MENU_HASHES[path],
+                         '0df93eb827267e25aa54a79b0c40fe91fc3e0f02132d11f35b6728ee64ed97ef')
+        self.assertEqual(installer.BASE_HASHES[path],
+                         'f048a9cb29bea1cccd5ecc5d441f2b0e45fca0ffd73509b541c01a2b6f2843ce')
+
+
 if __name__ == '__main__':
     unittest.main()
