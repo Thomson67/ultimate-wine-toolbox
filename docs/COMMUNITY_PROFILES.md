@@ -1,7 +1,7 @@
 # Community profiles
 
-This guide describes the current source branch, including post-v0.7.2 launcher
-and ZIP-transfer additions; see the [documentation index](README.md).
+This guide describes Ultimate Wine Toolbox **v0.8.0**, including complete
+launcher sharing and ZIP transfers; see the [documentation index](README.md).
 
 The interface stays inside each tool: **AntiMicroX → Download or share profiles**
 and **ReShade → Community presets** (also available from a configured ReShade game).

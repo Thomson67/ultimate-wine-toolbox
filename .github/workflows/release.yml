@@ -62,6 +62,11 @@ jobs:
           mkdir -p "dist/$ROOT"
           cp VERSION package-install.sh uninstall.sh README.md README.fr.md "dist/$ROOT/"
           cp -a release-notes "dist/$ROOT/release-notes"
+          cp RELEASING.md "dist/$ROOT/"
+          cp -a docs "dist/$ROOT/docs"
+          mkdir -p "dist/$ROOT/community-catalog/reshade"
+          cp community-catalog/README.md community-catalog/CONTRIBUTING.md "dist/$ROOT/community-catalog/"
+          cp community-catalog/reshade/README.md "dist/$ROOT/community-catalog/reshade/"
           cp -a toolbox "dist/$ROOT/toolbox"
           python3 .github/scripts/prepare-scraper-assets.py "dist/$ROOT/toolbox/scraper-assets"
           find "dist/$ROOT" -type d -name __pycache__ -prune -exec rm -rf {} +

@@ -1,21 +1,19 @@
-# Test AntiMicroX : jeux avec launcher
+# AntiMicroX : jeux avec launcher
 
-Base : Ultimate Wine Toolbox v0.7.2. Les archives de jeux et les scripts Windows
+Disponible depuis Ultimate Wine Toolbox v0.8.0. Les archives de jeux et les scripts Windows
 ne sont pas modifiés. Les launchers embarquant déjà AntiMicroX
 Windows ne sont pas migrés : choisir pour le premier essai un préfixe/jeu
 utilisant seulement l'instance native gérée par la Toolbox.
 
-## Installer
+## Installer ou mettre à jour
 
-Fermer le jeu, AntiMicroX et la Toolbox. Lancer l'installateur de cette branche
-avec `--ref` suivi du SHA complet du commit à tester. Il vérifie la v0.7.2 et
-les fichiers d'origine, télécharge et valide les fichiers avant de remplacer
-les composants concernés, les copies du hook, le lanceur Ports et le wrapper
-AntiMicroX déjà installé. Les aides intégrées FR/EN sont également actualisées.
-Les fichiers exacts des versions de test précédentes connues sont acceptés ;
-une modification manuelle du code reste refusée. Une version déjà installée
-ne crée pas de nouvelle sauvegarde. L’installateur imprime sa commande de
-restauration, conservée avec la sauvegarde sous `state/backups`.
+La gestion des launchers est intégrée à **Ultimate Wine Toolbox v0.8.0**.
+Fermer le jeu, AntiMicroX et la Toolbox, puis utiliser la mise à jour normale
+ou la commande publique d’installation du [README](../README.fr.md#installation).
+Les profils, associations et règles déjà configurés sont conservés, y compris
+ceux créés avec la version de test sur v0.7.2. Aucun installateur de test séparé
+n’est nécessaire avec la release. Ce fichier conserve son ancien nom pour
+préserver les liens existants.
 
 ## Premier essai
 
@@ -24,7 +22,7 @@ restauration, conservée avec la sauvegarde sous `state/backups`.
 2. Choisir le jeu, puis **Apprendre les fenêtres et configurer le mapping en jeu**.
 3. Créer un profil ou choisir un profil existant. La configuration en direct
    utilise toujours un profil manuel, sans bascule automatique. Hotkey+R1,
-   Alt+Tab et l'exclusion temporaire d'ES restent ceux de la v0.7.2.
+   Alt+Tab et l'exclusion temporaire d'ES gardent leur fonctionnement habituel.
 4. Afficher le launcher, enregistrer son mapping dans AntiMicroX. Afficher
    ensuite le jeu quelques secondes, puis quitter le jeu normalement.
 5. Au retour, la configuration des fenêtres et des règles s’ouvre directement, sans étape « Activer / Réessayer ».
@@ -74,7 +72,7 @@ enregistrés. Le suffixe `[L]` n’est pas requis. Désactiver l’AntiMicroX Wi
 
 ## Limites à vérifier sur Batocera
 
-- Cette première version observe Xorg/XWayland (`winex11.drv`), pas les fenêtres
+- Cette intégration observe Xorg/XWayland (`winex11.drv`), pas les fenêtres
   Wine utilisant un pilote Wayland natif.
 - Elle vérifie la session ES et le préfixe Wine des nouveaux processus.
   Une fenêtre sans `WINEPREFIX` identifiable est ignorée plutôt qu'assimilée
@@ -131,8 +129,8 @@ le jeu, le pseudo ou la description. La mention **[Launcher]** repère les jeux
 avec des règles configurées. Depuis le menu d’un jeu, l’export est immédiat et
 contient uniquement sa configuration.
 
-Sur l’autre machine, installer cette version de test ou une version ultérieure
-compatible, puis télécharger le partage ou ouvrir **Télécharger ou partager des
+Sur l’autre machine, installer Ultimate Wine Toolbox v0.8.0 ou une version
+ultérieure compatible, puis télécharger le partage ou ouvrir **Télécharger ou partager des
 profils > Partager et transférer des profils > Importer un paquet ZIP**. Pour un export groupé, toutes les configurations
 sont importées et une liste permet de choisir celles à associer aux jeux de
 la nouvelle machine. Choisir ensuite le jeu cible et l’option

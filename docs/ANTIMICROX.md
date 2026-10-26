@@ -1,8 +1,8 @@
 # AntiMicroX — native profiles, launchers and transfers
 
-This guide describes the current source branch, including changes after stable
-v0.7.2. It does not announce a new stable release. See the [documentation index](README.md)
-and the [French launcher walkthrough](ANTIMICROX-LAUNCHERS-TEST.fr.md).
+Available in Ultimate Wine Toolbox **v0.8.0**. See the
+[documentation index](README.md) and the
+[French launcher walkthrough](ANTIMICROX-LAUNCHERS-TEST.fr.md).
 
 On the user's Batocera v44/labwc machine, launcher/game switching was validated
 on a `.wine`; community sharing and reassignment to the same game as a

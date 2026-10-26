@@ -1,14 +1,15 @@
 # Documentation — Ultimate Wine Toolbox
 
-Les guides de cette branche décrivent le code présent après la release stable
-v0.7.2, notamment les règles launcher/jeu et les transferts AntiMicroX. Le numéro
-`VERSION` et les notes des anciennes releases restent ceux des versions publiées.
-Les commandes d’installation publiques des README installent la release stable,
-pas automatiquement les évolutions de cette branche.
+Ces guides décrivent Ultimate Wine Toolbox **v0.8.0**, avec les profils
+launcher/jeu, les transferts complets AntiMicroX et le choix de nettoyage des
+backups de sauvegardes après MAJ WSquashFS. La mise à jour normale conserve les
+configurations créées pendant les tests. Les anciennes notes de release restent
+propres à leur version.
 
-The guides on this branch describe the current source, including post-v0.7.2
-changes. Historical release notes retain their original scope. A successful test
-on one Batocera setup does not establish compatibility with all games/runners.
+These guides describe **v0.8.0**, including launcher profiles, complete
+configuration transfers and optional cleanup of update save-data backups.
+Normal updates retain configurations created during testing. A successful test
+on one setup does not establish compatibility with every game and runner.
 
 ## Guides disponibles / Available guides
 
@@ -42,7 +43,7 @@ la langue choisie. Les fichiers techniques ci-dessous complètent ces guides.
   [shader rétro livré](../toolbox/data/reshade-retro/README.md) : provenance,
   contraintes et licences.
 - [Processus de release](../RELEASING.md) et [notes publiées](../release-notes/) :
-  les évolutions de branche ne sont pas attribuées rétroactivement à v0.7.2.
+  chaque release garde son propre historique.
 
 ## État des vérifications / Validation scope
 

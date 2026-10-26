@@ -6,7 +6,7 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.7.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.7.2).**
+**Stable version: [v0.8.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.8.0).**
 
 ## Features
 
@@ -19,7 +19,7 @@ Created by **Thomsonito**.
 - DXVK / VKD3D-Proton / DXVK-NVAPI bundles, Batocera 40–43 / 43.1 models and global or per-game selection
 - NVAPI version filtering based on known DXVK requirements
 - per-game ReShade: installation, toggling, presets, effect templates and API hints
-- AntiMicroX: controller profiles, in-game editing, Pad2Key conversion and game assignments
+- AntiMicroX: controller profiles, launcher/game switching, in-game editing and Pad2Key conversion
 - community catalogue: download, share and moderate AntiMicroX profiles and ReShade presets
 - Wine bottle maintenance and orphan detection
 - runner and DXVK / VKD3D diagnostics
@@ -33,10 +33,7 @@ Created by **Thomsonito**.
 - native Batocera Ports launcher and Pad2Key support
 - update checks at startup and from the toolbox menu
 
-## Changes on this branch
-
-The following changes are present on this source branch after stable v0.7.2;
-this is not an announcement of a new stable release.
+## New in v0.8.0
 
 - AntiMicroX: launcher-only or separate launcher/game profiles, selected using
   Xorg/XWayland window titles, classes or executables.
@@ -46,12 +43,15 @@ this is not an announcement of a new stable release.
   configurations to one local ZIP and assign them to games on the target machine.
 - Grouped removal: game configurations and unassigned profiles, with protection
   for profiles still referenced elsewhere.
+- WSquashFS updates: choose whether to retain save-data backup copies created by the operation after success.
 
 The `.wine` → community share → import for the same `.wsquashfs` game workflow
 was validated on the Batocera v44/labwc test
 machine. See the [guide index](docs/README.md),
 [AntiMicroX guide](docs/ANTIMICROX.md) and
 [French launcher walkthrough](docs/ANTIMICROX-LAUNCHERS-TEST.fr.md).
+
+[v0.8.0 release notes](release-notes/v0.8.0.md)
 
 ## New in v0.7.2
 

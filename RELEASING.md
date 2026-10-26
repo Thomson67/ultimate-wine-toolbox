@@ -21,8 +21,8 @@ Ultimate Wine Toolbox uses the following release convention:
 No ZIP or checksum needs to be created manually. The workflow also runs on
 README/release-note changes pushed to `main` and can replace assets for the
 current version: prepare the intended new VERSION and matching release notes
-before promoting branch-only features. Do not publish launcher/transfer changes
-as if they had been included in the existing v0.7.2 release.
+before promoting branch-only features. Publish new features under a new version rather than retroactively changing
+the scope of an existing release.
 
 ## Documentation and validation before promotion
 

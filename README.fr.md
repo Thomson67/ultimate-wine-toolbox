@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.7.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.7.2).**
+**Version stable : [v0.8.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.8.0).**
 
 ## Fonctionnalités
 
@@ -19,7 +19,7 @@ Créée par **Thomsonito**.
 - bundles DXVK / VKD3D-Proton / DXVK-NVAPI, modèles Batocera 40 à 43 / 43.1 et choix global ou par jeu
 - filtrage des versions NVAPI selon la compatibilité connue avec DXVK
 - ReShade par jeu : installation, activation/désactivation, presets, modèles d’effets et aide au choix de l’API
-- AntiMicroX : profils manette, édition en jeu, conversion Pad2Key et gestion des associations
+- AntiMicroX : profils manette, bascule launcher/jeu, édition en jeu et conversion Pad2Key
 - catalogue communautaire : téléchargement, partage et validation de profils AntiMicroX et presets ReShade
 - maintenance des Wine bottles et détection des bottles orphelines
 - diagnostics des runners et de DXVK / VKD3D
@@ -33,10 +33,7 @@ Créée par **Thomsonito**.
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
 
-## Évolutions de cette branche
-
-Les changements ci-dessous sont présents sur cette branche, après la release
-stable v0.7.2 ; ils ne sont pas une annonce de nouvelle version stable.
+## Nouveautés de la v0.8.0
 
 - AntiMicroX : profil launcher seul ou profils launcher/jeu distincts, bascule
   selon le titre, la classe ou l’exécutable de la fenêtre Xorg/XWayland.
@@ -46,12 +43,15 @@ stable v0.7.2 ; ils ne sont pas une annonce de nouvelle version stable.
   plusieurs jeux dans un ZIP, puis association aux jeux de la machine cible.
 - Suppressions regroupées : configurations de jeux et profils sans jeu associé,
   avec protection des profils encore référencés.
+- MAJ WSquashFS : choix de conserver ou supprimer les copies de sauvegardes créées par l’opération après réussite.
 
 Le parcours `.wine` → partage communautaire → réimport pour le même jeu en
 `.wsquashfs` a été validé sur la machine
 Batocera v44/labwc de test. Voir l’[index des guides](docs/README.md), le
 [guide AntiMicroX](docs/ANTIMICROX.md) et le
 [parcours launcher en français](docs/ANTIMICROX-LAUNCHERS-TEST.fr.md).
+
+[Notes de la v0.8.0](release-notes/v0.8.0.md)
 
 ## Nouveautés de la v0.7.2
 
