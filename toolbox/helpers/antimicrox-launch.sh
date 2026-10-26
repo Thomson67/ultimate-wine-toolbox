@@ -28,6 +28,19 @@ export QT_PLUGIN_PATH="$DIR/squashfs-root/usr/plugins"
 export QT_QPA_PLATFORM_PLUGIN_PATH="$QT_PLUGIN_PATH/platforms"
 export DISPLAY="${DISPLAY:-:0}"
 export SDL_VIDEODRIVER=x11
+# Sunshine libvirtualhid can enumerate through SDL HIDAPI without delivering
+# any buttons. evdev receives them correctly. Keep this override local to AMX
+# launches made while a Sunshine controller is present (including its siblings).
+for input_name in /sys/class/input/event*/device/name; do
+  [ -r "$input_name" ] || continue
+  IFS= read -r device_name < "$input_name" || continue
+  case "$device_name" in
+    Sunshine*)
+      export SDL_JOYSTICK_HIDAPI=0
+      echo 'Sunshine controller detected: SDL HIDAPI disabled for AntiMicroX' >&2
+      break ;;
+  esac
+done
 # Upstream 3.6.1 never registers QXmlStreamReader*, so queued profile loads
 # silently time out. Register that one type before main(), using bundled Qt6.
 if [ -f "$DIR/squashfs-root/usr/lib/libQt6Core.so.6" ]; then

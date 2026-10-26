@@ -195,3 +195,17 @@ associé** permet uniquement de nettoyer les fichiers inutilisés. Les profils
 référencés par un jeu, dans l’un des deux rôles launcher/jeu ou comme dépendance
 d’un paquet importé, restent protégés. Une association ajoutée après l’affichage
 de la liste empêche également la suppression.
+
+
+## Manette via Moonlight / Sunshine
+
+Une manette virtuelle Sunshine peut être visible dans AntiMicroX sans que les
+boutons réagissent. Le lanceur natif détecte les périphériques Sunshine présents
+dans sysfs et définit `SDL_JOYSTICK_HIDAPI=0` uniquement pour AntiMicroX, afin
+d’utiliser la réception evdev validée avec Sunshine/libvirtualhid. Sans manette
+Sunshine, les réglages SDL existants sont conservés. Cette adaptation couvre
+l’éditeur, les sessions en jeu et les changements de profil launcher/jeu.
+
+Connecter Moonlight avant de lancer AntiMicroX ou le jeu. Si la manette virtuelle
+apparaît alors qu’AntiMicroX était déjà ouvert, fermer puis relancer AntiMicroX
+(ou le jeu qui le gère) pour appliquer cette détection au démarrage.

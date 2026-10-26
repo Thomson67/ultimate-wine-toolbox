@@ -350,6 +350,52 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertNotIn('unassigned profile filter', (self.home/'toolbox/helpers/antimicrox_profiles.py').read_text())
 
 
+    def test_install_and_restore_update_the_existing_native_wrapper_too(self):
+        name = 'toolbox/helpers/antimicrox-launch.sh'
+        wrapper = self.home/'tools/antimicrox/antimicrox'
+        wrapper.parent.mkdir(parents=True); wrapper.write_bytes(self.old[name]); wrapper.chmod(0o755)
+        backup = self.install()
+        self.assertEqual(wrapper.read_bytes(), (self.source/name).read_bytes())
+        self.assertEqual(wrapper.stat().st_mode & 0o777, 0o755)
+        self.assertIsNone(self.install())
+        installer.restore(backup)
+        self.assertEqual(wrapper.read_bytes(), self.old[name])
+        self.assertEqual(wrapper.stat().st_mode & 0o777, 0o755)
+
+    def test_test_install_does_not_create_a_runtime_when_antimicrox_is_absent(self):
+        self.install()
+        self.assertFalse((self.home/'tools/antimicrox/antimicrox').exists())
+
+    def test_modified_installed_native_wrapper_is_refused_before_any_write(self):
+        wrapper = self.home/'tools/antimicrox/antimicrox'
+        wrapper.parent.mkdir(parents=True); wrapper.write_text('# local customization\n')
+        with self.assertRaises(ValueError): self.install()
+        self.assertFalse((self.home/'state/backups').exists())
+        self.assertEqual((self.home/'toolbox/modules/antimicrox.sh').read_bytes(), self.old['toolbox/modules/antimicrox.sh'])
+
+    def test_installed_wrapper_symlink_is_refused_before_any_write(self):
+        wrapper = self.home/'tools/antimicrox/antimicrox'; wrapper.parent.mkdir(parents=True)
+        target = self.root/'custom-wrapper'; target.write_text('# custom\n'); wrapper.symlink_to(target)
+        with self.assertRaises(ValueError): self.install()
+        self.assertFalse((self.home/'state/backups').exists())
+        self.assertEqual(target.read_text(), '# custom\n')
+
+    def test_upgrade_from_unassigned_cleanup_version_updates_both_native_wrappers(self):
+        name = 'toolbox/helpers/antimicrox-launch.sh'
+        wrapper = self.home/'tools/antimicrox/antimicrox'
+        wrapper.parent.mkdir(parents=True); wrapper.write_bytes(self.old[name]); wrapper.chmod(0o755)
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        source = self.source/name; source.write_bytes(source.read_bytes()+b'\n# Sunshine SDL workaround\n')
+        with patch.object(installer, 'UNASSIGNED_REMOVAL_HASHES', hashes):
+            backup = self.install()
+        self.assertIn(b'Sunshine SDL workaround', wrapper.read_bytes())
+        self.assertEqual(wrapper.read_bytes(), (self.home/name).read_bytes())
+        installer.restore(backup)
+        self.assertNotIn(b'Sunshine SDL workaround', wrapper.read_bytes())
+
+
 class PublishedVersionHashesTests(unittest.TestCase):
     def test_deletion_version_keeps_its_updated_profiles_helper_hash(self):
         # Published in 02edb647: this must not inherit the pre-deletion baseline.
@@ -365,6 +411,14 @@ class PublishedVersionHashesTests(unittest.TestCase):
                          installer.DELETION_MENU_HASHES['toolbox/helpers/antimicrox_profiles.py'])
         self.assertEqual(installer.EXPLICIT_REMOVAL_HASHES['toolbox/modules/antimicrox.sh'],
                          '6e5ab5ad92c0924dd329b9da43558bdd22cf64010f231d77e9be0100a552ada4')
+
+
+    def test_unassigned_cleanup_version_preserves_its_profile_and_wrapper_hashes(self):
+        self.assertEqual(installer.UNASSIGNED_REMOVAL_HASHES['toolbox/helpers/antimicrox_profiles.py'],
+                         'a48f52d0cb36c737a28d7d189e36e1d684f53e48d54a3c8f0051f0e85ada77ab')
+        for name, hashes in vars(installer).items():
+            if name.endswith('_HASHES'):
+                self.assertEqual(hashes['toolbox/helpers/antimicrox-launch.sh'], 'a5266a0e16eb3aba60beb27dae1810eff4b2c2d239ce8383f75f9bd422aa438b', name)
 
 
 if __name__ == '__main__':
