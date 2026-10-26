@@ -39,3 +39,6 @@ Keeping links or save rules preserves locations, but tested progression may repl
 At the end of a successful update, choose whether to delete save-data backup copies created by that operation. No keeps them; Yes removes only the listed verified copies. Active saves and any old WSquashFS archive backup are kept. The choice persists if finalization is resumed. Changed or undeletable backups are kept with a warning; optional cleanup does not undo the successful update.
 
 Earlier updates’ backups and copies explicitly created for a destination conflict are not removed by this choice. Old pending operations lacking a full backup record retain their copies. No global deletion of .backup-* folders occurs.
+
+LINKS ALREADY PRESENT IN THE NEW VERSION
+If the source directory contains links at save locations already known by the existing configuration, the Toolbox displays their current targets and the configuration targets, then offers to replace them. Links are restored in the working prefix with the usual test redirections. Declining stops preparation before the source directory is moved. Old target folders remain untouched and their progress is not imported automatically. External links without a known matching save location remain rejected.

@@ -821,3 +821,5 @@ I18N[wsq_update_save_cleanup_title]="Save-data backup copies"
 I18N[wsq_update_save_cleanup_body]="The update succeeded. Delete the old save-data backup copies created by this operation?\n\n%s\n\nActive saves and any old WSquashFS archive backup are kept. Backups from earlier updates are not included. Choose No to keep these copies."
 I18N[wsq_update_save_cleanup_progress]="Removing this update’s save-data backup copies…"
 I18N[wsq_update_save_cleanup_failed]="Some save backups could not be verified or deleted. Remaining copies are kept for manual review. The update succeeded and active saves are kept. Log:\n%s"
+
+I18N[wsq_update_replace_source_links]="The new version contains links at known save locations:\n\n%s\n\nReplace these links using the existing configuration? Tests will use the workflow’s test copies (except links to the shared root).\n\nOnly the links will be replaced: their old target folders, including saves from a previous test, remain untouched. Their contents will not be imported. No stops preparation before the source directory is moved."

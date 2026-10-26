@@ -295,6 +295,71 @@ wsq_apply_executable_selection drive_c/game/new.exe
         (self.source / 'outside').unlink()
         with self.assertRaises(ValueError): update.validate_source(self.prefix, self.prefix)
 
+    def source_link_fixture(self, missing=False):
+        (self.prefix / 'autorun.cmd').write_text('DIR=drive_c/game\nCMD=old.exe\n')
+        old = self.game / 'ph/work/out'
+        old.parent.mkdir(parents=True)
+        old.symlink_to(self.original_save)
+        stale = self.saves / '.uwt-test-previous/.legacy-shared/Game'
+        if not missing:
+            stale.mkdir(parents=True)
+            (stale / 'slot').write_text('previous test progress')
+        source_link = self.source / 'ph/work/out'
+        source_link.parent.mkdir(parents=True)
+        source_link.symlink_to(stale)
+        return stale, source_link
+
+    def test_source_save_link_requires_consent_without_changing_source(self):
+        stale, source_link = self.source_link_fixture()
+        offered = update.source_save_links(self.prefix, self.source, self.saves)
+        self.assertEqual(offered, [dict(path='ph/work/out', original=str(stale),
+                                      target=str(self.original_save))])
+        with self.assertRaisesRegex(ValueError, 'link escapes'):
+            self.prepare()
+        self.assertEqual(os.readlink(source_link), str(stale))
+        self.assertTrue((self.game / 'old.exe').is_file())
+        self.assertFalse(self.manifest.exists())
+
+    def test_replace_source_save_links_isolates_test_and_keeps_previous_progress(self):
+        stale, _ = self.source_link_fixture()
+        update.prepare(self.prefix, self.source, self.archive, self.saves, self.manifest,
+                       replace_source_save_links=True)
+        data = json.loads(self.manifest.read_text())
+        link = self.game / 'ph/work/out'
+        self.assertEqual(link.resolve(), Path(data['test_save']) / '.legacy-shared/Game')
+        self.assertEqual((link / 'slot').read_text(), 'original')
+        (link / 'slot').write_text('new test')
+        self.assertEqual((stale / 'slot').read_text(), 'previous test progress')
+        self.assertEqual((self.original_save / 'slot').read_text(), 'original')
+        self.assertEqual(data['replaced_source_save_links'][0]['original'], str(stale))
+        update.restore_legacy(self.prefix, self.manifest)
+        self.assertEqual(link.resolve(), self.original_save)
+
+    def test_replace_broken_source_save_link(self):
+        self.source_link_fixture(missing=True)
+        update.prepare(self.prefix, self.source, self.archive, self.saves, self.manifest,
+                       replace_source_save_links=True)
+        self.assertEqual((self.game / 'ph/work/out/slot').read_text(), 'original')
+
+    def test_replace_consent_does_not_allow_other_external_links(self):
+        _, source_link = self.source_link_fixture()
+        (self.source / 'other').symlink_to(self.original_save)
+        for operation in (lambda: update.source_save_links(self.prefix, self.source, self.saves),
+                          lambda: update.prepare(self.prefix, self.source, self.archive,
+                              self.saves, self.manifest, replace_source_save_links=True)):
+            with self.assertRaisesRegex(ValueError, 'link escapes'):
+                operation()
+        self.assertTrue(source_link.is_symlink())
+        self.assertTrue((self.game / 'old.exe').is_file())
+
+    def test_replace_consent_refuses_redirected_parent(self):
+        stale, source_link = self.source_link_fixture()
+        source_link.unlink()
+        source_link.parent.rmdir()
+        source_link.parent.symlink_to(stale)
+        with self.assertRaisesRegex(ValueError, 'link escapes'):
+            update.source_save_links(self.prefix, self.source, self.saves)
+
     def test_config_backup_and_all_game_options(self):
         conf = self.base / 'batocera.conf'
         conf.write_text('# comment\nwindows.dxvk=1\nwindows["Game.wsquashfs"].wine-runner=UMU\nwindows["Game.wsquashfs"].custom=42\n')

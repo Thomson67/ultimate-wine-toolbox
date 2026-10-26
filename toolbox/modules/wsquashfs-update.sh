@@ -310,6 +310,7 @@ wsq_update_prefix_target() {
 wsq_update_new() {
     wsq_pending_guard || return
     local archive source prefix game_name exe_rel runner snapshot metadata log choice idx=1 rows="" path stamp matched label base reuse_prefix=0 phase
+    local source_links
     local -a prepare_args=()
     local WT_MENU_CANCEL_LABEL="$(i18n back)"
     local -a items=()
@@ -397,6 +398,16 @@ wsq_update_new() {
         printf 'Reusing existing Wine prefix without extraction: %s\n' "$prefix" >> "$log"
     fi
     wsq_update_state phase preparing || return
+    if ! source_links="$(python3 "$WSQ_UPDATE_HELPER" source-save-links "$prefix" "$source" "$WSQ_SAVE_ROOT" 2>> "$log")"; then
+        msgbox "$(i18n wsq_update_title)" \
+            "$(i18n wsq_update_prepare_failed "$(wsq_update_log_detail "$log")" "$prefix" "$log")"
+        return
+    fi
+    if [ -n "$source_links" ]; then
+        yesno "$(i18n wsq_update_title)" \
+            "$(i18n wsq_update_replace_source_links "$(wsq_display_path "$source_links")")" || return
+        prepare_args+=(--replace-source-save-links)
+    fi
     if ! wsq_update_run "$(i18n wsq_update_title)" "$(i18n wsq_update_copy)" "$log" \
         python3 "$WSQ_UPDATE_HELPER" prepare "$prefix" "$source" "$archive" "$WSQ_SAVE_ROOT" "$metadata" "${prepare_args[@]}"; then
         msgbox "$(i18n wsq_update_title)" \

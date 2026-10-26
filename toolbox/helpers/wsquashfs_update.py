@@ -149,7 +149,7 @@ def relative_path(value):
     return path
 
 
-def validate_source(source, prefix):
+def validate_source(source, prefix, replaceable_links=()):
     source = source.resolve(strict=True)
     prefix = prefix.resolve(strict=True)
     if not source.is_dir() or source == Path('/'):
@@ -163,9 +163,33 @@ def validate_source(source, prefix):
     for root, dirs, files in os.walk(source, followlinks=False):
         for name in dirs + files:
             path = Path(root) / name
-            if path.is_symlink() and (Path(os.readlink(path)).is_absolute() or not path.resolve().is_relative_to(source)):
+            if (path.is_symlink() and path.relative_to(source).as_posix() not in replaceable_links
+                    and (Path(os.readlink(path)).is_absolute() or not path.resolve().is_relative_to(source))):
                 raise ValueError(f'game-content link escapes the source: {path}')
     return source
+
+
+def source_save_links(prefix, source, save_root):
+    """Offer only source symlinks at save locations already known by the prefix.
+
+    Do not follow source links or read/copy their targets, including stale test saves.
+    All other external links still fail validation before any move takes place.
+    """
+    prefix = prefix.resolve(strict=True)
+    source = source.resolve(strict=True)
+    game = game_directory(prefix)
+    result = []
+    for link in save_links(prefix, save_root):
+        location = prefix / link['path']
+        if not location.is_relative_to(game) or location == game:
+            continue
+        relative = location.relative_to(game)
+        candidate = source / relative
+        if (candidate.parent.resolve().is_relative_to(source) and candidate.is_symlink()):
+            result.append(dict(path=relative.as_posix(), original=os.readlink(candidate),
+                               target=link['original']))
+    validate_source(source, prefix, {link['path'] for link in result})
+    return result
 
 
 def redirect_saves(prefix, old, new, excluded=None):
@@ -366,7 +390,8 @@ def cleanup_test_saves(manifest):
         shutil.rmtree(test)
 
 
-def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False):
+def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False,
+            replace_source_save_links=False):
     new_archive = reuse_prefix and not archive.exists() and not archive.is_symlink()
     if not new_archive and (archive.is_symlink() or not archive.is_file()):
         raise ValueError('archive must be a regular file')
@@ -380,7 +405,8 @@ def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False):
     game = game_directory(root)
     if (root / 'drive_c').is_symlink() or not game.is_dir() or game.is_symlink():
         raise ValueError('archive must contain an internal game directory')
-    source = validate_source(source, root)
+    replacements = source_save_links(root, source, save_root) if replace_source_save_links else []
+    source = validate_source(source, root, {link['path'] for link in replacements})
     text, values = directives(root)
     links = save_links(root, save_root)
     savedir = relative_path(values.get('SAVEDIR', '')) if values.get('SAVEDIR') else None
@@ -407,7 +433,7 @@ def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False):
         raise ValueError('game source and prefix must be on the same filesystem for a move without copying')
     existing_launch = launch_executable(root)
     data = {'archive': str(archive), 'archive_signature': None if new_archive else signature(archive),
-            'reuse_prefix': reuse_prefix,
+            'reuse_prefix': reuse_prefix, 'replaced_source_save_links': replacements,
             'prefix': str(prefix), 'source': str(source), 'game_dir': game.relative_to(root).as_posix(), 'game_backup': str(old_game),
             'original_save': str(original_save), 'test_save': str(test_save),
             'autorun': text, 'savedir': values.get('SAVEDIR', ''),
@@ -927,6 +953,10 @@ def main():
     for name in ('prefix', 'source', 'archive', 'save_root', 'manifest'):
         a.add_argument(name, type=Path)
     a.add_argument('--reuse-prefix', action='store_true')
+    a.add_argument('--replace-source-save-links', action='store_true')
+    a = sp.add_parser('source-save-links')
+    for name in ('prefix', 'source', 'save_root'):
+        a.add_argument(name, type=Path)
     a = sp.add_parser('autorun')
     a.add_argument('prefix', type=Path); a.add_argument('exe')
     a.add_argument('--savedir'); a.add_argument('--savefiles')
@@ -958,7 +988,11 @@ def main():
     try:
         if a.action == 'listing':
             for path, matched in update_listing(a.directory, a.kind, a.preferred, a.exclude): print(f'{path}\t{int(matched)}')
-        elif a.action == 'prepare': prepare(a.prefix, a.source, a.archive, a.save_root, a.manifest, a.reuse_prefix)
+        elif a.action == 'prepare': prepare(a.prefix, a.source, a.archive, a.save_root, a.manifest,
+                                          a.reuse_prefix, a.replace_source_save_links)
+        elif a.action == 'source-save-links':
+            for link in source_save_links(a.prefix, a.source, a.save_root):
+                print(link['path'] + '\n  ' + link['original'] + '\n  -> ' + link['target'])
         elif a.action == 'autorun': write_autorun(a.prefix, a.exe, a.savedir, a.savefiles)
         elif a.action == 'detach': detach_saves(a.prefix, a.save)
         elif a.action == 'config': print(copy_config(a.conf, a.source, a.dest, a.backup_dir, a.preserve_existing))
