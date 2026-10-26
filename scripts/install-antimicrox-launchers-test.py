@@ -52,6 +52,10 @@ BLACK_MENU_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70129
 for previous in (BASE_HASHES, PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES, REGULAR_MENU_HASHES, BLACK_MENU_HASHES):
     previous.update({'toolbox/modules/runners.sh': 'f7f4c867a48b9003fdba4ddb7c8c4bcd48e73ab81082006bab1adc0873fcd0ff', 'toolbox/modules/reshade.sh': '5d1695e50de989e912b0b554f5c194364d740932aa42f6b20eb7ff7f8341e2ac', 'toolbox/modules/dxvk-manager.sh': '81e54013e6827f3c7db5f56d7f2531f772088f56894719eb53280335ee0ce3db', 'toolbox/modules/wsquashfs.sh': 'bb5e7cff04facd4fbf298971a9a657af782173a377212c0960f9b0190fc7df70', 'toolbox/modules/wsquashfs-update.sh': '2cafae324a7a2279f1ae72c0e94dfd84557e94257fee24a43708a0e5d13b48c5', 'toolbox/modules/wsquashfs-dotnet.sh': '8ea383c47a7c6d9daacd9fb58b351896b715bd9aeea6b81ce58728bdf3d937e6', 'toolbox/modules/batocera-conf-extra.sh': '3964048534e028842726a992ef9e0d3b6dc5970b7bba40547756971b463cda1b', 'toolbox/modules/batocera-conf-transfer.sh': '00d12ad6e36e8103787c5ea15d374569ef5074ee8c49b812f0c0568bfecc05b8', 'toolbox/modules/settings.sh': '22556b1a9cfd16d17e2d4653854b47bab3c82f05343b1759bf20519c646bbd64'})
 
+SELECTIVE_MENU_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70129bb4b01e05382b793410cfc3d9c227ad6b0c7830791bf', 'toolbox/modules/antimicrox.sh': 'c0b22af085a53be5ca890b27a84e400c4cbeb70535f0ea5d55103b9cbf1ec312', 'toolbox/hooks/antimicrox-game-event.sh': 'e64e2d83ee294f5335fc2b98db599d4993b7c2164d9b497bd43978d6ff058f55', 'toolbox/modules/community.sh': 'c390b104428046775130ffbe80807ea3181849d90490ae8f31f6ace2dba86efe', 'toolbox/helpers/community_profiles.py': 'a56b24e473b9fac81620a6221d65100dd3988f0c91bb0b655ca3362e2ab631d0', 'toolbox/helpers/community_service.py': '354e9d97fd21a283618168029e456cec1dd0f707d7a05bcadc6ccf6264486b6f', 'toolbox/lib/common.sh': 'de35d54563a87794bb14ce8691a969e27fae90c41f8d03062a74e335f7bcf657', 'toolbox/modules/runners.sh': 'afd60bd122e1a4f4ac4ad42412c9a5f4c755fb222f97d479a06e64278dc5a38b', 'toolbox/modules/reshade.sh': '398397c68404ea5cc86c2f4d7b07e0329e55becc7c1021878a2149ad97df7e25', 'toolbox/modules/dxvk-manager.sh': 'cd5391f5101c3e61db6a0ad490a3ce1c2e8fae24f87d4d099ee8a65354aa67fc', 'toolbox/modules/wsquashfs.sh': '267a5c187765bae37d7de431a5ac081015b67a470daf523833b4259808d8a010', 'toolbox/modules/wsquashfs-update.sh': '8994d189bd983d568d31e2128e8d374f9715bbca490a82ce4cc6bab1378e1eec', 'toolbox/modules/wsquashfs-dotnet.sh': '08057c25f4bf437bc6209ac9ea989ea081bf4e3ee0f3208ea62685a3ec5965ec', 'toolbox/modules/batocera-conf-extra.sh': 'cf829b6c84b1700aeb55df4a42a3b3f568c9a2b41d6e776ec8f9738585d7a2bc', 'toolbox/modules/batocera-conf-transfer.sh': 'c2cdd4675ca6312b4309d2c47b1bdb71e3cec28a2a44fd8a3d4f04b65b518f56', 'toolbox/modules/settings.sh': '5855a2516ef6decff2295459306737c6bd5041c6cb57623c1ad008469ca5c785', 'toolbox/helpers/antimicrox_launcher.py': 'a3728a24c43000a5fe949b8eec3be3eedf6ce4570ac069301670fd5fea548de5'}
+for previous in (BASE_HASHES, PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES, REGULAR_MENU_HASHES, BLACK_MENU_HASHES, SELECTIVE_MENU_HASHES):
+    previous['toolbox/ports/Ultimate Wine Toolbox.sh'] = '70335e39badb800485096ac217f0efb5477a8dd3ef6cc95dbbf2262b28ee8c92'
+
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -75,12 +79,14 @@ def idle():
         raise ValueError('Fermez le jeu, AntiMicroX et la Toolbox avant installation/restauration.')
 
 
-def install(home, hook, ref, source=None):
+def install(home, hook, ref, source=None, port=None):
     idle()
     if (home/'VERSION').read_text().strip() != '0.7.2':
         raise ValueError('Ce test nécessite la Toolbox v0.7.2.')
     targets = [(home/path, path) for path in BASE_HASHES]
     targets += [(home/HELPER, HELPER), (hook, 'toolbox/hooks/antimicrox-game-event.sh')]
+    if port is not None:
+        targets.append((port, 'toolbox/ports/Ultimate Wine Toolbox.sh'))
     payloads = {}
     for source_path in [*BASE_HASHES, HELPER]:
         if source:
@@ -104,7 +110,7 @@ def install(home, hook, ref, source=None):
     upgrading = (home/HELPER).exists()
     expected = BASE_HASHES
     if upgrading:
-        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES, REGULAR_MENU_HASHES, BLACK_MENU_HASHES):
+        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES, REGULAR_MENU_HASHES, BLACK_MENU_HASHES, SELECTIVE_MENU_HASHES):
             if all(not target.is_symlink() and target.is_file() and
                    sha(target.read_bytes()) == candidate.get(source_path)
                    for target, source_path in targets):
@@ -179,6 +185,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--home', type=Path, default=Path('/userdata/system/ultimate-wine-toolbox'))
     parser.add_argument('--hook', type=Path, default=Path('/userdata/system/scripts/ultimate-wine-toolbox-antimicrox.sh'))
+    parser.add_argument('--port', type=Path, default=Path('/userdata/roms/ports/Ultimate Wine Toolbox.sh'))
     parser.add_argument('--ref', help='Commit SHA to install')
     parser.add_argument('--source', type=Path, help='Local source tree (developer tests)')
     parser.add_argument('--restore', type=Path)
@@ -188,7 +195,7 @@ def main():
     else:
         if not args.source and (not args.ref or not re.fullmatch('[0-9a-f]{40}', args.ref)):
             parser.error('--ref doit être le SHA complet du commit de test')
-        install(args.home.resolve(), args.hook.absolute(), args.ref or 'local', args.source)
+        install(args.home.resolve(), args.hook.absolute(), args.ref or 'local', args.source, args.port.absolute())
 
 
 if __name__ == '__main__':

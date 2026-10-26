@@ -142,3 +142,7 @@ profils, fichiers, versions et sélections multiples ne colorent plus leur
 initiale ; la navigation au clavier reste disponible. Lorsqu’une ligne ajoute
 un profil, un état ou un auteur après le jeu, seul le nom du jeu est en gras.
 Les listes de noms seuls restent en écriture normale.
+
+Le lanceur du terminal conserve la couleur noire des noms en gras : le gras
+ne transforme plus le noir en gris clair. Ce réglage s’applique au prochain
+lancement complet de la Toolbox, y compris après le retour d’un jeu.

@@ -42,6 +42,9 @@ class LauncherInstallTests(unittest.TestCase):
         helper = self.source/installer.HELPER
         helper.parent.mkdir(parents=True, exist_ok=True)
         helper.write_text('print("new helper")\n')
+        self.port = self.root/'ports/Ultimate Wine Toolbox.sh'
+        self.port.parent.mkdir()
+        self.port.write_bytes(self.old['toolbox/ports/Ultimate Wine Toolbox.sh'])
         hashes = {name: installer.sha(data) for name, data in self.old.items()}
         p = patch.object(installer, 'BASE_HASHES', hashes)
         p.start(); self.addCleanup(p.stop)
@@ -49,7 +52,7 @@ class LauncherInstallTests(unittest.TestCase):
         p.start(); self.addCleanup(p.stop)
 
     def install(self):
-        return installer.install(self.home, self.hook, 'local', self.source)
+        return installer.install(self.home, self.hook, 'local', self.source, self.port)
 
     def test_install_updates_both_hook_copies_and_restore_preserves_user_profiles(self):
         backup = self.install()
@@ -210,7 +213,7 @@ class LauncherInstallTests(unittest.TestCase):
 
     def test_reinstalling_same_version_is_a_noop_including_copied_hook(self):
         backup = self.install()
-        paths = [self.home/name for name in [*self.old, installer.HELPER]]+[self.hook]
+        paths = [self.home/name for name in [*self.old, installer.HELPER]]+[self.hook, self.port]
         before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in paths}
         self.assertIsNone(self.install())
         self.assertEqual(list((self.home/'state/backups').iterdir()), [backup])
@@ -247,6 +250,27 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertIn('data list presentation', (self.home/'toolbox/modules/reshade.sh').read_text())
         installer.restore(backup)
         self.assertNotIn('data list presentation', (self.home/'toolbox/modules/reshade.sh').read_text())
+
+
+    def test_upgrade_refreshes_both_ports_copies_and_restore_reverts_both(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        source = self.source/'toolbox/ports/Ultimate Wine Toolbox.sh'
+        source.write_bytes(source.read_bytes()+b'\n# contrast option +pc\n')
+        with patch.object(installer, 'SELECTIVE_MENU_HASHES', hashes):
+            backup = self.install()
+        self.assertEqual(self.port.read_bytes(), source.read_bytes())
+        self.assertEqual((self.home/'toolbox/ports/Ultimate Wine Toolbox.sh').read_bytes(), source.read_bytes())
+        installer.restore(backup)
+        self.assertNotIn(b'contrast option', self.port.read_bytes())
+
+    def test_custom_ports_launcher_is_not_overwritten(self):
+        self.port.write_text('#!/bin/bash\n# custom launcher\n')
+        with self.assertRaises(ValueError):
+            self.install()
+        self.assertIn('custom launcher', self.port.read_text())
+        self.assertFalse((self.home/'state/backups').exists())
 
 
 if __name__ == '__main__':

@@ -55,6 +55,7 @@ export LANGUAGE="$WT_UTF8_LOCALE"
     echo "launcher=$LAUNCHER"
 } >>"$BOOT_LOG" 2>&1
 
+# Keep bold black text black instead of mapping it to bright grey (+pc).
 # Configurable terminal profile. Changes apply on the next Ports launch.
 WT_DISPLAY_MODE_FILE="/userdata/system/ultimate-wine-toolbox/config/display-mode"
 WT_FONT_SIZE_FILE="/userdata/system/ultimate-wine-toolbox/config/font-size"
@@ -104,6 +105,7 @@ else
         env "$RESUME_ENV=1" /usr/bin/xterm \
             +lc \
             -u8 \
+            +pc \
             -fa "DejaVu Sans Mono" \
             -fs "$WT_FONT_SIZE" \
             -title "Ultimate Wine Toolbox" \
@@ -114,6 +116,7 @@ else
         /usr/bin/xterm \
             +lc \
             -u8 \
+            +pc \
             -fa "DejaVu Sans Mono" \
             -fs "$WT_FONT_SIZE" \
             -title "Ultimate Wine Toolbox" \

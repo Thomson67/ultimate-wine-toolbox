@@ -210,5 +210,28 @@ WT_MENU_LIST=1 menu_select Title Prompt one 'Same game — Profile A' two 'Same 
             self.assertIn('Profile B', args)
 
 
+    def test_initial_launch_and_game_return_keep_bold_text_black(self):
+        source = (ROOT/'toolbox/ports/Ultimate Wine Toolbox.sh').read_text()
+        start = source.index('if [ "${WT_SKIP_INITIAL_TOOLBOX:-0}"')
+        end = source.index('\nwait_for_es_api() {', start)
+        body = source[start:end].replace('/usr/bin/xterm', '"$MOCK_XTERM"')
+        for resume in (0, 1):
+            with self.subTest(resume=resume), tempfile.TemporaryDirectory() as folder:
+                home = Path(folder)
+                executable = home/'xterm-mock'
+                executable.write_text('#!/bin/bash\nprintf \'%s\\0\' "$@" > "$ARGUMENTS"\n')
+                executable.chmod(0o755)
+                script = 'WT_SKIP_INITIAL_TOOLBOX=0; resume_requested="$RESUME"; RESUME_ENV=WT_AUTO_RESUME_AMX; WT_FONT_SIZE=16; WT_XTERM_DISPLAY_ARGS=(-geometry 120x36)\n'+body
+                result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=5,
+                    env=dict(os.environ, MOCK_XTERM=str(executable), ARGUMENTS=str(home/'args'),
+                             RESUME=str(resume), BOOT_LOG=str(home/'boot.log'), LAUNCHER='/userdata/toolbox-launcher.sh'))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                args = (home/'args').read_bytes().decode().split('\0')[:-1]
+                self.assertIn('+pc', args)
+                self.assertLess(args.index('+pc'), args.index('-e'))
+                self.assertEqual(args[args.index('-fs')+1], '16')
+                self.assertEqual(args[args.index('-geometry')+1], '120x36')
+
+
 if __name__ == '__main__':
     unittest.main()
