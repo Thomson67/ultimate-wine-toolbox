@@ -192,5 +192,18 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertNotIn('readable menus', (self.home/'toolbox/lib/common.sh').read_text())
 
 
+    def test_upgrade_from_readability_version_keeps_menu_settings_restorable(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        module = self.source/'toolbox/lib/common.sh'
+        module.write_bytes(module.read_bytes()+b'\n# regular menu font\n')
+        with patch.object(installer, 'READABLE_MENU_HASHES', hashes):
+            backup = self.install()
+        self.assertIn('regular menu font', (self.home/'toolbox/lib/common.sh').read_text())
+        installer.restore(backup)
+        self.assertNotIn('regular menu font', (self.home/'toolbox/lib/common.sh').read_text())
+
+
 if __name__ == '__main__':
     unittest.main()

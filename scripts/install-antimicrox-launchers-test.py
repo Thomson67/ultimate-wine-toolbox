@@ -44,6 +44,8 @@ ASSIGNED_MENU_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70
 for previous in (BASE_HASHES, PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES):
     previous['toolbox/lib/common.sh'] = 'f6c02437ac5f59925b4a87a1d2089a8ceac973e7a44536566348ead5cabe4fad'
 
+READABLE_MENU_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70129bb4b01e05382b793410cfc3d9c227ad6b0c7830791bf', 'toolbox/modules/antimicrox.sh': 'bcab39647401b43d0f84ca1ee0582cb068ad2c271d8535b372e4276ae5bcfc95', 'toolbox/hooks/antimicrox-game-event.sh': 'e64e2d83ee294f5335fc2b98db599d4993b7c2164d9b497bd43978d6ff058f55', 'toolbox/modules/community.sh': 'd424080da815a1efd9c99f99215cbc8177baa65b658045c269dc5b3d634bbe78', 'toolbox/helpers/community_profiles.py': 'ce019e5ff04e58ddd7e5c8ff8f2947fdb11c2b3b945bdcd5f4f2c8304925f041', 'toolbox/helpers/community_service.py': '354e9d97fd21a283618168029e456cec1dd0f707d7a05bcadc6ccf6264486b6f', 'toolbox/lib/common.sh': '5aa122776105b2214151bf63f49d06b92561e5c164268a5c7458f1dbb452185a', 'toolbox/helpers/antimicrox_launcher.py': 'a3728a24c43000a5fe949b8eec3be3eedf6ce4570ac069301670fd5fea548de5'}
+
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -76,7 +78,7 @@ def install(home, hook, ref, source=None):
     upgrading = (home/HELPER).exists()
     expected = BASE_HASHES
     if upgrading:
-        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES):
+        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES):
             if all(not target.is_symlink() and target.is_file() and
                    sha(target.read_bytes()) == candidate.get(source_path)
                    for target, source_path in targets):

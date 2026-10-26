@@ -50,7 +50,7 @@ have_dialog() { command -v dialog >/dev/null 2>&1; }
 if type -P dialog >/dev/null 2>&1; then
 dialog() {
     local -a args=("$@")
-    local cols lines index widget h w limit max_h max_w list_h
+    local cols lines index widget h w limit max_h max_w list_h theme rc
     cols="$(tput cols 2>/dev/null || true)"
     lines="$(tput lines 2>/dev/null || true)"
     if [[ ! "$cols" =~ ^[0-9]+$ || ! "$lines" =~ ^[0-9]+$ ]]; then
@@ -89,6 +89,20 @@ dialog() {
                 ;;
         esac
     done
+    # Keep the current colors and selection background, using regular text.
+    # --create-rc reads the user's current theme; only tuple highlight flags
+    # change in this temporary copy. Never rewrite the user's configuration.
+    if [ "${widget:-}" = --menu ]; then
+        theme="$(mktemp /tmp/uwt-menu-theme.XXXXXX)" || theme=""
+        if [ -n "$theme" ] && command dialog --create-rc "$theme" 2>/dev/null &&
+           sed -i -E 's/(=[[:space:]]*\([^,]*,[^,]*,)[[:space:]]*ON/\1OFF/' "$theme"; then
+            DIALOGRC="$theme" command dialog "${args[@]}"
+            rc=$?
+            rm -f -- "$theme"
+            return "$rc"
+        fi
+        [ -z "$theme" ] || rm -f -- "$theme"
+    fi
     command dialog "${args[@]}"
 }
 fi

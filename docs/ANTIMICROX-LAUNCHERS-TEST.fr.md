@@ -130,7 +130,8 @@ modifiés et aucun jeu, préfixe Wine ou exécutable n’est ajouté au paquet.
 
 ## Lisibilité des menus
 
-Les menus utilisent la largeur du terminal et masquent les identifiants internes
+Les menus utilisent une écriture normale (sans gras), conservent la sélection
+en couleur et utilisent la largeur du terminal et masquent les identifiants internes
 des actions. **Texte complet** affiche l’intitulé sélectionné avec retour
 à la ligne dans une fenêtre défilante, sans déclencher son action. Fermer cette
 fenêtre ramène sur la même entrée. **[Launcher]** apparaît au début des lignes

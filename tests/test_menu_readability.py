@@ -74,6 +74,8 @@ menu_select Title Prompt 'tag with spaces' 'Full description with a long game na
             home = Path(folder)
             wrapper = home/'dialog'
             wrapper.write_text('''#!/bin/bash
+if [ \"${1:-}\" = --create-rc ]; then exec \"$REAL_DIALOG\" \"$@\"; fi
+if [ -n \"${DIALOGRC:-}\" ]; then cp -- \"$DIALOGRC\" \"$DIALOG_LOG.rc\"; printf '%s' \"$DIALOGRC\" > \"$DIALOG_LOG.theme-path\"; fi
 python3 - "$DIALOG_LOG" "$@" <<'ARGUMENTS'
 import json,sys
 from pathlib import Path
@@ -120,6 +122,11 @@ menu_select Title Prompt 'tag with spaces' "$DESCRIPTION" back Back > "$SELECTIO
                 first = calls[0]; index = first.index('--menu')
                 self.assertEqual(first[index+2:index+4], ['22', '76'])
                 self.assertIn('--textbox', calls[1])
+                theme = (home/'log.rc').read_text()
+                self.assertIn('item_selected_color = button_active_color', theme)
+                self.assertIn('button_active_color = (WHITE,BLUE,OFF)', theme)
+                self.assertIn('title_color = (BLUE,WHITE,OFF)', theme)
+                self.assertFalse(Path((home/'log.theme-path').read_text()).exists())
                 wrapped = (home/'log.text').read_text()
                 self.assertTrue(all(len(line) <= 68 for line in wrapped.splitlines()))
                 self.assertEqual(' '.join(wrapped.split()), ' '.join(description.split()))
