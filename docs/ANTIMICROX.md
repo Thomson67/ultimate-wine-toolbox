@@ -6,8 +6,7 @@ and the [French launcher walkthrough](ANTIMICROX-LAUNCHERS-TEST.fr.md).
 
 On the user's Batocera v44/labwc machine, launcher/game switching was validated
 on a `.wine`; community sharing and reassignment to the same game as a
-`.wsquashfs` restored both profiles and rules. Native mapping through Moonlight
-was also validated after the Sunshine-specific input workaround below. These
+`.wsquashfs` restored both profiles and rules. These
 results do not establish compatibility with every game, runner or controller.
 
 ## Runtime and menus
@@ -364,29 +363,11 @@ game. Titles/classes/executables must still match its game version and language.
 Sharing a `.wine` configuration and importing it for the same `.wsquashfs` game
 was validated on the user's machine. See [community details](COMMUNITY_PROFILES.md).
 
-## Moonlight / Sunshine input
 
-The wrapper detects Sunshine input devices in `/sys/class/input/event*/device/name`
-and sets `SDL_JOYSTICK_HIDAPI=0` for that AntiMicroX process. With Sunshine's
-libvirtualhid controller, evtest received sticks/buttons while AntiMicroX's
-HIDAPI path showed no button activity; disabling HIDAPI fixed it, and restoring
-the default reproduced it. Normal in-game use through Moonlight was confirmed.
-Without a Sunshine device at launch, the inherited SDL setting is preserved.
+## Read complete menu entries
 
-Connect Moonlight before starting the editor or mapped game. If the virtual
-controller appears after AntiMicroX starts, restart the managed game/editor so
-startup detection runs again. This changes the SDL input path for all controllers
-in that AntiMicroX instance; it is not a system-wide or Wine HIDRAW setting.
-It does not change Sunshine's display/service configuration.
-
-## Menu readability
-
-Action menus keep their colored accelerator letter. Game/profile/file/version
-pickers and multi-selection lists use normal text without a red initial.
-Only a game name followed by details gets a bold name column; name-only lists
-remain plain. **Full text** opens a wrapped scrollable description and returns
-to the same selected entry without activating it. Titles remain bold, menus use
-the available terminal width and the xterm launcher keeps bold black text black.
+**Full text** opens a wrapped scrollable description and returns to the same
+selected entry without activating it.
 
 ## Logs and validation
 

@@ -48,7 +48,7 @@ la langue choisie. Les fichiers techniques ci-dessous complètent ces guides.
 
 Sur la machine Batocera v44/labwc de test, la bascule de deux profils
 launcher/jeu sur `.wine`, le partage communautaire puis réimport sur le même
-jeu en `.wsquashfs`, et les commandes via Moonlight/Sunshine ont été confirmés.
+jeu en `.wsquashfs` ont été confirmés.
 Les règles de fenêtres observent Xorg/XWayland ; les fenêtres Wine Wayland
 natives ne sont pas couvertes. Les essais automatisés vérifient aussi les
 transactions, refus de chemins, profils partagés, imports et menus, sans

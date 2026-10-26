@@ -55,10 +55,7 @@ Importer un paquet ZIP valide toutes les entrées puis permet de choisir celles 
 
 L’espace modérateur utilise un code d’appairage et une page de navigateur. Il permet d’examiner les propositions ou de retirer un partage publié. Retirer une entrée communautaire conserve les profils déjà installés chez les joueurs.
 
-MOONLIGHT / SUNSHINE
-Connecter Moonlight avant de lancer le jeu ou l’éditeur. Lorsqu’une manette virtuelle Sunshine est présente, le lanceur définit SDL_JOYSTICK_HIDAPI=0 pour AntiMicroX. Cela corrige le cas où la manette apparaît mais aucun bouton ne se surligne. Sans Sunshine, le réglage SDL hérité est conservé. Si la manette virtuelle apparaît après le démarrage d’AntiMicroX, fermer puis relancer l’éditeur ou le jeu géré. Cette adaptation concerne toute cette instance AntiMicroX, pas les réglages HIDRAW de Wine.
-
-LISIBILITÉ ET DÉPANNAGE
-Les listes de jeux et profils n’ont pas d’initiale rouge. Les noms suivis d’informations peuvent être en gras. Texte complet affiche la ligne sans déclencher son action, puis revient à la même sélection.
+DÉPANNAGE
+Texte complet affiche la ligne sans déclencher son action, puis revient à la même sélection.
 
 Journaux : /userdata/system/logs/ultimate-wine-toolbox/antimicrox.log pour les jeux, antimicrox-editor.log pour l’éditeur seul, antimicrox-handoff.log pour le lancement différé. Un AntiMicroX indépendant déjà ouvert bloque le lancement d’une autre instance gérée : le fermer avant de recommencer.

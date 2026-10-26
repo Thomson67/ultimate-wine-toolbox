@@ -55,10 +55,7 @@ Import a ZIP package validates every entry, then lets you choose configurations 
 
 Moderator access uses a pairing code and browser page. It permits reviewing submissions and removing published entries. Community removal keeps profiles already installed by players.
 
-MOONLIGHT / SUNSHINE
-Connect Moonlight before starting the editor or mapped game. With a Sunshine virtual controller present, the launcher sets SDL_JOYSTICK_HIDAPI=0 for AntiMicroX. This fixes a controller appearing without any button highlighting. Without Sunshine, the inherited SDL setting is preserved. If the virtual controller appears after AntiMicroX starts, close and restart the editor or managed game. This affects all controllers in that AntiMicroX instance, rather than Wine HIDRAW settings.
-
-READABILITY AND TROUBLESHOOTING
-Game and profile lists do not have a red initial. Game names followed by details may be bold. Full text shows the entry without activating it, then returns to the same selection.
+TROUBLESHOOTING
+Full text shows the entry without activating it, then returns to the same selection.
 
 Logs: /userdata/system/logs/ultimate-wine-toolbox/antimicrox.log for games, antimicrox-editor.log for the standalone editor, antimicrox-handoff.log for detached launches. An independent running AntiMicroX prevents another managed instance from starting: close it first.

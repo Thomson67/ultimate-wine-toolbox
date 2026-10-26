@@ -1,7 +1,7 @@
 # Test AntiMicroX : jeux avec launcher
 
-Base : Ultimate Wine Toolbox v0.7.2. Aucun changement des archives de jeux,
-des scripts Windows ou de Sunshine. Les launchers embarquant déjà AntiMicroX
+Base : Ultimate Wine Toolbox v0.7.2. Les archives de jeux et les scripts Windows
+ne sont pas modifiés. Les launchers embarquant déjà AntiMicroX
 Windows ne sont pas migrés : choisir pour le premier essai un préfixe/jeu
 utilisant seulement l'instance native gérée par la Toolbox.
 
@@ -94,8 +94,6 @@ Sur la machine Batocera v44/labwc de l’utilisateur :
 - Profil launcher et profil jeu distincts, avec bascule sur un `.wine` : validé.
 - Partage communautaire complet, puis téléchargement/réimport pour le même jeu
   en `.wsquashfs` : les deux profils et les règles correctes ont été retrouvés.
-- Mapping natif via Moonlight avec la manette virtuelle Sunshine : validé après
-  le correctif HIDAPI, avec reproduction du défaut sans ce réglage.
 
 Ces résultats ne valident pas toutes les combinaisons de jeux/runners/manettes.
 Pour les autres cas, vérifier notamment :
@@ -153,24 +151,11 @@ Les ZIP de partage restent dans `exports/community/antimicrox/`, les exports
 locaux dans `exports/antimicrox/`. Les profils source ne sont pas
 modifiés et aucun jeu, préfixe Wine ou exécutable n’est ajouté au paquet.
 
-## Lisibilité des menus
+## Lire les intitulés complets
 
-Les options des menus utilisent une écriture noire normale, les titres restent
-en gras, la sélection reste en couleur et les menus utilisent la largeur du terminal et masquent les identifiants internes
-des actions. **Texte complet** affiche l’intitulé sélectionné avec retour
-à la ligne dans une fenêtre défilante, sans déclencher son action. Fermer cette
-fenêtre ramène sur la même entrée. **[Launcher]** apparaît au début des lignes
-dans la liste des jeux à partager ou exporter.
-
-Les lettres rouges restent réservées aux menus d’actions. Les listes de jeux,
-profils, fichiers, versions et sélections multiples ne colorent plus leur
-initiale ; la navigation au clavier reste disponible. Lorsqu’une ligne ajoute
-un profil, un état ou un auteur après le jeu, seul le nom du jeu est en gras.
-Les listes de noms seuls restent en écriture normale.
-
-Le lanceur du terminal conserve la couleur noire des noms en gras : le gras
-ne transforme plus le noir en gris clair. Ce réglage s’applique au prochain
-lancement complet de la Toolbox, y compris après le retour d’un jeu.
+**Texte complet** affiche l’intitulé sélectionné avec retour à la ligne dans
+une fenêtre défilante, sans déclencher son action. Fermer cette fenêtre ramène
+sur la même entrée.
 
 ## Modifier séparément les deux profils
 
@@ -215,16 +200,3 @@ d’un paquet importé, restent protégés. Une association ajoutée après l’
 de la liste empêche également la suppression.
 
 
-## Manette via Moonlight / Sunshine
-
-Une manette virtuelle Sunshine peut être visible dans AntiMicroX sans que les
-boutons réagissent. Le lanceur natif détecte les périphériques Sunshine présents
-dans sysfs et définit `SDL_JOYSTICK_HIDAPI=0` uniquement pour AntiMicroX, afin
-d’utiliser la réception evdev validée avec Sunshine/libvirtualhid. Ce choix
-concerne tous les contrôleurs de cette instance AntiMicroX, pas les réglages
-HIDRAW de Wine. Sans manette Sunshine, les réglages SDL existants sont conservés. Cette adaptation couvre
-l’éditeur, les sessions en jeu et les changements de profil launcher/jeu.
-
-Connecter Moonlight avant de lancer AntiMicroX ou le jeu. Si la manette virtuelle
-apparaît alors qu’AntiMicroX était déjà ouvert, fermer puis relancer AntiMicroX
-(ou le jeu qui le gère) pour appliquer cette détection au démarrage.

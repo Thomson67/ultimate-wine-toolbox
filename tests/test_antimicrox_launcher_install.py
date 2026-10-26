@@ -442,7 +442,7 @@ class PublishedVersionHashesTests(unittest.TestCase):
         self.assertEqual(installer.PLAIN_GAME_LIST_HASHES['toolbox/helpers/antimicrox-launch.sh'],
                          installer.MOONLIGHT_INPUT_HASHES['toolbox/helpers/antimicrox-launch.sh'])
         for name, hashes in vars(installer).items():
-            if name.endswith('_HASHES') and name not in ('MOONLIGHT_INPUT_HASHES', 'PLAIN_GAME_LIST_HASHES', 'DOCS_REFRESH_HASHES'):
+            if name.endswith('_HASHES') and name not in ('MOONLIGHT_INPUT_HASHES', 'PLAIN_GAME_LIST_HASHES', 'DOCS_REFRESH_HASHES', 'SAVE_BACKUP_CLEANUP_HASHES'):
                 self.assertEqual(hashes['toolbox/helpers/antimicrox-launch.sh'], 'a5266a0e16eb3aba60beb27dae1810eff4b2c2d239ce8383f75f9bd422aa438b', name)
 
 

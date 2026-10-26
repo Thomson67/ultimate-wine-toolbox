@@ -46,11 +46,9 @@ this is not an announcement of a new stable release.
   configurations to one local ZIP and assign them to games on the target machine.
 - Grouped removal: game configurations and unassigned profiles, with protection
   for profiles still referenced elsewhere.
-- An AntiMicroX-specific Moonlight/Sunshine input workaround and more readable
-  lists without a red initial in game/profile pickers.
 
-The `.wine` → community share → import for the same `.wsquashfs` game workflow,
-and mapping through Moonlight, were validated on the Batocera v44/labwc test
+The `.wine` → community share → import for the same `.wsquashfs` game workflow
+was validated on the Batocera v44/labwc test
 machine. See the [guide index](docs/README.md),
 [AntiMicroX guide](docs/ANTIMICROX.md) and
 [French launcher walkthrough](docs/ANTIMICROX-LAUNCHERS-TEST.fr.md).

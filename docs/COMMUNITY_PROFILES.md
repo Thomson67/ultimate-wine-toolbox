@@ -239,6 +239,6 @@ The automated tests simulate catalogue networking, exports, review/import,
 hash/content/path rejection, cache fallback, preservation of local edits,
 menu routing, Pad2Key restoration and ReShade preset backup/application. Real
 controller and game behavior is not established by these tests alone. Native
-launcher/game switching, complete community transfer from `.wine` to `.wsquashfs`
-and the Sunshine input workaround have been confirmed on the reported Batocera
+launcher/game switching and complete community transfer from `.wine` to
+`.wsquashfs` have been confirmed on the reported Batocera
 v44/labwc machine; other combinations remain to be checked.
