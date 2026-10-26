@@ -154,18 +154,55 @@ yesno_default_no() {
     case "$ans" in y|Y|o|O|oui|OUI|yes|YES) return 0 ;; *) return 1 ;; esac
 } >&2 # Confirmations return a status, never selector data on stdout.
 
+# A scrollable, wrapped copy of an entry, without activating its action.
+wt_menu_item_details() (
+    local title="$1" text="$2" width="$3" report
+    report="$(mktemp /tmp/uwt-menu-details.XXXXXX)" || return 1
+    trap 'rm -f -- "$report"' EXIT
+    printf '%s\n' "$text" | python3 -c 'import sys,textwrap
+width=max(12,int(sys.argv[1])-8)
+for line in sys.stdin.read().splitlines():
+    print(textwrap.fill(line, width, replace_whitespace=False, break_on_hyphens=False) if line else "")' "$width" > "$report" || return 1
+    wt_clear_tty
+    dialog --clear --no-shadow --scrollbar --exit-label "$(i18n back)" \
+        --title "$title" --textbox "$report" 24 "$width"
+    wt_clear_tty
+) >&2
+
 menu_select() {
     local title="$1" prompt="$2"
     shift 2
     if have_dialog; then
-        wt_clear_tty
-        local result rc
-        result="$(dialog --stdout --clear --no-shadow --cr-wrap --ok-label "$(i18n ok)" --cancel-label "${WT_MENU_CANCEL_LABEL:-$(i18n cancel)}" \
-            --title "$title" --menu "$prompt" 24 100 16 "$@")"
-        rc=$?
-        wt_clear_tty
-        [ "$rc" -eq 0 ] && printf '%s' "$result"
-        return "$rc"
+        local result rc cols width=100 detail_label key text found
+        local -a options=("$@") default_item=()
+        cols="$(tput cols 2>/dev/null || true)"
+        if [[ "$cols" =~ ^[0-9]+$ ]] && ((cols >= 28)); then width=$((cols - 4)); fi
+        if [ "${WT_LANGUAGE:-fr}" = fr ]; then detail_label='Texte complet'; else detail_label='Full text'; fi
+        ((width >= 50)) || detail_label=Info
+        while true; do
+            wt_clear_tty
+            result="$(dialog --stdout --clear --no-shadow --cr-wrap --no-tags \
+                --help-button --help-tags --help-label "$detail_label" \
+                --ok-label "$(i18n ok)" --cancel-label "${WT_MENU_CANCEL_LABEL:-$(i18n cancel)}" \
+                "${default_item[@]}" --title "$title" --menu "$prompt" 24 "$width" 16 "${options[@]}")"
+            rc=$?
+            wt_clear_tty
+            if [ "$rc" -eq 2 ]; then
+                found=0
+                for ((key=0; key<${#options[@]}; key+=2)); do
+                    if [ "$result" = "HELP ${options[key]}" ] || [ "$result" = "HELP \"${options[key]}\"" ]; then
+                        text="${options[key+1]}"
+                        default_item=(--default-item "${options[key]}")
+                        found=1
+                        wt_menu_item_details "$title" "$text" "$width"
+                        break
+                    fi
+                done
+                [ "$found" -eq 1 ] && continue
+            fi
+            [ "$rc" -eq 0 ] && printf '%s' "$result"
+            return "$rc"
+        done
     else
         clear
         printf '==== %s ====\n\n%b\n\n' "$title" "$prompt"

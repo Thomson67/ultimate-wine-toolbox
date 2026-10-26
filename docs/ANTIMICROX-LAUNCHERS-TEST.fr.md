@@ -127,3 +127,11 @@ ne savent pas importer ce nouveau paquet : elles voient un profil vide, pour
 
 Le ZIP reste dans `exports/community/antimicrox/`. Les profils source ne sont pas
 modifiés et aucun jeu, préfixe Wine ou exécutable n’est ajouté au paquet.
+
+## Lisibilité des menus
+
+Les menus utilisent la largeur du terminal et masquent les identifiants internes
+des actions. **Texte complet** affiche l’intitulé sélectionné avec retour
+à la ligne dans une fenêtre défilante, sans déclencher son action. Fermer cette
+fenêtre ramène sur la même entrée. **[Launcher]** apparaît au début des lignes
+dans la liste des jeux à partager ou exporter.

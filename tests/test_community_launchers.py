@@ -300,7 +300,7 @@ community_choose_profile_game AntiMicroX
         self.assertEqual(result.returncode, 0, result.stderr)
         options = (self.home/'options').read_bytes().decode().split('\0')
         labels = options[3:-1:2]
-        self.assertIn('[Launcher]', labels[0])
+        self.assertTrue(labels[0].startswith('[Launcher] '))
         self.assertNotIn('[Launcher]', labels[1])
         self.assertNotIn('[Launcher]', labels[2])
 

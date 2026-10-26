@@ -355,7 +355,7 @@ community_choose_profile_game() {
     games+=("$rom")
     label="$(basename "$rom") — $(basename "$profile")"
     if [ "$(amx_launcher_cmd configured "$rom" "$profile" 2>/dev/null)" = 1 ]; then
-      label+=" [Launcher]"
+      label="[Launcher] $label"
     fi
     items+=("${#games[@]}" "$label")
   done < <(amx_associations)

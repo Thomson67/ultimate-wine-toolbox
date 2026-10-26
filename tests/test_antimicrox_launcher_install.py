@@ -26,7 +26,8 @@ class LauncherInstallTests(unittest.TestCase):
                     'toolbox/hooks/antimicrox-game-event.sh': self.hook.read_bytes(),
                     'toolbox/modules/community.sh': b'#!/bin/bash\necho oldcommunity\n',
                     'toolbox/helpers/community_profiles.py': b'# old profiles\n',
-                    'toolbox/helpers/community_service.py': b'# old service\n'}
+                    'toolbox/helpers/community_service.py': b'# old service\n',
+                    'toolbox/lib/common.sh': b'#!/bin/bash\necho oldcommon\n'}
         for name, data in self.old.items():
             target = self.home/name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -176,6 +177,19 @@ class LauncherInstallTests(unittest.TestCase):
         with patch.object(installer, 'COMMUNITY_MENU_HASHES', hashes):
             self.install()
         self.assertIn('assigned games selector', (self.home/'toolbox/modules/community.sh').read_text())
+
+
+    def test_upgrade_from_assigned_menu_updates_common_menu_and_can_restore_it(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        module = self.source/'toolbox/lib/common.sh'
+        module.write_bytes(module.read_bytes()+b'\n# readable menus\n')
+        with patch.object(installer, 'ASSIGNED_MENU_HASHES', hashes):
+            backup = self.install()
+        self.assertIn('readable menus', (self.home/'toolbox/lib/common.sh').read_text())
+        installer.restore(backup)
+        self.assertNotIn('readable menus', (self.home/'toolbox/lib/common.sh').read_text())
 
 
 if __name__ == '__main__':
