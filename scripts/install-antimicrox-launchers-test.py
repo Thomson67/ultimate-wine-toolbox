@@ -46,6 +46,8 @@ for previous in (BASE_HASHES, PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRAT
 
 READABLE_MENU_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70129bb4b01e05382b793410cfc3d9c227ad6b0c7830791bf', 'toolbox/modules/antimicrox.sh': 'bcab39647401b43d0f84ca1ee0582cb068ad2c271d8535b372e4276ae5bcfc95', 'toolbox/hooks/antimicrox-game-event.sh': 'e64e2d83ee294f5335fc2b98db599d4993b7c2164d9b497bd43978d6ff058f55', 'toolbox/modules/community.sh': 'd424080da815a1efd9c99f99215cbc8177baa65b658045c269dc5b3d634bbe78', 'toolbox/helpers/community_profiles.py': 'ce019e5ff04e58ddd7e5c8ff8f2947fdb11c2b3b945bdcd5f4f2c8304925f041', 'toolbox/helpers/community_service.py': '354e9d97fd21a283618168029e456cec1dd0f707d7a05bcadc6ccf6264486b6f', 'toolbox/lib/common.sh': '5aa122776105b2214151bf63f49d06b92561e5c164268a5c7458f1dbb452185a', 'toolbox/helpers/antimicrox_launcher.py': 'a3728a24c43000a5fe949b8eec3be3eedf6ce4570ac069301670fd5fea548de5'}
 
+REGULAR_MENU_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70129bb4b01e05382b793410cfc3d9c227ad6b0c7830791bf', 'toolbox/modules/antimicrox.sh': 'bcab39647401b43d0f84ca1ee0582cb068ad2c271d8535b372e4276ae5bcfc95', 'toolbox/hooks/antimicrox-game-event.sh': 'e64e2d83ee294f5335fc2b98db599d4993b7c2164d9b497bd43978d6ff058f55', 'toolbox/modules/community.sh': 'd424080da815a1efd9c99f99215cbc8177baa65b658045c269dc5b3d634bbe78', 'toolbox/helpers/community_profiles.py': 'ce019e5ff04e58ddd7e5c8ff8f2947fdb11c2b3b945bdcd5f4f2c8304925f041', 'toolbox/helpers/community_service.py': '354e9d97fd21a283618168029e456cec1dd0f707d7a05bcadc6ccf6264486b6f', 'toolbox/lib/common.sh': 'd009195a871c4edbb0ab31af987623ce75ff22ae4b9c056d9b08d459de288964', 'toolbox/helpers/antimicrox_launcher.py': 'a3728a24c43000a5fe949b8eec3be3eedf6ce4570ac069301670fd5fea548de5'}
+
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -75,25 +77,6 @@ def install(home, hook, ref, source=None):
         raise ValueError('Ce test nécessite la Toolbox v0.7.2.')
     targets = [(home/path, path) for path in BASE_HASHES]
     targets += [(home/HELPER, HELPER), (hook, 'toolbox/hooks/antimicrox-game-event.sh')]
-    upgrading = (home/HELPER).exists()
-    expected = BASE_HASHES
-    if upgrading:
-        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES):
-            if all(not target.is_symlink() and target.is_file() and
-                   sha(target.read_bytes()) == candidate.get(source_path)
-                   for target, source_path in targets):
-                expected = candidate
-                break
-        else:
-            raise ValueError('Version de test inconnue ou code modifié : aucun fichier modifié.')
-    for target, source_path in targets:
-        if target.is_symlink():
-            raise ValueError('Chemin symbolique inattendu : '+str(target))
-        if source_path == HELPER and not upgrading:
-            if target.exists():
-                raise ValueError('Le module de test existe déjà. Restaurer avant réinstallation.')
-        elif sha(target.read_bytes()) != expected[source_path]:
-            raise ValueError('Fichier modifié ou version différente : '+str(target)+'. Aucun fichier modifié.')
     payloads = {}
     for source_path in [*BASE_HASHES, HELPER]:
         if source:
@@ -109,6 +92,30 @@ def install(home, hook, ref, source=None):
         else:
             subprocess.run(['/bin/bash', '-n'], input=data, check=True)
         payloads[source_path] = data
+    if all(not target.is_symlink() and target.is_file() and
+           target.read_bytes() == payloads[source_path]
+           for target, source_path in targets):
+        print('Cette version de test est déjà installée. Aucun fichier modifié.')
+        return None
+    upgrading = (home/HELPER).exists()
+    expected = BASE_HASHES
+    if upgrading:
+        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES, REGULAR_MENU_HASHES):
+            if all(not target.is_symlink() and target.is_file() and
+                   sha(target.read_bytes()) == candidate.get(source_path)
+                   for target, source_path in targets):
+                expected = candidate
+                break
+        else:
+            raise ValueError('Version de test inconnue ou code modifié : aucun fichier modifié.')
+    for target, source_path in targets:
+        if target.is_symlink():
+            raise ValueError('Chemin symbolique inattendu : '+str(target))
+        if source_path == HELPER and not upgrading:
+            if target.exists():
+                raise ValueError('Le module de test existe déjà. Restaurer avant réinstallation.')
+        elif sha(target.read_bytes()) != expected[source_path]:
+            raise ValueError('Fichier modifié ou version différente : '+str(target)+'. Aucun fichier modifié.')
     # No installed file has been modified before all downloads and checks pass.
     stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
     backup = home/'state/backups'/('antimicrox-launchers-'+stamp)

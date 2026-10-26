@@ -205,5 +205,33 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertNotIn('regular menu font', (self.home/'toolbox/lib/common.sh').read_text())
 
 
+    def test_reinstalling_same_version_is_a_noop_including_copied_hook(self):
+        backup = self.install()
+        paths = [self.home/name for name in [*self.old, installer.HELPER]]+[self.hook]
+        before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in paths}
+        self.assertIsNone(self.install())
+        self.assertEqual(list((self.home/'state/backups').iterdir()), [backup])
+        self.assertEqual({path: (path.read_bytes(), path.stat().st_mtime_ns) for path in paths}, before)
+        installer.restore(backup)
+        self.assertFalse((self.home/installer.HELPER).exists())
+
+    def test_same_version_with_a_changed_hook_is_still_refused(self):
+        self.install()
+        self.hook.write_text('#!/bin/bash\necho local change\n')
+        with self.assertRaisesRegex(ValueError, 'code modifié'):
+            self.install()
+        self.assertIn('local change', self.hook.read_text())
+
+    def test_upgrade_from_regular_menu_version(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        module = self.source/'toolbox/lib/common.sh'
+        module.write_bytes(module.read_bytes()+b'\n# next version\n')
+        with patch.object(installer, 'REGULAR_MENU_HASHES', hashes):
+            self.install()
+        self.assertIn('next version', (self.home/'toolbox/lib/common.sh').read_text())
+
+
 if __name__ == '__main__':
     unittest.main()
