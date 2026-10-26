@@ -64,7 +64,11 @@ amx_manage_launcher_game /userdata/roms/windows/New.wine
             result = self.bash(home, '''
 amx_current_profile() { echo /userdata/Launcher.amgp; }
 amx_launcher_cmd() { [ "$1" != game-profile ] || echo /userdata/Game.amgp; }
-menu_select() { if [ -f "$WT_HOME/asked" ]; then echo back; else touch "$WT_HOME/asked"; echo edit_game; fi; }
+menu_select() {
+  if [ ! -f "$WT_HOME/asked" ]; then touch "$WT_HOME/asked"; echo edit_game;
+  elif [ ! -f "$WT_HOME/submenu" ]; then touch "$WT_HOME/submenu"; echo editor;
+  else echo back; fi
+}
 amx_editor() { printf '%s' "$1" > "$WT_HOME/edited"; }
 amx_set_profile() { touch "$WT_HOME/incorrect-reassignment"; }
 amx_manage_launcher_game /userdata/roms/windows/New.wine
@@ -103,31 +107,28 @@ amx_launcher_setup /userdata/roms/windows/New.wine
             self.assertEqual(choices, ['launcher', 'profiles', 'back'])
 
 
-    def test_direct_share_passes_current_rom_and_profile_in_both_menus(self):
+    def test_each_game_menu_has_one_grouped_sharing_entry_with_the_current_context(self):
         for launcher in (False, True):
-            for accept in (False, True):
-                with self.subTest(launcher=launcher, accept=accept), tempfile.TemporaryDirectory() as folder:
-                    home = Path(folder)
-                    code = r'''
+            with self.subTest(launcher=launcher), tempfile.TemporaryDirectory() as folder:
+                home = Path(folder)
+                result = self.bash(home, r'''
 amx_current_profile() { echo /userdata/Launcher.amgp; }
 amx_launcher_cmd() { :; }
 amx_associations() { :; }
 menu_select() {
   if [ -f "$WT_HOME/asked" ]; then echo back;
-  else printf '%s\0' "$@" > "$WT_HOME/menu"; touch "$WT_HOME/asked"; echo share; fi
+  else printf '%s\0' "$@" > "$WT_HOME/menu"; touch "$WT_HOME/asked"; echo sharing; fi
 }
-yesno() { printf '%s' "$2" > "$WT_HOME/notice"; [ "$ACCEPT" = 1 ]; }
-community_share() { printf '%s\0' "$@" > "$WT_HOME/shared"; }
+community_game_share_menu() { printf '%s\0' "$@" > "$WT_HOME/shared"; }
 "$MANAGE" /userdata/roms/windows/New.wine
-'''
-                    result = self.bash(home, code, MANAGE='amx_manage_launcher_game' if launcher else 'amx_manage_game', ACCEPT=str(int(accept)))
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertIn('share', (home/'menu').read_bytes().decode().split('\0')[2:-1:2])
-                    self.assertTrue((home/'shared').exists())
-                    if (home/'shared').exists():
-                        self.assertEqual((home/'shared').read_bytes().decode().split('\0')[:-1],
-                                         ['antimicrox', 'AntiMicroX', '/userdata/roms/windows/New.wine', '/userdata/Launcher.amgp'])
-                    self.assertFalse((home/'notice').exists())
+''', MANAGE='amx_manage_launcher_game' if launcher else 'amx_manage_game')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                options = (home/'menu').read_bytes().decode().split('\0')[2:-1:2]
+                self.assertIn('sharing', options)
+                self.assertNotIn('share', options)
+                self.assertNotIn('export', options)
+                self.assertEqual((home/'shared').read_bytes().decode().split('\0')[:-1],
+                                 ['AntiMicroX', '/userdata/roms/windows/New.wine', '/userdata/Launcher.amgp'])
 
     def test_community_direct_share_does_not_ask_to_select_the_profile_again(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -147,6 +148,78 @@ community_share antimicrox AntiMicroX /userdata/roms/windows/New.wine /userdata/
             self.assertEqual((home/'context').read_text(), '/userdata/Launcher.amgp\n/userdata/roms/windows/New.wine')
             self.assertEqual((home/'export').read_bytes().decode().split('\0')[:3], ['share', 'antimicrox', '/userdata/Launcher.amgp'])
             self.assertEqual((home/'submitted').read_text().strip(), 'package')
+
+
+    def test_each_profile_offers_live_and_standalone_editing_with_the_correct_file(self):
+        for role in ('launcher', 'game'):
+            for mode in ('live', 'editor'):
+                with self.subTest(role=role, mode=mode), tempfile.TemporaryDirectory() as folder:
+                    home = Path(folder)
+                    result = self.bash(home, r'''
+amx_current_profile() { echo /userdata/Launcher.amgp; }
+amx_launcher_cmd() { [ "$1" != game-profile ] || echo /userdata/Game.amgp; }
+menu_select() {
+  if [ ! -f "$WT_HOME/asked" ]; then touch "$WT_HOME/asked"; echo "edit_$ROLE";
+  elif [ ! -f "$WT_HOME/submenu" ]; then touch "$WT_HOME/submenu"; printf '%s\0' "$@" > "$WT_HOME/options"; echo "$MODE";
+  else echo back; fi
+}
+amx_editor() { printf '%s\0' "$@" > "$WT_HOME/editor"; }
+amx_live_start_for() { printf '%s\0' "$@" > "$WT_HOME/live"; }
+amx_set_profile() { touch "$WT_HOME/unwanted-reassignment"; }
+amx_manage_launcher_game /userdata/roms/windows/New.wine
+''', ROLE=role, MODE=mode)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    options = (home/'options').read_bytes().decode().split('\0')[2:-1:2]
+                    self.assertEqual(options, ['live', 'editor', 'back'])
+                    profile = '/userdata/Game.amgp' if role == 'game' else '/userdata/Launcher.amgp'
+                    if mode == 'live':
+                        self.assertEqual((home/'live').read_bytes().decode().split('\0')[:-1],
+                                         ['/userdata/roms/windows/New.wine', profile, '', role])
+                        self.assertFalse((home/'editor').exists())
+                    else:
+                        self.assertEqual((home/'editor').read_bytes().decode().split('\0')[:-1], [profile])
+                        self.assertFalse((home/'live').exists())
+                    self.assertFalse((home/'unwanted-reassignment').exists())
+
+    def test_window_recording_is_grouped_under_rules_instead_of_a_duplicate_main_action(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            result = self.bash(home, r'''
+amx_current_profile() { echo /userdata/Launcher.amgp; }
+amx_launcher_cmd() { :; }
+menu_select() {
+  if [ ! -f "$WT_HOME/main-options" ]; then printf '%s\0' "$@" > "$WT_HOME/main-options"; echo rules;
+  elif [ ! -f "$WT_HOME/rule-options" ]; then printf '%s\0' "$@" > "$WT_HOME/rule-options"; echo learn;
+  else echo back; fi
+}
+amx_launcher_relearn_for() { printf '%s' "$1" > "$WT_HOME/relearn"; }
+amx_manage_launcher_game /userdata/roms/windows/New.wine
+''')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            main = (home/'main-options').read_bytes().decode().split('\0')[2:-1:2]
+            self.assertIn('rules', main)
+            self.assertNotIn('learn', main)
+            rules = (home/'rule-options').read_bytes().decode().split('\0')
+            self.assertEqual(rules[2:-1:2], ['edit', 'learn', 'back'])
+            self.assertIn('refaire le relevé des fenêtres', '\n'.join(rules))
+            self.assertEqual((home/'relearn').read_text(), '/userdata/roms/windows/New.wine')
+
+    def test_relearn_uses_existing_launcher_profile_without_an_extra_selection(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            profile = home/'Launcher.amgp'; profile.touch()
+            result = self.bash(home, r'''
+amx_running() { return 1; }
+amx_current_profile() { echo "$WT_HOME/Launcher.amgp"; }
+menu_select() { touch "$WT_HOME/unwanted-picker"; return 1; }
+amx_launcher_cmd() { printf '%s\0' "$@" > "$WT_HOME/recording"; }
+amx_live_start_for() { printf '%s\0' "$@" > "$WT_HOME/live"; }
+amx_launcher_relearn_for /userdata/roms/windows/New.wine
+''')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((home/'unwanted-picker').exists())
+            self.assertEqual((home/'recording').read_bytes().decode().split('\0')[:-1], ['learn', '/userdata/roms/windows/New.wine'])
+            self.assertEqual((home/'live').read_bytes().decode().split('\0')[:-1], ['/userdata/roms/windows/New.wine', str(profile), 'learning'])
 
 
 if __name__ == '__main__':

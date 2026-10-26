@@ -196,39 +196,75 @@ community_share antimicrox AntiMicroX /userdata/roms/windows/Game.wine /userdata
         self.assertEqual((self.home/'export-command').read_bytes().decode().split('\0')[:-1], ['export-configs', '/userdata/roms/windows/Game.wine'])
 
 
-    def test_community_menu_exposes_complete_sharing_and_offline_export_in_both_languages(self):
+    def test_community_menu_groups_sharing_and_transfers_in_both_languages(self):
         for language in ('fr', 'en'):
-            for action, destination in [('share_game', 'community'), ('export', 'local')]:
-                with self.subTest(language=language, action=action), tempfile.TemporaryDirectory() as folder:
-                    home = Path(folder)
-                    script = r'''
+            with self.subTest(language=language), tempfile.TemporaryDirectory() as folder:
+                home = Path(folder)
+                script = r'''
 source "$ROOT/toolbox/modules/community.sh"
 i18n() { echo Back; }
 menu_select() {
   if [ -f "$WT_HOME/asked" ]; then echo back;
-  else touch "$WT_HOME/asked"; printf '%s\0' "$@" > "$WT_HOME/options"; echo "$ACTION"; fi
+  else touch "$WT_HOME/asked"; printf '%s\0' "$@" > "$WT_HOME/options"; echo share; fi
 }
-community_choose_profile_game() { echo /userdata/roms/windows/Launcher.wine; }
-amx_current_profile() { printf '%s' "$1" > "$WT_HOME/selected"; echo /userdata/launcher.amgp; }
-community_share() { printf '%s\0' "$@" > "$WT_HOME/shared"; }
-community_export_configs() { printf '%s\0' "$@" > "$WT_HOME/exported"; }
+community_share_menu() { printf '%s\0' "$@" > "$WT_HOME/group"; }
 community_menu antimicrox
 '''
-                    result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=5,
-                        env=dict(os.environ, ROOT=str(ROOT), WT_HOME=str(home), WT_LANGUAGE=language, ACTION=action))
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    options = (home/'options').read_bytes().decode().split('\0')
-                    self.assertIn('share_game', options[2:-1:2])
-                    self.assertIn('export', options[2:-1:2])
-                    if destination == 'local':
-                        self.assertTrue((home/'exported').exists())
-                        self.assertFalse((home/'shared').exists())
-                        self.assertFalse((home/'selected').exists())
-                    else:
-                        args = (home/'shared').read_bytes().decode().split('\0')[:-1]
-                        self.assertEqual(args[0], 'antimicrox')
-                        self.assertEqual(args[2:], ['/userdata/roms/windows/Launcher.wine', '/userdata/launcher.amgp', destination])
-                        self.assertEqual((home/'selected').read_text(), '/userdata/roms/windows/Launcher.wine')
+                result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=5,
+                    env=dict(os.environ, ROOT=str(ROOT), WT_HOME=str(home), WT_LANGUAGE=language))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                options = (home/'options').read_bytes().decode().split('\0')[2:-1:2]
+                self.assertIn('share', options)
+                self.assertNotIn('share_game', options)
+                self.assertNotIn('export', options)
+                self.assertNotIn('import', options)
+                self.assertNotIn('validate', options)
+                self.assertNotIn('forget', options)
+                self.assertTrue((home/'group').exists())
+
+    def test_grouped_sharing_menu_dispatches_every_transfer_action(self):
+        for action in ('game', 'profile', 'export', 'import', 'validate', 'forget'):
+            with self.subTest(action=action), tempfile.TemporaryDirectory() as folder:
+                home = Path(folder)
+                script = r'''
+source "$ROOT/toolbox/modules/community.sh"
+i18n() { echo Back; }
+menu_select() { if [ -f "$WT_HOME/asked" ]; then echo back; else touch "$WT_HOME/asked"; printf '%s\0' "$@" > "$WT_HOME/options"; echo "$ACTION"; fi; }
+community_share_game_config() { printf 'game\0%s\0' "$@" > "$WT_HOME/call"; }
+community_share() { printf 'profile\0%s\0' "$@" > "$WT_HOME/call"; }
+community_export_configs() { printf 'export\0%s\0' "$@" > "$WT_HOME/call"; }
+community_import_package() { printf 'import\0%s\0' "$@" > "$WT_HOME/call"; }
+community_validate() { printf 'validate\0%s\0' "$@" > "$WT_HOME/call"; }
+community_forget_access() { printf 'forget\0%s\0' "$@" > "$WT_HOME/call"; }
+community_share_menu AntiMicroX /userdata/roms/windows/Game.wine
+'''
+                result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=5,
+                    env=dict(os.environ, ROOT=str(ROOT), WT_HOME=str(home), WT_LANGUAGE='fr', ACTION=action))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                options = (home/'options').read_bytes().decode().split('\0')[2:-1:2]
+                self.assertEqual(options, ['game', 'profile', 'export', 'import', 'validate', 'forget', 'back'])
+                self.assertEqual((home/'call').read_bytes().decode().split('\0')[0], action)
+
+    def test_game_sharing_submenu_keeps_selected_rom_and_profile(self):
+        for action in ('share', 'export'):
+            with self.subTest(action=action), tempfile.TemporaryDirectory() as folder:
+                home = Path(folder)
+                script = r'''
+source "$ROOT/toolbox/modules/community.sh"
+i18n() { echo Back; }
+menu_select() { if [ -f "$WT_HOME/asked" ]; then echo back; else touch "$WT_HOME/asked"; printf '%s\0' "$@" > "$WT_HOME/options"; echo "$ACTION"; fi; }
+community_share() { printf '%s\0' "$@" > "$WT_HOME/share"; }
+community_export_configs() { printf '%s\0' "$@" > "$WT_HOME/export"; }
+community_game_share_menu AntiMicroX /userdata/roms/windows/Game.wine /userdata/Game.amgp
+'''
+                result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=5,
+                    env=dict(os.environ, ROOT=str(ROOT), WT_HOME=str(home), WT_LANGUAGE='fr', ACTION=action))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                options = (home/'options').read_bytes().decode().split('\0')[2:-1:2]
+                self.assertEqual(options, ['share', 'export', 'back'])
+                args = (home/action).read_bytes().decode().split('\0')[:-1]
+                if action == 'share': self.assertEqual(args, ['antimicrox', 'AntiMicroX', '/userdata/roms/windows/Game.wine', '/userdata/Game.amgp'])
+                else: self.assertEqual(args, ['AntiMicroX', '/userdata/roms/windows/Game.wine'])
 
     def test_game_configuration_share_does_not_fall_back_to_an_unrelated_profile(self):
         script = r'''

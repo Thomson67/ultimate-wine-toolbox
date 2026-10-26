@@ -43,6 +43,52 @@ amx_live_resume
         self.assertFalse(self.keys.exists())
         self.assertTrue(Path(data['profile']).is_file())
 
+    def test_editing_either_launcher_role_returns_to_game_management_without_reassignment(self):
+        for role in ('launcher', 'game'):
+            with self.subTest(role=role):
+                profile = self.home/'config/antimicrox-profiles'/(role+'.amgp')
+                profile.parent.mkdir(parents=True, exist_ok=True)
+                profile.write_text('<gamecontroller><sets/></gamecontroller>')
+                association = self.home/'config/antimicrox-games.tsv'
+                association.write_text(str(self.rom)+'\t/userdata/Launcher.amgp\n')
+                rules = self.home/'config/rules-preserved.json'; rules.write_text('{"unchanged":true}')
+                original_association, original_rules = association.read_bytes(), rules.read_bytes()
+                data = self.session.prepare(self.rom, str(profile), launcher_edit_role=role)
+                self.assertEqual(data['launcher_edit_role'], role)
+                self.assertEqual(data['profile'], str(profile))
+                self.assertIsNotNone(data['action'])
+                self.session.finish('normal')
+                fake_root = self.base/'toolbox'
+                (fake_root/'hooks').mkdir(parents=True, exist_ok=True)
+                (fake_root/'hooks/antimicrox-game-event.sh').write_text('#!/bin/bash\nexit 0\n')
+                script = r'''
+source "$MODULE"
+amx_live_cmd() { python3 "$HELPER" --home "$WT_HOME" "$@"; }
+amx_manage_launcher_game() { printf '%s' "$1" > "$WT_HOME/returned-game"; }
+amx_set_profile() { touch "$WT_HOME/unwanted-reassignment"; }
+menu_select() { touch "$WT_HOME/unwanted-activation-menu"; echo activate; }
+msgbox() { :; }
+amx_live_resume
+'''
+                result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=10,
+                    env=dict(os.environ, WT_HOME=str(self.home), WT_ROOT=str(fake_root), WT_LANGUAGE='fr',
+                             MODULE=str(ROOT/'toolbox/modules/antimicrox.sh'), HELPER=str(ROOT/'toolbox/helpers/antimicrox_live.py')))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual((self.home/'returned-game').read_text(), str(self.rom))
+                self.assertEqual(association.read_bytes(), original_association)
+                self.assertEqual(rules.read_bytes(), original_rules)
+                self.assertFalse((self.home/'unwanted-reassignment').exists())
+                self.assertFalse((self.home/'unwanted-activation-menu').exists())
+                self.assertFalse(self.session.state.exists())
+                self.assertFalse(self.keys.exists())
+                self.assertTrue(profile.is_file())
+
+    def test_invalid_launcher_edit_role_is_refused_before_preparing_a_session(self):
+        with self.assertRaisesRegex(ValueError, 'editing role'):
+            self.session.prepare(self.rom, launcher_edit_role='unknown')
+        self.assertFalse(self.session.state.exists())
+        self.assertFalse(self.keys.exists())
+
     def test_runtime_rules_test_uses_return_lifecycle_without_editor_shortcut(self):
         data = self.session.prepare(self.rom, runtime_test=True)
         self.assertTrue(data['runtime_test'])

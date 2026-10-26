@@ -563,24 +563,71 @@ community_validate() (
   done
 )
 
+community_game_share_menu() {
+  local title="$1" rom="$2" profile="$3" choice
+  while true; do
+    choice="$(menu_select "$title" "$(basename "$rom")\n\n$(community_txt 'Partager ou exporter cette configuration' 'Share or export this configuration')" \
+      share "$(community_txt 'Partager avec la communauté' 'Share with the community')" \
+      export "$(community_txt 'Exporter dans un ZIP' 'Export to a ZIP')" back "$(i18n back)")" || return
+    case "$choice" in
+      share) community_share antimicrox "$title" "$rom" "$profile" ;;
+      export) community_export_configs "$title" "$rom" ;;
+      *) return ;;
+    esac
+  done
+}
+
+community_forget_access() {
+  local title="$1" output
+        if yesno "$title" "$(community_txt 'Révoquer l’autorisation mémorisée et déconnecter ce Batocera ?' 'Revoke the remembered authorization and sign this Batocera out?')"; then
+          if output="$(community_service_cmd forget 2>&1)"; then msgbox "$title" "$(community_txt 'Accès local oublié et autorisation révoquée.' 'Local access forgotten and authorization revoked.')";
+          else msgbox "$title" "$(community_txt 'Accès local oublié. Si la révocation distante a échoué, révoquez aussi l’appareil depuis la page d’appairage.' 'Local access forgotten. If remote revocation failed, also revoke the device on the pairing page.')
+$output"; fi
+        fi
+}
+
+community_share_menu() {
+  local title="$1" rom="${2:-}" choice
+  while true; do
+    choice="$(menu_select "$title" "$(community_txt 'Partager et transférer des profils' 'Share and transfer profiles')" \
+      game "$(community_txt 'Partager la configuration complète d’un jeu' 'Share a complete game configuration')" \
+      profile "$(community_txt 'Partager un profil de manette' 'Share a controller profile')" \
+      export "$(community_txt 'Exporter des configurations dans un ZIP' 'Export configurations to a ZIP')" \
+      import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')" \
+      validate "$(community_txt 'Gérer les partages (modérateurs)' 'Manage submissions (moderators)')" \
+      forget "$(community_txt 'Retirer l’accès modérateur de ce PC' 'Remove moderator access from this PC')" back "$(i18n back)")" || return
+    case "$choice" in
+      game) community_share_game_config "$title" "$rom" community ;;
+      profile) community_share antimicrox "$title" "$rom" ;;
+      export) community_export_configs "$title" "$rom" ;;
+      import) community_import_package antimicrox "$title" "$rom" ;;
+      validate) community_validate antimicrox "$title" ;;
+      forget) community_forget_access "$title" ;;
+      *) return ;;
+    esac
+  done
+}
+
+
 community_menu() {
   local kind="$1" rom="${2:-}" title choice query="" rows id label selected details path output share_label empty_label count_label search_prompt
   local -a items=()
   local browse_label intro game_name
   local -A WT_MENU_GAME_LABELS=()
-  local -a config_options=()
+  local -a import_options=() management_options=()
   if [ "$kind" = antimicrox ]; then title="AntiMicroX — $(community_txt 'Profils communautaires' 'Community profiles')"; else title="ReShade — $(community_txt 'Presets communautaires' 'Community presets')"; fi
   if [ "$kind" = reshade ]; then
     share_label="$(community_txt 'Partager mon preset ReShade' 'Share my ReShade preset')"
+    import_options=(import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')")
+    management_options=(validate "$(community_txt 'Valider les partages (modérateurs)' 'Review submissions (moderators)')"
+      forget "$(community_txt 'Retirer l’accès modérateur de ce PC' 'Remove moderator access from this PC')")
     browse_label="$(community_txt 'Voir les presets disponibles' 'Browse available presets')"
     intro="$(community_txt 'Un preset contient les réglages visuels de ReShade. Téléchargez ceux d’autres joueurs ou partagez les vôtres. Un modérateur valide les partages avant publication.' 'A preset contains ReShade visual settings. Download presets from other players or share yours. A moderator reviews submissions before publication.')"
     empty_label="$(community_txt 'Aucun preset ReShade trouvé. Actualisez le catalogue ou partagez votre preset.' 'No ReShade preset found. Refresh the catalogue or share your preset.')"
     count_label="$(community_txt 'presets ReShade' 'ReShade presets')"
     search_prompt="$(community_txt 'Jeu, nom du preset ReShade ou auteur' 'Game, ReShade preset title or author')"
   else
-    share_label="$(community_txt 'Partager mon profil de manette' 'Share my controller profile')"
-    config_options=(share_game "$(community_txt 'Partager la configuration d’un jeu (profils et règles launcher)' 'Share a game configuration (profiles and launcher rules)')"
-      export "$(community_txt 'Exporter des configurations dans un ZIP' 'Export configurations to a ZIP')")
+    share_label="$(community_txt 'Partager et transférer des profils' 'Share and transfer profiles')"
     browse_label="$(community_txt 'Voir les profils disponibles' 'Browse available profiles')"
     intro="$(community_txt 'Un profil contient les commandes de la manette pour un jeu. Téléchargez ceux d’autres joueurs ou partagez les vôtres. Un modérateur valide les partages avant publication.' 'A profile contains controller mappings for a game. Download profiles from other players or share yours. A moderator reviews submissions before publication.')"
     empty_label="$(community_txt 'Aucun profil AntiMicroX trouvé. Actualisez le catalogue ou partagez votre profil.' 'No AntiMicroX profile found. Refresh the catalogue or share your profile.')"
@@ -592,28 +639,21 @@ community_menu() {
       browse "$browse_label" \
       search "$(community_txt 'Rechercher un jeu ou un auteur' 'Search for a game or author')" \
       refresh "$(community_txt 'Mettre à jour la liste' 'Refresh the list')" \
-      "${config_options[@]}" \
       share "$share_label" \
-      import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')" \
-      validate "$(community_txt 'Valider les partages (modérateurs)' 'Review submissions (moderators)')" \
-      forget "$(community_txt 'Retirer l’accès modérateur de ce PC' 'Remove moderator access from this PC')" back "$(i18n back)")" || return 0
+      "${import_options[@]}" \
+      "${management_options[@]}" back "$(i18n back)")" || return 0
     case "$choice" in
       refresh)
         if output="$(community_cmd refresh --kind "$kind" 2>&1)"; then msgbox "$title" "$(community_txt "Catalogue actualisé : $output $count_label." "Catalogue refreshed: $output $count_label.")"; else msgbox "$title" "$(community_txt 'Actualisation impossible ; le cache précédent reste disponible.' 'Refresh failed; the previous cache remains available.')
 $output"; fi
         continue ;;
-      share_game) community_share_game_config "$title" "$rom" community; continue ;;
-      export) community_share_game_config "$title" "$rom" local; continue ;;
-      share) community_share "$kind" "$title" "$rom"; continue ;;
+      share)
+        if [ "$kind" = antimicrox ]; then community_share_menu "$title" "$rom";
+        else community_share "$kind" "$title" "$rom"; fi
+        continue ;;
       import) community_import_package "$kind" "$title" "$rom"; continue ;;
       validate) community_validate "$kind" "$title"; continue ;;
-      forget)
-        if yesno "$title" "$(community_txt 'Révoquer l’autorisation mémorisée et déconnecter ce Batocera ?' 'Revoke the remembered authorization and sign this Batocera out?')"; then
-          if output="$(community_service_cmd forget 2>&1)"; then msgbox "$title" "$(community_txt 'Accès local oublié et autorisation révoquée.' 'Local access forgotten and authorization revoked.')";
-          else msgbox "$title" "$(community_txt 'Accès local oublié. Si la révocation distante a échoué, révoquez aussi l’appareil depuis la page d’appairage.' 'Local access forgotten. If remote revocation failed, also revoke the device on the pairing page.')
-$output"; fi
-        fi
-        continue ;;
+      forget) community_forget_access "$title"; continue ;;
       search) query="$(input_text "$title" "$search_prompt" '')" || continue ;;
       browse) query="" ;;
       *) return 0 ;;

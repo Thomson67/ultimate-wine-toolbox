@@ -338,16 +338,14 @@ amx_manage_game() {
       live "$(amx_txt 'Modifier les commandes et tester en jeu' 'Edit controls and test in game')" \
       edit "$(amx_txt 'Modifier le profil sans lancer le jeu' 'Edit the profile without starting the game')" \
       info "$(amx_txt 'Voir les commandes et les informations du profil' 'View profile controls and information')" \
-      share "$(amx_txt 'Partager ce profil avec la communauté' 'Share this profile with the community')" \
-      export "$(amx_txt 'Exporter la configuration dans un ZIP' 'Export configuration to a ZIP')" \
+      sharing "$(amx_txt 'Partager ou exporter' 'Share or export')" \
       replace "$(amx_txt 'Choisir un autre profil pour ce jeu' 'Choose another profile for this game')" \
       remove "$(amx_txt 'Désactiver pour ce jeu (garder le profil)' 'Disable for this game (keep the profile)')" \
       delete "$(amx_txt 'Supprimer ce profil pour tous les jeux' 'Delete this profile for all games')" \
       back "$(i18n back)")" || return
     case "$choice" in
       info) amx_profile_info "$profile" ;;
-      share) community_share antimicrox AntiMicroX "$rom" "$profile" ;;
-      export) community_share antimicrox AntiMicroX "$rom" "$profile" local ;;
+      sharing) community_game_share_menu AntiMicroX "$rom" "$profile" ;;
       delete) amx_delete_profile_for "$profile" ;;
       edit) amx_editor "$profile" ;;
       live)
@@ -393,7 +391,7 @@ amx_manage_associations() {
 }
 amx_live_cmd() { python3 "$WT_ROOT/helpers/antimicrox_live.py" --home "$WT_HOME" "$@"; }
 amx_live_start_for() {
-  local rom="$1" profile="${2:-}" learning="${3:-}" selected switch_label
+  local rom="$1" profile="${2:-}" learning="${3:-}" edit_role="${4:-}" selected switch_label edit_notice=""
   local -a options=()
   amx_ensure_installed || return 1
   [ -w /dev/uinput ] || {
@@ -407,12 +405,16 @@ amx_live_start_for() {
   fi
   [ -z "$profile" ] || options=(--profile "$profile")
   [ "$learning" != learning ] || options+=(--launcher-learning)
+  if [ -n "$edit_role" ]; then
+    options+=(--launcher-role "$edit_role")
+    edit_notice="$(amx_txt 'Le profil choisi reste actif pendant cette session de réglage. Les règles automatiques seront utilisées aux lancements normaux.' 'The selected profile remains active during this editing session. Automatic rules apply on normal launches.')"
+  fi
   if ! selected="$(amx_live_cmd prepare "$rom" "${options[@]}" 2>/tmp/uwt-amx-live.log)"; then
     msgbox AntiMicroX "$(amx_txt 'Préparation impossible :' 'Preparation failed:')\n$(cat /tmp/uwt-amx-live.log)"
     return 1
   fi
   switch_label="$(amx_live_cmd field "switch_$WT_LANGUAGE")"
-  msgbox AntiMicroX "$(amx_txt "Le jeu va démarrer avec l’éditeur ouvert.\n\nBasculer : $switch_label (activation directe des fenêtres). Appuyez puis relâchez les boutons pour basculer.\n\nModifiez puis testez vos affectations. Cliquez sur Enregistrer dans AntiMicroX AVANT de quitter le jeu.\n\nProfil : $selected\n\nLa combinaison est temporaire. Le menu AntiMicroX reviendra à la fin du jeu." "The game will start with the editor open.\n\nSwitch: $switch_label (direct window activation). Press and release the buttons to switch.\n\nEdit and test your mappings. Click Save in AntiMicroX BEFORE quitting the game.\n\nProfile: $selected\n\nThe shortcut is temporary. The AntiMicroX menu will return when the game closes.")" || {
+  msgbox AntiMicroX "$(amx_txt "Le jeu va démarrer avec l’éditeur ouvert.\n\nBasculer : $switch_label (activation directe des fenêtres). Appuyez puis relâchez les boutons pour basculer.\n\nModifiez puis testez vos affectations. Cliquez sur Enregistrer dans AntiMicroX AVANT de quitter le jeu.\n\nProfil : $selected\n$edit_notice\n\nLa combinaison est temporaire. Le menu AntiMicroX reviendra à la fin du jeu." "The game will start with the editor open.\n\nSwitch: $switch_label (direct window activation). Press and release the buttons to switch.\n\nEdit and test your mappings. Click Save in AntiMicroX BEFORE quitting the game.\n\nProfile: $selected\n$edit_notice\n\nThe shortcut is temporary. The AntiMicroX menu will return when the game closes.")" || {
     if amx_live_cmd finish --result cancelled; then amx_live_cmd clear; fi
     return 1
   }
@@ -481,6 +483,13 @@ amx_live_resume() {
     amx_launcher_test_resume "$rom" "$result" "$error"
     return
   fi
+  case "$(amx_live_cmd field launcher_edit_role)" in
+    launcher|game)
+      amx_live_cmd clear || return 1
+      [ -z "$error" ] || msgbox AntiMicroX "$result\n$error"
+      amx_manage_launcher_game "$rom"
+      return ;;
+  esac
   if [ "$(amx_live_cmd field launcher_learning)" = True ]; then
     amx_live_cmd clear || return 1
     [ -z "$error" ] || msgbox AntiMicroX "$result\n$error"
@@ -551,9 +560,7 @@ amx_launcher_test_resume() {
         return ;;
       learn)
         amx_live_cmd clear || return 1
-        profile="$(amx_current_profile "$rom")"
-        amx_launcher_cmd learn "$rom" || return 1
-        amx_live_start_for "$rom" "$profile" learning
+        amx_launcher_relearn_for "$rom"
         return ;;
       *) amx_live_cmd clear; return ;;
     esac
@@ -642,6 +649,21 @@ amx_launcher_setup() {
   [ "$choice" != test ] || amx_launcher_test_start "$rom"
 }
 
+
+amx_edit_launcher_profile() {
+  local rom="$1" profile="$2" role="$3" label choice
+  if [ "$role" = game ]; then label="$(amx_txt 'Profil jeu' 'Game profile')";
+  else label="$(amx_txt 'Profil launcher' 'Launcher profile')"; fi
+  choice="$(menu_select AntiMicroX "$label\n$profile\n\n$(amx_txt 'Comment souhaitez-vous modifier les commandes ?' 'How do you want to edit the controls?')" \
+    live "$(amx_txt 'Modifier le profil en jeu' 'Edit the profile in game')" \
+    editor "$(amx_txt 'Modifier le profil sans lancer le jeu' 'Edit the profile without starting the game')" \
+    back "$(i18n back)")" || return
+  case "$choice" in
+    live) amx_live_start_for "$rom" "$profile" "" "$role" ;;
+    editor) amx_editor "$profile" ;;
+  esac
+}
+
 amx_manage_launcher_game() {
   local rom="$1" profile game_profile choice output
   local -a items=()
@@ -653,22 +675,18 @@ amx_manage_launcher_game() {
       rules "$(amx_txt 'Modifier les fenêtres, le mode ou les profils associés' 'Edit windows, mode or assigned profiles')"
       edit_launcher "$(amx_txt 'Modifier les commandes du profil launcher' 'Edit launcher profile controls')")
     [ -z "$game_profile" ] || items+=(edit_game "$(amx_txt 'Modifier les commandes du profil jeu' 'Edit game profile controls')")
-    items+=(export "$(amx_txt 'Exporter la configuration complète dans un ZIP' 'Export the complete configuration to a ZIP')"
-      share "$(amx_txt 'Partager la configuration complète avec la communauté' 'Share the complete configuration with the community')"
-      learn "$(amx_txt 'Configurer en jeu et refaire le relevé des fenêtres' 'Configure in game and record windows again')"
+    items+=(sharing "$(amx_txt 'Partager ou exporter' 'Share or export')"
       info "$(amx_txt 'Voir les règles et les profils' 'View rules and profiles')"
       classic "$(amx_txt 'Désactiver les règles launcher (garder le profil)' 'Disable launcher rules (keep the profile)')"
       remove "$(amx_txt 'Désactiver AntiMicroX pour ce jeu (garder les profils)' 'Disable AntiMicroX for this game (keep profiles)')"
       back "$(i18n back)")
     choice="$(menu_select AntiMicroX "$(basename "$rom")\n\n$(amx_txt 'Jeu avec launcher' 'Game with a launcher')\n$(amx_txt 'Profil launcher :' 'Launcher profile:') $profile${game_profile:+\n$(amx_txt 'Profil jeu :' 'Game profile:') $game_profile}" "${items[@]}")" || return
     case "$choice" in
-      share) community_share antimicrox AntiMicroX "$rom" "$profile" ;;
-      export) community_share antimicrox AntiMicroX "$rom" "$profile" local ;;
+      sharing) community_game_share_menu AntiMicroX "$rom" "$profile" ;;
       test) amx_launcher_test_start "$rom" ;;
-      rules) amx_launcher_setup "$rom" ;;
-      edit_launcher) amx_editor "$profile" ;;
-      edit_game) [ -z "$game_profile" ] || amx_editor "$game_profile" ;;
-      learn) amx_launcher_learn_for "$rom"; return ;;
+      rules) amx_launcher_rules_menu "$rom" ;;
+      edit_launcher) amx_edit_launcher_profile "$rom" "$profile" launcher ;;
+      edit_game) [ -z "$game_profile" ] || amx_edit_launcher_profile "$rom" "$game_profile" game ;;
       info)
         output="$(amx_launcher_cmd show "$rom" 2>&1)"
         msgbox AntiMicroX "$output"
@@ -690,6 +708,31 @@ amx_manage_launcher_game() {
       *) return ;;
     esac
   done
+}
+
+
+
+amx_launcher_rules_menu() {
+  local rom="$1" choice
+  choice="$(menu_select AntiMicroX "$(basename "$rom")\n\n$(amx_txt 'Fenêtres, mode et profils associés' 'Windows, mode and assigned profiles')" \
+    edit "$(amx_txt 'Modifier les règles avec les fenêtres déjà relevées' 'Edit rules using the recorded windows')" \
+    learn "$(amx_txt 'Relancer le jeu et refaire le relevé des fenêtres' 'Restart the game and record windows again')" \
+    back "$(i18n back)")" || return
+  case "$choice" in
+    edit) amx_launcher_setup "$rom" ;;
+    learn) amx_launcher_relearn_for "$rom" ;;
+  esac
+}
+
+amx_launcher_relearn_for() {
+  local rom="$1" profile
+  if amx_running; then
+    msgbox AntiMicroX "$(amx_txt 'Fermez le jeu et AntiMicroX avant le relevé.' 'Close the game and AntiMicroX before recording windows.')"; return 1
+  fi
+  profile="$(amx_current_profile "$rom")"
+  [ -f "$profile" ] || return 1
+  amx_launcher_cmd learn "$rom" || return 1
+  amx_live_start_for "$rom" "$profile" learning
 }
 
 amx_launcher_learn_for() {

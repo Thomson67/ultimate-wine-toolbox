@@ -311,5 +311,18 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertNotIn('bulk configuration export', (self.home/'toolbox/helpers/community_profiles.py').read_text())
 
 
+    def test_upgrade_from_bulk_export_version_updates_role_editing_helpers(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        module = self.source/'toolbox/helpers/antimicrox_live.py'
+        module.write_bytes(module.read_bytes()+b'\n# edit launcher or game role\n')
+        with patch.object(installer, 'BULK_EXPORT_HASHES', hashes):
+            backup = self.install()
+        self.assertIn('edit launcher or game role', (self.home/'toolbox/helpers/antimicrox_live.py').read_text())
+        installer.restore(backup)
+        self.assertNotIn('edit launcher or game role', (self.home/'toolbox/helpers/antimicrox_live.py').read_text())
+
+
 if __name__ == '__main__':
     unittest.main()

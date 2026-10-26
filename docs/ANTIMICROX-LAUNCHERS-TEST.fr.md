@@ -106,7 +106,8 @@ Dans **Mes jeux et leurs profils**, choisir le jeu puis :
 - **Partager la configuration complète avec la communauté** : envoi pour validation.
 - **Exporter la configuration complète dans un ZIP** : création locale sans publication.
 
-Dans **Télécharger ou partager des profils**, l’action **Exporter des configurations
+Dans **Télécharger ou partager des profils > Partager et transférer des profils**,
+l’action **Exporter des configurations
 dans un ZIP** affiche une liste à cocher limitée aux jeux ayant un profil associé
 disponible. Cochez un ou plusieurs jeux puis validez : un seul ZIP est créé dans
 `exports/antimicrox/`. Les noms sont déduits automatiquement, sans question sur
@@ -116,7 +117,7 @@ contient uniquement sa configuration.
 
 Sur l’autre machine, installer cette version de test ou une version ultérieure
 compatible, puis télécharger le partage ou ouvrir **Télécharger ou partager des
-profils > Importer un paquet ZIP**. Pour un export groupé, toutes les configurations
+profils > Partager et transférer des profils > Importer un paquet ZIP**. Pour un export groupé, toutes les configurations
 sont importées et une liste permet de choisir celles à associer aux jeux de
 la nouvelle machine. Choisir ensuite le jeu cible et l’option
 **Utiliser ce profil pour un jeu** : les règles sont associées à ce jeu et les deux
@@ -152,3 +153,27 @@ Les listes de noms seuls restent en écriture normale.
 Le lanceur du terminal conserve la couleur noire des noms en gras : le gras
 ne transforme plus le noir en gris clair. Ce réglage s’applique au prochain
 lancement complet de la Toolbox, y compris après le retour d’un jeu.
+
+## Modifier séparément les deux profils
+
+Dans **Mes jeux et leurs profils**, choisir le jeu puis **Modifier les commandes
+du profil launcher** ou **Modifier les commandes du profil jeu**. Chacune de ces
+actions propose **Modifier le profil en jeu** et **Modifier le profil sans lancer
+le jeu**. Le profil sélectionné reste chargé durant l’édition en jeu. À la fin,
+la Toolbox revient au menu du jeu sans remplacer l’association launcher par le
+profil jeu. Les règles de bascule et l’autre profil sont conservés.
+
+Dans **Modifier les fenêtres, le mode ou les profils associés**, deux choix
+sont regroupés : modifier les règles avec le relevé existant, ou relancer le jeu
+pour refaire le relevé. Il n’y a plus d’entrée de relevé séparée dans le menu
+principal du jeu. L’action **Refaire le relevé des fenêtres** est réservée à la détection. Elle
+réutilise le profil launcher associé, sans demander de créer ou choisir un
+autre profil. Les modifications de commandes passent par les deux sous-menus
+launcher/jeu décrits ci-dessus.
+
+## Partage regroupé
+
+Dans le menu d’un jeu, **Partager ou exporter** contient le partage communautaire
+et l’export ZIP. Dans **Télécharger ou partager des profils**, **Partager et
+transférer des profils** regroupe le partage complet d’un jeu, le partage d’un
+profil seul, l’export groupé, l’import ZIP et les actions de modération.

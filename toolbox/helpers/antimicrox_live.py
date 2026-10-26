@@ -114,7 +114,9 @@ class LiveSession:
     def write(self, data):
         atomic(self.state, json.dumps(data, ensure_ascii=False, indent=2).encode())
 
-    def prepare(self, rom, profile=None, runtime_test=False, launcher_learning=False):
+    def prepare(self, rom, profile=None, runtime_test=False, launcher_learning=False, launcher_edit_role=None):
+        if launcher_edit_role not in (None, 'launcher', 'game'):
+            raise ValueError('Invalid launcher editing role')
         with self.locked():
             if self.state.exists():
                 raise ValueError('A previous live session must be recovered first.')
@@ -174,6 +176,8 @@ class LiveSession:
                     'mode': mode, 'injected_sha256': digest(injected), 'displaced': displaced,
                     'result': '', 'error': '', 'action': action,
                     'switch_fr': switch_fr, 'switch_en': switch_en}
+            if launcher_edit_role:
+                data['launcher_edit_role'] = launcher_edit_role
             if launcher_learning:
                 data['launcher_learning'] = True
             if runtime_test:
@@ -291,6 +295,7 @@ def main():
     sub = parser.add_subparsers(dest='command', required=True)
     prepare = sub.add_parser('prepare'); prepare.add_argument('rom'); prepare.add_argument('--profile')
     prepare.add_argument('--launcher-learning', action='store_true')
+    prepare.add_argument('--launcher-role', choices=('launcher', 'game'))
     profile = sub.add_parser('profile'); profile.add_argument('rom')
     mark = sub.add_parser('mark'); mark.add_argument('rom'); mark.add_argument('--phase'); mark.add_argument('--error')
     finish = sub.add_parser('finish'); finish.add_argument('--rom'); finish.add_argument('--result', default='stopped')
@@ -300,7 +305,7 @@ def main():
     args = parser.parse_args()
     session = LiveSession(args.home)
     if args.command == 'prepare':
-        print(session.prepare(args.rom, args.profile, launcher_learning=args.launcher_learning)['profile'])
+        print(session.prepare(args.rom, args.profile, launcher_learning=args.launcher_learning, launcher_edit_role=args.launcher_role)['profile'])
     elif args.command == 'profile':
         print(session.profile(args.rom))
     elif args.command == 'mark':
