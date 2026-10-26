@@ -70,6 +70,11 @@ menu_select Title Prompt 'tag with spaces' 'Full description with a long game na
 
     @unittest.skipUnless(shutil.which('dialog'), 'Real Dialog required for terminal interaction')
     def test_real_dialog_small_terminal_full_text_then_return_and_select(self):
+        for data_list in (0, 1):
+            with self.subTest(data_list=data_list):
+                self.run_native_dialog(data_list)
+
+    def run_native_dialog(self, data_list):
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder)
             wrapper = home/'dialog'
@@ -92,12 +97,14 @@ exec "$REAL_DIALOG" "$@"
 source "$WT_ROOT/lib/common.sh"
 WT_LANGUAGE=fr; load_i18n
 wt_clear_tty() { :; }
+WT_MENU_LIST="$TEST_LIST"
+if [ "$TEST_LIST" = 1 ]; then declare -A WT_MENU_GAME_LABELS=(["tag with spaces"]="Un nom de jeu"); fi
 menu_select Title Prompt 'tag with spaces' "$DESCRIPTION" back Back > "$SELECTION"
 '''
             description = '[Launcher] '+('Un nom de jeu très long et sa description détaillée. '*20)
             env = dict(os.environ, TERM='xterm', PATH=str(home)+os.pathsep+os.environ['PATH'],
                        REAL_DIALOG=shutil.which('dialog'), DIALOG_LOG=str(home/'log'),
-                       WT_ROOT=str(ROOT/'toolbox'), DESCRIPTION=description, SELECTION=str(home/'selected'))
+                       WT_ROOT=str(ROOT/'toolbox'), TEST_LIST=str(data_list), DESCRIPTION=description, SELECTION=str(home/'selected'))
             proc = subprocess.Popen(['bash', '-c', script], stdin=slave, stdout=slave, stderr=slave, env=env)
             os.close(slave)
             output = b''; stage = 0; deadline = time.monotonic()+8
@@ -127,8 +134,21 @@ menu_select Title Prompt 'tag with spaces' "$DESCRIPTION" back Back > "$SELECTIO
                 self.assertIn('button_active_color = (WHITE,BLUE,OFF)', theme)
                 self.assertIn('title_color = (BLUE,WHITE,ON)', theme)
                 self.assertIn('dialog_color = (BLACK,WHITE,OFF)', theme)
-                self.assertIn('tag_color = dialog_color', theme)
                 self.assertIn('item_color = dialog_color', theme)
+                if data_list:
+                    self.assertIn('tag_key_color = tag_color', theme)
+                    self.assertIn('tag_key_selected_color = tag_selected_color', theme)
+                    self.assertIn('tag_color = (BLACK,WHITE,ON)', theme)
+                    self.assertIn('tag_selected_color = (YELLOW,BLUE,ON)', theme)
+                    self.assertNotIn('--no-tags', first)
+                    self.assertIn('[Launcher] Un nom de jeu', first)
+                    self.assertNotIn('--colors', first)
+                    self.assertNotIn(b'\\Zb', output)
+                else:
+                    self.assertIn('tag_color = dialog_color', theme)
+                    self.assertIn('tag_key_color = button_key_inactive_color', theme)
+                    self.assertIn('button_key_inactive_color = (RED,WHITE,OFF)', theme)
+                    self.assertNotIn('--colors', first)
                 self.assertFalse(Path((home/'log.theme-path').read_text()).exists())
                 wrapped = (home/'log.text').read_text()
                 self.assertTrue(all(len(line) <= 68 for line in wrapped.splitlines()))
@@ -137,6 +157,57 @@ menu_select Title Prompt 'tag with spaces' "$DESCRIPTION" back Back > "$SELECTIO
             finally:
                 if proc.poll() is None: proc.kill(); proc.wait()
                 os.close(master)
+
+
+    def test_game_name_columns_preserve_details_and_action_values(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            result = self.shell(home, r'''
+have_dialog() { return 0; }; tput() { echo 120; }
+declare -A WT_MENU_GAME_LABELS=([one]='Game — Part II' [two]='Plain game')
+dialog() { printf '%s\0' "$@" > "$TEST_HOME/args"; echo one; }
+WT_MENU_LIST=1 menu_select Title Prompt one '[Launcher] Game — Part II — Launcher.amgp' two 'Plain game' back Back
+''')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), 'one')
+            args = (home/'args').read_bytes().decode().split('\0')
+            self.assertIn('[Launcher] Game — Part II', args)
+            self.assertIn('Launcher.amgp', args)
+            self.assertNotIn('--no-tags', args)
+            self.assertIn('Plain game', args)
+            self.assertNotIn('\\ZbPlain game', '\n'.join(args))
+
+    def test_literal_dialog_sequences_in_names_are_never_interpreted(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            result = self.shell(home, r'''
+have_dialog() { return 0; }; tput() { echo 120; }
+declare -A WT_MENU_GAME_LABELS=([one]='Game' [two]='Plain game')
+dialog() { printf '%s\0' "$@" > "$TEST_HOME/args"; echo one; }
+WT_MENU_LIST=1 menu_select Title Prompt one 'Game — profile' two 'C:\Zelda.amgp' back Back
+''')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            args = (home/'args').read_bytes().decode().split('\0')
+            self.assertNotIn('--colors', args)
+            self.assertIn('C:\\Zelda.amgp', args)
+
+
+    def test_duplicate_game_names_keep_distinct_action_values(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            result = self.shell(home, r'''
+have_dialog() { return 0; }; tput() { echo 120; }
+declare -A WT_MENU_GAME_LABELS=([one]='Same game' [two]='Same game')
+dialog() { printf '%s\0' "$@" > "$TEST_HOME/args"; printf 'Same game (2)'; }
+WT_MENU_LIST=1 menu_select Title Prompt one 'Same game — Profile A' two 'Same game — Profile B' back Back
+''')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, 'two')
+            args = (home/'args').read_bytes().decode().split('\0')
+            self.assertIn('Same game', args)
+            self.assertIn('Same game (2)', args)
+            self.assertIn('Profile A', args)
+            self.assertIn('Profile B', args)
 
 
 if __name__ == '__main__':

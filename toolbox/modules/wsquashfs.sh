@@ -260,7 +260,7 @@ wsq_select_template() {
         }
     fi
 
-    choice="$(menu_select "$(i18n wsq_templates_title)" "$(i18n wsq_templates_prompt)" "${items[@]}")" || return 1
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n wsq_templates_title)" "$(i18n wsq_templates_prompt)" "${items[@]}")" || return 1
     WSQ_SELECTED_TEMPLATE="$(sed -n "${choice}p" <<< "$rows")"
     [ -n "$WSQ_SELECTED_TEMPLATE" ]
 }
@@ -347,7 +347,7 @@ wsq_select_executable() {
         return 1
     fi
 
-    choice="$(menu_select "$(i18n wsq_executable_title)" "$(i18n wsq_executable_prompt)" "${items[@]}")" || return 1
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n wsq_executable_title)" "$(i18n wsq_executable_prompt)" "${items[@]}")" || return 1
     sed -n "${choice}p" <<< "$rows"
 }
 
@@ -442,7 +442,7 @@ wsq_select_runner() {
         idx=$((idx+1))
     done < <(wsq_runner_candidates)
 
-    choice="$(menu_select "$(i18n wsq_runner_title)" "$(i18n wsq_runner_prompt)" "${items[@]}")" || return 1
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n wsq_runner_title)" "$(i18n wsq_runner_prompt)" "${items[@]}")" || return 1
     sed -n "${choice}p" <<< "$rows"
 }
 
@@ -837,7 +837,7 @@ wsq_browse_save_terminal() {
             dirs+=("$path")
             items+=("${#dirs[@]}" "$(basename "$path")/")
         done < <(python3 "$WSQ_HELPER" directories "$prefix" "$current" --save-root "$WSQ_SAVE_ROOT" 2>/dev/null)
-        choice="$(menu_select "$(i18n wsq_browser_title)" \
+        choice="$(WT_MENU_LIST=1 menu_select "$(i18n wsq_browser_title)" \
             "$(i18n wsq_browser_prompt "$(wsq_display_path "$current")")" "${items[@]}")" || return 1
         case "$choice" in
             inspect) wsq_inspect_folder "$current" || true ;;
@@ -905,7 +905,7 @@ wsq_select_savefiles() {
         msgbox "$(i18n wsq_files_title)" "$(i18n wsq_files_none)"
         return 1
     fi
-    choice="$(menu_select "$(i18n wsq_files_title)" "$(i18n wsq_files_folder)" "${items[@]}")" || return 1
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n wsq_files_title)" "$(i18n wsq_files_folder)" "${items[@]}")" || return 1
     case "$choice" in ''|*[!0-9]*) return 1 ;; esac
     [ "$choice" -ge 1 ] && [ "$choice" -le "${#folders[@]}" ] || return 1
     folder="${folders[$((choice-1))]}"

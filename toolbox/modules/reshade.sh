@@ -193,7 +193,7 @@ resh_install_game() {
     if [ "$resumed" -eq 0 ] && [ "${#exes[@]}" -eq 1 ]; then
         exe="${exes[0]}"
     elif [ "$resumed" -eq 0 ]; then
-        selected="$(menu_select "$(i18n resh_title)" "$(i18n resh_exe_prompt)" "${items[@]}")" || return 1
+        selected="$(WT_MENU_LIST=1 menu_select "$(i18n resh_title)" "$(i18n resh_exe_prompt)" "${items[@]}")" || return 1
         case "$selected" in ''|*[!0-9]*) return 1 ;; esac
         [ "$selected" -ge 1 ] && [ "$selected" -le "${#exes[@]}" ] || return 1
         exe="${exes[$((selected-1))]}"
@@ -232,7 +232,7 @@ PY_PENDING
         current="$(resh_cmd details "$rom")"
         [ -z "$current" ] || items+=(current "$(i18n resh_model_current)")
         items+=(community "$(community_txt 'Rechercher un preset dans la base communautaire' 'Find a preset in the community catalogue')")
-        model="$(menu_select "$(i18n resh_title)" "$(i18n resh_model_prompt)" "${items[@]}")" || return 1
+        model="$(WT_MENU_LIST=1 menu_select "$(i18n resh_title)" "$(i18n resh_model_prompt)" "${items[@]}")" || return 1
         case "$model" in
             standard|retro|thomson|manual) defaults="$(resh_model_packs "$model")" ;;
             community) community_preset="$(community_choose_reshade_preset "$(i18n resh_title)")" || return 1; model=community-preset; defaults=""; apply_community=1 ;;
@@ -432,6 +432,7 @@ resh_game_rows() {
 resh_pick_game() {
     local filter="${1:-all}" query="${2:-}" rom choice path name state label enabled_label disabled_label missing_label external_enabled external_disabled external_unsupported
     local -a games=() items=()
+    local -A WT_MENU_GAME_LABELS=()
     enabled_label="$(i18n resh_status_enabled)"
     disabled_label="$(i18n resh_status_disabled)"
     missing_label="$(i18n resh_status_missing)"
@@ -450,10 +451,11 @@ resh_pick_game() {
             external-unsupported) label="$external_unsupported" ;;
             *) label="$missing_label" ;;
         esac
+        WT_MENU_GAME_LABELS["${#games[@]}"]="$name"
         items+=("${#games[@]}" "$name — $label")
     done < <(resh_game_rows "$filter" 2>> "${WT_SESSION_LOG:-/dev/null}")
     [ "${#games[@]}" -gt 0 ] || { msgbox "$(i18n resh_title)" "$(i18n resh_no_match)"; return; }
-    choice="$(menu_select "$(i18n resh_title)" "$(i18n resh_game_prompt)" "${items[@]}")" || return
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n resh_title)" "$(i18n resh_game_prompt)" "${items[@]}")" || return
     case "$choice" in ''|*[!0-9]*) return ;; esac
     [ "$choice" -ge 1 ] && [ "$choice" -le "${#games[@]}" ] || return
     rom="${games[$((choice-1))]}"

@@ -62,6 +62,17 @@ class CommunityTests(unittest.TestCase):
                 path.unlink()
                 self.assertIsNone(self.community.local_profile(item))
 
+    def test_optional_game_column_retains_exact_catalogue_game_name(self):
+        item, _ = self.catalogue()
+        output = io.StringIO()
+        with patch.object(sys, 'argv', ['community', '--home', str(self.home), 'list', 'antimicrox', '--with-game']), contextlib.redirect_stdout(output):
+            community.main()
+        fields = output.getvalue().rstrip('\n').split('\t')
+        self.assertEqual(len(fields), 3)
+        self.assertEqual(fields[0], item['id'])
+        self.assertEqual(fields[2], item['game'])
+        self.assertEqual(fields[1], community.entry_label(item))
+
     def test_generic_internal_profile_name_falls_back_to_game_filename(self):
         source = self.base/'Max Payne.amgp'
         source.write_text('<gamecontroller><profilename>Default</profilename></gamecontroller>')

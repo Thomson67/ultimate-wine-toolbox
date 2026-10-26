@@ -95,7 +95,7 @@ wsq_dotnet_restore_menu() {
         msgbox "$(i18n dotnet_title)" "$(i18n dotnet_no_backup)"
         return 1
     }
-    choice="$(menu_select "$(i18n dotnet_restore)" "$(i18n dotnet_restore_choose)" "${items[@]}" back "$(i18n back)")" || return 1
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n dotnet_restore)" "$(i18n dotnet_restore_choose)" "${items[@]}" back "$(i18n back)")" || return 1
     case "$choice" in back|'') return 1 ;; esac
     yesno_default_no "$(i18n dotnet_restore)" "$(i18n dotnet_restore_confirm "$choice")" || return 1
     mkdir -p "$WSQ_STATE_DIR"

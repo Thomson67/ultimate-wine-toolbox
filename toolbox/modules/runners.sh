@@ -293,7 +293,7 @@ PY
         return 1
     fi
 
-    choice="$(menu_select "$title" "$(i18n runner_choose_version)" "${items[@]}" "0" "$(i18n back)")" || return 1
+    choice="$(WT_MENU_LIST=1 menu_select "$title" "$(i18n runner_choose_version)" "${items[@]}" "0" "$(i18n back)")" || return 1
     [ "$choice" != "0" ] && [ -n "$choice" ] || return 1
     sed -n "${choice}p" <<< "$rows"
 }

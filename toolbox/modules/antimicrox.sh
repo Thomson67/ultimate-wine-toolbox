@@ -66,7 +66,7 @@ amx_choose_game() {
     msgbox "AntiMicroX" "$(amx_txt 'Aucun jeu Windows trouvé.' 'No Windows games found.')"
     return 1
   }
-  selected="$(menu_select "AntiMicroX" "$(amx_txt 'Choisir le jeu à configurer' 'Choose a game to configure')" "${options[@]}")" || return 1
+  selected="$(WT_MENU_LIST=1 menu_select "AntiMicroX" "$(amx_txt 'Choisir le jeu à configurer' 'Choose a game to configure')" "${options[@]}")" || return 1
   [[ "$selected" =~ ^[0-9]+$ ]] || return 1
   [ "$selected" -ge 1 ] && [ "$selected" -le "${#games[@]}" ] || return 1
   printf '%s\n' "${games[$((selected-1))]}"
@@ -130,7 +130,7 @@ amx_profile_file() {
     [ "$profile" != "$current" ] || label+=" — $(amx_txt 'actuel' 'current')"
     items+=("${#profiles[@]}" "$label")
   done <<< "$rows"
-  selected="$(menu_select AntiMicroX "$(amx_txt 'Choisir un profil enregistré' 'Choose a saved profile')" "${items[@]}" \
+  selected="$(WT_MENU_LIST=1 menu_select AntiMicroX "$(amx_txt 'Choisir un profil enregistré' 'Choose a saved profile')" "${items[@]}" \
     manual "$(amx_txt 'Parcourir les fichiers .amgp…' 'Browse .amgp files…')" back "$(i18n back)")" || return 1
   case "$selected" in
     manual) amx_browse_profile "$current" ;;
@@ -278,7 +278,7 @@ amx_delete_profiles() {
       profiles+=("$profile")
       options+=("${#profiles[@]}" "$(basename "$profile") — $(dirname "$profile")")
     done <<< "$output"
-    selected="$(menu_select AntiMicroX "$(amx_txt 'Choisissez le profil à supprimer. Il sera aussi retiré des jeux qui l’utilisent.' 'Choose a profile to delete. It will also be removed from games that use it.')" \
+    selected="$(WT_MENU_LIST=1 menu_select AntiMicroX "$(amx_txt 'Choisissez le profil à supprimer. Il sera aussi retiré des jeux qui l’utilisent.' 'Choose a profile to delete. It will also be removed from games that use it.')" \
       "${options[@]}" other "$(amx_txt 'Choisir un autre fichier .amgp' 'Choose another .amgp file')" back "$(i18n back)")" || return 0
     case "$selected" in
       other) profile="$(amx_browse_profile '')" || continue ;;
@@ -368,11 +368,13 @@ amx_manage_game() {
 amx_manage_associations() {
   local rom profile selected label
   local -a games=() options=()
+  local -A WT_MENU_GAME_LABELS=()
   while true; do
-    games=(); options=()
+    games=(); options=(); WT_MENU_GAME_LABELS=()
     while IFS=$'\t' read -r rom profile; do
       [ -n "$rom" ] && [ -n "$profile" ] || continue
       games+=("$rom")
+      WT_MENU_GAME_LABELS["${#games[@]}"]="$(basename "$rom")"
       label="$(basename "$rom") — $(basename "$profile")"
       [ -e "$rom" ] || label+=" $(amx_txt '[jeu absent]' '[game missing]')"
       [ -f "$profile" ] || label+=" $(amx_txt '[profil absent]' '[profile missing]')"
@@ -382,7 +384,7 @@ amx_manage_associations() {
       msgbox AntiMicroX "$(amx_txt 'Aucun jeu avec un profil associé.' 'No games with an assigned profile.')"
       return 0
     }
-    selected="$(menu_select AntiMicroX "$(amx_txt "Jeux avec un profil associé : ${#games[@]}\nChoisissez un jeu pour consulter ou gérer son profil." "Games with an assigned profile: ${#games[@]}\nChoose a game to view or manage its profile.")" \
+    selected="$(WT_MENU_LIST=1 menu_select AntiMicroX "$(amx_txt "Jeux avec un profil associé : ${#games[@]}\nChoisissez un jeu pour consulter ou gérer son profil." "Games with an assigned profile: ${#games[@]}\nChoose a game to view or manage its profile.")" \
       "${options[@]}" back "$(i18n back)")" || return 0
     [[ "$selected" =~ ^[0-9]+$ ]] || return 0
     [ "$selected" -ge 1 ] && [ "$selected" -le "${#games[@]}" ] || return 0
@@ -567,7 +569,7 @@ amx_launcher_rule() (
     [ -n "$index" ] || continue
     items+=("$index" "$title — $exe — $class")
   done <<< "$rows"
-  selected="$(menu_select AntiMicroX "$role\n\n$(amx_txt 'Choisir une fenêtre relevée pendant le dernier apprentissage, ou saisir une règle. Le titre distingue les fenêtres d’un même exécutable.' 'Choose a window recorded during the last learning session, or enter a rule. Titles distinguish windows of the same executable.')" \
+  selected="$(WT_MENU_LIST=1 menu_select AntiMicroX "$role\n\n$(amx_txt 'Choisir une fenêtre relevée pendant le dernier apprentissage, ou saisir une règle. Le titre distingue les fenêtres d’un même exécutable.' 'Choose a window recorded during the last learning session, or enter a rule. Titles distinguish windows of the same executable.')" \
     "${items[@]}" manual "$(amx_txt 'Saisir une règle manuellement' 'Enter a rule manually')" back "$(i18n back)")" || exit 1
   [ "$selected" != back ] || exit 1
   field="$(menu_select AntiMicroX "$(amx_txt 'Reconnaître la fenêtre par :' 'Match the window using:')" \

@@ -237,17 +237,19 @@ wsq_update_select_executable() {
 wsq_update_select_source() {
     local path base choice selected game_dir matched preferred="${1:-}" excluded="${2:-}" idx=1
     local -a folders=() items=()
+    local -A WT_MENU_GAME_LABELS=()
     while IFS=$'\t' read -r path matched; do
         [ -d "$path" ] && [ ! -L "$path" ] || continue
         base="$(basename "$path")"
         wsq_source_folder_visible "$base" || continue
         folders+=("$path")
+        [ "$matched" != 1 ] || WT_MENU_GAME_LABELS["$idx"]="$base"
         [ "$matched" != 1 ] || base="$base — $(i18n wsq_update_name_match)"
         items+=("$idx" "$base")
         idx=$((idx+1))
     done < <(python3 "$WSQ_UPDATE_HELPER" listing "$WSQ_WINDOWS_DIR" sources --preferred "$preferred" --exclude "$excluded")
     items+=(browse "$(i18n wsq_update_source_browse)")
-    choice="$(menu_select "$(i18n wsq_update_source_title)" "$(i18n wsq_update_source_list_prompt)" "${items[@]}")" || return 1
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n wsq_update_source_title)" "$(i18n wsq_update_source_list_prompt)" "${items[@]}")" || return 1
     case "$choice" in
         browse)
     if command -v yad >/dev/null 2>&1; then
@@ -311,6 +313,7 @@ wsq_update_new() {
     local -a prepare_args=()
     local WT_MENU_CANCEL_LABEL="$(i18n back)"
     local -a items=()
+    local -A WT_MENU_GAME_LABELS=()
     command -v unsquashfs >/dev/null 2>&1 && command -v mksquashfs >/dev/null 2>&1 || {
         msgbox "$(i18n wsq_update_title)" "$(i18n squash_tools_missing)"; return
     }
@@ -321,6 +324,7 @@ wsq_update_new() {
             label="$label — $(i18n wsq_update_reuse_label)"
         fi
         [ "$matched" != 1 ] || label="$label — $(i18n wsq_update_name_match)"
+        [ "$label" = "${path##*/}" ] || WT_MENU_GAME_LABELS["$idx"]="${path##*/}"
         items+=("$idx" "$label")
         rows+="$path"$'\n'
         idx=$((idx+1))
@@ -329,7 +333,7 @@ wsq_update_new() {
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_no_base)"; return
     }
     while true; do
-        choice="$(menu_select "$(i18n wsq_update_title)" "$(i18n wsq_update_intro)\n\n$(i18n wsq_version_warning)" "${items[@]}")" || return
+        choice="$(WT_MENU_LIST=1 menu_select "$(i18n wsq_update_title)" "$(i18n wsq_update_intro)\n\n$(i18n wsq_version_warning)" "${items[@]}")" || return
         case "$choice" in ''|*[!0-9]*) return ;; esac
         [ "$choice" -ge 1 ] && [ "$choice" -lt "$idx" ] || return
         base="$(sed -n "${choice}p" <<< "$rows")"

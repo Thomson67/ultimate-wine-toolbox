@@ -28,6 +28,9 @@ class LauncherInstallTests(unittest.TestCase):
                     'toolbox/helpers/community_profiles.py': b'# old profiles\n',
                     'toolbox/helpers/community_service.py': b'# old service\n',
                     'toolbox/lib/common.sh': b'#!/bin/bash\necho oldcommon\n'}
+        for name in installer.BASE_HASHES:
+            if name not in self.old:
+                self.old[name] = ('#!/bin/bash\n# old '+name+'\n').encode()
         for name, data in self.old.items():
             target = self.home/name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -231,6 +234,19 @@ class LauncherInstallTests(unittest.TestCase):
         with patch.object(installer, 'REGULAR_MENU_HASHES', hashes):
             self.install()
         self.assertIn('next version', (self.home/'toolbox/lib/common.sh').read_text())
+
+
+    def test_upgrade_from_black_menu_version_updates_all_list_modules(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        module = self.source/'toolbox/modules/reshade.sh'
+        module.write_bytes(module.read_bytes()+b'\n# data list presentation\n')
+        with patch.object(installer, 'BLACK_MENU_HASHES', hashes):
+            backup = self.install()
+        self.assertIn('data list presentation', (self.home/'toolbox/modules/reshade.sh').read_text())
+        installer.restore(backup)
+        self.assertNotIn('data list presentation', (self.home/'toolbox/modules/reshade.sh').read_text())
 
 
 if __name__ == '__main__':

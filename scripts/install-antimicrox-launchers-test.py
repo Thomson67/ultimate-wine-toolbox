@@ -48,6 +48,10 @@ READABLE_MENU_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70
 
 REGULAR_MENU_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70129bb4b01e05382b793410cfc3d9c227ad6b0c7830791bf', 'toolbox/modules/antimicrox.sh': 'bcab39647401b43d0f84ca1ee0582cb068ad2c271d8535b372e4276ae5bcfc95', 'toolbox/hooks/antimicrox-game-event.sh': 'e64e2d83ee294f5335fc2b98db599d4993b7c2164d9b497bd43978d6ff058f55', 'toolbox/modules/community.sh': 'd424080da815a1efd9c99f99215cbc8177baa65b658045c269dc5b3d634bbe78', 'toolbox/helpers/community_profiles.py': 'ce019e5ff04e58ddd7e5c8ff8f2947fdb11c2b3b945bdcd5f4f2c8304925f041', 'toolbox/helpers/community_service.py': '354e9d97fd21a283618168029e456cec1dd0f707d7a05bcadc6ccf6264486b6f', 'toolbox/lib/common.sh': 'd009195a871c4edbb0ab31af987623ce75ff22ae4b9c056d9b08d459de288964', 'toolbox/helpers/antimicrox_launcher.py': 'a3728a24c43000a5fe949b8eec3be3eedf6ce4570ac069301670fd5fea548de5'}
 
+BLACK_MENU_HASHES = {'toolbox/helpers/antimicrox_live.py': '7b536259a2aa69f70129bb4b01e05382b793410cfc3d9c227ad6b0c7830791bf', 'toolbox/modules/antimicrox.sh': 'bcab39647401b43d0f84ca1ee0582cb068ad2c271d8535b372e4276ae5bcfc95', 'toolbox/hooks/antimicrox-game-event.sh': 'e64e2d83ee294f5335fc2b98db599d4993b7c2164d9b497bd43978d6ff058f55', 'toolbox/modules/community.sh': 'd424080da815a1efd9c99f99215cbc8177baa65b658045c269dc5b3d634bbe78', 'toolbox/helpers/community_profiles.py': 'ce019e5ff04e58ddd7e5c8ff8f2947fdb11c2b3b945bdcd5f4f2c8304925f041', 'toolbox/helpers/community_service.py': '354e9d97fd21a283618168029e456cec1dd0f707d7a05bcadc6ccf6264486b6f', 'toolbox/lib/common.sh': 'b64e925d0a0bf3042244372bfd6d9d3eb4bbbb59f94d81aed30f7fd6bc739349', 'toolbox/helpers/antimicrox_launcher.py': 'a3728a24c43000a5fe949b8eec3be3eedf6ce4570ac069301670fd5fea548de5'}
+for previous in (BASE_HASHES, PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES, REGULAR_MENU_HASHES, BLACK_MENU_HASHES):
+    previous.update({'toolbox/modules/runners.sh': 'f7f4c867a48b9003fdba4ddb7c8c4bcd48e73ab81082006bab1adc0873fcd0ff', 'toolbox/modules/reshade.sh': '5d1695e50de989e912b0b554f5c194364d740932aa42f6b20eb7ff7f8341e2ac', 'toolbox/modules/dxvk-manager.sh': '81e54013e6827f3c7db5f56d7f2531f772088f56894719eb53280335ee0ce3db', 'toolbox/modules/wsquashfs.sh': 'bb5e7cff04facd4fbf298971a9a657af782173a377212c0960f9b0190fc7df70', 'toolbox/modules/wsquashfs-update.sh': '2cafae324a7a2279f1ae72c0e94dfd84557e94257fee24a43708a0e5d13b48c5', 'toolbox/modules/wsquashfs-dotnet.sh': '8ea383c47a7c6d9daacd9fb58b351896b715bd9aeea6b81ce58728bdf3d937e6', 'toolbox/modules/batocera-conf-extra.sh': '3964048534e028842726a992ef9e0d3b6dc5970b7bba40547756971b463cda1b', 'toolbox/modules/batocera-conf-transfer.sh': '00d12ad6e36e8103787c5ea15d374569ef5074ee8c49b812f0c0568bfecc05b8', 'toolbox/modules/settings.sh': '22556b1a9cfd16d17e2d4653854b47bab3c82f05343b1759bf20519c646bbd64'})
+
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -100,7 +104,7 @@ def install(home, hook, ref, source=None):
     upgrading = (home/HELPER).exists()
     expected = BASE_HASHES
     if upgrading:
-        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES, REGULAR_MENU_HASHES):
+        for candidate in (PREVIOUS_TEST_HASHES, RETEST_TEST_HASHES, INTEGRATED_MENUS_HASHES, DIRECT_RETURN_HASHES, CONTEXT_SHARE_HASHES, COMPLETE_PACKAGE_HASHES, COMMUNITY_MENU_HASHES, ASSIGNED_MENU_HASHES, READABLE_MENU_HASHES, REGULAR_MENU_HASHES, BLACK_MENU_HASHES):
             if all(not target.is_symlink() and target.is_file() and
                    sha(target.read_bytes()) == candidate.get(source_path)
                    for target, source_path in targets):

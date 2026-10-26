@@ -92,12 +92,22 @@ dialog() {
     # Regular black menu entries, with the original bold title and selection.
     # With --no-tags, Dialog uses tag_color to draw the entire item label.
     # Adjust a temporary theme copy; never rewrite the user's configuration.
-    if [ "${widget:-}" = --menu ]; then
+    if [[ "${widget:-}" = --menu || "${widget:-}" = --checklist || "${widget:-}" = --radiolist ]]; then
         theme="$(mktemp /tmp/uwt-menu-theme.XXXXXX)" || theme=""
         if [ -n "$theme" ] && command dialog --create-rc "$theme" 2>/dev/null &&
            sed -i -E -e '/^[[:space:]]*title_color[[:space:]]*=/b' \
                -e 's/(=[[:space:]]*\([^,]*,[^,]*,)[[:space:]]*ON/\1OFF/' \
                -e 's/^(item_color|tag_color)[[:space:]]*=.*/\1 = dialog_color/' "$theme"; then
+            if [[ "${WT_MENU_LIST:-0}" = 1 || "$widget" != --menu ]]; then
+                # Data rows retain keyboard navigation without a red initial.
+                sed -i -E -e 's/^tag_key_color[[:space:]]*=.*/tag_key_color = tag_color/' \
+                    -e 's/^tag_key_selected_color[[:space:]]*=.*/tag_key_selected_color = tag_selected_color/' "$theme"
+            fi
+            if [ "${WT_MENU_GAME_COLUMNS:-0}" = 1 ]; then
+                # Native tag/item columns allow bold game names with plain details.
+                sed -i -E -e 's/^tag_color[[:space:]]*=.*/tag_color = (BLACK,WHITE,ON)/' \
+                    -e 's/^tag_selected_color[[:space:]]*=.*/tag_selected_color = (YELLOW,BLUE,ON)/' "$theme"
+            fi
             DIALOGRC="$theme" command dialog "${args[@]}"
             rc=$?
             rm -f -- "$theme"
@@ -189,32 +199,81 @@ menu_select() {
     local title="$1" prompt="$2"
     shift 2
     if have_dialog; then
-        local result rc cols width=100 detail_label key text found
-        local -a options=("$@") default_item=()
+        local result rc cols width=100 detail_label key text found game prefix suffix tag visible extra count max_name
+        local WT_MENU_GAME_COLUMNS=0
+        local -a options=("$@") display_options=("$@") display_tags=() default_item=() tag_style=(--no-tags)
+        local -A seen_tags=()
         cols="$(tput cols 2>/dev/null || true)"
         if [[ "$cols" =~ ^[0-9]+$ ]] && ((cols >= 28)); then width=$((cols - 4)); fi
+        # Use native columns only for game rows with trailing information.
+        # The original tags/labels remain the action values and full-text source.
+        if [ "${WT_MENU_LIST:-0}" = 1 ] && [[ "$(declare -p WT_MENU_GAME_LABELS 2>/dev/null)" = 'declare -A '* ]]; then
+            for ((key=0; key<${#options[@]}; key+=2)); do
+                tag="${options[key]}"
+                game="${WT_MENU_GAME_LABELS["$tag"]-}"
+                text="${options[key+1]}"
+                if [ -n "$game" ] && [[ "$text" = *"$game"* ]] && [ "$text" != "$game" ]; then
+                    WT_MENU_GAME_COLUMNS=1
+                    break
+                fi
+            done
+        fi
+        if [ "$WT_MENU_GAME_COLUMNS" -eq 1 ]; then
+            display_options=(); tag_style=()
+            max_name=$(((width - 12) / 2))
+            ((max_name >= 12)) || max_name=12
+            for ((key=0; key<${#options[@]}; key+=2)); do
+                tag="${options[key]}"
+                game="${WT_MENU_GAME_LABELS["$tag"]-}"
+                text="${options[key+1]}"
+                visible="$text"; suffix=""
+                if [ -n "$game" ] && [[ "$text" = *"$game"* ]]; then
+                    prefix="${text%%"$game"*}"
+                    suffix="${text#*"$game"}"
+                    visible="$prefix$game"
+                    suffix="${suffix# — }"
+                fi
+                prefix="$visible"
+                if ((${#prefix} > max_name)); then prefix="${prefix:0:max_name-1}…"; fi
+                visible="$prefix"; count=1
+                while [ -n "${seen_tags["$visible"]-}" ]; do
+                    count=$((count+1)); extra=" ($count)"
+                    visible="${prefix:0:max_name-${#extra}}$extra"
+                done
+                seen_tags["$visible"]=1
+                display_tags+=("$visible")
+                display_options+=("$visible" "$suffix")
+            done
+        fi
         if [ "${WT_LANGUAGE:-fr}" = fr ]; then detail_label='Texte complet'; else detail_label='Full text'; fi
         ((width >= 50)) || detail_label=Info
         while true; do
             wt_clear_tty
-            result="$(dialog --stdout --clear --no-shadow --cr-wrap --no-tags \
+            result="$(dialog --stdout --clear --no-shadow --cr-wrap "${tag_style[@]}" \
                 --help-button --help-tags --help-label "$detail_label" \
                 --ok-label "$(i18n ok)" --cancel-label "${WT_MENU_CANCEL_LABEL:-$(i18n cancel)}" \
-                "${default_item[@]}" --title "$title" --menu "$prompt" 24 "$width" 16 "${options[@]}")"
+                "${default_item[@]}" --title "$title" --menu "$prompt" 24 "$width" 16 "${display_options[@]}")"
             rc=$?
             wt_clear_tty
             if [ "$rc" -eq 2 ]; then
                 found=0
                 for ((key=0; key<${#options[@]}; key+=2)); do
-                    if [ "$result" = "HELP ${options[key]}" ] || [ "$result" = "HELP \"${options[key]}\"" ]; then
+                    visible="${options[key]}"
+                    [ "$WT_MENU_GAME_COLUMNS" -ne 1 ] || visible="${display_tags[key/2]}"
+                    if [ "$result" = "HELP $visible" ] || [ "$result" = "HELP \"$visible\"" ]; then
                         text="${options[key+1]}"
-                        default_item=(--default-item "${options[key]}")
+                        default_item=(--default-item "$visible")
                         found=1
                         wt_menu_item_details "$title" "$text" "$width"
                         break
                     fi
                 done
                 [ "$found" -eq 1 ] && continue
+            fi
+            if [ "$rc" -eq 0 ] && [ "$WT_MENU_GAME_COLUMNS" -eq 1 ]; then
+                for ((key=0; key<${#display_tags[@]}; key++)); do
+                    if [ "$result" = "${display_tags[key]}" ]; then result="${options[key*2]}"; break; fi
+                done
             fi
             [ "$rc" -eq 0 ] && printf '%s' "$result"
             return "$rc"

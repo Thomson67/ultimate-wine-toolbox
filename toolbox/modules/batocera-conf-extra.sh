@@ -121,7 +121,7 @@ batocera_conf_restore() {
         return
     }
 
-    choice="$(menu_select "$(i18n batocera_conf_restore)" "$(i18n batocera_conf_restore_prompt "$count")" "${items[@]}")" || return
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n batocera_conf_restore)" "$(i18n batocera_conf_restore_prompt "$count")" "${items[@]}")" || return
     [ -n "$choice" ] || return
 
     selected="$(sed -n "${choice}p" <<< "$rows")"

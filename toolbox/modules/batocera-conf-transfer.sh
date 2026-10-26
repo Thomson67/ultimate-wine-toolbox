@@ -128,7 +128,7 @@ batocera_conf_import_windows() {
                 return
             }
 
-            choice="$(menu_select "$(i18n batocera_conf_import_title)" \
+            choice="$(WT_MENU_LIST=1 menu_select "$(i18n batocera_conf_import_title)" \
                 "$(i18n batocera_conf_import_choose "$count")" \
                 "${items[@]}")" || return
             [ -n "$choice" ] || return

@@ -565,7 +565,9 @@ def main():
     arg = sub.add_parser('suggest-game'); arg.add_argument('kind', choices=KINDS); arg.add_argument('source'); arg.add_argument('--rom', default='')
     for command in ('list', 'show', 'fetch', 'local'):
         arg = sub.add_parser(command); arg.add_argument('kind', choices=KINDS)
-        if command == 'list': arg.add_argument('--query', default='')
+        if command == 'list':
+            arg.add_argument('--query', default='')
+            arg.add_argument('--with-game', action='store_true')
         else: arg.add_argument('identifier')
     arg = sub.add_parser('share'); arg.add_argument('kind', choices=KINDS); arg.add_argument('source')
     for name in ('game', 'title', 'author'): arg.add_argument('--'+name, required=True)
@@ -620,7 +622,7 @@ def main():
                 label = entry_label(item)
                 if local:
                     label += (' [Téléchargé' if args.language == 'fr' else ' [Downloaded') + ((' — modifié' if args.language == 'fr' else ' — modified') if local[1] else '') + ']'
-                print(item['id']+'\t'+label)
+                print(item['id']+'\t'+label+('\t'+item['game'] if args.with_game else ''))
     elif args.command == 'show': print(details(community.find(args.kind, args.identifier), args.language == 'fr'))
     elif args.command == 'local':
         item = community.find(args.kind, args.identifier)

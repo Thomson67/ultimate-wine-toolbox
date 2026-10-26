@@ -142,7 +142,7 @@ dxvk_choose_release() {
         return 1
     fi
 
-    choice="$(menu_select "$title" "$(i18n dxvk_choose_release)" "${items[@]}" "0" "$(i18n back)")" || return 1
+    choice="$(WT_MENU_LIST=1 menu_select "$title" "$(i18n dxvk_choose_release)" "${items[@]}" "0" "$(i18n back)")" || return 1
     [ "$choice" != "0" ] && [ -n "$choice" ] || return 1
 
     line="$(sed -n "${choice}p" <<< "$data")"
@@ -361,7 +361,7 @@ dxvk_install_model_menu() {
         items+=("$id" "Batocera $label — DXVK $dxvk / VKD3D $vkd3d / NVAPI $nvapi")
     done < <(python3 "$WT_ROOT/helpers/dxvk_models.py" list)
     [ "${#items[@]}" -gt 0 ] || return 1
-    choice="$(menu_select "$(i18n dxvk_install_model)" "$(i18n dxvk_model_prompt)" "${items[@]}" "0" "$(i18n back)")" || return
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n dxvk_install_model)" "$(i18n dxvk_model_prompt)" "${items[@]}" "0" "$(i18n back)")" || return
     case "$choice" in 40|41|42|43) ;; *) return ;; esac
     lines="$(python3 "$WT_ROOT/helpers/dxvk_models.py" releases "$choice")" || return 1
     mapfile -t parts <<< "$lines"
@@ -410,7 +410,7 @@ dxvk_choose_global_menu() {
         return
     fi
 
-    choice="$(menu_select "$(i18n dxvk_choose_global)" "$(i18n dxvk_choose_global_prompt)" "${items[@]}" "0" "$(i18n back)")" || return
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n dxvk_choose_global)" "$(i18n dxvk_choose_global_prompt)" "${items[@]}" "0" "$(i18n back)")" || return
     [ "$choice" != "0" ] && [ -n "$choice" ] || return
     selected="$(sed -n "${choice}p" <<< "$rows")"
     [ -n "$selected" ] && dxvk_activate_bundle "$selected"
@@ -482,7 +482,7 @@ dxvk_choose_bundle_value() {
 
     [ "${#items[@]}" -gt 0 ] || return 1
 
-    choice="$(menu_select "$(i18n dxvk_per_game)" "$(i18n dxvk_choose_bundle_for_games)" "${items[@]}" "0" "$(i18n back)")" || return 1
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n dxvk_per_game)" "$(i18n dxvk_choose_bundle_for_games)" "${items[@]}" "0" "$(i18n back)")" || return 1
     [ "$choice" != "0" ] && [ -n "$choice" ] || return 1
     sed -n "${choice}p" <<< "$rows"
 }

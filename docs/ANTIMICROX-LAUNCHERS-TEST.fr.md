@@ -136,3 +136,9 @@ des actions. **Texte complet** affiche l’intitulé sélectionné avec retour
 à la ligne dans une fenêtre défilante, sans déclencher son action. Fermer cette
 fenêtre ramène sur la même entrée. **[Launcher]** apparaît au début des lignes
 dans la liste des jeux à partager ou exporter.
+
+Les lettres rouges restent réservées aux menus d’actions. Les listes de jeux,
+profils, fichiers, versions et sélections multiples ne colorent plus leur
+initiale ; la navigation au clavier reste disponible. Lorsqu’une ligne ajoute
+un profil, un état ou un auteur après le jeu, seul le nom du jeu est en gras.
+Les listes de noms seuls restent en écriture normale.

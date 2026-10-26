@@ -3,7 +3,7 @@
 language_menu() {
     while true; do
         local choice
-        choice="$(menu_select "$(i18n language_title)" "$(i18n language_title)"             "fr" "Français"             "en" "English"             "0" "$(i18n back)")" || return
+        choice="$(WT_MENU_LIST=1 menu_select "$(i18n language_title)" "$(i18n language_title)"             "fr" "Français"             "en" "English"             "0" "$(i18n back)")" || return
 
         case "$choice" in
             fr|en)
@@ -34,9 +34,9 @@ display_mode_menu() {
         case "$choice" in
             w)
                 if [ "$WT_LANGUAGE" = fr ]; then
-                    choice="$(menu_select "Fenêtre" "Mode de fenêtre" "normal" "Normal" "fullscreen" "Plein écran" "0" "Retour")" || continue
+                    choice="$(WT_MENU_LIST=1 menu_select "Fenêtre" "Mode de fenêtre" "normal" "Normal" "fullscreen" "Plein écran" "0" "Retour")" || continue
                 else
-                    choice="$(menu_select "Window" "Window mode" "normal" "Normal" "fullscreen" "Fullscreen" "0" "Back")" || continue
+                    choice="$(WT_MENU_LIST=1 menu_select "Window" "Window mode" "normal" "Normal" "fullscreen" "Fullscreen" "0" "Back")" || continue
                 fi
                 case "$choice" in normal|fullscreen)
                     mkdir -p "$WT_CONFIG"
@@ -44,9 +44,9 @@ display_mode_menu() {
                 esac ;;
             f)
                 if [ "$WT_LANGUAGE" = fr ]; then
-                    choice="$(menu_select "Police" "Taille de police" "11" "11" "13" "13" "16" "16" "18" "18" "20" "20" "0" "Retour")" || continue
+                    choice="$(WT_MENU_LIST=1 menu_select "Police" "Taille de police" "11" "11" "13" "13" "16" "16" "18" "18" "20" "20" "0" "Retour")" || continue
                 else
-                    choice="$(menu_select "Font" "Font size" "11" "11" "13" "13" "16" "16" "18" "18" "20" "20" "0" "Back")" || continue
+                    choice="$(WT_MENU_LIST=1 menu_select "Font" "Font size" "11" "11" "13" "13" "16" "16" "18" "18" "20" "20" "0" "Back")" || continue
                 fi
                 case "$choice" in 11|13|16|18|20)
                     mkdir -p "$WT_CONFIG"

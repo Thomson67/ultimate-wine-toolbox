@@ -142,7 +142,7 @@ community_apply_existing_reshade() {
   while IFS= read -r folder; do [ -z "$folder" ] || items+=("$folder" "$folder"); done <<< "$folders"
   [ "${#items[@]}" -gt 0 ] || return 1
   if [ "${#items[@]}" -eq 2 ]; then folder="${items[0]}";
-  else folder="$(menu_select "$title" "$(community_txt 'Choisir le dossier de l’injecteur ReShade existant' 'Choose the existing ReShade injector folder')" "${items[@]}" back "$(i18n back)")" || return 1; fi
+  else folder="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir le dossier de l’injecteur ReShade existant' 'Choose the existing ReShade injector folder')" "${items[@]}" back "$(i18n back)")" || return 1; fi
   [ "$folder" != back ] || return 1
   yesno "$title" "$(community_txt "Appliquer le preset à $(basename "$rom") en conservant son ReShade existant ?
 
@@ -173,7 +173,7 @@ community_choose_reshade_preset() {
     rows="$(community_cmd list reshade --query "$query" 2>&1)" || { msgbox "$title" "$rows"; return 1; }
     items=()
     while IFS=$'\t' read -r id label; do [ -z "$id" ] || items+=("$id" "$label"); done <<< "$rows"
-    choice="$(menu_select "$title" "$(community_txt 'Choisir un preset communautaire ReShade' 'Choose a community ReShade preset')" \
+    choice="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir un preset communautaire ReShade' 'Choose a community ReShade preset')" \
       search "$(community_txt 'Rechercher un jeu ou un auteur' 'Search for a game or author')" \
       refresh "$(community_txt 'Mettre à jour la liste' 'Refresh the list')" "${items[@]}" back "$(i18n back)")" || return 1
     case "$choice" in
@@ -191,18 +191,20 @@ community_choose_reshade_preset() {
 community_pick_game() {
   local title="$1" preferred="${2:-}" query="" rows path name choice
   local -a games=() items=()
+  local -A WT_MENU_GAME_LABELS=()
   while true; do
     if ! rows="$(community_cmd games --query "$query" --prefer "$preferred" 2>&1)"; then
       msgbox "$title" "$(community_txt 'Impossible de lire la liste des jeux Windows. Vérifiez leur présence dans /userdata/roms/windows.' 'Unable to read the Windows game list. Check the games under /userdata/roms/windows.')
 $rows"; return 1
     fi
-    games=(); items=()
+    games=(); items=(); WT_MENU_GAME_LABELS=()
     while IFS=$'\t' read -r path name; do
       [ -n "$path" ] || continue
       games+=("$path"$'\t'"$name")
+      WT_MENU_GAME_LABELS["${#games[@]}"]="$name"
       items+=("${#games[@]}" "$name — ${path##*/}")
     done <<< "$rows"
-    choice="$(menu_select "$title" "$(community_txt 'Choisir le jeu Windows (.wine, .pc ou .wsquashfs)' 'Choose a Windows game (.wine, .pc or .wsquashfs)')" \
+    choice="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir le jeu Windows (.wine, .pc ou .wsquashfs)' 'Choose a Windows game (.wine, .pc or .wsquashfs)')" \
       search "$(community_txt 'Rechercher un jeu' 'Search for a game')" "${items[@]}" back "$(i18n back)")" || return 1
     case "$choice" in
       search) query="$(input_text "$title" "$(community_txt 'Nom du jeu à rechercher' 'Game name to search for')" "$query")" || return 1 ;;
@@ -219,9 +221,10 @@ community_pick_reshade_game() {
   local -a filter=()
   [ "$mode" != managed ] || filter=(--managed-only)
   local -a games=() items=()
+  local -A WT_MENU_GAME_LABELS=()
   while true; do
     rows="$(community_cmd reshade-games --query "$query" "${filter[@]}" 2>&1)" || { msgbox "$title" "$rows"; return 1; }
-    games=(); items=()
+    games=(); items=(); WT_MENU_GAME_LABELS=()
     while IFS=$'\t' read -r path name state; do
       [ -n "$path" ] || continue
       games+=("$path"$'\t'"$name")
@@ -231,12 +234,13 @@ community_pick_reshade_game() {
         external-disabled) state="$(community_txt 'ReShade intégré désactivé' 'Integrated ReShade disabled')" ;;
         *) state="$(community_txt 'ReShade intégré au jeu' 'ReShade bundled with the game')" ;;
       esac
+      WT_MENU_GAME_LABELS["${#games[@]}"]="$name"
       items+=("${#games[@]}" "$name — $state")
     done <<< "$rows"
     if [ "${#games[@]}" -eq 0 ]; then
       msgbox "$title" "$(community_txt 'Aucun jeu ReShade trouvé pour cette recherche. Lancez la détection ci-dessous ou partagez directement un fichier preset .ini. Vous pouvez appliquer un preset téléchargé à un autre jeu depuis le catalogue communautaire.' 'No ReShade game matches this search. Run detection below or share a preset .ini file directly. You can apply a downloaded preset to another game from the community catalogue.')"
     fi
-    choice="$(menu_select "$title" "$(community_txt 'Choisir un jeu configuré avec ReShade' 'Choose a game configured with ReShade')" \
+    choice="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir un jeu configuré avec ReShade' 'Choose a game configured with ReShade')" \
       scan "$(community_txt 'Détecter les ReShade intégrés aux jeux (.wine, .pc, .wsquashfs)' 'Detect bundled ReShade (.wine, .pc, .wsquashfs)')" \
       search "$(community_txt 'Rechercher un jeu ReShade' 'Search for a ReShade game')" "${items[@]}" back "$(i18n back)")" || return 1
     case "$choice" in
@@ -265,7 +269,7 @@ community_export_reshade() {
     msgbox "$title" "$(community_txt 'ReShade a été détecté mais aucun preset .ini n’a été trouvé près de son injecteur. Vous pouvez choisir un fichier preset .ini manuellement.' 'ReShade was detected but no preset .ini was found near its injector. You can choose a preset .ini file manually.')"; return 1
   fi
   if [ "${#items[@]}" -eq 2 ]; then selected="${items[0]}";
-  else selected="$(menu_select "$title" "$(community_txt 'Choisir le preset à partager — archive du jeu ou réglages enregistrés' 'Choose a preset to share — game archive or saved settings')" "${items[@]}" back "$(i18n back)")" || return 1; fi
+  else selected="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir le preset à partager — archive du jeu ou réglages enregistrés' 'Choose a preset to share — game archive or saved settings')" "${items[@]}" back "$(i18n back)")" || return 1; fi
   [ "$selected" != back ] || return 1
   output="$(community_cmd reshade-export "$rom" "$selected" "$destination" 2>&1)" || { msgbox "$title" "$output"; return 1; }
 }
@@ -350,9 +354,11 @@ The $asset_en and these details will be sent to the community service for review
 community_choose_profile_game() {
   local title="$1" rom profile selected label
   local -a games=() items=()
+  local -A WT_MENU_GAME_LABELS=()
   while IFS=$'\t' read -r rom profile; do
     [ -n "$rom" ] && [ -f "$profile" ] || continue
     games+=("$rom")
+    WT_MENU_GAME_LABELS["${#games[@]}"]="$(basename "$rom")"
     label="$(basename "$rom") — $(basename "$profile")"
     if [ "$(amx_launcher_cmd configured "$rom" "$profile" 2>/dev/null)" = 1 ]; then
       label="[Launcher] $label"
@@ -363,7 +369,7 @@ community_choose_profile_game() {
     msgbox "$title" "$(community_txt 'Aucun jeu avec un profil associé disponible à partager ou exporter.' 'No games with an available assigned profile to share or export.')"
     return 1
   fi
-  selected="$(menu_select "$title" "$(community_txt 'Choisir un jeu avec un profil associé' 'Choose a game with an assigned profile')" "${items[@]}" back "$(i18n back)")" || return 1
+  selected="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir un jeu avec un profil associé' 'Choose a game with an assigned profile')" "${items[@]}" back "$(i18n back)")" || return 1
   [[ "$selected" =~ ^[0-9]+$ ]] || return 1
   [ "$selected" -ge 1 ] && [ "$selected" -le "${#games[@]}" ] || return 1
   printf '%s\n' "${games[$((selected-1))]}"
@@ -426,7 +432,7 @@ community_review_pending() {
     [ -n "$rows" ] || { msgbox "$title" "$(community_txt 'Aucune proposition en attente.' 'No pending contributions.')"; return 0; }
     items=()
     while IFS=$'\t' read -r selected output; do items+=("$selected" "$output"); done <<< "$rows"
-    selected="$(menu_select "$title" "$(community_txt 'Propositions à valider — pseudo non vérifié' 'Contributions for review — unverified nickname')" "${items[@]}" back "$(i18n back)")" || return 0
+    selected="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Propositions à valider — pseudo non vérifié' 'Contributions for review — unverified nickname')" "${items[@]}" back "$(i18n back)")" || return 0
     [ "$selected" != back ] || return 0
     review="$(community_service_cmd review "$kind" "$selected" 2>&1)" || { msgbox "$title" "$review"; continue; }
     checksum="${review%%$'\n'*}"
@@ -452,7 +458,7 @@ community_remove_published() {
     [ -n "$rows" ] || { msgbox "$title" "$(community_txt 'Aucun partage publié pour cet outil.' 'No published submissions for this tool.')"; return 0; }
     items=()
     while IFS=$'\t' read -r selected label; do items+=("$selected" "$label"); done <<< "$rows"
-    selected="$(menu_select "$title" "$(community_txt 'Choisir le partage à retirer de la liste communautaire' 'Choose a submission to remove from the community catalogue')" "${items[@]}" back "$(i18n back)")" || return 0
+    selected="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir le partage à retirer de la liste communautaire' 'Choose a submission to remove from the community catalogue')" "${items[@]}" back "$(i18n back)")" || return 0
     case "$selected" in ''|back) return 0 ;; esac
     review="$(community_service_cmd published-review "$kind" "$selected" 2>&1)" || { msgbox "$title" "$review"; continue; }
     checksum="${review%%$'\n'*}"
@@ -495,7 +501,8 @@ community_validate() (
 community_menu() {
   local kind="$1" rom="${2:-}" title choice query="" rows id label selected details path output share_label empty_label count_label search_prompt
   local -a items=()
-  local browse_label intro
+  local browse_label intro game_name
+  local -A WT_MENU_GAME_LABELS=()
   local -a config_options=()
   if [ "$kind" = antimicrox ]; then title="AntiMicroX — $(community_txt 'Profils communautaires' 'Community profiles')"; else title="ReShade — $(community_txt 'Presets communautaires' 'Community presets')"; fi
   if [ "$kind" = reshade ]; then
@@ -546,11 +553,14 @@ $output"; fi
       browse) query="" ;;
       *) return 0 ;;
     esac
-    if ! rows="$(community_cmd list "$kind" --query "$query" 2>&1)"; then msgbox "$title" "$rows"; continue; fi
+    if ! rows="$(community_cmd list "$kind" --query "$query" --with-game 2>&1)"; then msgbox "$title" "$rows"; continue; fi
     if [ -z "$rows" ]; then msgbox "$title" "$empty_label"; continue; fi
-    items=()
-    while IFS=$'\t' read -r id label; do items+=("$id" "$label"); done <<< "$rows"
-    selected="$(menu_select "$title" "$(community_txt 'Choisir un profil ou un preset' 'Choose a profile or preset')" "${items[@]}" back "$(i18n back)")" || continue
+    items=(); WT_MENU_GAME_LABELS=()
+    while IFS=$'\t' read -r id label game_name; do
+      items+=("$id" "$label")
+      [ -z "$game_name" ] || WT_MENU_GAME_LABELS["$id"]="$game_name"
+    done <<< "$rows"
+    selected="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir un profil ou un preset' 'Choose a profile or preset')" "${items[@]}" back "$(i18n back)")" || continue
     [ "$selected" != back ] || continue
     details="$(community_cmd show "$kind" "$selected" 2>&1)" || { msgbox "$title" "$details"; continue; }
     path="$(community_cmd local "$kind" "$selected" 2>/dev/null)" || path=""
