@@ -346,9 +346,32 @@ The $asset_en and these details will be sent to the community service for review
 }
 
 
+
+community_choose_profile_game() {
+  local title="$1" rom profile selected label
+  local -a games=() items=()
+  while IFS=$'\t' read -r rom profile; do
+    [ -n "$rom" ] && [ -f "$profile" ] || continue
+    games+=("$rom")
+    label="$(basename "$rom") — $(basename "$profile")"
+    if [ "$(amx_launcher_cmd configured "$rom" "$profile" 2>/dev/null)" = 1 ]; then
+      label+=" [Launcher]"
+    fi
+    items+=("${#games[@]}" "$label")
+  done < <(amx_associations)
+  if [ "${#games[@]}" -eq 0 ]; then
+    msgbox "$title" "$(community_txt 'Aucun jeu avec un profil associé disponible à partager ou exporter.' 'No games with an available assigned profile to share or export.')"
+    return 1
+  fi
+  selected="$(menu_select "$title" "$(community_txt 'Choisir un jeu avec un profil associé' 'Choose a game with an assigned profile')" "${items[@]}" back "$(i18n back)")" || return 1
+  [[ "$selected" =~ ^[0-9]+$ ]] || return 1
+  [ "$selected" -ge 1 ] && [ "$selected" -le "${#games[@]}" ] || return 1
+  printf '%s\n' "${games[$((selected-1))]}"
+}
+
 community_share_game_config() {
   local title="$1" rom="${2:-}" destination="${3:-community}" profile
-  [ -n "$rom" ] || rom="$(amx_choose_game)" || return
+  [ -n "$rom" ] || rom="$(community_choose_profile_game "$title")" || return
   profile="$(amx_current_profile "$rom")"
   if [ -z "$profile" ]; then
     msgbox "$title" "$(community_txt 'Ce jeu n’a pas encore de profil associé. Configurez-le dans « Créer ou modifier un profil en jeu » avant de partager sa configuration.' 'This game has no assigned profile yet. Configure it in “Create or edit a profile in game” before sharing its configuration.')"

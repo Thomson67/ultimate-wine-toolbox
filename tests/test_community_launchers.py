@@ -208,7 +208,7 @@ menu_select() {
   if [ -f "$WT_HOME/asked" ]; then echo back;
   else touch "$WT_HOME/asked"; printf '%s\0' "$@" > "$WT_HOME/options"; echo "$ACTION"; fi
 }
-amx_choose_game() { echo /userdata/roms/windows/Launcher.wine; }
+community_choose_profile_game() { echo /userdata/roms/windows/Launcher.wine; }
 amx_current_profile() { printf '%s' "$1" > "$WT_HOME/selected"; echo /userdata/launcher.amgp; }
 community_share() { printf '%s\0' "$@" > "$WT_HOME/shared"; }
 community_menu antimicrox
@@ -227,7 +227,7 @@ community_menu antimicrox
     def test_game_configuration_share_does_not_fall_back_to_an_unrelated_profile(self):
         script = r'''
 source "$ROOT/toolbox/modules/community.sh"
-amx_choose_game() { echo /userdata/roms/windows/Unconfigured.wine; }
+community_choose_profile_game() { echo /userdata/roms/windows/Unconfigured.wine; }
 amx_current_profile() { :; }
 msgbox() { echo "$2"; }
 community_share() { touch "$WT_HOME/unwanted-share"; }
@@ -238,6 +238,71 @@ community_share_game_config AntiMicroX
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('pas encore de profil', result.stdout)
         self.assertFalse((self.home/'unwanted-share').exists())
+
+
+    def test_export_selector_lists_only_assigned_games_with_an_available_profile(self):
+        profile = self.home/'Available.amgp'; profile.write_bytes(LAUNCHER)
+        script = r'''
+source "$ROOT/toolbox/modules/community.sh"
+i18n() { echo Back; }
+amx_associations() {
+  printf '/games/Configured.wine\t%s\n/games/Missing-profile.pc\t%s\n/games/Empty.wsquashfs\t\n' "$PROFILE" "$WT_HOME/missing.amgp"
+}
+amx_choose_game() { touch "$WT_HOME/unwanted-general-picker"; }
+menu_select() { printf '%s\0' "$@" > "$WT_HOME/options"; echo 1; }
+community_choose_profile_game AntiMicroX
+'''
+        result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=5,
+            env=dict(os.environ, ROOT=str(ROOT), WT_HOME=str(self.home), WT_LANGUAGE='fr', PROFILE=str(profile)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), '/games/Configured.wine')
+        options = (self.home/'options').read_bytes().decode()
+        self.assertIn('Configured.wine', options)
+        self.assertNotIn('Missing-profile', options)
+        self.assertNotIn('Empty.wsquashfs', options)
+        self.assertFalse((self.home/'unwanted-general-picker').exists())
+
+    def test_export_selector_handles_empty_list_and_cancel_without_export(self):
+        for choice in ('empty', 'back'):
+            with self.subTest(choice=choice):
+                profile = self.home/'Available.amgp'; profile.write_bytes(LAUNCHER)
+                script = r'''
+source "$ROOT/toolbox/modules/community.sh"
+i18n() { echo Back; }
+amx_associations() { [ "$CHOICE" = empty ] || printf '/games/Game.wine\t%s\n' "$PROFILE"; }
+menu_select() { echo back; }
+msgbox() { printf '%s' "$2" > "$WT_HOME/notice"; }
+community_share() { touch "$WT_HOME/unwanted-share"; }
+community_share_game_config AntiMicroX '' local
+'''
+                result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=5,
+                    env=dict(os.environ, ROOT=str(ROOT), WT_HOME=str(self.home), WT_LANGUAGE='fr', PROFILE=str(profile), CHOICE=choice))
+                self.assertFalse((self.home/'unwanted-share').exists())
+                if choice == 'empty': self.assertIn('Aucun jeu', (self.home/'notice').read_text())
+
+
+    def test_assigned_game_selector_marks_only_games_with_rules_for_the_current_profile(self):
+        profile = self.home/'Launcher.amgp'; profile.write_bytes(LAUNCHER)
+        other = self.home/'Other.amgp'; other.write_bytes(GAME)
+        Store(self.home).save('/games/Launcher.wine', 'launcher', str(profile), RULE)
+        # This game changed to another profile: stale rules should not mark it.
+        Store(self.home).save('/games/Reassigned.wine', 'launcher', str(other), RULE)
+        script = r'''
+source "$ROOT/toolbox/modules/community.sh"
+i18n() { echo Back; }
+amx_associations() { printf '/games/Launcher.wine\t%s\n/games/Classic.pc\t%s\n/games/Reassigned.wine\t%s\n' "$PROFILE" "$PROFILE" "$PROFILE"; }
+amx_launcher_cmd() { python3 "$ROOT/toolbox/helpers/antimicrox_launcher.py" --home "$WT_HOME" "$@"; }
+menu_select() { printf '%s\0' "$@" > "$WT_HOME/options"; echo 1; }
+community_choose_profile_game AntiMicroX
+'''
+        result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=5,
+            env=dict(os.environ, ROOT=str(ROOT), WT_HOME=str(self.home), WT_LANGUAGE='fr', PROFILE=str(profile)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        options = (self.home/'options').read_bytes().decode().split('\0')
+        labels = options[3:-1:2]
+        self.assertIn('[Launcher]', labels[0])
+        self.assertNotIn('[Launcher]', labels[1])
+        self.assertNotIn('[Launcher]', labels[2])
 
 
 if __name__ == '__main__':

@@ -108,8 +108,9 @@ Dans **Mes jeux et leurs profils**, choisir le jeu puis :
 
 Ces deux actions sont aussi accessibles directement dans **Télécharger ou partager
 des profils** : **Partager la configuration d’un jeu (profils et règles launcher)**
-et **Exporter la configuration d’un jeu dans un ZIP**. Elles demandent le jeu à
-transférer et récupèrent son profil associé et ses règles automatiquement.
+et **Exporter la configuration d’un jeu dans un ZIP**. Elles affichent uniquement les jeux ayant un profil associé disponible, puis
+récupèrent ce profil et ses règles automatiquement. La mention **[Launcher]**
+repère les jeux dont les règles launcher sont configurées.
 
 Sur l’autre machine, installer cette version de test ou une version ultérieure
 compatible, puis télécharger le partage ou ouvrir **Télécharger ou partager des

@@ -167,5 +167,16 @@ class LauncherInstallTests(unittest.TestCase):
         self.assertNotIn('complete game menu actions', (self.home/'toolbox/modules/community.sh').read_text())
 
 
+    def test_upgrade_from_community_menu_version(self):
+        self.install()
+        hashes = {name: installer.sha((self.home/name).read_bytes())
+                  for name in [*self.old, installer.HELPER]}
+        module = self.source/'toolbox/modules/community.sh'
+        module.write_bytes(module.read_bytes()+b'\n# assigned games selector\n')
+        with patch.object(installer, 'COMMUNITY_MENU_HASHES', hashes):
+            self.install()
+        self.assertIn('assigned games selector', (self.home/'toolbox/modules/community.sh').read_text())
+
+
 if __name__ == '__main__':
     unittest.main()
