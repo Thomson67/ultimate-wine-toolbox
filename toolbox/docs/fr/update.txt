@@ -42,3 +42,6 @@ Les backups de MAJ précédentes et les copies explicitement créées lors d’u
 
 LIENS DÉJÀ PRÉSENTS DANS LA NOUVELLE VERSION
 Si le dossier source contient des liens aux emplacements de sauvegarde déjà connus de la configuration existante, la Toolbox affiche leurs destinations actuelles et celles de la configuration, puis propose de les remplacer. Les liens sont rétablis dans le préfixe de travail avec les redirections de test habituelles. Refuser interrompt la préparation avant le déplacement du dossier source. Les anciens dossiers cibles restent intacts et leur progression n’est pas importée automatiquement. Les liens externes sans correspondance connue restent refusés.
+
+ANCIENS LIENS TEMPORAIRES
+Si la configuration existante contient des liens vers un ancien dossier de test .uwt-test-…, la préparation est refusée avant le déplacement des fichiers du jeu. Comparer les copies de sauvegarde et réparer les destinations permanentes avant de recommencer ; aucune progression n’est choisie automatiquement. Un contrôle avant compression bloque aussi les liens temporaires dans les opérations déjà en attente, même si le contrôle d’intégrité est ignoré. Les copies restent conservées pour récupération.

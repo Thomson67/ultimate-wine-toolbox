@@ -42,3 +42,6 @@ Earlier updates’ backups and copies explicitly created for a destination confl
 
 LINKS ALREADY PRESENT IN THE NEW VERSION
 If the source directory contains links at save locations already known by the existing configuration, the Toolbox displays their current targets and the configuration targets, then offers to replace them. Links are restored in the working prefix with the usual test redirections. Declining stops preparation before the source directory is moved. Old target folders remain untouched and their progress is not imported automatically. External links without a known matching save location remain rejected.
+
+STALE TEMPORARY LINKS
+If the existing configuration retains links to an old .uwt-test-… directory, preparation is refused before game files are moved. Compare the save copies and repair their permanent destinations before retrying; no progression is selected automatically. A precompression check also blocks temporary links in pending operations, even when archive integrity verification is skipped. Save copies remain available for recovery.

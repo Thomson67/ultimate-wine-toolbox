@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.8.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.8.0).**
+**Version stable : [v0.8.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.8.1).**
 
 ## Fonctionnalités
 
@@ -32,6 +32,13 @@ Créée par **Thomsonito**.
 - sauvegarde automatique avant les opérations destructives sur `batocera.conf`
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
+
+## Correctifs de la v0.8.1
+
+- MAJ WSquashFS : remplacement proposé des liens déjà présents dans les nouveaux fichiers aux emplacements de sauvegarde connus.
+- Refus des anciennes cibles temporaires de sauvegarde, avec contrôle avant compression des opérations en attente. Les copies restent conservées pour récupération.
+
+[Notes de version v0.8.1](release-notes/v0.8.1.md)
 
 ## Nouveautés de la v0.8.0
 
