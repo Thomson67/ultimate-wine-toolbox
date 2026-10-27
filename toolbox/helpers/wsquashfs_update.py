@@ -265,6 +265,42 @@ def save_links(prefix, save_root):
     return result
 
 
+def reject_temporary_save_links(links, prefix, save_root, test_save=None):
+    """Fail before mutation rather than guess which save copy should win."""
+    base = Path(save_root).resolve()
+    temporary = Path(test_save).absolute() if test_save is not None else None
+    invalid = []
+    for link in links:
+        path = Path(prefix) / link['path']
+        original = Path(link['original'])
+        lexical = Path(os.path.abspath(original if original.is_absolute() else path.parent / original))
+        for target in (lexical, Path(link['target'])):
+            under_test = temporary is not None and target.is_relative_to(temporary)
+            reserved = target.is_relative_to(base) and any(
+                part.startswith('.uwt-test-') or part in ('.legacy-shared', '.legacy-publish')
+                for part in target.relative_to(base).parts)
+            if under_test or reserved:
+                invalid.append(f"{link['path']} -> {link['original']}")
+                break
+    if invalid:
+        raise ValueError('Temporary save links cannot be retained or published. '
+                         'Compare the save copies and repair these links to their permanent '
+                         'destinations before retrying; no save data was deleted:\n' + '\n'.join(invalid))
+
+
+def validate_archive_save_links(manifest):
+    data = json.loads(manifest.read_text())
+    prefix = Path(data['prefix'])
+    links = []
+    for root, dirs, files in os.walk(prefix, followlinks=False):
+        for name in dirs + files:
+            path = Path(root) / name
+            if path.is_symlink():
+                links.append(dict(path=path.relative_to(prefix).as_posix(),
+                                  original=os.readlink(path), target=str(path.resolve())))
+    reject_temporary_save_links(links, prefix, data['save_root'], data['test_save'])
+
+
 def custom_links(data):
     savedir = relative_path(data['savedir']) if data.get('savedir') else None
     if savedir is not None:
@@ -290,6 +326,8 @@ def custom_links(data):
 def restore_legacy(prefix, manifest, restore_links=True):
     data = json.loads(manifest.read_text())
     links = custom_links(data) if restore_links == 'custom' else data.get('save_links', [])
+    if restore_links:
+        reject_temporary_save_links(links, prefix, data['save_root'], data['test_save'])
     for link in links if restore_links else []:
         path = prefix / link['path']
         if not path.parent.resolve().is_relative_to(prefix.resolve()):
@@ -314,6 +352,8 @@ def restore_legacy(prefix, manifest, restore_links=True):
 def stage_legacy(manifest):
     """Merge only save locations used by this test, never copy the whole root."""
     data = json.loads(manifest.read_text())
+    reject_temporary_save_links(data.get('save_links', []), data['prefix'],
+                                data['save_root'], data['test_save'])
     shared = Path(data['test_save']) / '.legacy-shared'
     base = Path(data['save_root'])
     stage = Path(data['test_save']) / '.legacy-publish'
@@ -409,6 +449,7 @@ def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False,
     source = validate_source(source, root, {link['path'] for link in replacements})
     text, values = directives(root)
     links = save_links(root, save_root)
+    reject_temporary_save_links(links, root, save_root)
     savedir = relative_path(values.get('SAVEDIR', '')) if values.get('SAVEDIR') else None
     if savedir is not None and savedir != Path('.') and not (root / savedir).parent.resolve().is_relative_to(root):
         raise ValueError('save-directory parent escapes the prefix')
@@ -973,7 +1014,7 @@ def main():
     a.add_argument('manifest', type=Path); a.add_argument('staged', type=Path); a.add_argument('--prepared-save', type=Path); a.add_argument('--replace', action='store_true')
     a = sp.add_parser('cleanup-bottles')
     a.add_argument('root', type=Path); a.add_argument('archive_name')
-    for action in ('save-backups', 'cleanup-save-backups', 'keep-save-backups', 'cleanup-test', 'profiles', 'restore-save-rules', 'finish-game', 'restore-legacy', 'restore-custom', 'restore-scripts', 'stage-legacy', 'legacy-summary', 'exe', 'game-dir'):
+    for action in ('validate-save-links', 'save-backups', 'cleanup-save-backups', 'keep-save-backups', 'cleanup-test', 'profiles', 'restore-save-rules', 'finish-game', 'restore-legacy', 'restore-custom', 'restore-scripts', 'stage-legacy', 'legacy-summary', 'exe', 'game-dir'):
         a = sp.add_parser(action)
         a.add_argument('prefix' if action in ('exe', 'game-dir', 'profiles') else 'manifest', type=Path)
     a = sp.add_parser('root-link')
@@ -1054,6 +1095,7 @@ def main():
         elif a.action == 'restore-legacy':
             data = json.loads(a.manifest.read_text()); restore_legacy(Path(data['prefix']), a.manifest)
         elif a.action == 'stage-legacy': stage_legacy(a.manifest)
+        elif a.action == 'validate-save-links': validate_archive_save_links(a.manifest)
         elif a.action == 'legacy-summary':
             data = json.loads(a.manifest.read_text())
             print('\n'.join(link['path'] + ' -> ' + link['target'] for link in data.get('save_links', [])))

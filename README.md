@@ -190,6 +190,8 @@ Before the move, the old game directory is renamed `<name>.bak`. The updated dir
 
 The test prefix keeps the exact archive name, replacing `.wsquashfs` with `.wine`, including bracket tags. An existing `.wine` directory triggers replace, choose another name, or quit. WSquashFS ES settings take priority; if it has no game-specific settings, existing Wine settings are reused. `batocera.conf` is backed up before changes. A directory containing the updated source cannot be removed; choose another prefix name instead.
 
+Archives retaining save links to an old `.uwt-test-…` directory are refused before game files are moved. Compare the save copies and repair their permanent destinations before retrying. A precompression check also blocks temporary links in pending updates, even when archive integrity verification is skipped. Save copies remain available for recovery.
+
 ## DXVK, VKD3D-Proton and NVAPI
 
 **DXVK** translates DirectX 9/10/11 to Vulkan; **VKD3D-Proton** does the same for DirectX 12. Bundles let you choose these components separately from the runner, globally or for an individual game. Per-game selection keeps a compatible combination without imposing the same versions on the entire collection.

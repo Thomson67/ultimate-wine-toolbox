@@ -667,6 +667,12 @@ wsq_resume_update() {
         }
     fi
     [ "$final_mode" != replace ] || commit_args+=(--replace)
+    # Also cover older pending operations already marked ready. Never compress
+    # links to a current or previous test-save tree, even if integrity is skipped.
+    if ! python3 "$WSQ_UPDATE_HELPER" validate-save-links "$metadata" >> "$log" 2>&1; then
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"
+        return 1
+    fi
     staged="$archive.update-tmp-$$"
     if ! maintenance_squash_wine "$prefix" "$staged" ask-full "$log"; then
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return

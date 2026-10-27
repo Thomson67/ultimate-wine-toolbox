@@ -192,6 +192,8 @@ Avant le déplacement, l’ancien dossier du jeu est renommé en `<nom>.bak`. Le
 
 Le préfixe de test reprend le nom exact de l’archive en remplaçant `.wsquashfs` par `.wine`, balises comprises. Un dossier `.wine` existant déclenche le choix : remplacer le dossier, choisir un autre nom ou quitter. Les réglages ES du `.wsquashfs` sont prioritaires ; s’il n’a aucun réglage spécifique, ceux du `.wine` existant sont repris. Les réglages de `batocera.conf` sont sauvegardés avant modification. Un dossier contenant la source de mise à jour ne peut pas être supprimé : choisissez alors un autre nom de préfixe.
 
+Une archive contenant encore des liens de sauvegarde vers un ancien dossier de test `.uwt-test-…` est refusée avant le déplacement des fichiers. Comparez les sauvegardes et corrigez leurs destinations permanentes avant de recommencer. Un contrôle avant compression bloque aussi les liens temporaires dans les mises à jour déjà en attente, même si la vérification d’intégrité est ignorée. Les copies de sauvegarde restent disponibles pour récupération.
+
 ## DXVK, VKD3D-Proton et NVAPI
 
 **DXVK** traduit DirectX 9/10/11 vers Vulkan ; **VKD3D-Proton** fait de même pour DirectX 12. Un bundle permet de choisir ces composants indépendamment du runner, globalement ou pour un jeu précis. Le choix par jeu permet de garder une combinaison compatible sans imposer les mêmes versions à toute la collection.
