@@ -58,10 +58,17 @@ class MangoHudInstallerTests(unittest.TestCase):
         self.assertEqual(self.settings.read_bytes(), self.original_settings)
         self.assertFalse((self.home / installer.STATE).exists())
 
-    def test_embedded_payload_matches_all_packaged_sources(self):
+    def test_embedded_snapshot_is_complete_and_valid(self):
         payload = installer.unpack()
         for name, content in payload["files"].items():
-            self.assertEqual((ROOT / name).read_text(), content, name)
+            self.assertTrue(content, name)
+            self.assertIn(name, payload['base_hashes'])
+            if name.endswith('.py'):
+                compile(content, name, 'exec')
+        # The installer remains a fixed snapshot when later topic branches
+        # extend shared translations or documentation.
+        helper = 'toolbox/helpers/mangohud_settings.py'
+        self.assertEqual((ROOT / helper).read_text(), payload['files'][helper])
 
     def test_install_repeat_restore_preserves_settings_and_other_files(self):
         unrelated = self.home / "config/runners.json"

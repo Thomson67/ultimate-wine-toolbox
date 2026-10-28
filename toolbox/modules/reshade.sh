@@ -125,23 +125,26 @@ resh_api_select() {
     prompt="$(i18n resh_api_prompt)\n\n$(i18n resh_api_detection "${evidence:-?}")"
     while true; do
         rows=()
-        for api in d3d9 dxgi opengl32; do
-            case "$api" in d3d9) label='DirectX 9 (d3d9)' ;; dxgi) label='DirectX 10 / 11 / 12 (dxgi)' ;; opengl32) label='OpenGL (opengl32)' ;; esac
+        for api in d3d9 dxgi opengl32 vulkan; do
+            case "$api" in d3d9) label='DirectX 9 (d3d9)' ;; dxgi) label='DirectX 10 / 11 / 12 (dxgi)' ;; opengl32) label='OpenGL (opengl32)' ;; vulkan) label="$(i18n resh_vulkan_label)" ;; esac
             if [[ ",$candidates," == *",$api,"* ]]; then
                 rows+=("$api" "$label — $(i18n resh_api_suggested)")
             fi
         done
-        for api in dxgi d3d9 opengl32; do
+        for api in dxgi d3d9 opengl32 vulkan; do
             [[ ",$candidates," != *",$api,"* ]] || continue
-            case "$api" in d3d9) label='DirectX 9 (d3d9)' ;; dxgi) label='DirectX 10 / 11 / 12 (dxgi)' ;; opengl32) label='OpenGL (opengl32)' ;; esac
+            case "$api" in d3d9) label='DirectX 9 (d3d9)' ;; dxgi) label='DirectX 10 / 11 / 12 (dxgi)' ;; opengl32) label='OpenGL (opengl32)' ;; vulkan) label="$(i18n resh_vulkan_label)" ;; esac
             rows+=("$api" "$label")
         done
-        if [[ ",$candidates," == *',vulkan,'* || ",$candidates," == *',legacy,'* ]]; then
+        if [[ ",$candidates," == *',legacy,'* ]]; then
             prompt+="\n$(i18n resh_api_unsupported)"
         fi
         choice="$(menu_select "$(i18n resh_title)" "$prompt" "${rows[@]}" diagnostic "$(i18n resh_diag_title)" wiki "$(i18n resh_api_wiki)")" || return 1
         case "$choice" in
             dxgi|d3d9|opengl32) printf '%s' "$choice"; return 0 ;;
+            vulkan)
+                msgbox "$(i18n resh_title)" "$(i18n resh_vulkan_help)" >&2
+                printf '%s' vulkan; return 0 ;;
             diagnostic) resh_diagnostic "$rom" "$exe" && return 2; continue ;;
             wiki)
                 query="$(resh_cmd wiki-title "$rom")"
@@ -171,7 +174,7 @@ resh_api_select() {
 }
 
 resh_install_game() {
-    local rom="$1" exe selected dll version packs backend_packs state workspace name label model defaults current
+    local rom="$1" exe selected dll backend_dll version packs backend_packs state workspace name label model defaults current
     local resume_exe="${2:-}" community_preset="${3:-}" resumed=0 index apply_community=0
     local -a exes=() items=() shaders=()
     local listing
@@ -218,7 +221,9 @@ PY_PENDING
         fi
         return 1
     }
-    case "$dll" in dxgi|d3d9|opengl32) ;; *) return 1 ;; esac
+    case "$dll" in dxgi|d3d9|opengl32|vulkan) ;; *) return 1 ;; esac
+    backend_dll="$dll"
+    [ "$dll" != vulkan ] || backend_dll=dxgi
     version="$(input_text "$(i18n resh_title)" "$(i18n resh_version_prompt)" latest)" || return 1
     [[ "$version" =~ ^(latest|[0-9]+\.[0-9]+\.[0-9]+)$ ]] || {
         msgbox "$(i18n resh_title)" "$(i18n resh_version_invalid)"
@@ -304,7 +309,7 @@ PY_PENDING
         MAIN_PATH="$WT_HOME/reshade/runtime" WINEPREFIX="" UI_BACKEND=cli \
             RESHADE_VERSION="$version" RESHADE_ADDON_SUPPORT=0 NO_COLOR=1 PROGRESS_UI=0 \
             PATH="$shim:$PATH" bash "$RESH_BACKEND" --cli --game-path="$workspace" \
-            --dll-override="$dll" --shader-repos="$backend_packs" <<< i
+            --dll-override="$backend_dll" --shader-repos="$backend_packs" <<< i
     ) >> "$log" 2>&1 && resh_cmd finish "$rom" >> "$log" 2>&1 || {
         msgbox "$(i18n resh_title)" "$(i18n resh_failed "$log")"
         return 1

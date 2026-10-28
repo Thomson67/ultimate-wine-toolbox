@@ -5,7 +5,16 @@ ReShade applies effects to the game image: colors, sharpening, CRT rendering or 
 INSTALL
 In Tools and compatibility → ReShade, select the game, then Install / change version and shaders. Choose the actual game executable, API, ReShade version and shader packs.
 
-Select the game’s API before DXVK/VKD3D translation: a DirectX 11 game using DXVK remains DirectX 11 for this selection. Launch diagnostics and PCGamingWiki lookups provide hints to confirm. Native Vulkan is not covered by this integration.
+Select the game’s API before DXVK/VKD3D translation: a DirectX 11 game using DXVK remains DirectX 11 for this selection. Launch diagnostics and PCGamingWiki lookups provide hints to confirm.
+
+VULKAN UNDER WINE (EXPERIMENTAL)
+For Windows Azahar using Vulkan, select Native Vulkan under Wine. This retains the existing presets, shader packs and ReShade interface. Shader downloading uses the existing backend; the same ReShade DLL provides the Vulkan layer.
+
+The official Windows VulkanRT 1.4.341.0 loader is downloaded from LunarG with SHA-256 verification. The Toolbox stages vulkan-1.dll and the ReShade layer next to the executable and adds a scoped registry value in the game’s Wine prefix. Launch the game once with its runner first. The WSquashFS archive is unchanged.
+
+Keep Azahar using Vulkan, install/modify ReShade from its normal menu and select Vulkan. Relaunch: Home should open ReShade. Saved Toolbox presets remain available. Recheck Mailbox using MangoHud’s Detailed profile; coexistence and performance need hardware testing. Effects add rendering overhead.
+
+After closing the game, Disable ReShade restores original DLLs and environment and removes only its layer registry value, retaining other game changes. Another active ReShade Vulkan layer in the prefix causes an explicit refusal. For failures, inspect reshade-install-*.log, reshade-game-event.log and ReShade.log next to the executable. Wine/Proton compatibility is experimental.
 
 MODELS
 - Standard: ReShade and SweetFX.

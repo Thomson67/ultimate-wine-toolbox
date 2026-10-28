@@ -219,7 +219,7 @@ Open **Tools and compatibility → ReShade**, select a game, then **Install / ch
 
 Launch from EmulationStation and press **Home** to open ReShade. New profiles skip the tutorial and use **End** to toggle effects; existing customized profiles are preserved. No effect is forced on first launch: enable the effects you want in ReShade. The Toolbox can import a preset `.ini`; its shaders must be available in your selected packs. This uses official Windows ReShade inside Wine/Proton.
 
-- Offered formats: `.wine`, `.pc`, `.wsquashfs`; DirectX 9/10/11/12 and OpenGL. Native Vulkan is outside this integration's scope.
+- Offered formats: `.wine`, `.pc`, `.wsquashfs`; DirectX 9/10/11/12 and OpenGL. Vulkan under Wine is experimental, using the official Windows loader and a per-prefix layer.
 - Launch a `.pc` game once with the selected runner to initialize its bottle before enabling.
 - For `.wsquashfs`, managed files go into the bottle's writable layer. The archive stays intact, and ReShade is reapplied when the bottle is recreated.
 - Per-game presets/settings are stored under `/userdata/system/ultimate-wine-toolbox/reshade/profiles`. The menu shows the directory. Settings are collected when the game closes and survive runner changes.
@@ -240,7 +240,7 @@ The retro supplement includes `5XBR_NoBlend.fx` and downloads only `4xBRZ.fx` an
 
 In the overlay, look for **xBRZ4x**, **xBR5x_NoBlend**, **HQ4X**, **TWO_D_SCALER**, **TWO_D_SCALER_LEVEL2** or **AnomalousPixelBlending**. For 4xBRZ, its author recommends setting `Strength` to the image height divided by its original height (for example 1080 / 240 = 4.5). 5xBR NoBlend starts with `Strength` set to 1.5. Test these alternatives on 2D games; compare results before combining multiple smoothing filters.
 - PE imports and graphical DLL references provide API hints after executable selection. Adjacent `UnityPlayer.dll` is checked when its import is found. Reads are bounded to 16 MiB per file, including WSquashFS files; the archive is not fully extracted. Dynamic loading, engines and wrappers may make detection incomplete. Confirm the choice.
-- **PCGamingWiki** lookup is optional and runs only for the selected game: choose the correct page before reading supported APIs. Listing games makes no network requests. The site may block automated access (403 observed); local/manual selection remains available. Listed supported APIs do not establish the active renderer. Native Vulkan and DirectX 8 or earlier remain outside this direct integration.
+- **PCGamingWiki** lookup is optional and runs only for the selected game: choose the correct page before reading supported APIs. Listing games makes no network requests. The site may block automated access (403 observed); local/manual selection remains available. Listed supported APIs do not establish the active renderer. DirectX 8 or earlier remains outside this direct integration; Vulkan under Wine is experimental.
 
 Inside **Install / change version and shaders**, after executable selection, the API selector offers **Detect the API by launching the game**. Launch runs through EmulationStation; reach the menu or gameplay, then quit normally. After showing the result, the toolbox resumes at API selection for the same executable. It observes Windows DLLs in the game's Wine and UMU prefixes. WSquashFS archives, autorun files and launch variables remain unchanged. Linux Vulkan libraries are not interpreted as evidence of native Vulkan.
 

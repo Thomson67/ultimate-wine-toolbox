@@ -15,7 +15,7 @@ import subprocess
 import sys
 import tempfile
 
-HOOKS = {'dxgi', 'd3d9', 'opengl32'}
+HOOKS = {'dxgi', 'd3d9', 'opengl32', 'vulkan'}
 COMPILER_HASH = {32: '2ad0d4987fc4624566b190e747c9d95038443956ed816abfd1e2d389b5ec0851',
                  64: '4432bbd1a390874f3f0a503d45cc48d346abc3a8c0213c289f4b615bf0ee84f3'}
 
@@ -190,10 +190,12 @@ def prepare(home, rom, exe, dll, version, repos):
     state_file = cache / 'game-state' / (state_key + '.state')
     old = state_file.read_text() if state_file.is_file() else ''
     previous = re.search(r'^selected_repos=(.*)$', old, re.M)
-    atomic_bytes(state_file, (f'dll={dll}\narch={arch}\ngamePath={workspace.resolve()}\n'
+    backend_dll = 'dxgi' if dll == 'vulkan' else dll
+    atomic_bytes(state_file, (f'dll={backend_dll}\narch={arch}\ngamePath={workspace.resolve()}\n'
                              f'selected_repos={previous[1] if previous else ""}\napp_id=\n').encode())
     save_json(workspace / 'pending.json', {'rom': str(rom), 'exe': exe, 'dll': dll, 'arch': arch,
-                                          'version': version, 'repos': repos, 'state_key': state_key})
+                                          'version': version, 'repos': repos, 'state_key': state_key,
+                                          'backend_dll': backend_dll})
     return workspace
 
 
@@ -201,7 +203,7 @@ def finish(home, rom):
     workspace = home / 'reshade/workspaces' / key(rom)
     pending = read_json(workspace / 'pending.json')
     cache = home / 'reshade/runtime'
-    dll = (workspace / (pending['dll'] + '.dll')).resolve(strict=True)
+    dll = (workspace / (pending.get('backend_dll', pending['dll']) + '.dll')).resolve(strict=True)
     compiler = (workspace / 'd3dcompiler_47.dll').resolve(strict=True)
     shaders = (workspace / 'ReShade_shaders').resolve(strict=True)
     for path in (dll, compiler, shaders):
@@ -225,6 +227,10 @@ def finish(home, rom):
     pending.update(enabled=old.get('enabled', False), runtime=str(dll), compiler=str(compiler),
                    shaders=str(shaders), runtime_hash=fingerprint(dll)['sha256'],
                    compiler_hash=fingerprint(compiler)['sha256'])
+    if pending['dll'] == 'vulkan':
+        from reshade_vulkan import loader
+        native_loader = loader(home, pending['arch'])
+        pending.update(vulkan_loader=str(native_loader), vulkan_loader_hash=fingerprint(native_loader)['sha256'])
     save_json(config, pending)
     profile = home / 'reshade/profiles' / key(rom)
     profile.mkdir(parents=True, exist_ok=True)
@@ -356,10 +362,13 @@ def install_files(home, rom, root, prefix, cfg):
     journal = read_json(jp)
     if journal and journal['exe'] != cfg['exe']:
         raise ValueError('disable ReShade before changing its executable')
+    if journal and journal.get('api', cfg['dll']) != cfg['dll']:
+        raise ValueError('disable ReShade before changing its API')
     folder = PurePosixPath(cfg['exe']).parent
     profile = home / 'reshade/profiles' / key(rom)
     ini = profile_ini((profile / 'ReShade.ini').read_text(), cfg).encode()
-    files = [(root, (folder / (cfg['dll'] + '.dll')).as_posix(), Path(cfg['runtime']).read_bytes(), False),
+    runtime_name = 'ReShade' + str(cfg['arch']) if cfg['dll'] == 'vulkan' else cfg['dll']
+    files = [(root, (folder / (runtime_name + '.dll')).as_posix(), Path(cfg['runtime']).read_bytes(), False),
              (root, (folder / 'd3dcompiler_47.dll').as_posix(), Path(cfg['compiler']).read_bytes(), False),
              (root, (folder / 'ReShade.ini').as_posix(), ini, True),
              (root, (folder / 'ReShadePreset.ini').as_posix(), (profile / 'ReShadePreset.ini').read_bytes(), True)]
@@ -375,6 +384,16 @@ def install_files(home, rom, root, prefix, cfg):
                 pass
     sysdir = 'syswow64' if cfg['arch'] == 32 and not win32 else 'system32'
     files.append((prefix, f'drive_c/windows/{sysdir}/d3dcompiler_47.dll', Path(cfg['compiler']).read_bytes(), False))
+    if cfg['dll'] == 'vulkan':
+        from reshade_vulkan import manifest
+        native_loader = Path(cfg['vulkan_loader'])
+        if (not native_loader.resolve().is_relative_to((home / 'reshade/runtime').resolve())
+                or fingerprint(native_loader.resolve()) != {'sha256': cfg['vulkan_loader_hash']}
+                or pe_arch(native_loader.read_bytes()) != cfg['arch']):
+            raise ValueError('Vulkan loader missing or changed; reinstall ReShade for this game')
+        files.extend([(root, (folder / 'vulkan-1.dll').as_posix(), native_loader.read_bytes(), False),
+                      (root, (folder / (runtime_name + '.json')).as_posix(), manifest(cfg['arch']), False),
+                      (prefix, f'drive_c/windows/{sysdir}/vulkan-1.dll', native_loader.read_bytes(), False)])
     # Do not write through a shared Windows directory link into a runner.
     targets = [(safe_leaf(base, rel), data, mutable) for base, rel, data, mutable in files]
     root.mkdir(parents=True, exist_ok=True)
@@ -406,7 +425,7 @@ def install_files(home, rom, root, prefix, cfg):
         if rec and not mutable and fingerprint(target) not in (None, rec['installed']):
             raise ValueError(f'managed DLL was changed by another tool: {target}')
     if not journal:
-        journal = {'rom': str(rom), 'root': str(root), 'prefix': str(prefix), 'exe': cfg['exe'],
+        journal = {'rom': str(rom), 'root': str(root), 'prefix': str(prefix), 'exe': cfg['exe'], 'api': cfg['dll'],
                    'files': {}, 'env_words': [], 'root_id': directory_id(root), 'prefix_id': directory_id(prefix)}
     backups = jp.parent / (jp.stem + '-backups')
     backups.mkdir(parents=True, exist_ok=True)
@@ -425,8 +444,18 @@ def install_files(home, rom, root, prefix, cfg):
         raise ValueError('autorun.cmd must be a regular file')
     if not autorun.exists():
         atomic_bytes(autorun, autorun_source(rom).encode('utf-8', 'surrogateescape'))
-    words = ['WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-};' + cfg['dll'] + '=n,b;d3dcompiler_47=n,b"',
+    override = 'vulkan-1=n' if cfg['dll'] == 'vulkan' else cfg['dll'] + '=n,b'
+    words = ['WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-};' + override + ';d3dcompiler_47=n,b"',
              'UMU_BATOCERA_EXTRA_RO=' + shlex.quote(str(home / 'reshade/runtime')) + ':"${UMU_BATOCERA_EXTRA_RO:-}"']
+    registry_text = None
+    if cfg['dll'] == 'vulkan':
+        from reshade_vulkan import registry_plan
+        baseline = None
+        if not (prefix / 'system.reg').exists() and rom.suffix.casefold() == '.wsquashfs':
+            baseline = archive_bytes(rom, 'system.reg').decode('utf-8', 'surrogateescape')
+        journal['vulkan_registry'], registry_text = registry_plan(
+            prefix, safe_leaf(root, (folder / (runtime_name + '.json')).as_posix()),
+            cfg['arch'], win32, journal.get('vulkan_registry'), baseline)
     text = rewrite_env(autorun.read_text(encoding='utf-8', errors='surrogateescape'), journal.get('env_words', []), words)
     for target, data, mutable in targets:
         rec = journal['files'][str(target)]
@@ -438,6 +467,8 @@ def install_files(home, rom, root, prefix, cfg):
     for target, data, mutable in targets:
         atomic_bytes(target, data)
         journal['files'][str(target)]['installed'] = fingerprint(target)
+    if registry_text is not None:
+        atomic_bytes(safe_leaf(prefix, 'system.reg'), registry_text.encode('utf-8', 'surrogateescape'))
     atomic_bytes(autorun, text.encode('utf-8', 'surrogateescape'))
     journal['env_words'] = words
     save_json(jp, journal)
@@ -468,6 +499,9 @@ def restore_install(home, path):
         if original and 'sha256' in original and fingerprint(Path(rec['backup'])) != original:
             raise ValueError(f'original backup missing/changed: {rec["backup"]}')
         targets.append((target, rec))
+    if prefix_current and journal.get('vulkan_registry'):
+        from reshade_vulkan import registry_restore
+        registry_restore(journal['vulkan_registry'])
     for target, rec in targets:
         original = rec['original']
         if not original:

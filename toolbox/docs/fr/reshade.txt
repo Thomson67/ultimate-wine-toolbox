@@ -5,7 +5,16 @@ ReShade applique des effets à l’image du jeu : couleurs, netteté, rendu CRT 
 INSTALLER
 Dans Outils et compatibilité → ReShade, choisir le jeu puis Installer / modifier version et shaders. Sélectionner le véritable exécutable du jeu, l’API, la version de ReShade et les packs de shaders.
 
-Choisir l’API du jeu avant traduction par DXVK/VKD3D : un jeu DirectX 11 utilisant DXVK reste un jeu DirectX 11 pour ce choix. Le diagnostic par lancement et la recherche PCGamingWiki donnent des indices à confirmer. Vulkan natif n’est pas couvert par cette intégration.
+Choisir l’API du jeu avant traduction par DXVK/VKD3D : un jeu DirectX 11 utilisant DXVK reste un jeu DirectX 11 pour ce choix. Le diagnostic par lancement et la recherche PCGamingWiki donnent des indices à confirmer.
+
+VULKAN SOUS WINE (EXPÉRIMENTAL)
+Pour Azahar Windows en Vulkan, choisir « Vulkan natif sous Wine ». Ce mode conserve les presets, packs et interface ReShade habituels. Le téléchargement des shaders utilise le backend existant ; la même DLL ReShade fournit la couche Vulkan.
+
+Le chargeur Windows officiel VulkanRT 1.4.341.0 est téléchargé depuis LunarG, avec vérification SHA-256. La Toolbox prépare vulkan-1.dll et la couche ReShade près de l’exécutable et ajoute une valeur au registre du seul préfixe Wine du jeu. Lancer le jeu une fois avec son runner avant l’installation. Le WSquashFS reste inchangé.
+
+Conserver Vulkan dans Azahar, installer/modifier ReShade depuis le menu habituel et sélectionner Vulkan. Relancer : Home doit ouvrir ReShade. Les presets sauvegardés par la Toolbox restent disponibles. Vérifier à nouveau Mailbox dans le profil Détaillé de MangoHud ; coexistence et performances restent à valider sur le matériel. Les effets ont leur propre coût de rendu.
+
+Après fermeture du jeu, Désactiver ReShade restaure les DLL et l’environnement antérieurs et retire uniquement la valeur de registre de la couche, en conservant les autres changements du jeu. Une autre couche ReShade Vulkan déjà active dans le préfixe provoque un refus. En cas d’échec, consulter reshade-install-*.log, reshade-game-event.log et ReShade.log près de l’exécutable. Compatibilité Wine/Proton expérimentale.
 
 MODÈLES
 - Standard : ReShade et SweetFX.
