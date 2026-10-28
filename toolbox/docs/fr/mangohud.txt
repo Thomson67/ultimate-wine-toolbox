@@ -44,3 +44,5 @@ SI L’AFFICHAGE MANQUE
 Vérifier le réglage individuel : Désactivé peut prendre le dessus sur l’activation globale. Contrôler aussi les réglages déjà présents dans l’autorun et le comportement du runner. Consulter les logs de la Toolbox avant de modifier manuellement les variables.
 
 Après une mise à jour du jeu, une ancienne bottle peut conserver d’anciens réglages. Le workflow de mise à jour WSquashFS nettoie celles du jeu après réussite. Une suppression manuelle de bottle peut également supprimer des données utilisateur : sauvegarder ce qui est important avant cette opération.
+
+Retour utilisateur positif sur AMD avec Azahar sous Wine : Mailbox pris en compte, moins de latence ressentie qu’avec sa VSync interne, y compris avec ReShade Vulkan. Ce résultat reste propre à la configuration testée.

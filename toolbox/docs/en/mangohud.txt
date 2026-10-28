@@ -44,3 +44,5 @@ IF THE DISPLAY IS MISSING
 Check the game-specific setting: Off can override global activation. Also check settings already present in autorun and the runner’s behavior. Inspect Toolbox logs before manually editing variables.
 
 After updating a game, an old bottle may retain stale settings. The WSquashFS update workflow cleans the game’s bottles after success. Manually deleting a bottle can also delete user data: back up important contents first.
+
+Positive user feedback on AMD with Azahar under Wine: Mailbox applied, lower perceived latency than internal VSync, including with Vulkan ReShade. This result is specific to the tested configuration.

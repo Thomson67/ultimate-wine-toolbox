@@ -6,7 +6,7 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.8.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.8.1).**
+**Stable version: [v0.9.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.9.0).**
 
 ## Features
 
@@ -18,7 +18,7 @@ Created by **Thomsonito**.
 - Global and per-game MangoHud controls: display profiles, hidden mode, Vulkan VSync (including Mailbox) and OpenGL VSync; optional advanced custom FPS limiter
 - DXVK / VKD3D-Proton / DXVK-NVAPI bundles, Batocera 40–43 / 43.1 models and global or per-game selection
 - NVAPI version filtering based on known DXVK requirements
-- per-game ReShade: installation, toggling, presets, effect templates and API hints
+- per-game ReShade: installation, toggling, presets, effect templates, API hints and Vulkan under Wine (experimental)
 - AntiMicroX: controller profiles, launcher/game switching, in-game editing and Pad2Key conversion
 - community catalogue: download, share and moderate AntiMicroX profiles and ReShade presets
 - Wine bottle maintenance and orphan detection

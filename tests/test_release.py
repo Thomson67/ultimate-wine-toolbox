@@ -258,11 +258,23 @@ test -f "$WSQ_SAVE_ROOT/Old/.slot" || exit 14
         conf = self.base / 'userdata/system/batocera.conf'
         conf.write_text('windows.wine-runner=wine-11.5-amd64\n')
         (dest / 'toolbox/obsolete').touch()
+        markers = {'mangohud-controls-test.json': 'mangohud-controls-test1',
+                   'reshade-vulkan-test.json': 'reshade-vulkan-test1'}
+        for name, test_id in markers.items():
+            (dest / 'state' / name).write_text(json.dumps({'test': test_id, 'backup': 'keep-original-backup'}))
+        (dest / 'state/unrelated-test.json').write_text('{"keep": true}')
         subprocess.run(['bash', str(package / 'package-install.sh')], env=env, check=True, capture_output=True)
         for directory in ('config', 'templates', 'dxvk/bundles', 'state', 'runtime'):
             self.assertEqual((dest / directory / 'retained').read_text(), 'user data')
         self.assertFalse((dest / 'toolbox/obsolete').exists())
         self.assertEqual(conf.read_text(), 'windows.wine-runner=wine-11.5-amd64\n')
+        backup_root = self.base / 'userdata/system/backups/ultimate-wine-toolbox/graduated-tests'
+        for name, test_id in markers.items():
+            self.assertFalse((dest / 'state' / name).exists())
+            archived = list(backup_root.glob('*/' + name))
+            self.assertEqual(len(archived), 1)
+            self.assertEqual(json.loads(archived[0].read_text())['test'], test_id)
+        self.assertEqual((dest / 'state/unrelated-test.json').read_text(), '{"keep": true}')
 
     def test_integrity_exit_codes(self):
         archive, log, cancel = self.base / 'game.wsquashfs', self.base / 'check.log', self.base / 'cancel'

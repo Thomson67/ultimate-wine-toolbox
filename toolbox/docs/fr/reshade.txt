@@ -47,3 +47,6 @@ Partager mon preset ReShade permet de choisir un jeu avec ReShade, qu’il soit 
 Confirmer le jeu identifié ou le choisir dans la liste ES, puis renseigner le nom du preset, le pseudo public et une description. Le partage attend une validation avant publication, sans compte GitHub nécessaire. L’affichage dans le catalogue peut prendre un peu de temps ; actualiser la liste.
 
 L’espace validateur s’ouvre par appairage avec un code dans un navigateur. Il permet de valider les propositions ou de retirer un partage publié, avec résumé et confirmation dans la même fenêtre. Les presets déjà installés chez les joueurs restent conservés.
+
+VALIDATION MATÉRIELLE
+Un utilisateur a validé Azahar Windows sous Wine en Vulkan sur sa configuration AMD : ouverture de ReShade, création d’un preset et coexistence avec MangoHud/Mailbox sans problème constaté. Ce retour ne valide pas tous les GPU, runners ou effets.

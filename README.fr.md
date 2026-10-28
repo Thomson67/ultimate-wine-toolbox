@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.8.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.8.1).**
+**Version stable : [v0.9.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.9.0).**
 
 ## Fonctionnalités
 
@@ -18,7 +18,7 @@ Créée par **Thomsonito**.
 - gestion globale et par jeu de MangoHud : profils d’affichage, mode masqué, VSync Vulkan (dont Mailbox) et OpenGL ; limiteur de FPS personnalisé en option avancée
 - bundles DXVK / VKD3D-Proton / DXVK-NVAPI, modèles Batocera 40 à 43 / 43.1 et choix global ou par jeu
 - filtrage des versions NVAPI selon la compatibilité connue avec DXVK
-- ReShade par jeu : installation, activation/désactivation, presets, modèles d’effets et aide au choix de l’API
+- ReShade par jeu : installation, activation/désactivation, presets, modèles d’effets, aide au choix de l’API et Vulkan sous Wine (expérimental)
 - AntiMicroX : profils manette, bascule launcher/jeu, édition en jeu et conversion Pad2Key
 - catalogue communautaire : téléchargement, partage et validation de profils AntiMicroX et presets ReShade
 - maintenance des Wine bottles et détection des bottles orphelines

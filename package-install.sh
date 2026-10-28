@@ -160,6 +160,32 @@ fi
 
 command -v batocera-es-swissknife >/dev/null 2>&1 && batocera-es-swissknife --update-gamelists >/dev/null 2>&1 || true
 
+# These scoped experiments are now part of the stable package. Retire their
+# rollback markers after installation succeeds, keeping the recovery backups
+# and all live game/settings data. Old test installers must not undo a stable
+# upgrade merely because some source files still have identical hashes.
+python3 - "$DEST" "$BACKUP_DIR" <<'PY_PROMOTE_TESTS'
+import datetime, json, shutil, sys
+from pathlib import Path
+home, backups = map(Path, sys.argv[1:])
+expected = {
+    'mangohud-controls-test.json': 'mangohud-controls-test1',
+    'reshade-vulkan-test.json': 'reshade-vulkan-test1',
+}
+destination = backups / 'graduated-tests' / datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
+for name, test_id in expected.items():
+    marker = home / 'state' / name
+    if marker.is_symlink() or not marker.is_file():
+        continue
+    try:
+        if json.loads(marker.read_text()).get('test') != test_id:
+            continue
+        destination.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(marker), str(destination / name))
+    except (OSError, ValueError, AttributeError) as error:
+        print('Test marker retained: ' + str(marker) + ': ' + str(error), file=sys.stderr)
+PY_PROMOTE_TESTS
+
 echo
 say "Ultimate Wine Toolbox installée." "Ultimate Wine Toolbox installed."
 say "Pad2Key natif Batocera installé." "Native Batocera Pad2Key installed."

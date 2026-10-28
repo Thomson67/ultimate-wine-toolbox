@@ -47,3 +47,6 @@ Share my ReShade preset lets you choose a game with ReShade, whether Toolbox-man
 Confirm the detected game or choose it from the ES game list, then enter the preset title, public nickname and description. Submissions need moderation before publication and do not require a GitHub account. Catalogue updates can take a little time; refresh the list.
 
 The validator area uses a pairing code and a browser page. Validators can approve submissions or remove a published entry, with its summary and confirmation in the same window. Presets already installed by players are retained.
+
+HARDWARE VALIDATION
+A user validated Windows Azahar under Wine using Vulkan on their AMD configuration: ReShade opened, a preset was created and MangoHud/Mailbox coexisted without reported issues. This does not validate every GPU, runner or effect.
