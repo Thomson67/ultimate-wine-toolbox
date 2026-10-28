@@ -1,6 +1,6 @@
-MANGOHUD: DISPLAY PERFORMANCE
+MANGOHUD: DISPLAY AND SYNCHRONIZATION
 
-MangoHud displays information while playing: FPS and, depending on the profile, frame pacing, load, temperatures and memory. It helps observe performance; enabling it does not itself optimize the game.
+MangoHud displays information while playing: FPS and, depending on the profile, frame pacing, load, temperatures and memory. It can also override Vulkan presentation modes and OpenGL synchronization. Enabling it alone does not optimize the game.
 
 USE
 Open Tools and compatibility, then MangoHud. Choose global activation or a setting for one game. A game can inherit the global setting, be forced On or be forced Off.
@@ -9,6 +9,31 @@ Choose a profile:
 - Minimal: FPS only.
 - Default: standard display.
 - Detailed: FPS, frame pacing, CPU/GPU load and temperatures, RAM and VRAM.
+- Hidden: keep synchronization controls active without visible statistics.
+
+GLOBAL AND PER-GAME CONTROLS
+The Global controls and Per-game controls menus configure display, Vulkan VSync, OpenGL VSync and the MangoHud FPS limiter independently. Each per-game value overrides its matching global value; other settings inherit. MangoHud must also be enabled for the game. Configuring controls does not activate it automatically.
+
+Vulkan modes:
+- Do not force: keep the application or existing configuration choice.
+- Off (Immediate): immediate presentation, tearing possible.
+- Mailbox: display the latest ready image at refresh without tearing or accumulating queued images. Lower latency is not guaranteed.
+- On (FIFO): standard synchronization without tearing; latency may increase.
+- Adaptive (FIFO relaxed): tearing possible when an image arrives late.
+
+These modes are not GPU-brand-specific, but require driver and display-environment support. Vulkan only guarantees FIFO. An unsupported mode may be rejected; revert to Do not force if needed.
+
+OpenGL: force swap interval 1 (on) or 0 (off). This does not control Vulkan applications. Driver and compositor synchronization may also affect the result.
+
+MANGOHUD LIMITER (ADVANCED)
+Batocera’s Windows limiter offers a 60 FPS cap. MangoHud accepts custom values, including 40, 90, 120, 144, 165 and 240 FPS. 0 removes only the MangoHud cap; Do not force keeps existing settings. Late waits after presentation aiming for low latency; Early waits before presentation aiming for consistent frametimes. Results depend on the game.
+
+Use a single limiter for easier comparison: disable Batocera’s limiter for the game when choosing MangoHud’s. A remaining 60 FPS cap elsewhere will still prevent reaching 120. A cap does not unlock a game restricted to 30/60 FPS. Capping an emulator too low may slow it down. No cap is enabled by default.
+
+EXAMPLE: AZAHAR UNDER WINE USING VULKAN
+Enable MangoHud for the game, choose Hidden and test Mailbox in its per-game settings. Disable VSync in Azahar and keep emulation speed at 100%. Compare the same scene with and without Mailbox. Detailed also displays the Vulkan presentation mode for diagnosis; it does not measure button-to-screen latency.
+
+No synchronization override is forced by default. Custom MANGOHUD_CONFIG options are retained where possible, with explicitly selected Toolbox controls taking precedence during launch. On gameStop, the original ENV value is restored and temporary Toolbox additions are removed. Controls are stored in config/mangohud-settings.json. Remove these overrides returns control to global or existing settings.
 
 Close and relaunch the game after a change. Toolbox settings apply to the Windows games it manages, rather than every emulator’s performance display.
 

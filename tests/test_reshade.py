@@ -277,7 +277,8 @@ class ReShadeTests(unittest.TestCase):
         def mango(enabled):
             result = subprocess.run(['python3', '-', str(self.rom / 'autorun.cmd'), str(int(enabled)),
                                      '0', 'libMangoHud_shim.so', mango_root + '/lib64/mangohud:' + mango_root + '/lib32/mangohud',
-                                     mango_root, 'default'], input=block, capture_output=True, text=True)
+                                     mango_root, 'default', str(ROOT / 'toolbox/helpers'),
+                                     str(self.home / 'config'), str(self.rom)], input=block, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
         for mango_first in (False, True):
             (self.rom / 'autorun.cmd').write_text(self.original)

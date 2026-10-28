@@ -177,9 +177,11 @@ rewrite_autorun() {
     local file="$1" state="$2" legacy="$3"
     [ -f "$file" ] || return 1
 
-    python3 - "$file" "$state" "$legacy" "$MANGOHUD_PRELOAD" "$MANGOHUD_LIBPATH_PREFIX" "$MANGOHUD_UMU_EXTRA_RO" "$hud_profile" <<'PY'
+    python3 - "$file" "$state" "$legacy" "$MANGOHUD_PRELOAD" "$MANGOHUD_LIBPATH_PREFIX" "$MANGOHUD_UMU_EXTRA_RO" "$hud_profile" "$ROOT/toolbox/helpers" "$CONFIG_DIR" "$rom" <<'PY'
 import re, sys
 from pathlib import Path
+sys.path.insert(0, sys.argv[8])
+from mangohud_settings import BACKUP_RE, apply_config, restore_config, settings
 
 path=Path(sys.argv[1])
 enabled=sys.argv[2] == "1"
@@ -191,7 +193,11 @@ profile_configs = {
     "minimal": "fps_only=1,frametime=0,frame_timing=0",
     "detailed": "fps,cpu_stats,gpu_stats,cpu_temp,gpu_temp,ram,vram,frametime,frame_timing",
 }
-profile_config = profile_configs.get(sys.argv[7], "")
+try:
+    control_settings = settings(sys.argv[9], sys.argv[10])
+except (OSError, ValueError) as error:
+    print("MangoHud settings: " + str(error), file=sys.stderr)
+    control_settings = {"display": sys.argv[7]}
 
 try:
     text=path.read_text(encoding="utf-8", errors="replace")
@@ -203,8 +209,11 @@ out=[]
 found=False
 
 def clean_payload(payload):
-    for config in profile_configs.values():
-        payload = re.sub(r"(^|\s)MANGOHUD_CONFIG=" + re.escape(config) + r"(?=\s|$)", " ", payload)
+    had_backup = bool(BACKUP_RE.search(payload))
+    payload = restore_config(payload)
+    if not had_backup:
+        for config in profile_configs.values():
+            payload = re.sub(r"(^|\s)MANGOHUD_CONFIG=" + re.escape(config) + r"(?=\s|$)", " ", payload)
     payload=re.sub(r'(^|\s)MANGOHUD=[^\s]+', ' ', payload)
     payload=re.sub(r'(^|\s)MANGOHUD_DLSYM=[^\s]+', ' ', payload)
 
@@ -234,15 +243,14 @@ def clean_payload(payload):
     # Remove the legacy Ultimate-managed pressure-vessel form during migration.
     payload=re.sub(r'(^|\s)PRESSURE_VESSEL_FILESYSTEMS_RO=[^\s]+', ' ', payload)
     payload=re.sub(r'(^|\s)UMU_BATOCERA_EXTRA_RO=[^\s]*' + re.escape(managed_umu_extra_ro) + r'[^\s]*(?=\s|$)', ' ', payload)
-    return re.sub(r'\s+', ' ', payload).strip()
+    return payload.strip()
 
 for line in lines:
     if line.startswith("ENV=") and not found:
         payload=clean_payload(line[4:])
         if enabled:
             payload=(payload + " " if payload else "") + "MANGOHUD=1"
-            if profile_config:
-                payload += " MANGOHUD_CONFIG=" + profile_config
+            payload = apply_config(payload, control_settings)
             # Match MangoHud's official wrapper: preload plain filenames and
             # let the dynamic linker select the matching 32/64-bit library.
             if not re.search(r'(^|\s)LD_LIBRARY_PATH=', payload):
@@ -259,8 +267,7 @@ for line in lines:
 
 if enabled and not found:
     payload="MANGOHUD=1"
-    if profile_config:
-        payload += " MANGOHUD_CONFIG=" + profile_config
+    payload = apply_config(payload, control_settings)
     payload += " LD_LIBRARY_PATH=\'" + managed_libpath_prefix + "\':\"${LD_LIBRARY_PATH:-}\""
     payload += " UMU_BATOCERA_EXTRA_RO=\'" + managed_umu_extra_ro + "\':\"${UMU_BATOCERA_EXTRA_RO:-}\""
     payload += " LD_PRELOAD='" + managed_preload + "'"

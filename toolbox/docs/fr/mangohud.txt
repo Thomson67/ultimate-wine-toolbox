@@ -1,6 +1,6 @@
-MANGOHUD : AFFICHER LES PERFORMANCES
+MANGOHUD : AFFICHAGE ET SYNCHRONISATION
 
-MangoHud affiche des informations pendant le jeu : FPS et, selon le profil, fluidité, charge, températures et mémoire. Il sert à observer les performances ; l’activer ne constitue pas une optimisation du jeu.
+MangoHud affiche des informations pendant le jeu : FPS et, selon le profil, fluidité, charge, températures et mémoire. Il peut aussi remplacer le mode de présentation Vulkan ou la synchronisation OpenGL. L’activer seul ne constitue pas une optimisation du jeu.
 
 UTILISATION
 Ouvrir Outils et compatibilité, puis le menu MangoHud. Choisir l’activation globale ou un réglage propre à un jeu. Un jeu peut hériter du réglage global, être forcé sur Activé ou être forcé sur Désactivé.
@@ -9,6 +9,31 @@ Choisir un profil :
 - Minimaliste : uniquement les FPS.
 - Par défaut : affichage standard.
 - Détaillé : FPS, fluidité, charge et températures CPU/GPU, RAM et VRAM.
+- Masqué : MangoHud reste actif pour la synchronisation, sans statistiques visibles.
+
+RÉGLAGES GLOBAUX ET PAR JEU
+Les menus « Réglages globaux : VSync, FPS et affichage » et « Réglages par jeu : VSync, FPS et affichage » permettent de choisir indépendamment le profil, la VSync Vulkan, la VSync OpenGL et le limiteur de FPS MangoHud. Les exceptions par jeu remplacent uniquement les valeurs choisies ; les autres héritent du global. MangoHud doit également être activé pour le jeu. Ces réglages ne l’activent pas automatiquement.
+
+Vulkan :
+- Ne pas forcer : conserver le choix de l’application ou la configuration existante.
+- Désactivée (Immediate) : présentation immédiate, tearing possible.
+- Mailbox : présenter la dernière image prête au rafraîchissement, sans tearing et sans accumuler une file d’images. Une réduction de latence n’est pas garantie.
+- Activée (FIFO) : synchronisation classique, sans tearing, avec une latence potentiellement supérieure.
+- Adaptative (FIFO relaxed) : tearing possible quand une image arrive en retard.
+
+Ces modes ne dépendent pas d’une marque de GPU, mais le pilote et l’environnement d’affichage doivent prendre en charge le mode demandé. Seul FIFO est garanti par Vulkan. Un mode non pris en charge peut être refusé : revenir à « Ne pas forcer » si nécessaire.
+
+OpenGL : forcer la synchronisation activée (intervalle 1) ou désactivée (intervalle 0). Ce réglage ne concerne pas les applications Vulkan. La synchronisation du compositeur ou du pilote peut aussi influencer le résultat.
+
+LIMITEUR MANGOHUD (AVANCÉ)
+Le limiteur Windows de Batocera propose un plafond de 60 FPS. MangoHud permet une valeur personnalisée, notamment 40, 90, 120, 144, 165 ou 240 FPS. 0 retire uniquement le plafond MangoHud ; « Ne pas forcer » conserve la configuration existante. La méthode Late attend après présentation et privilégie une faible latence ; Early attend avant présentation et privilégie la régularité des temps d’image. Le résultat dépend du jeu.
+
+Utiliser un seul limiteur pour faciliter les comparaisons : désactiver celui de Batocera pour le jeu lorsqu’on choisit celui de MangoHud. Si un autre plafond à 60 FPS reste actif, régler MangoHud à 120 ne permettra pas de le dépasser. Un plafond ne débloque pas un jeu limité à 30/60 FPS. En émulation, une limite trop basse peut ralentir le jeu. Aucun plafond n’est activé par défaut.
+
+EXEMPLE : AZAHAR SOUS WINE EN VULKAN
+Activer MangoHud pour le jeu, choisir le profil Masqué et tester Mailbox dans ses réglages individuels. Désactiver la VSync dans Azahar et conserver la vitesse d’émulation à 100 %. Comparer avec et sans Mailbox, sur la même scène. Le profil Détaillé affiche également le mode de présentation Vulkan pour aider au diagnostic ; il ne mesure pas la latence entre le bouton et l’écran.
+
+Aucun réglage de synchronisation n’est forcé par défaut. Les options personnalisées MANGOHUD_CONFIG sont conservées autant que possible ; les clés explicitement choisies dans la Toolbox sont prioritaires pendant le lancement. Au gameStop, la valeur ENV d’origine est restaurée et les ajouts temporaires de la Toolbox sont retirés. Les réglages sont enregistrés dans config/mangohud-settings.json. « Retirer ces exceptions » rend la main au global ou à la configuration existante.
 
 Fermer puis relancer le jeu après un changement. Le réglage de la Toolbox concerne les jeux Windows qu’elle gère ; il ne règle pas l’affichage des performances de tous les émulateurs.
 

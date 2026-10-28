@@ -161,28 +161,141 @@ mangohud_disable_individual_menu() {
     fi
 }
 mangohud_profile_state() {
-    local profile=default
-    [ ! -s "$MANGOHUD_CONFIG_DIR/mangohud-profile" ] || profile="$(head -n1 "$MANGOHUD_CONFIG_DIR/mangohud-profile")"
-    case "$profile" in minimal|detailed) ;; *) profile=default ;; esac
-    printf '%s' "$profile"
+    mangohud_setting_get display "" --effective
 }
 
 mangohud_profile_menu() {
-    local choice current profile tmp
+    local choice current profile
     local -a items=()
     current="$(mangohud_profile_state)"
     items+=("$current" "$(i18n "mangohud_profile_$current")")
-    for profile in default minimal detailed; do
+    for profile in default minimal detailed hidden; do
         [ "$profile" = "$current" ] || items+=("$profile" "$(i18n "mangohud_profile_$profile")")
     done
     choice="$(menu_select "$(i18n mangohud_profile_title)" "$(i18n mangohud_profile_prompt)" \
         "${items[@]}" 0 "$(i18n back)")" || return
-    case "$choice" in default|minimal|detailed) ;; *) return ;; esac
-    mkdir -p "$MANGOHUD_CONFIG_DIR" || return
-    tmp="$(mktemp "$MANGOHUD_CONFIG_DIR/.mangohud-profile.XXXXXX")" || return
-    printf '%s\n' "$choice" > "$tmp"
-    mv -f -- "$tmp" "$MANGOHUD_CONFIG_DIR/mangohud-profile" || { rm -f -- "$tmp"; return; }
+    case "$choice" in default|minimal|detailed|hidden) ;; *) return ;; esac
+    mangohud_setting_set display "$choice" "" || return
     msgbox "$(i18n mangohud_profile_title)" "$(i18n mangohud_profile_applied "$(i18n "mangohud_profile_$choice")")"
+}
+
+mangohud_setting_get() {
+    local key="$1" game="${2:-}"
+    shift 2
+    python3 "$WT_ROOT/helpers/mangohud_settings.py" get "$MANGOHUD_CONFIG_DIR" "$key" --game "$game" "$@"
+}
+
+mangohud_setting_set() {
+    python3 "$WT_ROOT/helpers/mangohud_settings.py" set "$MANGOHUD_CONFIG_DIR" "$1" "$2" --game "${3:-}" || {
+        msgbox "$(i18n mangohud_controls)" "$(i18n mangohud_settings_error)"
+        return 1
+    }
+}
+
+mangohud_setting_label() {
+    local key="$1" value="$2" game="${3:-}"
+    case "$value" in
+        inherit)
+            if [ -n "$game" ]; then
+                printf '%s (%s)' "$(i18n mangohud_inherit)" \
+                    "$(mangohud_setting_label "$key" "$(mangohud_setting_get "$key" "$game" --effective)" "")"
+            else
+                i18n mangohud_application
+            fi ;;
+        *)
+            if [ "$key" = display ]; then
+                i18n "mangohud_profile_$value"
+            elif [ "$key" = fps ]; then
+                if [ "$value" = 0 ]; then i18n mangohud_unlimited; else printf '%s FPS' "$value"; fi
+            else
+                i18n "mangohud_value_$value"
+            fi ;;
+    esac
+}
+
+mangohud_control_edit() {
+    local key="$1" game="${2:-}" current choice value
+    local -a values=() items=()
+    current="$(mangohud_setting_get "$key" "$game")" || return
+    if [ "$key" = fps ]; then
+        items+=("$current" "$(mangohud_setting_label fps "$current" "$game")")
+        for value in inherit 0 30 40 60 90 120 144 165 240; do
+            [ "$value" = "$current" ] || items+=("$value" "$(mangohud_setting_label fps "$value" "$game")")
+        done
+        choice="$(menu_select "$(i18n mangohud_fps)" "$(i18n mangohud_fps_help)" \
+            "${items[@]}" custom "$(i18n mangohud_custom)" back "$(i18n back)")" || return
+        case "$choice" in
+            custom)
+                [ "$current" != inherit ] || current=60
+                choice="$(input_text "$(i18n mangohud_fps)" "$(i18n mangohud_fps_input)" "$current")" || return ;;
+            inherit) ;;
+            *) [[ "$choice" =~ ^[0-9]+$ ]] || return ;;
+        esac
+        mangohud_setting_set "$key" "$choice" "$game"
+        return
+    fi
+    case "$key" in
+        display) values=(default minimal detailed hidden) ;;
+        vulkan) values=(off mailbox on adaptive) ;;
+        opengl) values=(off on) ;;
+        method) values=(early late) ;;
+        *) return ;;
+    esac
+    # Put the current selection first; menu_select has no default-item API.
+    items+=("$current" "$(mangohud_setting_label "$key" "$current" "$game")")
+    for value in inherit "${values[@]}"; do
+        [ "$value" = "$current" ] || items+=("$value" "$(mangohud_setting_label "$key" "$value" "$game")")
+    done
+    choice="$(menu_select "$(i18n "mangohud_$key")" "$(i18n "mangohud_${key}_help")" \
+        "${items[@]}" back "$(i18n back)")" || return
+    [ "$choice" != back ] && [ -n "$choice" ] || return
+    mangohud_setting_set "$key" "$choice" "$game"
+}
+
+mangohud_controls_menu() {
+    local game="${1:-}" choice key value target
+    local -a items=()
+    target="$(i18n mangohud_global_controls)"
+    [ -z "$game" ] || target="$(basename "$game")"
+    while true; do
+        items=()
+        for key in display vulkan opengl fps method; do
+            value="$(mangohud_setting_get "$key" "$game")" || return
+            if [ -z "$game" ] && [ "$key" = display ]; then
+                value="$(mangohud_setting_get display "" --effective)" || return
+            fi
+            items+=("$key" "$(i18n "mangohud_$key") : $(mangohud_setting_label "$key" "$value" "$game")")
+        done
+        choice="$(menu_select "$target" "$(i18n mangohud_controls_help)" \
+            "${items[@]}" reset "$(i18n mangohud_controls_reset)" back "$(i18n back)")" || return
+        case "$choice" in
+            display|vulkan|opengl|fps|method) mangohud_control_edit "$choice" "$game" ;;
+            reset)
+                for key in display vulkan opengl fps method; do
+                    mangohud_setting_set "$key" inherit "$game" || return
+                done ;;
+            *) return ;;
+        esac
+    done
+}
+
+mangohud_game_controls_menu() {
+    local path selected idx=1
+    local -a paths=() items=()
+    while IFS= read -r path; do
+        paths+=("$path")
+        items+=("$idx" "$(basename "$path")")
+        idx=$((idx+1))
+    done < <(mangohud_list_games)
+    if [ "${#paths[@]}" -eq 0 ]; then
+        msgbox "$(i18n mangohud_controls)" "$(i18n mangohud_no_games)"
+        return
+    fi
+    selected="$(menu_select "$(i18n mangohud_game_controls)" "$(i18n mangohud_controls_help)" \
+        "${items[@]}" back "$(i18n back)")" || return
+    [[ "$selected" =~ ^[0-9]+$ ]] || return
+    [ "$selected" -ge 1 ] && [ "$selected" -le "${#paths[@]}" ] || return
+    mangohud_controls_menu "${paths[$((selected-1))]}"
 }
 
 mangohud_menu() {
@@ -195,6 +308,8 @@ mangohud_menu() {
             "3" "$(i18n mangohud_per_game)" \
             "4" "$(i18n mangohud_disable_individual)" \
             "5" "$(i18n mangohud_profile_title)" \
+            "6" "$(i18n mangohud_global_controls)" \
+            "7" "$(i18n mangohud_game_controls)" \
             "0" "$(i18n back)")" || return
 
         case "$choice" in
@@ -203,6 +318,8 @@ mangohud_menu() {
             3) mangohud_game_menu ;;
             4) mangohud_disable_individual_menu ;;
             5) mangohud_profile_menu ;;
+            6) mangohud_controls_menu ;;
+            7) mangohud_game_controls_menu ;;
             0|"") return ;;
         esac
     done

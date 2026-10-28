@@ -15,7 +15,7 @@ Créée par **Thomsonito**.
 - Starter Pack de runners Wine, avec liste des runners installés et manquants
 - gestion individuelle des runners Wine classiques
 - GE-Proton classiques adaptés à Batocera, y compris 11.x (Batocera v44 conseillée)
-- gestion globale et par jeu de MangoHud
+- gestion globale et par jeu de MangoHud : profils d’affichage, mode masqué, VSync Vulkan (dont Mailbox) et OpenGL ; limiteur de FPS personnalisé en option avancée
 - bundles DXVK / VKD3D-Proton / DXVK-NVAPI, modèles Batocera 40 à 43 / 43.1 et choix global ou par jeu
 - filtrage des versions NVAPI selon la compatibilité connue avec DXVK
 - ReShade par jeu : installation, activation/désactivation, presets, modèles d’effets et aide au choix de l’API
