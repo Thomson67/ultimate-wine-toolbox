@@ -267,6 +267,9 @@ class KeySender:
 
 
 def gtk_dependencies():
+    os.environ.setdefault('DISPLAY', ':0')
+    if 'XAUTHORITY' not in os.environ and Path('/var/lib/.Xauthority').is_file():
+        os.environ['XAUTHORITY'] = '/var/lib/.Xauthority'
     os.environ.setdefault('NO_AT_BRIDGE', '1')
     os.environ['GDK_BACKEND'] = 'wayland' if os.environ.get('WAYLAND_DISPLAY') else 'x11'
     import gi

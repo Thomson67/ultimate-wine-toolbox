@@ -371,4 +371,20 @@ class RuntimeIntegrationTests(unittest.TestCase):
         self.assertEqual(typed,[]);self.assertEqual(shown,[])
 
 
+class GtkStartupTests(unittest.TestCase):
+    def test_wayland_display_is_initialized_before_layer_support_is_queried(self):
+        initialized=[]
+        gtk=types.SimpleNamespace(init_check=lambda:(initialized.append(True) or True, []))
+        def supported():
+            self.assertTrue(initialized, 'GTK must connect to the display before querying layer-shell')
+            return True
+        layer=types.SimpleNamespace(is_supported=supported)
+        gi=types.SimpleNamespace(require_version=lambda *args:None)
+        repository=types.SimpleNamespace(Gtk=gtk,Gdk=object(),GLib=object(),GtkLayerShell=layer)
+        with patch.dict(sys.modules,{'gi':gi,'gi.repository':repository}), \
+             patch.dict(os.environ,{'WAYLAND_DISPLAY':'wayland-0'}):
+            dependencies=runtime.gtk_dependencies()
+        self.assertIs(dependencies[3],layer)
+
+
 if __name__=='__main__':unittest.main()
