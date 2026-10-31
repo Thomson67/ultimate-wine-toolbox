@@ -31,7 +31,17 @@ class VulkanInstallerTests(unittest.TestCase):
         payload = installer.unpack()
         for path, content in payload['files'].items():
             if path.endswith(('.py', '.sh')):
-                self.assertEqual(content, (ROOT / path).read_text(), path)
+                current = (ROOT / path).read_text()
+                if path in ('toolbox/lang/fr.sh', 'toolbox/lang/en.sh'):
+                    # The historical 0.8.1 installer predates the unrelated
+                    # prefix-preparation diagnostic added in 0.9.1.
+                    def without_prefix_diagnostic(text):
+                        return '\n'.join(line for line in text.splitlines()
+                                         if '[wsq_prepare_failed]=' not in line)
+                    self.assertEqual(without_prefix_diagnostic(content),
+                                     without_prefix_diagnostic(current), path)
+                else:
+                    self.assertEqual(content, current, path)
             else:
                 # The scoped 0.8.1 installer keeps its historical help text;
                 # stable releases can append hardware validation to the guides.
