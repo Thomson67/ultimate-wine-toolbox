@@ -45,6 +45,9 @@ wt_update_backup_current() {
 wt_update_restore_backup() {
     local backup="$1"
     [ -d "$backup/toolbox" ] || return 1
+    if [ -f "$WT_HOME/toolbox/helpers/virtual_keyboard.py" ]; then
+        python3 "$WT_HOME/toolbox/helpers/virtual_keyboard.py" --home "$WT_HOME" stop || return 1
+    fi
     rm -rf "$WT_HOME/toolbox"
     cp -a "$backup/toolbox" "$WT_HOME/toolbox" || return 1
     cp -a "$backup/VERSION" "$WT_HOME/VERSION" || return 1
@@ -54,6 +57,11 @@ wt_update_restore_backup() {
     cp -f "$WT_HOME/toolbox/ports/Ultimate Wine Toolbox.sh.keys" "/userdata/roms/ports/Ultimate Wine Toolbox.sh.keys" 2>/dev/null || true
     cp -f "$WT_HOME/toolbox/hooks/mangohud-game-event.sh" "/userdata/system/scripts/ultimate-wine-toolbox-mangohud.sh" 2>/dev/null || true
     cp -f "$WT_HOME/toolbox/hooks/dxvk-game-event.sh" "/userdata/system/scripts/ultimate-wine-toolbox-dxvk.sh" 2>/dev/null || true
+    if [ -f "$WT_HOME/toolbox/hooks/virtual-keyboard-game-event.sh" ]; then
+        cp -f "$WT_HOME/toolbox/hooks/virtual-keyboard-game-event.sh" "/userdata/system/scripts/ultimate-wine-toolbox-virtual-keyboard.sh" || return 1
+    else
+        rm -f "/userdata/system/scripts/ultimate-wine-toolbox-virtual-keyboard.sh"
+    fi
     chmod +x "/userdata/roms/ports/Ultimate Wine Toolbox.sh" "/userdata/system/scripts/ultimate-wine-toolbox-"*.sh 2>/dev/null || true
 }
 

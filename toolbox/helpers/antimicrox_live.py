@@ -27,9 +27,13 @@ def hotkey_choices():
     return choices()
 
 
-def switch_for(profile, home, actions=()):
+def switch_for(profile, home, actions=(), rom=None):
     root = ET.parse(profile).getroot()
     blocked, indices = {button for button, _ in hotkey_choices()}, set()
+    if rom is not None:
+        from virtual_keyboard import Settings
+        if Settings(home).enabled(rom):
+            blocked.add('select')
     for action in actions:
         value = action.get('trigger')
         if isinstance(value, list) and 'hotkey' in value and action.get('target'):
@@ -153,7 +157,7 @@ class LiveSession:
                     raise ValueError('Profiles must remain under /userdata.')
             if not valid_profile(profile):
                 raise ValueError('Invalid AntiMicroX XML profile.')
-            action, switch_fr, switch_en = switch_for(profile, self.home, actions)
+            action, switch_fr, switch_en = switch_for(profile, self.home, actions, rom)
             if runtime_test:
                 # Reuse the proven detached launch/return lifecycle, without
                 # the editor or its temporary controller shortcut.

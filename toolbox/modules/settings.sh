@@ -60,12 +60,13 @@ display_mode_menu() {
 settings_menu() {
     while true; do
         local choice
-        choice="$(menu_select "$(i18n settings_title)" "$(i18n settings_title)"             "u" "$(i18n update_check_action)"             "l" "$(i18n settings_language)"             "d" "Affichage / Display"             "0" "$(i18n back)")" || return
+        choice="$(menu_select "$(i18n settings_title)" "$(i18n settings_title)"             "u" "$(i18n update_check_action)"             "l" "$(i18n settings_language)"             "k" "$(i18n osk_title)"             "d" "Affichage / Display"             "0" "$(i18n back)")" || return
 
         case "$choice" in
             u) manual_update_check ;;
             l) language_menu ;;
             d) display_mode_menu ;;
+            k) virtual_keyboard_menu ;;
             0|"") return ;;
         esac
     done

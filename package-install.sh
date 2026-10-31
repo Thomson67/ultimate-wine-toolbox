@@ -16,6 +16,7 @@ MANGOHUD_HOOK="$SCRIPTS/ultimate-wine-toolbox-mangohud.sh"
 DXVK_HOOK="$SCRIPTS/ultimate-wine-toolbox-dxvk.sh"
 RESHADE_HOOK="$SCRIPTS/ultimate-wine-toolbox-reshade.sh"
 ANTIMICROX_HOOK="$SCRIPTS/ultimate-wine-toolbox-antimicrox.sh"
+KEYBOARD_HOOK="$SCRIPTS/ultimate-wine-toolbox-virtual-keyboard.sh"
 OLD_MANGOHUD_HOOK="$SCRIPTS/thomsonito-wine-toolbox-mangohud.sh"
 OLD_DXVK_HOOK="$SCRIPTS/thomsonito-wine-toolbox-dxvk.sh"
 
@@ -136,6 +137,14 @@ fi
 if [ -s "$DEST/toolbox/hooks/reshade-game-event.sh" ]; then
     cp -f "$DEST/toolbox/hooks/reshade-game-event.sh" "$RESHADE_HOOK"
     chmod +x "$RESHADE_HOOK"
+fi
+
+if [ -s "$DEST/toolbox/helpers/virtual_keyboard.py" ]; then
+    python3 "$DEST/toolbox/helpers/virtual_keyboard.py" --home "$DEST" stop
+fi
+if [ -s "$DEST/toolbox/hooks/virtual-keyboard-game-event.sh" ]; then
+    cp -f "$DEST/toolbox/hooks/virtual-keyboard-game-event.sh" "$KEYBOARD_HOOK"
+    chmod +x "$KEYBOARD_HOOK"
 fi
 
 if [ -s "$DEST/toolbox/hooks/antimicrox-game-event.sh" ]; then

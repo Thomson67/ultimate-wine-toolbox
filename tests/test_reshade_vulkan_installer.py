@@ -2,6 +2,7 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -30,7 +31,21 @@ class VulkanInstallerTests(unittest.TestCase):
     def test_embedded_sources_and_baselines_are_complete(self):
         payload = installer.unpack()
         for path, content in payload['files'].items():
-            if path.endswith(('.py', '.sh')):
+            if path.startswith('toolbox/lang/'):
+                # This historical scoped installer must retain all its own
+                # translations. Later independent features may add keys to the
+                # current catalog without belonging in the ReShade installer.
+                def catalog(text):
+                    command = 'declare -A I18N=(); source /dev/stdin; for key in "${!I18N[@]}"; do printf "%s\\0%s\\0" "$key" "${I18N[$key]}"; done'
+                    result = subprocess.run(['bash', '-c', command], input=text,
+                                            capture_output=True, text=True, check=True)
+                    fields = result.stdout.split('\0')[:-1]
+                    return dict(zip(fields[::2], fields[1::2]))
+                embedded, current = catalog(content), catalog((ROOT/path).read_text())
+                self.assertTrue(embedded)
+                for key, value in embedded.items():
+                    self.assertEqual(value, current.get(key), (path, key))
+            elif path.endswith(('.py', '.sh')):
                 self.assertEqual(content, (ROOT / path).read_text(), path)
             else:
                 # The scoped 0.8.1 installer keeps its historical help text;
