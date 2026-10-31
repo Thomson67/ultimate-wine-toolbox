@@ -187,6 +187,19 @@ class ControllerTests(unittest.TestCase):
         with self.assertRaises(ValueError):runtime.bindings(ET.fromstring(xml.replace('code="316"','code="314"')))
         with self.assertRaises(ValueError):runtime.bindings(ET.fromstring(xml.replace('code="316"','id="12"')))
 
+    def test_shortcut_follows_user_remapping_instead_of_fixed_ps_buttons(self):
+        xml='<inputConfig>'+''.join(f'<input name="{name}" type="button" code="{code}" value="1"/>' for name,code in [('hotkey',310),('select',318),('b',304),('a',305),('start',315)])+'</inputConfig>'
+        mapping=runtime.bindings(ET.fromstring(xml))
+        device=FakeDevice()
+        controller=runtime.Controller(device,mapping,self.e)
+        # The usual Sony PS/Create codes must not activate this remapped pad.
+        device.event(316,1);device.event(314,1)
+        self.assertEqual(controller.poll(),[])
+        device.event(316,0);device.event(314,0);controller.poll()
+        # Only the two event codes saved by the user in ES activate it.
+        device.event(310,1);device.event(318,1)
+        self.assertEqual(controller.poll(),['toggle'])
+
     def test_sdl_hardware_identity_ignores_name_crc_and_driver_marker(self):
         self.assertEqual(runtime.guid_identity('050000004c050000e60c000000010000'), (5, 0x054c, 0x0ce6, 0x0100))
         self.assertEqual(runtime.guid_identity('0500abcd4c050000e60c000000016800'), (5, 0x054c, 0x0ce6, 0x0100))

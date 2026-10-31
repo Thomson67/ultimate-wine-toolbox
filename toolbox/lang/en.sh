@@ -854,7 +854,7 @@ I18N[wsq_update_save_cleanup_failed]="Some save backups could not be verified or
 I18N[wsq_update_replace_source_links]="The new version contains links at known save locations:\n\n%s\n\nReplace these links using the existing configuration? Tests will use the workflow’s test copies (except links to the shared root).\n\nOnly the links will be replaced: their old target folders, including saves from a previous test, remain untouched. Their contents will not be imported. No stops preparation before the source directory is moved."
 
 I18N[osk_title]="Controller virtual keyboard (test)"
-I18N[osk_intro]="Show / hide: Hotkey + Select (PS + Create on DualSense). Off by default. Applies to upcoming Windows launches. Per-game settings take priority. Existing Batocera shortcuts are preserved."
+I18N[osk_intro]="Show / hide: Hotkey + Select, as configured in EmulationStation. Off by default. Applies to upcoming Windows launches. Per-game settings take priority. Existing Batocera shortcuts are preserved."
 I18N[osk_inherit]="Follow global setting"
 I18N[osk_global]="Global Windows activation"
 I18N[osk_global_on]="Enable globally for Windows games"

@@ -319,8 +319,8 @@ class Overlay:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         for side in ('top', 'bottom', 'start', 'end'): getattr(box, 'set_margin_'+side)(12)
         self.window.add(box)
-        title = ('Clavier — PS/Hotkey + Create/Select : afficher / masquer' if french else
-                 'Keyboard — PS/Hotkey + Create/Select: show / hide')
+        title = ('Clavier — Hotkey + Select : afficher / masquer' if french else
+                 'Keyboard — Hotkey + Select: show / hide')
         box.pack_start(Gtk.Label(label=title), False, False, 0)
         self.grid = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.pack_start(self.grid, True, True, 0)
