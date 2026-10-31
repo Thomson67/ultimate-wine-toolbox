@@ -165,17 +165,29 @@ class Controller:
         finally: self.device.close()
 
 
+def guid_identity(value):
+    """Linux SDL GUID hardware fields, ignoring name CRC and driver markers."""
+    try:
+        raw = bytes.fromhex(value)
+        if len(raw) != 16: return None
+        return tuple(int.from_bytes(raw[offset:offset+2], 'little') for offset in (0, 4, 8, 12))
+    except (TypeError, ValueError):
+        return None
+
+
 def controllers(paths=None):
     import evdev
     paths = paths or [Path('/userdata/system/configs/emulationstation/es_input.cfg'),
                       Path('/usr/share/emulationstation/es_input.cfg')]
-    configs = {}
+    configs, seen = [], set()
     for path in paths:
         if path.exists():
             for config in ET.parse(path).getroot().findall('inputConfig'):
                 if config.get('type') == 'joystick':
-                    # The user's first configuration always wins over defaults.
-                    configs.setdefault(config.get('deviceName'), config)
+                    identity = (config.get('deviceGUID'), config.get('deviceName'))
+                    if identity not in seen:
+                        configs.append(config)
+                        seen.add(identity)
     result = []
     for path in evdev.list_devices():
         device = evdev.InputDevice(path)
@@ -183,13 +195,20 @@ def controllers(paths=None):
             caps = device.capabilities()
             if not any(0x120 <= key < 0x140 for key in caps.get(evdev.ecodes.EV_KEY, [])):
                 device.close(); continue
-            config = configs.get(device.name)
+            hardware = tuple(getattr(device.info, key) for key in ('bustype', 'vendor', 'product', 'version'))
+            # SDL can name a DualSense differently from the kernel. Match its
+            # recorded hardware GUID as well; all event codes are checked below.
+            config = next((item for item in configs if item.get('deviceName') == device.name
+                           or guid_identity(item.get('deviceGUID')) == hardware), None)
             if config is None:
                 device.close(); continue
             mapping = bindings(config)
             keys = caps.get(evdev.ecodes.EV_KEY, [])
             if any(code not in keys for kind, code, _ in mapping.values() if kind == 'button'):
                 raise ValueError('Recorded button code does not match physical device')
+            axes = caps.get(evdev.ecodes.EV_ABS, [])
+            if any(code not in axes for kind, code, _ in mapping.values() if kind == 'axis'):
+                raise ValueError('Recorded axis code does not match physical device')
             result.append(Controller(device, mapping, evdev.ecodes))
         except (ValueError, OSError) as exc:
             print(f'virtual_keyboard_controller_skipped name={device.name!r} reason={exc}', flush=True)

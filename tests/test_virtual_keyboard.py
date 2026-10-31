@@ -187,6 +187,25 @@ class ControllerTests(unittest.TestCase):
         with self.assertRaises(ValueError):runtime.bindings(ET.fromstring(xml.replace('code="316"','code="314"')))
         with self.assertRaises(ValueError):runtime.bindings(ET.fromstring(xml.replace('code="316"','id="12"')))
 
+    def test_sdl_hardware_identity_ignores_name_crc_and_driver_marker(self):
+        self.assertEqual(runtime.guid_identity('050000004c050000e60c000000010000'), (5, 0x054c, 0x0ce6, 0x0100))
+        self.assertEqual(runtime.guid_identity('0500abcd4c050000e60c000000016800'), (5, 0x054c, 0x0ce6, 0x0100))
+        self.assertIsNone(runtime.guid_identity(None))
+        self.assertIsNone(runtime.guid_identity('invalid'))
+
+    def test_controller_matches_hardware_when_sdl_and_kernel_names_differ(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'es_input.cfg'
+            path.write_text('<inputList><inputConfig type="joystick" deviceName="DualSense Wireless Controller" deviceGUID="050000004c050000e60c000000010000">'+''.join(f'<input name="{name}" type="button" code="{code}" value="1"/>' for name,code in [('hotkey',316),('select',314),('b',304),('a',305),('start',315)])+'</inputConfig></inputList>')
+            device=FakeDevice();device.name='Wireless Controller'
+            device.info=types.SimpleNamespace(bustype=5,vendor=0x054c,product=0x0ce6,version=0x0100)
+            device.capabilities=lambda:{1:[316,314,304,305,315],3:[]}
+            fake=types.SimpleNamespace(ecodes=self.e,list_devices=lambda:['physical'],InputDevice=lambda _:device)
+            with patch.dict(sys.modules,{'evdev':fake}):
+                result=runtime.controllers([path])
+            self.assertEqual(len(result),1)
+            result[0].close();self.assertTrue(device.closed)
+
 
 class KeyboardTests(unittest.TestCase):
     def test_layout_navigation_case_symbols_and_actions(self):
@@ -247,8 +266,8 @@ def run(home,rom):
  with lifecycle_lock(home) as state:
   data=json.loads((state/'session.json').read_text())
   assert data=={'rom':rom,'pid':os.getpid(),'token':process_identity(os.getpid())}
- (Path(home)/'ready').write_text(str(os.getpid()))
  signal.signal(signal.SIGTERM,lambda *_: (_ for _ in ()).throw(SystemExit()))
+ (Path(home)/'ready').write_text(str(os.getpid()))
  try:
   while True:time.sleep(.02)
  finally:(Path(home)/'closed').touch()
