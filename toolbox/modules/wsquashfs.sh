@@ -279,7 +279,14 @@ wsq_prepare_prefix() {
     [ ! -e "$target" ] || return 2
     rm -rf -- "$tmp"
 
-    if ! unsquashfs -f -q -no-xattrs -d "$tmp" "$template"; then
+    # A Toolbox terminal can inherit a lower file limit than an SSH shell.
+    # Keep the raised limit local to extraction and bound parallel open files.
+    if ! (
+        ulimit -Sn "$(ulimit -Hn)" 2>/dev/null || true
+        printf 'Prefix extraction open files: soft=%s hard=%s\n' \
+            "$(ulimit -Sn)" "$(ulimit -Hn)"
+        unsquashfs -processors 1 -f -q -no-xattrs -d "$tmp" "$template"
+    ); then
         rm -rf -- "$tmp"
         return 3
     fi
@@ -560,7 +567,7 @@ wsq_request_game_launch() {
 
 wsq_create_new() {
     wsq_pending_guard || return
-    local source template raw_name game_name target exe_rel runner snapshot rom_name
+    local source template raw_name game_name target exe_rel runner snapshot rom_name prepare_log
     command -v unsquashfs >/dev/null 2>&1 || {
         msgbox "$(i18n wsq_create_title)" "$(i18n squash_tools_missing)"
         return
@@ -620,8 +627,11 @@ wsq_create_new() {
                 yesno_default_no "$(i18n wsq_create_title)" \
                     "$(i18n wsq_move_confirm "$source" "$template" "$target")" || continue
 
-                if ! wsq_prepare_prefix "$source" "$template" "$game_name" "$target"; then
-                    msgbox "$(i18n wsq_create_title)" "$(i18n wsq_prepare_failed "$target")"
+                prepare_log="${WT_SESSION_LOG:-$WSQ_STATE_DIR/wsquashfs-prepare.log}"
+                mkdir -p "$(dirname "$prepare_log")" || return
+                printf '\n[%s] Prefix preparation started\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$prepare_log" || return
+                if ! wsq_prepare_prefix "$source" "$template" "$game_name" "$target" >> "$prepare_log" 2>&1; then
+                    msgbox "$(i18n wsq_create_title)" "$(i18n wsq_prepare_failed "$target" "$prepare_log" "$(wsq_update_log_detail "$prepare_log")")"
                     return
                 fi
                 prepared=1
