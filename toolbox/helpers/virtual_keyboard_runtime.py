@@ -405,6 +405,7 @@ def preview(home):
 def run(home, rom):
     import fcntl
     from virtual_keyboard import conflict, lifecycle_lock
+    from virtual_keyboard_antimicrox import priority
     home = Path(home)
     state = home/'state/virtual-keyboard'; state.mkdir(parents=True, exist_ok=True)
     with (state/'runtime.lock').open('a') as lock:
@@ -432,6 +433,9 @@ def run(home, rom):
             def hide():
                 overlay.hide()
                 for device in devices: device.ungrab()
+                try: priority(home, rom, False)
+                except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+                    print(f'virtual_keyboard_restore_error={exc}', flush=True)
             def action(key):
                 nonlocal pending
                 if key == 'close': pending = 'hide'; return
@@ -469,7 +473,11 @@ def run(home, rom):
                                 subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True, start_new_session=True)
                                 Gtk.main_quit(); return False
                             if key == 'toggle' and current_rom == rom:
-                                pending = 'hide' if overlay.visible() else 'show'
+                                if overlay.visible():
+                                    pending = 'hide'
+                                elif safe_foreground():
+                                    priority(home, rom, True)
+                                    pending = 'show'
                                 quiet_since = None
                             elif overlay.visible() and pending is None:
                                 if key in ('up', 'down', 'left', 'right'):
@@ -489,11 +497,12 @@ def run(home, rom):
                                     overlay.show()
                                     print('virtual_keyboard_shown', flush=True)
                                 else:
+                                    priority(home, rom, False)
                                     print('virtual_keyboard_refused=No active Wine X11/XWayland window', flush=True)
                                 pending, quiet_since = None, None
                         else: quiet_since = None
                     return True
-                except (OSError, ValueError, RuntimeError) as exc:
+                except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
                     print(f'virtual_keyboard_runtime_error={exc}', flush=True)
                     hide(); Gtk.main_quit(); return False
             GLib.timeout_add(25, tick)
@@ -502,6 +511,9 @@ def run(home, rom):
             Gtk.main()
         finally:
             if overlay: overlay.close()
+            try: priority(home, rom, False)
+            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+                print(f'virtual_keyboard_restore_error={exc}', flush=True)
             for device in devices: device.close()
             if sender: sender.close()
             if windows: windows.close()

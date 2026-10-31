@@ -23,8 +23,10 @@ Typed text is not stored. No clipboard is used. Native hotkeys are not changed.
 Controller event devices are captured temporarily, then released on hide or
 process exit. Games reading HIDRAW directly may still receive controller
 buttons: test this with the game. The game is not paused.
-Select conflicts in Pad2Key or assigned AMX profiles block activation without
-overwriting mappings. AMX live editing reserves Select when the keyboard is
+Select may stay mapped in AntiMicroX. A private runtime profile reserves
+Hotkey + Select. While the keyboard is open, AMX output is suspended; closing
+it restores the current game profile. Saved profiles stay unchanged. Pad2Key
+conflicts still block activation. AMX live editing reserves Select when the keyboard is
 enabled; if R1 is also busy it falls back to its keyboard-only editor shortcut.
 
 FIRST TEST SCOPE

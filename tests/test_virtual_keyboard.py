@@ -71,12 +71,14 @@ class PolicyTests(unittest.TestCase):
         (self.home/'config').mkdir()
         association = self.home/'config/antimicrox-games.tsv'
         association.write_text(f'{self.rom}\t{profile}\n')
-        self.assertIn('AntiMicroX',self.conflict())
+        with patch('antimicrox_hotkey.choices', return_value=[('guide','Pad')]):
+            self.assertFalse(self.conflict())
         association.unlink()
         rules = self.home/'config/antimicrox-launchers'; rules.mkdir()
         rule = rules/(hashlib.sha256(str(self.rom).encode()).hexdigest()+'.json')
         rule.write_text(json.dumps({'rom':str(self.rom),'game_profile':str(profile)}))
-        self.assertIn('AntiMicroX',self.conflict())
+        with patch('antimicrox_hotkey.choices', return_value=[('guide','Pad')]):
+            self.assertFalse(self.conflict())
 
     def test_live_editor_never_uses_select_reserved_by_keyboard(self):
         profile = self.home/'empty.amgp'

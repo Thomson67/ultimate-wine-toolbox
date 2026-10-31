@@ -32,7 +32,7 @@ Après validation d'un jeu, l'activation globale peut être utilisée. Les excep
 - Première cible : fenêtres Wine X11/XWayland, avec runners classiques ou UMU. Pas de prise en charge des fenêtres Wine Wayland natives à ce stade.
 - Le clavier ne prend pas le focus au jeu. Il utilise GTK, GtkLayerShell sur Wayland, python-evdev, uinput et la disposition XKB du bureau. Le diagnostic annonce un composant manquant sans modifier le système.
 - Les codes Linux de la manette doivent être présents dans la configuration EmulationStation ; Hotkey et Select doivent être deux boutons distincts.
-- Une affectation concurrente de Select ou de Hotkey seul dans Pad2Key/AntiMicroX est refusée. Le repli Select de l'éditeur AntiMicroX est réservé lorsque le clavier est activé pour ce jeu.
+- Select seul peut rester affecté dans AntiMicroX. Hotkey + Select est réservé dans un profil temporaire ; les commandes AntiMicroX sont suspendues pendant la saisie puis restaurées. Les profils enregistrés ne sont pas modifiés. Les conflits Pad2Key restent refusés. Le repli Select de l'éditeur AntiMicroX est réservé lorsque le clavier est activé pour ce jeu.
 - La capture temporaire des événements manette n'empêche pas nécessairement une lecture HIDRAW directe par le jeu. Vérifier qu'aucune action indésirable ne se produit pendant la saisie. Le jeu n'est pas mis en pause.
 - Le texte saisi n'est ni enregistré ni copié dans le presse-papiers.
 

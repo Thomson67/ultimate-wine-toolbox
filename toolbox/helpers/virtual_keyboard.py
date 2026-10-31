@@ -109,21 +109,12 @@ def conflict(home, rom, global_keys=None, system_keys=Path('/usr/share/evmapy/ho
         if not isinstance(data, dict) or data.get('rom') != str(rom):
             raise ValueError('Invalid launcher configuration')
         profiles.extend(Path(data[key]) for key in ('launcher_profile', 'game_profile') if data.get(key))
+    from virtual_keyboard_antimicrox import reserved_profile
     for path in profiles:
-        root = ET.parse(path).getroot()
-        if root.tag != 'gamecontroller':
-            return f'Unverified joystick profile: {path}'
-        # AMX's SDL gamecontroller Select is button 5. A populated slot in any
-        # set can consume this control, even without a Hotkey set switch.
-        if root.findall('./sets/set/button[@index="5"]/slots/slot'):
-            return f'Select mapped in AntiMicroX profile: {path}'
-        from antimicrox_hotkey import choices
-        indices = {'guide': 6, 'b': 1, 'a': 2, 'y': 3, 'x': 4, 'select': 5,
-                   'l3': 8, 'r3': 9, 'pageup': 10, 'pagedown': 11}
-        for name, _ in choices():
-            index = indices.get(name)
-            if index and root.findall(f'./sets/set/button[@index="{index}"]/slots/slot'):
-                return f'Hotkey mapped alone in AntiMicroX profile: {path}'
+        try:
+            reserved_profile(path)
+        except ValueError as exc:
+            return f'AntiMicroX: {exc}'
     return ''
 
 
@@ -196,8 +187,9 @@ def start(home, rom, log=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--home', type=Path, default=Path(os.environ.get('WT_HOME', HOME)))
-    parser.add_argument('action', choices=('get', 'set', 'start', 'stop', 'run', 'diagnose', 'preview'))
+    parser.add_argument('action', choices=('get', 'set', 'start', 'stop', 'run', 'diagnose', 'preview', 'profile'))
     parser.add_argument('--rom')
+    parser.add_argument('--profile')
     parser.add_argument('--value', choices=('on', 'off', 'inherit'))
     args = parser.parse_args()
     settings = Settings(args.home)
@@ -206,6 +198,9 @@ def main():
     elif args.action == 'set': settings.set(args.value, args.rom)
     elif args.action == 'stop': stop(args.home, args.rom)
     elif args.action == 'start': start(args.home, args.rom)
+    elif args.action == 'profile':
+        from virtual_keyboard_antimicrox import runtime_profile
+        print(runtime_profile(args.home, args.rom, args.profile))
     else:
         from virtual_keyboard_runtime import diagnose, run, preview
         if args.action == 'diagnose': diagnose(args.home)
