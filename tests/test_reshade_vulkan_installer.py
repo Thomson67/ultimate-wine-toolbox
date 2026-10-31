@@ -44,7 +44,12 @@ class VulkanInstallerTests(unittest.TestCase):
                 embedded, current = catalog(content), catalog((ROOT/path).read_text())
                 self.assertTrue(embedded)
                 for key, value in embedded.items():
-                    self.assertEqual(value, current.get(key), (path, key))
+                    # Stable 0.9.1 deliberately improves this unrelated
+                    # prefix-preparation diagnostic after the scoped installer.
+                    if key == 'wsq_prepare_failed':
+                        self.assertIn(key, current)
+                    else:
+                        self.assertEqual(value, current.get(key), (path, key))
             elif path.endswith(('.py', '.sh')):
                 self.assertEqual(content, (ROOT / path).read_text(), path)
             else:
