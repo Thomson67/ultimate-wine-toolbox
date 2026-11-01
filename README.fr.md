@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.10.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.10.0).**
+**Version stable : [v0.10.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.10.1).**
 
 ## Fonctionnalités
 
@@ -33,6 +33,12 @@ Créée par **Thomsonito**.
 - sauvegarde automatique avant les opérations destructives sur `batocera.conf`
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
+
+## Correctifs de la v0.10.1
+
+- Chargement des réglages clavier par jeu en une seule lecture, avec indication de préparation.
+- Liste dédiée pour retrouver et gérer les jeux ayant une règle personnalisée.
+- Menu clavier simplifié, aperçu de 10 secondes et aide à jour dans Documentation.
 
 ## Nouveautés de la v0.10.0
 
