@@ -71,13 +71,13 @@ class PolicyTests(unittest.TestCase):
         (self.home/'config').mkdir()
         association = self.home/'config/antimicrox-games.tsv'
         association.write_text(f'{self.rom}\t{profile}\n')
-        with patch('antimicrox_hotkey.choices', return_value=[('guide','Pad')]):
+        with patch('virtual_keyboard_antimicrox.active_modifiers', return_value=[6]):
             self.assertFalse(self.conflict())
         association.unlink()
         rules = self.home/'config/antimicrox-launchers'; rules.mkdir()
         rule = rules/(hashlib.sha256(str(self.rom).encode()).hexdigest()+'.json')
         rule.write_text(json.dumps({'rom':str(self.rom),'game_profile':str(profile)}))
-        with patch('antimicrox_hotkey.choices', return_value=[('guide','Pad')]):
+        with patch('virtual_keyboard_antimicrox.active_modifiers', return_value=[6]):
             self.assertFalse(self.conflict())
 
     def test_live_editor_never_uses_select_reserved_by_keyboard(self):
@@ -214,12 +214,38 @@ class ControllerTests(unittest.TestCase):
             path.write_text('<inputList><inputConfig type="joystick" deviceName="DualSense Wireless Controller" deviceGUID="050000004c050000e60c000000010000">'+''.join(f'<input name="{name}" type="button" code="{code}" value="1"/>' for name,code in [('hotkey',316),('select',314),('b',304),('a',305),('start',315)])+'</inputConfig></inputList>')
             device=FakeDevice();device.name='Wireless Controller'
             device.info=types.SimpleNamespace(bustype=5,vendor=0x054c,product=0x0ce6,version=0x0100)
-            device.capabilities=lambda:{1:[316,314,304,305,315],3:[]}
+            device.capabilities=lambda **kwargs:{1:[316,314,304,305,315],3:[]}
             fake=types.SimpleNamespace(ecodes=self.e,list_devices=lambda:['physical'],InputDevice=lambda _:device)
             with patch.dict(sys.modules,{'evdev':fake}):
                 result=runtime.controllers([path])
             self.assertEqual(len(result),1)
             result[0].close();self.assertTrue(device.closed)
+
+    def test_real_evdev_absolute_capabilities_use_codes_not_absinfo_pairs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'es_input.cfg'
+            buttons = [('hotkey',316),('select',314),('b',304),('a',305),('start',315)]
+            path.write_text('<inputList><inputConfig type="joystick" deviceName="Pad">'+
+                ''.join(f'<input name="{name}" type="button" id="{i}" code="{code}" value="1"/>'
+                        for i,(name,code) in enumerate(buttons))+
+                '<input name="joystick1left" type="axis" code="0" value="-1"/>'+
+                '<input name="joystick1up" type="axis" code="1" value="-1"/>'+
+                '</inputConfig></inputList>')
+            device = FakeDevice(); device.name = 'Pad'
+            device.info = types.SimpleNamespace(bustype=3,vendor=1,product=2,version=1)
+            calls = []
+            def capabilities(absinfo=True):
+                calls.append(absinfo)
+                return {1:[c for _,c in buttons],3:[(0,object()),(1,object())] if absinfo else [0,1]}
+            device.capabilities = capabilities
+            fake = types.SimpleNamespace(ecodes=self.e,list_devices=lambda:['pad'],InputDevice=lambda _:device)
+            with patch.dict(sys.modules,{'evdev':fake}):
+                result = runtime.controllers([path])
+            self.assertEqual(calls,[False])
+            self.assertEqual(len(result),1)
+            self.assertEqual(result[0].amx_hotkey,'guide')
+            self.assertEqual(result[0].mapping['left'],('axis',0,-1))
+            result[0].close()
 
 
 class KeyboardTests(unittest.TestCase):
@@ -268,7 +294,8 @@ class LifecycleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             home=Path(directory)
             helpers=home/'toolbox/helpers';helpers.mkdir(parents=True)
-            shutil.copy2(ROOT/'toolbox/helpers/virtual_keyboard.py',helpers/'virtual_keyboard.py')
+            for name in ('virtual_keyboard.py','virtual_keyboard_antimicrox.py'):
+                shutil.copy2(ROOT/'toolbox/helpers'/name,helpers/name)
             (helpers/'antimicrox_live.py').write_text('from pathlib import Path\ndef atomic(path,data):\n Path(path).parent.mkdir(parents=True,exist_ok=True)\n Path(path).write_bytes(data)\n')
             (helpers/'virtual_keyboard_runtime.py').write_text('''
 import os,time,signal

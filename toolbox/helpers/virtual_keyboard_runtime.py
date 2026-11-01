@@ -192,7 +192,7 @@ def controllers(paths=None):
     for path in evdev.list_devices():
         device = evdev.InputDevice(path)
         try:
-            caps = device.capabilities()
+            caps = device.capabilities(absinfo=False)
             if not any(0x120 <= key < 0x140 for key in caps.get(evdev.ecodes.EV_KEY, [])):
                 device.close(); continue
             hardware = tuple(getattr(device.info, key) for key in ('bustype', 'vendor', 'product', 'version'))
@@ -209,7 +209,10 @@ def controllers(paths=None):
             axes = caps.get(evdev.ecodes.EV_ABS, [])
             if any(code not in axes for kind, code, _ in mapping.values() if kind == 'axis'):
                 raise ValueError('Recorded axis code does not match physical device')
-            result.append(Controller(device, mapping, evdev.ecodes))
+            from antimicrox_hotkey import logical_hotkey
+            controller = Controller(device, mapping, evdev.ecodes)
+            controller.amx_hotkey = logical_hotkey(config)
+            result.append(controller)
         except (ValueError, OSError) as exc:
             print(f'virtual_keyboard_controller_skipped name={device.name!r} reason={exc}', flush=True)
             device.close()

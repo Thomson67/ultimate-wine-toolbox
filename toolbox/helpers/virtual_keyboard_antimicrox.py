@@ -18,15 +18,26 @@ INDICES = {'guide': 6, 'b': 1, 'a': 2, 'y': 3, 'x': 4, 'select': 5,
            'l3': 8, 'r3': 9, 'pageup': 10, 'pagedown': 11}
 
 
+def active_modifiers():
+    # Saved ES entries include disconnected controllers with other Hotkeys.
+    # Only physical devices validated by the same watcher affect this session.
+    from virtual_keyboard_runtime import controllers
+    devices = controllers()
+    try:
+        return [INDICES[d.amx_hotkey] for d in devices if d.amx_hotkey in INDICES]
+    finally:
+        for device in devices:
+            device.close()
+
+
 def reserved_profile(source, modifiers=None):
-    from antimicrox_hotkey import choices
     root = ET.parse(source).getroot()
     if root.tag != 'gamecontroller':
         raise ValueError(f'Unsupported AntiMicroX joystick profile: {source}')
     sets = root.find('sets')
     if sets is None:
         return ET.tostring(root, encoding='utf-8', xml_declaration=True)
-    modifiers = modifiers if modifiers is not None else [INDICES[name] for name, _ in choices() if name in INDICES]
+    modifiers = modifiers if modifiers is not None else active_modifiers()
     modifiers = set(modifiers)
     populated = [s for s in sets.findall('set') if any(c.tag != 'name' for c in s)]
     if not populated:

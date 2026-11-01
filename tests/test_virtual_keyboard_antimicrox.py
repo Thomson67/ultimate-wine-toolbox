@@ -20,6 +20,16 @@ class PriorityTests(unittest.TestCase):
         self.source.write_text('<gamecontroller><sets><set index="1"><button index="5"><slots><slot><code>0xff1b</code><mode>keyboard</mode></slot></slots></button><button index="1"><slots><slot><code>0x41</code></slot></slots></button></set></sets></gamecontroller>')
         self.original = self.source.read_bytes()
 
+    def test_only_connected_verified_controllers_select_the_amx_hotkey(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        pad = SimpleNamespace(amx_hotkey='guide',close=Mock())
+        with patch('virtual_keyboard_runtime.controllers',return_value=[pad]), \
+                patch('antimicrox_hotkey.choices',return_value=[('guide','Pad'),('select','Disconnected')]) as saved:
+            self.assertEqual(amx.active_modifiers(),[6])
+            saved.assert_not_called()
+        pad.close.assert_called_once()
+
     def test_plain_select_preserved_chord_reserved_and_other_actions_inherited(self):
         root = ET.fromstring(amx.reserved_profile(self.source, [6]))
         self.assertTrue(root.findall('./sets/set[@index="1"]/button[@index="5"]/slots/slot'))
@@ -65,7 +75,7 @@ class PriorityTests(unittest.TestCase):
 
     def test_launcher_switch_stays_empty_until_keyboard_closes(self):
         policy.Settings(self.home).set('on')
-        with patch('antimicrox_hotkey.choices',return_value=[('guide','Pad')]):
+        with patch('virtual_keyboard_antimicrox.active_modifiers',return_value=[6]):
             runtime = amx.runtime_profile(self.home,self.rom,self.source)
             state = self.home/'state/virtual-keyboard/profiles'
             marker = state/'visible'
@@ -87,7 +97,7 @@ class PriorityTests(unittest.TestCase):
 
     def test_priority_only_commands_owned_session_and_restores_latest_profile(self):
         policy.Settings(self.home).set('on')
-        with patch('antimicrox_hotkey.choices',return_value=[('guide','Pad')]):
+        with patch('virtual_keyboard_antimicrox.active_modifiers',return_value=[6]):
             runtime = amx.runtime_profile(self.home,self.rom,self.source)
         state = self.home/'state/antimicrox'; state.mkdir(parents=True)
         (state/'session').write_text(f'{self.rom}\t123\tstamp\n')
