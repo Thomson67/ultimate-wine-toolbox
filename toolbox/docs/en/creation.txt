@@ -43,3 +43,5 @@ The integrity entry in WSquashFS management can check the structure or read and 
 Simple .wine compression in this menu does not by itself perform the save externalization workflow described here.
 
 With mergerfs, free space is checked per disk and a suitable physical archive location is offered before compression. Total free space does not guarantee one archive fits on a disk. Keep the Toolbox open during compression, verification and finalization: closing it interrupts workers and retains recovery state.
+
+Folders containing only .ini files remain selectable with a lower score. INI filenames do not receive the sav/slot/user bonus; an INI file next to actual saves does not penalize the folder.

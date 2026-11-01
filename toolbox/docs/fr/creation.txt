@@ -43,3 +43,5 @@ Le contrôle d'intégrité du menu Gestion des WSquashFS peut vérifier la struc
 La compression simple d'un .wine dans ce menu ne réalise pas à elle seule le workflow d'externalisation décrit ici.
 
 Avec mergerfs, l’espace est vérifié par disque et un emplacement physique compatible est proposé avant la compression. La place libre totale du partage ne garantit pas qu’une archive puisse tenir sur un seul disque. Garder la Toolbox ouverte pendant compression, vérification et finalisation : fermer sa fenêtre interrompt les tâches et conserve l’état de reprise.
+
+Les dossiers contenant uniquement des fichiers .ini restent sélectionnables, avec un score réduit. Les noms des fichiers .ini ne donnent pas le bonus sav/slot/user ; un .ini à côté de vraies sauvegardes ne pénalise pas le dossier.

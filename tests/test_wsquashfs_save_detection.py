@@ -155,3 +155,39 @@ class SaveDirectoryDetectionTests(unittest.TestCase):
         plain = builder.score_save_dir('drive_c/game/Storage', ['state.txt'])[0]
         named = builder.score_save_dir('drive_c/game/Logan', ['state.txt'])[0]
         self.assertEqual(plain, named)
+
+    def test_ini_only_folder_stays_selectable_but_ranks_below_plain_data(self):
+        path = 'drive_c/game/storage'
+        plain = builder.score_save_dir(path, ['state.txt'])[0]
+        for filename in ('config.ini', 'UserSettings.INI', 'save_slot.ini'):
+            with self.subTest(filename=filename):
+                score, reason = builder.score_save_dir(path, [filename])
+                self.assertGreater(score, 0)
+                self.assertLess(score, plain)
+                self.assertIn('INI configuration files only', reason)
+
+    def test_documents_user_settings_ini_no_longer_outranks_slot_file(self):
+        ini = builder.score_save_dir('drive_c/users/steamuser/Documents/Ninja Gaiden 4',
+                                     ['UserSettings.ini'])[0]
+        slot = builder.score_save_dir('drive_c/game/storage', ['slot01.dat'])[0]
+        self.assertLess(ini, slot)
+
+    def test_ini_does_not_penalize_real_save_in_mixed_directory(self):
+        path = 'drive_c/game/storage'
+        real = builder.score_save_dir(path, ['slot01.dat'])[0]
+        mixed = builder.score_save_dir(path, ['slot01.dat', 'UserSettings.ini', 'save_config.ini'])[0]
+        self.assertEqual(real, mixed)
+
+    def test_many_ini_files_do_not_accumulate_save_name_bonuses(self):
+        path = 'drive_c/game/storage'
+        one = builder.score_save_dir(path, ['config.ini'])[0]
+        many = builder.score_save_dir(path, ['user.ini', 'slot.ini', 'save.ini'])[0]
+        self.assertEqual(one, many)
+
+    def test_ini_only_folder_is_in_snapshot_candidates_even_with_a_log(self):
+        before = builder.snapshot(self.prefix)
+        self.write('drive_c/game/storage/UserSettings.ini')
+        self.write('drive_c/game/storage/game.log')
+        rows = builder.diff_snapshots(self.prefix, before, builder.snapshot(self.prefix))
+        self.assertIn('drive_c/game/storage', [row[1] for row in rows])
+        self.assertGreater(next(row[0] for row in rows if row[1] == 'drive_c/game/storage'), 0)

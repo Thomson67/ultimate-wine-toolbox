@@ -6,7 +6,7 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.9.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.9.0).**
+**Stable version: [v0.10.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.10.0).**
 
 ## Features
 
@@ -20,6 +20,7 @@ Created by **Thomsonito**.
 - NVAPI version filtering based on known DXVK requirements
 - per-game ReShade: installation, toggling, presets, effect templates, API hints and Vulkan under Wine (experimental)
 - AntiMicroX: controller profiles, launcher/game switching, in-game editing and Pad2Key conversion
+- controller virtual keyboard: global or per-game activation, Hotkey + Select, AZERTY/QWERTY and text cursor keys
 - community catalogue: download, share and moderate AntiMicroX profiles and ReShade presets
 - Wine bottle maintenance and orphan detection
 - runner and DXVK / VKD3D diagnostics
@@ -32,6 +33,12 @@ Created by **Thomsonito**.
 - automatic backups before destructive `batocera.conf` operations
 - native Batocera Ports launcher and Pad2Key support
 - update checks at startup and from the toolbox menu
+
+## New in v0.10.0
+
+- Optional controller keyboard, enabled per game or globally, with priority over AntiMicroX while typing.
+- Save detection: rank INI-only folders lower while preserving evidence such as sav and slot filenames.
+- Game return: bring the Toolbox terminal back to the foreground when it remains behind EmulationStation.
 
 ## Fixed in v0.8.1
 

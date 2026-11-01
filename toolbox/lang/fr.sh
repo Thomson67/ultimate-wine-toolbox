@@ -853,7 +853,7 @@ I18N[wsq_update_save_cleanup_failed]="Certaines copies de sauvegardes n’ont pa
 
 I18N[wsq_update_replace_source_links]="La nouvelle version contient des liens aux emplacements de sauvegarde connus :\n\n%s\n\nRemplacer ces liens par ceux de la configuration existante ? Les essais utiliseront les copies de test prévues par le workflow (sauf lien vers la racine partagée).\n\nSeuls les liens seront remplacés : leurs anciens dossiers cibles, y compris les sauvegardes d’un essai précédent, restent intacts. Leur contenu ne sera pas importé. Non interrompt la préparation avant le déplacement du dossier source."
 
-I18N[osk_title]="Clavier virtuel à la manette (test)"
+I18N[osk_title]="Clavier virtuel à la manette"
 I18N[osk_intro]="Afficher / masquer : Hotkey + Select, selon votre configuration EmulationStation. Désactivé par défaut. Valable pour les prochains lancements Windows. Les réglages par jeu sont prioritaires. Les raccourcis Batocera existants restent inchangés."
 I18N[osk_inherit]="Suivre le réglage global"
 I18N[osk_global]="Activation globale Windows"

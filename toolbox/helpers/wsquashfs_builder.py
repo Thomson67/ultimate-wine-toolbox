@@ -336,8 +336,14 @@ def score_save_dir(rel_dir: str, changed_files, directory_files=None):
     if len(save_files) < len(meaningful):
         score -= 20 if not save_files else 5
         reasons.append("cache filename(s)")
+    # INI files remain selectable, but names such as UserSettings.ini or
+    # save_config.ini must not masquerade as strong progression evidence.
+    evidence_files = [name for name in save_files if Path(name).suffix.casefold() != ".ini"]
+    if meaningful and all(Path(name).suffix.casefold() == ".ini" for name in meaningful):
+        score -= 10
+        reasons.append("INI configuration files only")
     name_hits = sum(any(hint in Path(name).name.casefold() for hint in SAVE_NAME_HINTS)
-                    for name in save_files)
+                    for name in evidence_files)
     strong_hits = sum(Path(name).suffix.casefold() in STRONG_SAVE_EXTENSIONS for name in save_files)
     if name_hits or strong_hits:
         score += 65 + min(15, max(name_hits, strong_hits) * 5)

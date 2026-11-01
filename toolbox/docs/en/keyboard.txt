@@ -1,4 +1,4 @@
-CONTROLLER VIRTUAL KEYBOARD — TEST VERSION
+CONTROLLER VIRTUAL KEYBOARD
 
 Enable it under Graphics and tools > Controller virtual keyboard, or Settings.
 Off by default. Global activation covers Windows games. Each game can inherit,
@@ -29,7 +29,7 @@ closing it releases the controller without reloading a profile. Saved profiles s
 conflicts still block activation. AMX live editing reserves Select when the keyboard is
 enabled; if R1 is also busy it falls back to its keyboard-only editor shortcut.
 
-FIRST TEST SCOPE
+SUPPORTED GAMES
 Windows Wine/UMU games with an X11/XWayland window. Native Wine Wayland windows
 are not yet supported. No automatic text-field detection. Controller configured
 in EmulationStation with recorded Linux codes and distinct Hotkey/Select.

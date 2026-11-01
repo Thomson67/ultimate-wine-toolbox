@@ -26,7 +26,7 @@ the scope of an existing release.
 
 ## Documentation and validation before promotion
 
-- Review all eight `toolbox/docs/fr/*.txt` and `toolbox/docs/en/*.txt` topics,
+- Review all `toolbox/docs/fr/*.txt` and `toolbox/docs/en/*.txt` topics,
   both root README files, and relevant technical/community guides.
 - Keep menu paths, file locations, limits and examples consistent with the code.
   Distinguish local ZIP transfer from a moderated community submission.

@@ -1,53 +1,41 @@
-# Clavier virtuel à la manette — premier test
+# Clavier virtuel à la manette
 
-Cette branche ajoute un clavier facultatif pour les jeux Windows dans Ultimate Wine Toolbox. La version stable reste inchangée. Le raccourci retenu après vérification de la configuration utilisateur est **Hotkey + Select**, soit **PS + Create** avec cette DualSense.
+Disponible dans Ultimate Wine Toolbox depuis la version **0.10.0**. Désactivé par défaut.
 
-## Installer la branche de test
+## Activer le clavier
 
-Fermer les jeux et la Toolbox, puis lancer sur Batocera :
+1. Ouvrir **Ports > Ultimate Wine Toolbox > Paramètres > Clavier virtuel à la manette**. L’entrée est aussi accessible dans les réglages graphiques et outils.
+2. Choisir **Régler un jeu**, sélectionner le jeu puis **Activé**. Une activation globale pour les jeux Windows est aussi possible ; les choix par jeu restent prioritaires.
+3. Fermer puis relancer le jeu pour appliquer le changement. Sélectionner le champ de texte avant d’ouvrir le clavier.
+4. Appuyer puis relâcher **Hotkey + Select**, selon la configuration de la manette dans Batocera. Par exemple PS + Create si PS est la Hotkey d’une DualSense. Les deux boutons doivent être distincts.
 
-```bash
-curl -fL https://github.com/Thomson67/ultimate-wine-toolbox/archive/refs/heads/feature/virtual-keyboard.zip -o /tmp/uwt-keyboard-test.zip &&
-unzip -oq /tmp/uwt-keyboard-test.zip -d /tmp/uwt-keyboard-test &&
-bash /tmp/uwt-keyboard-test/ultimate-wine-toolbox-feature-virtual-keyboard/package-install.sh
-```
+## Saisir et corriger le texte
 
-L'installateur conserve les réglages et sauvegarde la précédente Toolbox. Aucun jeu, runner ni fichier Pad2Key n'est modifié par la fonction clavier.
+- Croix directionnelle ou stick gauche : sélectionner une touche.
+- Bouton du bas (Croix PS / A Xbox) : saisir la touche sélectionnée.
+- Bouton de droite (Rond PS / B Xbox) : fermer le clavier.
+- Bouton de gauche (Carré PS / X Xbox) : effacer le caractère précédent.
+- Bouton du haut (Triangle PS / Y Xbox) : espace.
+- L1 : majuscules ; R1 : chiffres et signes ; Start : Entrée puis fermeture.
+- Touches **← ↓ ↑ →** : déplacer le curseur dans le texte. **Début**, **Fin** et **Suppr** permettent d’éditer la ligne.
+- **Hotkey + Select** masque aussi le clavier ; **Hotkey + Start** conserve la sortie du jeu.
 
-## Premier essai
+AZERTY et QWERTY suivent la langue de la Toolbox ; la disposition du bureau doit permettre les caractères choisis. Aucun texte saisi n’est enregistré.
 
-1. Ouvrir **Ports > Ultimate Wine Toolbox > Paramètres > Clavier virtuel à la manette (test)**. La même entrée est accessible dans les outils.
-2. Lancer **Vérifier les composants et la manette**. En cas d'erreur, fournir le texte du diagnostic avant de tenter un jeu.
-3. Utiliser **Aperçu sans saisie** pour vérifier le rendu. Il ne capte pas la manette et se ferme après 20 secondes ; ses touches ne sont pas envoyées au système.
-4. Laisser le global désactivé. Dans **Régler un jeu**, sélectionner un jeu permettant de saisir un nom et choisir **Activé**.
-5. Lancer ce jeu depuis EmulationStation et sélectionner son champ de saisie.
-6. Appuyer sur **PS + Create**, puis relâcher. Utiliser le stick gauche ou la croix directionnelle pour déplacer la sélection, puis Croix pour saisir.
-7. Rond masque le clavier ; Carré efface, Triangle ajoute un espace, L1 change la casse et R1 affiche les chiffres/signes. Start envoie Entrée et masque le clavier.
-8. Vérifier le retour normal des commandes au jeu, puis quitter et relancer. Vérifier également **PS + Start** lorsque le clavier est visible.
+## AntiMicroX et fenêtres compatibles
 
-Après validation d'un jeu, l'activation globale peut être utilisée. Les exceptions par jeu ont priorité : **Suivre le global / Activé / Désactivé**.
+Le clavier fonctionne sur les fenêtres Wine X11/XWayland, y compris les launchers comme le Notepad de Beyond Good & Evil. Les fenêtres Wine Wayland natives ne sont pas prises en charge.
 
-## Limites à vérifier sur Batocera
+Select seul peut garder son action AntiMicroX. La Toolbox réserve Hotkey + Select dans un profil temporaire et capture les événements de la manette pendant la saisie. La fermeture libère les commandes sans recharger de profil ; les profils enregistrés restent intacts. Les conflits Pad2Key ou les profils incompatibles sont signalés.
 
-- Première cible : fenêtres Wine X11/XWayland, avec runners classiques ou UMU. Pas de prise en charge des fenêtres Wine Wayland natives à ce stade.
-- Le clavier ne prend pas le focus au jeu. Il utilise GTK, GtkLayerShell sur Wayland, python-evdev, uinput et la disposition XKB du bureau. Le diagnostic annonce un composant manquant sans modifier le système.
-- Les codes Linux de la manette doivent être présents dans la configuration EmulationStation ; Hotkey et Select doivent être deux boutons distincts.
-- Select seul peut rester affecté dans AntiMicroX. Hotkey + Select est réservé dans un profil temporaire ; les commandes AntiMicroX sont suspendues pendant la saisie puis restaurées. Les profils enregistrés ne sont pas modifiés. Les conflits Pad2Key restent refusés. Le repli Select de l'éditeur AntiMicroX est réservé lorsque le clavier est activé pour ce jeu.
-- La capture temporaire des événements manette n'empêche pas nécessairement une lecture HIDRAW directe par le jeu. Vérifier qu'aucune action indésirable ne se produit pendant la saisie. Le jeu n'est pas mis en pause.
-- Le texte saisi n'est ni enregistré ni copié dans le presse-papiers.
+Le jeu n’est pas mis en pause. Un jeu lisant directement HIDRAW peut encore recevoir des boutons : vérifier son comportement avant une saisie importante.
+
+## Vérifier ou désactiver
+
+Le menu propose un diagnostic des composants et de la manette ainsi qu’un aperçu sans saisie de 20 secondes. Aucun composant manquant n’est installé automatiquement.
 
 Journal : `/userdata/system/logs/ultimate-wine-toolbox/virtual-keyboard.log`.
 
-## Désactiver ou revenir à la stable
+Pour désactiver partout, couper le global et remettre les jeux explicitement activés sur **Suivre le réglage global** ou **Désactivé**, puis fermer les jeux. Pour un seul jeu, choisir **Désactivé** dans sa règle.
 
-Pour désactiver : mettre le global sur Désactivé et les jeux explicitement activés sur Suivre le global ou Désactivé. Fermer le jeu pour appliquer.
-
-Pour retirer complètement le test, fermer jeux et Toolbox, puis :
-
-```bash
-python3 /userdata/system/ultimate-wine-toolbox/toolbox/helpers/virtual_keyboard.py stop &&
-rm -f /userdata/system/scripts/ultimate-wine-toolbox-virtual-keyboard.sh &&
-curl -fsSL https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/main/install.sh | bash
-```
-
-Les réglages du clavier restent conservés sans être utilisés par la stable. Les sauvegardes de jeux sont indépendantes.
+Validation matérielle : ouverture rapide dès le premier raccourci, priorité sur AntiMicroX, D-pad/stick, saisie, flèches et Entrée confirmés par l’utilisateur sur Batocera v44, en jeu et dans le Notepad du launcher BG&E.

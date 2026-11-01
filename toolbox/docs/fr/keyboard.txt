@@ -1,4 +1,4 @@
-CLAVIER VIRTUEL À LA MANETTE — VERSION DE TEST
+CLAVIER VIRTUEL À LA MANETTE
 
 OÙ LE TROUVER
 Réglages graphiques et outils > Clavier virtuel à la manette, ou Paramètres.
@@ -10,7 +10,7 @@ RACCOURCI
 Hotkey + Select affiche et masque le clavier. Sur une DualSense configurée
 avec PS comme Hotkey : PS + Create. Appuyez puis relâchez la combinaison.
 Les deux boutons doivent être distincts ; Select utilisé comme Hotkey n'est
-pas pris en charge par ce premier raccourci. Aucun raccourci natif n'est réécrit.
+pas pris en charge par ce raccourci. Aucun raccourci natif n'est réécrit.
 
 SAISIR DU TEXTE
 Placez d'abord le curseur dans le champ du jeu, puis ouvrez le clavier.
@@ -47,7 +47,7 @@ enregistrés sont conservés. Un conflit Pad2Key est encore refusé et journalis
 si le clavier est activé pour le jeu ; si R1 est aussi occupé, il utilise
 uniquement le raccourci clavier disponible pour son éditeur.
 
-LIMITES DU PREMIER TEST
+JEUX PRIS EN CHARGE
 Jeux Windows Wine classiques et UMU avec fenêtre X11/XWayland. Un jeu Wine
 en Wayland natif n'est pas encore pris en charge. Pas d'ouverture automatique
 sur détection d'un champ. Manette configurée dans EmulationStation avec ses

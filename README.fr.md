@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.9.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.9.0).**
+**Version stable : [v0.10.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.10.0).**
 
 ## Fonctionnalités
 
@@ -20,6 +20,7 @@ Créée par **Thomsonito**.
 - filtrage des versions NVAPI selon la compatibilité connue avec DXVK
 - ReShade par jeu : installation, activation/désactivation, presets, modèles d’effets, aide au choix de l’API et Vulkan sous Wine (expérimental)
 - AntiMicroX : profils manette, bascule launcher/jeu, édition en jeu et conversion Pad2Key
+- clavier virtuel à la manette : activation globale ou par jeu, Hotkey + Select, AZERTY/QWERTY et touches de déplacement dans le texte
 - catalogue communautaire : téléchargement, partage et validation de profils AntiMicroX et presets ReShade
 - maintenance des Wine bottles et détection des bottles orphelines
 - diagnostics des runners et de DXVK / VKD3D
@@ -32,6 +33,12 @@ Créée par **Thomsonito**.
 - sauvegarde automatique avant les opérations destructives sur `batocera.conf`
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
+
+## Nouveautés de la v0.10.0
+
+- Clavier virtuel activable par jeu ou globalement, avec priorité sur les commandes AntiMicroX pendant la saisie.
+- Sauvegardes : les dossiers contenant uniquement des fichiers INI sont moins prioritaires ; les indices de progression comme sav et slot restent valorisés.
+- Retour de jeu : remise au premier plan de la fenêtre de la Toolbox lorsque celle-ci reste derrière EmulationStation.
 
 ## Correctifs de la v0.8.1
 
