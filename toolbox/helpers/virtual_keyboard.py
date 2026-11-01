@@ -51,6 +51,15 @@ class Settings:
         data = self.read()
         return {'on': True, 'off': False}.get(data['games'].get(rom_key(rom)), data['global'])
 
+    def game_states(self, roms):
+        """Read the settings once for a complete game picker."""
+        data = self.read()
+        for rom in roms:
+            rom = rom.rstrip('\n')
+            if rom:
+                key = rom_key(rom)
+                yield data['games'].get(key, 'inherit'), key
+
     def set(self, value, rom=None):
         if value not in ('on', 'off', 'inherit') or (rom is None and value == 'inherit'):
             raise ValueError('Invalid keyboard activation')
@@ -191,7 +200,7 @@ def start(home, rom, log=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--home', type=Path, default=Path(os.environ.get('WT_HOME', HOME)))
-    parser.add_argument('action', choices=('get', 'set', 'start', 'stop', 'run', 'diagnose', 'preview', 'profile'))
+    parser.add_argument('action', choices=('get', 'set', 'start', 'stop', 'run', 'diagnose', 'preview', 'profile', 'game-states'))
     parser.add_argument('--rom')
     parser.add_argument('--profile')
     parser.add_argument('--value', choices=('on', 'off', 'inherit'))
@@ -199,6 +208,9 @@ def main():
     settings = Settings(args.home)
     if args.action == 'get':
         print(settings.override(args.rom) if args.rom else ('on' if settings.read()['global'] else 'off'))
+    elif args.action == 'game-states':
+        for state, rom in settings.game_states(sys.stdin):
+            print(state+'\t'+rom)
     elif args.action == 'set': settings.set(args.value, args.rom)
     elif args.action == 'stop': stop(args.home, args.rom)
     elif args.action == 'start': start(args.home, args.rom)

@@ -54,10 +54,9 @@ sur détection d'un champ. Manette configurée dans EmulationStation avec ses
 codes Linux enregistrés, Hotkey et Select distincts. Pas de modification des
 runners, préfixes, archives ou fichiers Pad2Key. Les autres systèmes sont exclus.
 
-DÉPANNAGE
-Vérifier les composants et la manette teste GTK, GtkLayerShell sous Wayland,
-python-evdev, /dev/uinput et la disposition XKB sans envoyer de caractères.
-Aperçu affiche le panneau sans injecter de touche et se ferme après 20 secondes.
+APERÇU ET AIDE
+Aperçu affiche le panneau sans injecter de touche et se ferme après 10 secondes.
+Cette aide est disponible dans Documentation > Clavier virtuel à la manette.
 La navigation manette ne fonctionne que pendant une session de jeu activée.
 Le menu n'installe pas de dépendance système manquante.
 Journal : /userdata/system/logs/ultimate-wine-toolbox/virtual-keyboard.log

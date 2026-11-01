@@ -32,7 +32,8 @@ Le jeu n’est pas mis en pause. Un jeu lisant directement HIDRAW peut encore re
 
 ## Vérifier ou désactiver
 
-Le menu propose un diagnostic des composants et de la manette ainsi qu’un aperçu sans saisie de 20 secondes. Aucun composant manquant n’est installé automatiquement.
+Le menu propose un aperçu sans saisie qui se ferme après **10 secondes**.
+L’aide intégrée est accessible dans **Documentation > Clavier virtuel à la manette**. Aucun composant manquant n’est installé automatiquement.
 
 Journal : `/userdata/system/logs/ultimate-wine-toolbox/virtual-keyboard.log`.
 
