@@ -866,3 +866,7 @@ I18N[osk_preview]="Preview without typing (closes automatically after 10 s)"
 I18N[doc_keyboard]="Controller virtual keyboard"
 
 I18N[osk_loading_games]="Preparing the game list and its settings…"
+
+I18N[osk_configured]="Manage configured games"
+I18N[osk_configured_help]="Games with an explicit enabled or disabled rule. Select a game to change its rule; Follow global setting removes it from this list. Games enabled only through the global setting are not listed. Close the game to apply changes."
+I18N[osk_no_configured]="No per-game overrides. Use Configure a game to add one. Games enabled only through the global setting are not listed here."

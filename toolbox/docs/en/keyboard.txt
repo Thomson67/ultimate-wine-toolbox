@@ -47,3 +47,8 @@ to Follow global setting or Disabled as well when turning everything off.
 TEXT EDITING
 The arrow keys move the text caret. Home/End move to the start/end of the
 line; Delete removes the next character. Select a key and press South.
+
+MANAGE CONFIGURED GAMES
+List explicit enabled/disabled rules without scanning the full ROM library.
+Choose a game to edit its rule; Follow global setting removes the override.
+Games enabled only through the global setting are not included.

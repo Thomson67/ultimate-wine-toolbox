@@ -866,3 +866,7 @@ I18N[osk_preview]="Aperçu sans saisie (fermeture automatique après 10 s)"
 I18N[doc_keyboard]="Clavier virtuel à la manette"
 
 I18N[osk_loading_games]="Préparation de la liste des jeux et de leurs réglages…"
+
+I18N[osk_configured]="Gérer les jeux configurés"
+I18N[osk_configured_help]="Jeux avec une règle personnelle, activée ou désactivée. Choisissez un jeu pour modifier sa règle ; Suivre le réglage global le retire de cette liste. Les jeux activés uniquement par le global ne sont pas listés. Fermez le jeu pour appliquer un changement."
+I18N[osk_no_configured]="Aucun réglage personnalisé par jeu. Utilisez Régler un jeu pour en ajouter. Les jeux activés uniquement par le réglage global ne figurent pas dans cette liste."

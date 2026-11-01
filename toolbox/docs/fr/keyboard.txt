@@ -4,6 +4,10 @@ OÙ LE TROUVER
 Réglages graphiques et outils > Clavier virtuel à la manette, ou Paramètres.
 Il est désactivé au départ. Le réglage global concerne les jeux Windows.
 Chaque jeu peut suivre le global, forcer l'activation ou la désactivation.
+Gérer les jeux configurés affiche seulement les règles personnelles activées
+ou désactivées. Choisissez un jeu pour changer sa règle ; Suivre le réglage
+global le retire de cette liste. Les jeux activés uniquement par le global
+ne sont pas listés. Aucune recherche complète de la collection n’est nécessaire.
 Fermez le jeu puis relancez-le pour appliquer une modification.
 
 RACCOURCI

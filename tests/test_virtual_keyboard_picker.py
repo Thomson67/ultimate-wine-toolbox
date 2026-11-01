@@ -27,15 +27,16 @@ class PickerTests(unittest.TestCase):
         self.assertEqual(rows[2],('inherit','/games/Game 2.wine'))
         self.assertEqual(rows[3],('on','/games/Game 3.wine'))
 
-    def run_picker(self, games, choice='back', value='off', invalid=False):
+    def run_picker(self, games, choice='back', value='off', invalid=False, mode='all', overrides=None):
         settings=policy.Settings(self.home)
         settings.set('on')
         settings.set('on','/games/Other.wine')
+        for rom,state in (overrides or {}).items():settings.set(state,rom)
         if invalid:settings.path.write_text('{bad config')
         before=settings.path.read_bytes()
         (self.home/'games').write_text('\n'.join(games)+'\n')
         env=dict(os.environ, WT_HOME=str(self.home), WT_ROOT=str(ROOT/'toolbox'), REAL_PYTHON=sys.executable,
-                 PICK=choice, VALUE=value)
+                 PICK=choice, VALUE=value, MODE=mode)
         script=r'''
 source "$WT_ROOT/modules/virtual-keyboard.sh"
 i18n() { printf '%s' "$1"; }
@@ -46,7 +47,7 @@ dialog() { printf 'loading\n' >> "$WT_HOME/order"; }
 mangohud_list_games() { printf 'enumeration\n' >> "$WT_HOME/order"; cat "$WT_HOME/games"; }
 msgbox() { printf '%s\n' "$*" >> "$WT_HOME/messages"; }
 menu_select() {
-  if [ "$1" = osk_game ]; then
+  if [ "$1" = osk_game ] || [ "$1" = osk_configured ]; then
     printf '%s\n' "$@" > "$WT_HOME/options"
     printf '%s' "$PICK"
   else
@@ -54,7 +55,7 @@ menu_select() {
     printf '%s' "$VALUE"
   fi
 }
-osk_game_menu
+osk_game_menu "$MODE"
 '''
         result=subprocess.run(['bash','-uc',script],env=env,capture_output=True,text=True,timeout=15)
         self.assertIn(result.returncode,(0,1) if choice=='back' else (0,),result.stderr)
@@ -73,6 +74,28 @@ osk_game_menu
         settings,_=self.run_picker(['/games/First.wine',game],choice='2',value='off')
         self.assertEqual(settings.read(),{'global':True,'games':{'/games/Other.wine':'on',game:'off'}})
         self.assertEqual((self.home/'game-menu').read_text().splitlines()[0],'Beyond Good and Evil[L].wsquashfs')
+
+    def test_configured_rules_are_sorted_and_independent_of_global_activation(self):
+        settings=policy.Settings(self.home)
+        for global_on in (False,True):
+            data={'global':global_on,'games':{'/games/Zelda.wine':'off','/games/Alpha [runner].wsquashfs':'on'}}
+            with patch.object(settings,'read',return_value=data) as read:
+                self.assertEqual(list(settings.configured_game_states()),[
+                    ('on','/games/Alpha [runner].wsquashfs'),('off','/games/Zelda.wine')])
+            read.assert_called_once()
+
+    def test_configured_picker_does_not_scan_roms_and_can_remove_an_override(self):
+        game='/games/Beyond Good and Evil[L].wsquashfs'
+        settings,_=self.run_picker([],choice='1',value='inherit',mode='configured',overrides={game:'on'})
+        self.assertEqual(settings.read(),{'global':True,'games':{'/games/Other.wine':'on'}})
+        self.assertFalse((self.home/'order').exists(),'Configured manager must not enumerate the ROM library')
+        self.assertIn('configured-games',(self.home/'calls').read_text())
+        self.assertIn('Beyond Good and Evil[L].wsquashfs — enabled',(self.home/'options').read_text())
+
+    def test_configured_picker_can_disable_and_preserve_the_entry(self):
+        settings,_=self.run_picker([],choice='1',value='off',mode='configured')
+        self.assertEqual(settings.read()['games'],{'/games/Other.wine':'off'})
+        self.assertEqual(list(settings.configured_game_states()),[('off','/games/Other.wine')])
 
     def test_preview_uses_ten_seconds_without_typing(self):
         import types
@@ -103,7 +126,7 @@ virtual_keyboard_menu
                               capture_output=True,text=True,timeout=5)
         self.assertEqual(result.returncode,0,result.stderr)
         menu=(self.home/'menu').read_text().splitlines()
-        self.assertIn('games',menu);self.assertIn('preview',menu)
+        self.assertIn('games',menu);self.assertIn('preview',menu);self.assertIn('configured',menu)
         self.assertNotIn('diagnose',menu);self.assertNotIn('help',menu)
         self.assertNotIn('osk_diagnose',menu)
 
