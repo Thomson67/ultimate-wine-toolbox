@@ -432,7 +432,7 @@ def preview(home):
 def run(home, rom):
     import fcntl
     from virtual_keyboard import conflict, lifecycle_lock
-    from virtual_keyboard_antimicrox import priority
+    from virtual_keyboard_antimicrox import INDICES, priority
     home = Path(home)
     state = home/'state/virtual-keyboard'; state.mkdir(parents=True, exist_ok=True)
     with (state/'runtime.lock').open('a') as lock:
@@ -451,6 +451,8 @@ def run(home, rom):
         try:
             devices = controllers()
             if not devices: raise RuntimeError('No configured controller with distinct Hotkey/Select and Linux codes')
+            modifiers = sorted({INDICES[d.amx_hotkey] for d in devices
+                                if getattr(d, 'amx_hotkey', None) in INDICES})
             sender = KeySender()
             from antimicrox_focus import XWindows
             windows = XWindows()
@@ -518,7 +520,7 @@ def run(home, rom):
                             if now-quiet_since >= .12:
                                 if pending == 'hide': hide()
                                 elif current_rom == rom and safe_foreground():
-                                    problem = conflict(home, rom)
+                                    problem = conflict(home, rom, modifiers=modifiers)
                                     if problem: raise RuntimeError(problem)
                                     for device in devices: device.grab()
                                     overlay.show()

@@ -84,7 +84,7 @@ def chord_conflicts(actions):
     return False
 
 
-def conflict(home, rom, global_keys=None, system_keys=Path('/usr/share/evmapy/hotkeys.keys')):
+def conflict(home, rom, global_keys=None, system_keys=Path('/usr/share/evmapy/hotkeys.keys'), modifiers=None):
     """Refuse conflicting user bindings instead of silently replacing them."""
     home, rom = Path(home), Path(rom)
     global_keys = global_keys or Path('/userdata/system/configs/hotkeys.keys')
@@ -109,10 +109,14 @@ def conflict(home, rom, global_keys=None, system_keys=Path('/usr/share/evmapy/ho
         if not isinstance(data, dict) or data.get('rom') != str(rom):
             raise ValueError('Invalid launcher configuration')
         profiles.extend(Path(data[key]) for key in ('launcher_profile', 'game_profile') if data.get(key))
-    from virtual_keyboard_antimicrox import reserved_profile
-    for path in profiles:
+    from virtual_keyboard_antimicrox import active_modifiers, reserved_profile
+    # One snapshot for all profiles. The watcher passes its already-open
+    # controllers so opening the keyboard never re-enumerates input devices.
+    if profiles and modifiers is None:
+        modifiers = active_modifiers()
+    for path in dict.fromkeys(profiles):
         try:
-            reserved_profile(path)
+            reserved_profile(path, modifiers=modifiers)
         except ValueError as exc:
             return f'AntiMicroX: {exc}'
     return ''

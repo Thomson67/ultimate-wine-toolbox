@@ -80,6 +80,26 @@ class PolicyTests(unittest.TestCase):
         with patch('virtual_keyboard_antimicrox.active_modifiers', return_value=[6]):
             self.assertFalse(self.conflict())
 
+    def test_cached_controller_snapshot_avoids_scan_but_rechecks_user_profiles(self):
+        profile = self.home/'profile.amgp'
+        profile.write_text('<gamecontroller><sets><set index="1"><button index="5"><slots><slot><code>0x41</code></slot></slots></button></set></sets></gamecontroller>')
+        (self.home/'config').mkdir()
+        (self.home/'config/antimicrox-games.tsv').write_text(f'{self.rom}\t{profile}\n')
+        with patch('virtual_keyboard_antimicrox.active_modifiers',side_effect=AssertionError('No rescan at display time')):
+            self.assertFalse(policy.conflict(self.home,self.rom,self.home/'global.keys',self.home/'system.keys',modifiers=[6]))
+            profile.write_text('<joystick/>')
+            self.assertIn('AntiMicroX',policy.conflict(self.home,self.rom,self.home/'global.keys',self.home/'system.keys',modifiers=[6]))
+
+    def test_multiple_profiles_share_one_controller_snapshot(self):
+        profile = self.home/'profile.amgp'
+        profile.write_text('<gamecontroller><sets><set index="1"><button index="5"/></set></sets></gamecontroller>')
+        rules = self.home/'config/antimicrox-launchers'; rules.mkdir(parents=True)
+        (rules/(hashlib.sha256(str(self.rom).encode()).hexdigest()+'.json')).write_text(
+            json.dumps({'rom':str(self.rom),'launcher_profile':str(profile),'game_profile':str(profile)}))
+        with patch('virtual_keyboard_antimicrox.active_modifiers',return_value=[6]) as scan:
+            self.assertFalse(self.conflict())
+            scan.assert_called_once()
+
     def test_live_editor_never_uses_select_reserved_by_keyboard(self):
         profile = self.home/'empty.amgp'
         profile.write_text('<gamecontroller><sets/></gamecontroller>')
@@ -392,6 +412,7 @@ class RuntimeIntegrationTests(unittest.TestCase):
             mapping={'hotkey':('button',316,1),'select':('button',314,1),'start':('button',315,1),
                      'b':('button',304,1),'a':('button',305,1)}
             controller=runtime.Controller(device,mapping,types.SimpleNamespace(EV_KEY=1,EV_ABS=3,EV_SYN=0,SYN_DROPPED=3,SYN_REPORT=0))
+            controller.amx_hotkey = 'guide'
             class Gtk:
                 quit=False
                 @classmethod
@@ -432,13 +453,14 @@ class RuntimeIntegrationTests(unittest.TestCase):
                  patch.object(runtime,'Overlay',Overlay), \
                  patch.object(runtime,'process_identity',return_value='test-token'), \
                  patch.object(runtime,'conflict',return_value=''), \
-                 patch.object(policy,'conflict',return_value=''), \
+                 patch.object(policy,'conflict',return_value='') as preflight, \
                  patch.object(runtime.time,'monotonic',side_effect=lambda:clock[0]), \
                  patch.object(runtime,'running_game',side_effect=lambda:rom if clock[0]<3 else ''), \
                  patch('virtual_keyboard_antimicrox.evdev_session',return_value=managed_amx), \
                  patch('virtual_keyboard_antimicrox.subprocess.run') as profile_ipc, \
                  patch.object(antimicrox_focus,'XWindows',return_value=windows):
                 runtime.run(home,rom)
+                preflight.assert_called_once_with(home,rom,modifiers=[6])
                 if managed_amx: profile_ipc.assert_not_called()
             self.assertFalse(device.grabbed)
             self.assertTrue(device.closed)
