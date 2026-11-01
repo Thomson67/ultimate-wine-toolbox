@@ -24,8 +24,8 @@ Controller event devices are captured temporarily, then released on hide or
 process exit. Games reading HIDRAW directly may still receive controller
 buttons: test this with the game. The game is not paused.
 Select may stay mapped in AntiMicroX. A private runtime profile reserves
-Hotkey + Select. While the keyboard is open, AMX output is suspended; closing
-it restores the current game profile. Saved profiles stay unchanged. Pad2Key
+Hotkey + Select. While the keyboard is open, temporary evdev capture blocks AMX output;
+closing it releases the controller without reloading a profile. Saved profiles stay unchanged. Pad2Key
 conflicts still block activation. AMX live editing reserves Select when the keyboard is
 enabled; if R1 is also busy it falls back to its keyboard-only editor shortcut.
 

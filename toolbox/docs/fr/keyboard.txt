@@ -38,7 +38,8 @@ jeux lisant directement HIDRAW peuvent encore recevoir les boutons : ce point
 nécessite un essai avec le jeu. Ne supposez pas que le jeu est mis en pause.
 Select peut rester affecté dans AntiMicroX : seul Hotkey + Select est réservé
 au clavier, dans une copie temporaire du profil. Pendant la saisie, les
-commandes AntiMicroX sont suspendues, puis rétablies à la fermeture. Les profils
+commandes AntiMicroX sont bloquées par la capture temporaire de la manette,
+puis rétablies à la fermeture, sans recharger son profil. Les profils
 enregistrés sont conservés. Un conflit Pad2Key est encore refusé et journalisé. L'éditeur AntiMicroX réserve Select
 si le clavier est activé pour le jeu ; si R1 est aussi occupé, il utilise
 uniquement le raccourci clavier disponible pour son éditeur.

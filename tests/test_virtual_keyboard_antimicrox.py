@@ -95,6 +95,28 @@ class PriorityTests(unittest.TestCase):
             self.assertEqual(amx.runtime_profile(self.home,self.rom,self.source),runtime)
         self.assertEqual(self.source.read_bytes(),self.original)
 
+    def test_evdev_priority_never_reloads_profiles_or_waits_on_amx_lock(self):
+        with patch.object(amx,'evdev_session',return_value=True), patch.object(amx.subprocess,'run') as run:
+            amx.priority(self.home,self.rom,True)
+            amx.priority(self.home,self.rom,False)
+            run.assert_not_called()
+        self.assertFalse((self.home/'state').exists())
+
+    def test_fast_capture_requires_the_current_owned_process_and_backend(self):
+        state = self.home/'state/antimicrox'; state.mkdir(parents=True)
+        (state/'session').write_text(f'{self.rom}\t123\tstamp\n')
+        real_read = Path.read_bytes
+        for environment, expected in (
+                (b'UWT_AMX_KEYBOARD_EVDEV=1\0SDL_JOYSTICK_HIDAPI=0\0SDL_LINUX_JOYSTICK_CLASSIC=0\0',True),
+                (b'UWT_AMX_KEYBOARD_EVDEV=1\0SDL_JOYSTICK_HIDAPI=1\0SDL_LINUX_JOYSTICK_CLASSIC=0\0',False)):
+            def read(path):
+                return environment if str(path)=='/proc/123/environ' else real_read(path)
+            with patch('antimicrox_launcher.Session.active',return_value=True), patch.object(Path,'read_bytes',read):
+                self.assertEqual(amx.evdev_session(self.home,self.rom),expected)
+                self.assertFalse(amx.evdev_session(self.home,self.rom+'other'))
+            with patch('antimicrox_launcher.Session.active',return_value=False), patch.object(Path,'read_bytes',read):
+                self.assertFalse(amx.evdev_session(self.home,self.rom))
+
     def test_priority_only_commands_owned_session_and_restores_latest_profile(self):
         policy.Settings(self.home).set('on')
         with patch('virtual_keyboard_antimicrox.active_modifiers',return_value=[6]):

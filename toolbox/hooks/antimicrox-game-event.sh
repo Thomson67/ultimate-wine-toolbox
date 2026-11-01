@@ -119,6 +119,11 @@ else
       live_error "Cannot reserve keyboard chord in runtime profile"; exit 0
     fi
   fi
+  case "$real" in
+    "$ROOT/state/virtual-keyboard/profiles/"*.amgp)
+      # The keyboard can capture this evdev reader without a second AMX launch.
+      export UWT_AMX_KEYBOARD_EVDEV=1 ;;
+  esac
   args=(--hidden --no-tray --eventgen uinput --log-level info --profile "$real")
 fi
 # Batocera 44 waits for captured hook pipes to reach EOF. A parent wrapper

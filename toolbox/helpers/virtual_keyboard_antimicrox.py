@@ -127,8 +127,29 @@ def empty_profile(home):
     return str(path)
 
 
+def evdev_session(home, rom):
+    from antimicrox_launcher import Session
+    try:
+        fields = (Path(home)/'state/antimicrox/session').read_text().rstrip('\n').split('\t')
+        if len(fields) != 3 or fields[0] != str(rom):
+            return False
+        session = Session(home, fields[0], int(fields[1]), fields[2])
+        if not session.active():
+            return False
+        environment = Path(f'/proc/{session.pid}/environ').read_bytes().split(b'\0')
+        return all(value in environment for value in (
+            b'UWT_AMX_KEYBOARD_EVDEV=1', b'SDL_JOYSTICK_HIDAPI=0', b'SDL_LINUX_JOYSTICK_CLASSIC=0'))
+    except (OSError, ValueError):
+        return False
+
+
 def priority(home, rom, visible):
     """Only command the verified AMX instance owned by this game session."""
+    # The normal new session needs no profile IPC or lifecycle lock: the
+    # caller grabs/releases its physical evdev devices after chord release.
+    if evdev_session(home, rom):
+        if visible: print('virtual_keyboard_priority=evdev-capture', flush=True)
+        return
     import fcntl
     from antimicrox_launcher import Session
     home = Path(home)

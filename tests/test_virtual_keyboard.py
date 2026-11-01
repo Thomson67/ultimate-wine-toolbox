@@ -377,7 +377,7 @@ def run(home,rom):
 
 
 class RuntimeIntegrationTests(unittest.TestCase):
-    def exercise(self, grab_failure=False):
+    def exercise(self, grab_failure=False, managed_amx=False):
         import antimicrox_focus
         with tempfile.TemporaryDirectory() as directory:
             home=Path(directory);rom=str(home/'Game.wine')
@@ -435,8 +435,11 @@ class RuntimeIntegrationTests(unittest.TestCase):
                  patch.object(policy,'conflict',return_value=''), \
                  patch.object(runtime.time,'monotonic',side_effect=lambda:clock[0]), \
                  patch.object(runtime,'running_game',side_effect=lambda:rom if clock[0]<3 else ''), \
+                 patch('virtual_keyboard_antimicrox.evdev_session',return_value=managed_amx), \
+                 patch('virtual_keyboard_antimicrox.subprocess.run') as profile_ipc, \
                  patch.object(antimicrox_focus,'XWindows',return_value=windows):
                 runtime.run(home,rom)
+                if managed_amx: profile_ipc.assert_not_called()
             self.assertFalse(device.grabbed)
             self.assertTrue(device.closed)
             self.assertFalse((state/'session.json').exists())
@@ -447,6 +450,14 @@ class RuntimeIntegrationTests(unittest.TestCase):
         self.assertEqual(typed,['a'])
         self.assertEqual(len(shown),1)
         self.assertGreaterEqual(shown[0],.3)
+
+    def test_managed_amx_opens_on_first_chord_without_profile_reload(self):
+        typed, shown = self.exercise(managed_amx=True)
+        self.assertEqual(typed,['a'])
+        self.assertEqual(len(shown),1)
+        # First chord at t=0, release at t=.2; it must be visible well before
+        # the second chord at t=1.2, which closes it rather than opening it.
+        self.assertLess(shown[0],.7)
 
     def test_failed_exclusive_grab_never_opens_overlay_and_cleans_up(self):
         typed,shown=self.exercise(True)
