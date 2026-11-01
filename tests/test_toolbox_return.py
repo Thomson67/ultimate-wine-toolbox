@@ -120,11 +120,61 @@ class ToolboxReturnTests(unittest.TestCase):
         api = Api(self.request)
         api.system_info = lambda name: dict(groupsystem='true')
         target = str(self.home/'runtime/proxy.sh')
-        with patch.object(helper, 'ensure_proxy', return_value=('uwt_return', target)) as create:
+        with patch.object(helper, 'ensure_proxy', return_value=('uwt_return', target, True)) as create:
             self.assertTrue(self.run_return(api))
-        create.assert_called_once_with(self.home)
+        create.assert_called_once_with(self.home, report_changes=True)
         self.assertEqual(api.targets, [target])
         self.assertEqual(api.calls.count('reload'), 1)
+
+    def test_existing_grouped_proxy_is_reused_without_reload(self):
+        api = Api(self.request)
+        api.system_info = lambda name: dict(groupsystem=True)
+        target = str(self.home/'runtime/proxy.sh')
+        with patch.object(helper,'ensure_proxy',return_value=('uwt_return',target,False)):
+            self.assertTrue(self.run_return(api))
+        self.assertNotIn('reload',api.calls)
+        self.assertEqual(api.launches,1)
+
+    def test_existing_proxy_missing_from_es_index_is_refreshed(self):
+        api = Api(self.request,indexed=False)
+        api.system_info = lambda name: dict(groupsystem=True)
+        target = str(self.home/'runtime/proxy.sh')
+        with patch.object(helper,'ensure_proxy',return_value=('uwt_return',target,False)):
+            self.assertTrue(self.run_return(api))
+        self.assertEqual(api.calls.count('reload'),1)
+        self.assertLess(api.calls.index('reload'),api.calls.index('launch'))
+
+    def test_no_retry_while_toolbox_is_starting_without_consuming_request(self):
+        api = Api(self.request,consume_on=10)
+        def running():
+            return (200,helper.TOOLBOX) if api.launches else (201,'')
+        api.running = running
+        self.assertFalse(self.run_return(api))
+        self.assertEqual(api.launches,1)
+        self.assertTrue(self.request.exists())
+
+    def test_other_game_starting_after_request_prevents_further_launches(self):
+        api = Api(self.request,consume_on=10)
+        api.running = lambda: (200,'/games/Other.wine') if api.launches else (201,'')
+        self.assertFalse(self.run_return(api))
+        self.assertEqual(api.launches,1)
+        self.assertTrue(self.request.exists())
+
+    def test_return_journal_contains_monotonic_timings_and_http_acknowledgement(self):
+        import io
+        from contextlib import redirect_stdout
+        api=Api(self.request)
+        launch=api.launch
+        def timed_launch(target):
+            self.time.sleep(.3)
+            launch(target)
+            return 200
+        api.launch=timed_launch
+        output=io.StringIO()
+        with redirect_stdout(output):self.assertTrue(self.run_return(api))
+        self.assertIn('elapsed=',output.getvalue())
+        self.assertIn('http=200 duration=0.300s',output.getvalue())
+        self.assertIn('confirmed',output.getvalue())
 
     def test_ungrouped_ports_keeps_native_launch_without_creating_proxy(self):
         api = Api(self.request)

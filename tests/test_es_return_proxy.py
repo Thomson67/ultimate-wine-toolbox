@@ -99,6 +99,38 @@ class ReturnProxyTests(unittest.TestCase):
         self.create()
         self.assertEqual(Path(str(rom)+'.keys').read_bytes(), self.keys.read_bytes())
 
+    def test_change_report_separates_first_install_from_identical_return(self):
+        args=(self.home,self.user,self.system,self.port)
+        self.assertTrue(proxy.ensure_proxy(*args,report_changes=True)[2])
+        launcher=proxy.proxy_launcher(self.home)
+        paths=[launcher,self.user/proxy.CONFIG_NAME,launcher.parent/'gamelist.xml']
+        before=[(p.stat().st_ino,p.stat().st_mtime_ns) for p in paths]
+        self.assertFalse(proxy.ensure_proxy(*args,report_changes=True)[2])
+        self.assertEqual(before,[(p.stat().st_ino,p.stat().st_mtime_ns) for p in paths])
+
+    def test_changed_ports_command_requires_index_refresh(self):
+        self.create()
+        self.primary.write_text(self.primary.read_text().replace('emulatorlauncher','custom-launcher'))
+        self.assertTrue(proxy.ensure_proxy(self.home,self.user,self.system,self.port,report_changes=True)[2])
+
+    def test_es_statistics_and_removed_comment_do_not_require_index_refresh(self):
+        _,rom=self.create()
+        path=Path(rom).parent/'gamelist.xml'
+        root=ET.parse(path).getroot()
+        ET.SubElement(root.find('game'),'playcount').text='7'
+        ET.ElementTree(root).write(path,encoding='utf-8',xml_declaration=True)
+        self.assertFalse(proxy.ensure_proxy(self.home,self.user,self.system,self.port,report_changes=True)[2])
+        self.assertEqual(ET.parse(path).findtext('game/playcount'),'7')
+
+    def test_missing_or_unhidden_entry_requires_index_refresh(self):
+        _,rom=self.create()
+        path=Path(rom).parent/'gamelist.xml'
+        root=ET.parse(path).getroot()
+        root.find('game/hidden').text='false'
+        ET.ElementTree(root).write(path)
+        self.assertTrue(proxy.ensure_proxy(self.home,self.user,self.system,self.port,report_changes=True)[2])
+        self.assertEqual(ET.parse(path).findtext('game/hidden'),'true')
+
     def rewrite_as_es(self, path, count):
         root = ET.parse(path).getroot()  # Default parser drops XML comments, like ES.
         game = root.find('game')

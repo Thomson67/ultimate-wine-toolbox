@@ -41,8 +41,21 @@ def _resume(home, parent_pid, api, clock, sleep, alive, timeout, refresh_timeout
     api = api or EsApi()
     request = Path(home) / 'state/resume-wsq.request'
 
+    started = clock()
+    last_state = None
+
     def log(message):
-        print(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Toolbox return: {message}', flush=True)
+        print(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Toolbox return: elapsed={clock()-started:.3f}s {message}', flush=True)
+
+    def running():
+        nonlocal last_state
+        before = clock()
+        state = api.running()
+        duration = clock()-before
+        if state != last_state or duration >= .5:
+            log(f'ES state http={state[0]} path={state[1]!r} query_duration={duration:.3f}s')
+            last_state = state
+        return state
 
     deadline = clock() + timeout
     while parent_pid is not None and alive(parent_pid):
@@ -56,7 +69,7 @@ def _resume(home, parent_pid, api, clock, sleep, alive, timeout, refresh_timeout
     while idle < 3:
         if not request.exists():
             return True  # Manually reopened during recovery.
-        code, _ = api.running()
+        code, _ = running()
         idle = idle + 1 if code == 201 else 0
         if clock() >= deadline:
             log('ES not idle; request retained')
@@ -64,53 +77,73 @@ def _resume(home, parent_pid, api, clock, sleep, alive, timeout, refresh_timeout
         sleep(.25)
 
     target, proxy_system = TOOLBOX, None
+    proxy_changed = False
     if hasattr(api, 'system_info'):
         info = api.system_info('ports')
         if str(info.get('groupsystem', False)).lower() == 'true':
-            log('Ports is grouped; preparing an owned child-system launcher without ungrouping Ports')
-            proxy_system, target = ensure_proxy(home)
-            # Reload only while idle; no compositor or ES process is stopped.
-            code, _ = api.running()
-            if code != 201:
-                log('ES became busy before proxy registration; request retained')
-                return False
-            api.reload_games()
+            proxy_system, target, proxy_changed = ensure_proxy(home, report_changes=True)
+            log(f'Ports is grouped; owned return launcher prepared index_changed={int(proxy_changed)}')
+
     def indexed():
         return api.indexed(target, system=proxy_system) if proxy_system else api.indexed(target)
 
-    if proxy_system or not indexed():
-        log('Waiting for Toolbox return entry in ES index')
-        if not proxy_system:
-            api.reload_games()
+    if proxy_changed or not indexed():
+        code, _ = running()
+        if code != 201:
+            log('ES became busy before proxy registration; request retained')
+            return False
+        log('Refreshing ES index for changed or missing Toolbox return entry')
+        before = clock()
+        api.reload_games()
+        log(f'ES reload request returned duration={clock()-before:.3f}s')
         deadline = clock() + refresh_timeout
         while not indexed():
             if not request.exists():
                 return True
-            code, _ = api.running()
+            code, _ = running()
             if code != 201 or clock() >= deadline:
                 log('Toolbox indexing unconfirmed or ES busy; request retained')
                 return False
             sleep(.25)
         sleep(.5)
+        log('Toolbox return entry indexed')
+    else:
+        log('Reusing indexed Toolbox return entry; no ES reload')
 
     for attempt in range(1, 4):
         if not request.exists():
             return True
-        code, _ = api.running()
+        code, _ = running()
         if code != 201:
             log('ES busy/unavailable before launch; request retained')
             return False
         log(f'launching through ES, attempt={attempt}')
         try:
-            api.launch(target)
+            before = clock()
+            status = api.launch(target)
+            log(f'launch request returned http={status} duration={clock()-before:.3f}s')
         except (OSError, RuntimeError) as exc:
             log(f'launch request failed: {exc}')
         deadline = clock() + confirm_timeout
+        target_running = False
+        observed_at = float('-inf')
         while clock() < deadline:
             if not request.exists():
                 log('new Ports launcher consumed resume request; confirmed')
                 return True
+            if clock()-observed_at >= .5:
+                code, path = running()
+                observed_at = clock()
+                if code == 200 and path:
+                    if os.path.normpath(path) not in (os.path.normpath(target), os.path.normpath(TOOLBOX)):
+                        log('another game became active; request retained without retry')
+                        return False
+                    target_running = True
             sleep(.25)
+        if target_running:
+            log('Toolbox launcher started but request not yet consumed; no duplicate launch; request retained')
+            return False
+        log(f'launch unconfirmed after {confirm_timeout}s, attempt={attempt}')
     log('return unconfirmed; reopen Toolbox from Ports; no direct terminal fallback')
     return False
 

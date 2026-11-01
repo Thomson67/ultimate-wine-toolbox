@@ -216,7 +216,7 @@ class HandoffTests(unittest.TestCase):
                 self.assertEqual(self.session.read()['phase'], 'finished')
             original_launch(rom)
         api.launch = launch
-        with patch.object(toolbox_return, 'ensure_proxy', return_value=('uwt_return', target)):
+        with patch.object(toolbox_return, 'ensure_proxy', return_value=('uwt_return', target, True)):
             self.assertEqual(self.worker(api).run(), 'short')
         self.assertEqual(api.launches, [str(self.rom), target])
         self.assertFalse(api.request.exists())

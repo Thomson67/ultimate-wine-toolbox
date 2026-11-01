@@ -77,6 +77,7 @@ class EsApi:
         with urllib.request.urlopen(request, timeout=5) as response:
             if response.status not in (200, 201, 202, 204):
                 raise RuntimeError(f'ES launch returned HTTP {response.status}')
+            return response.status
 
 
 class Handoff:

@@ -20,6 +20,8 @@ def atomic_owned(path, content, mode=0o644, marker=MARKER, owner=None):
     if path.is_symlink() or (path.exists() and marker.encode() not in path.read_bytes()
                              and not externally_owned):
         raise ValueError(f'foreign return-proxy file will not be replaced: {path}')
+    if path.is_file() and path.read_bytes() == content and (path.stat().st_mode & 0o777) == mode:
+        return False
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
@@ -28,6 +30,7 @@ def atomic_owned(path, content, mode=0o644, marker=MARKER, owner=None):
             stream.write(content)
         temporary.chmod(mode)
         os.replace(temporary, path)
+        return True
     finally:
         if temporary is not None and temporary.exists():
             temporary.unlink()
@@ -60,6 +63,7 @@ def update_gamelist(launcher, legacy_owned):
     if path.is_symlink():
         raise ValueError(f'foreign return-proxy gamelist: {path}')
     root = ET.Element('gameList')
+    changed = False
     if path.exists():
         if not (owned_marker(owner) or legacy_owned or MARKER.encode() in path.read_bytes()):
             raise ValueError(f'foreign return-proxy gamelist: {path}')
@@ -78,6 +82,7 @@ def update_gamelist(launcher, legacy_owned):
     for kind, raw in (('folder', '.'), ('game', './' + launcher.name)):
         entries = root.findall(kind)
         if not entries:
+            changed = True
             entry = ET.SubElement(root, kind)
             ET.SubElement(entry, 'path').text = raw
             ET.SubElement(entry, 'name').text = 'Ultimate Wine Toolbox return'
@@ -86,11 +91,14 @@ def update_gamelist(launcher, legacy_owned):
             hidden = entry.find('hidden')
             if hidden is None:
                 hidden = ET.SubElement(entry, 'hidden')
+            if hidden.text != 'true':
+                changed = True
             hidden.text = 'true'
     root.insert(0, ET.Comment(MARKER))
     # ES drops comments when saving play counts. Ownership must live outside XML.
     atomic_owned(owner, MARKER.encode())
     atomic_owned(path, ET.tostring(root, encoding='utf-8', xml_declaration=True), owner=owner)
+    return changed
 
 
 def ports_template(config_directory, system_directory):
@@ -121,7 +129,7 @@ def ports_template(config_directory, system_directory):
     return ports
 
 
-def ensure_proxy(home, config_directory=None, system_directory=None, port=None):
+def ensure_proxy(home, config_directory=None, system_directory=None, port=None, report_changes=False):
     home = Path(home)
     config_directory = Path(config_directory or '/userdata/system/configs/emulationstation')
     system_directory = Path(system_directory or '/usr/share/emulationstation')
@@ -139,6 +147,7 @@ def ensure_proxy(home, config_directory=None, system_directory=None, port=None):
     # Guard the ES addition before writing any runtime assets.
     if config.is_symlink() or (config.exists() and MARKER.encode() not in config.read_bytes()):
         raise ValueError('foreign ES return-proxy definition will not be replaced')
+    launcher_missing = not launcher.is_file()
     legacy_owned = legacy_proxy_owned(config, launcher)
     system = ports_template(config_directory, system_directory)
     command = system.findtext('command', '').strip()
@@ -182,6 +191,9 @@ def ensure_proxy(home, config_directory=None, system_directory=None, port=None):
     temp_keys.chmod(0o644)
     os.replace(temp_keys, key_path)
     key_marker.write_text(MARKER)
-    update_gamelist(launcher, legacy_owned)
-    atomic_owned(config, ET.tostring(document, encoding='utf-8', xml_declaration=True))
-    return SYSTEM, str(launcher)
+    metadata_changed = update_gamelist(launcher, legacy_owned)
+    config_changed = atomic_owned(config, ET.tostring(document, encoding='utf-8', xml_declaration=True))
+    result = (SYSTEM, str(launcher))
+    if report_changes:
+        return (*result, bool(launcher_missing or metadata_changed or config_changed))
+    return result
