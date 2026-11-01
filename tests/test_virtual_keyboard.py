@@ -143,7 +143,7 @@ class FakeDevice:
 
 class ControllerTests(unittest.TestCase):
     def setUp(self):
-        self.e=types.SimpleNamespace(EV_KEY=1,EV_ABS=3,EV_SYN=0,SYN_DROPPED=3)
+        self.e=types.SimpleNamespace(EV_KEY=1,EV_ABS=3,EV_SYN=0,SYN_DROPPED=3,SYN_REPORT=0)
         self.device=FakeDevice()
         self.mapping={'hotkey':('button',316,1),'select':('button',314,1),
                       'start':('button',315,1),'b':('button',304,1),'a':('button',305,1),
@@ -177,10 +177,50 @@ class ControllerTests(unittest.TestCase):
         self.device.event(316,1);self.controller.poll()
         self.device.event(315,1);self.assertEqual(self.controller.poll(),['exit'])
 
-    def test_empty_evdev_generator_and_lost_input_stream(self):
+    def test_lost_events_resynchronise_without_closing_or_typing_stale_input(self):
         self.assertEqual(self.controller.poll(),[])
+        self.controller.grab()
+        self.device.event(304,1)
         self.device.event(3,0,kind=0)
-        with self.assertRaises(RuntimeError): self.controller.poll()
+        self.device.event(305,1)
+        self.assertEqual(self.controller.poll(),[])
+        self.assertTrue(self.controller.syncing)
+        self.assertFalse(self.controller.released())
+        self.assertTrue(self.device.grabbed)
+        self.device.keys.clear()
+        self.device.event(0,0,kind=0)
+        self.assertEqual(self.controller.poll(),[])
+        self.assertFalse(self.controller.syncing)
+        self.assertTrue(self.controller.armed)
+        self.device.event(304,1)
+        self.assertEqual(self.controller.poll(),['b'])
+
+    def test_resync_held_shortcut_waits_for_release_and_new_press(self):
+        self.device.event(3,0,kind=0)
+        self.device.event(316,1); self.device.event(314,1)
+        self.device.event(0,0,kind=0)
+        self.assertEqual(self.controller.poll(),[])
+        self.device.event(314,2)
+        self.assertEqual(self.controller.poll(),[])
+        self.device.event(314,0); self.device.event(316,0)
+        self.controller.poll()
+        self.device.event(316,1); self.device.event(314,1)
+        self.assertEqual(self.controller.poll(),['toggle'])
+
+    def test_sensor_backlog_drained_across_multiple_batches(self):
+        from unittest.mock import Mock
+        events = [types.SimpleNamespace(type=1,code=316,value=1),
+                  types.SimpleNamespace(type=1,code=314,value=1)]
+        self.device.read = Mock(side_effect=[[events[0]], [events[1]], BlockingIOError()])
+        self.assertEqual(self.controller.poll(),['toggle'])
+        self.assertEqual(self.device.read.call_count,3)
+
+    def test_continuous_sensor_events_do_not_starve_the_gui(self):
+        from unittest.mock import Mock
+        sensor = types.SimpleNamespace(type=3,code=10,value=1)
+        self.device.read = Mock(return_value=[sensor])
+        self.assertEqual(self.controller.poll(),[])
+        self.assertEqual(self.device.read.call_count,64)
 
     def test_bindings_use_recorded_codes_and_reject_select_as_hotkey(self):
         xml='<inputConfig>'+''.join(f'<input name="{name}" type="button" code="{code}" value="1"/>' for name,code in [('hotkey',316),('select',314),('b',304),('a',305),('start',315)])+'<input name="joystick1left" type="axis" code="0" value="-1"/></inputConfig>'
@@ -351,7 +391,7 @@ class RuntimeIntegrationTests(unittest.TestCase):
                 device.grab=fail
             mapping={'hotkey':('button',316,1),'select':('button',314,1),'start':('button',315,1),
                      'b':('button',304,1),'a':('button',305,1)}
-            controller=runtime.Controller(device,mapping,types.SimpleNamespace(EV_KEY=1,EV_ABS=3,EV_SYN=0,SYN_DROPPED=3))
+            controller=runtime.Controller(device,mapping,types.SimpleNamespace(EV_KEY=1,EV_ABS=3,EV_SYN=0,SYN_DROPPED=3,SYN_REPORT=0))
             class Gtk:
                 quit=False
                 @classmethod

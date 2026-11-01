@@ -99,6 +99,7 @@ class Controller:
         # A held shortcut at process startup must first be released.
         self.armed = not bool(device.active_keys())
         self.chord = False
+        self.syncing = False
         self.repeat_at, self.repeated = 0, None
         self.limits = {code: device.absinfo(code) for kind, code, _ in mapping.values() if kind == 'axis'}
         self.values = {code: info.value for code, info in self.limits.items()}
@@ -116,18 +117,41 @@ class Controller:
         return down
 
     def poll(self):
-        actions = []
-        try: events = list(self.device.read())
-        except BlockingIOError: events = ()
+        actions, events = [], []
+        # DualSense sensor traffic can exceed one evdev batch per GTK tick.
+        # Drain the backlog with a bound so input cannot starve the GUI.
+        for _ in range(64):
+            try:
+                batch = list(self.device.read())
+            except BlockingIOError:
+                break
+            if not batch:
+                break
+            events.extend(batch)
+        dropped = [i for i, e in enumerate(events)
+                   if e.type == self.e.EV_SYN and e.code == self.e.SYN_DROPPED]
+        if self.syncing or dropped:
+            self.syncing = True
+            self.repeated = None
+            start = dropped[-1]+1 if dropped else 0
+            # Ignore the damaged frame through SYN_REPORT, then query the
+            # kernel's authoritative state instead of replaying partial input.
+            if any(e.type == self.e.EV_SYN and e.code == self.e.SYN_REPORT for e in events[start:]):
+                self.down = set(self.device.active_keys())
+                self.limits = {code: self.device.absinfo(code) for code in self.limits}
+                self.values = {code: info.value for code, info in self.limits.items()}
+                held = self.logical()
+                self.chord = {'hotkey', 'select'} <= held
+                self.armed = not bool(held)
+                self.syncing = False
+                print('virtual_keyboard_controller_resynced', flush=True)
+            return []
         for event in events:
             before = self.logical()
             if event.type == self.e.EV_KEY:
                 if event.value: self.down.add(event.code)
                 else: self.down.discard(event.code)
             elif event.type == self.e.EV_ABS: self.values[event.code] = event.value
-            elif event.type == self.e.EV_SYN and event.code == self.e.SYN_DROPPED:
-                # A lost input stream must never leave the controller captured.
-                raise RuntimeError('Controller input stream lost; close keyboard')
             after = self.logical()
             if not after: self.armed = True
             chord = {'hotkey', 'select'} <= after
@@ -147,7 +171,7 @@ class Controller:
         return actions
 
     def released(self):
-        return not self.device.active_keys() and not self.logical()
+        return not self.syncing and not self.device.active_keys() and not self.logical()
 
     def grab(self):
         if not self.captured:
