@@ -32,7 +32,8 @@ class KeyboardModel:
             rows = [list('qwertyuiop'), list('asdfghjkl'), list('zxcvbnm')]
         if self.upper and not self.symbols:
             rows = [[char.upper() for char in row] for row in rows]
-        return rows+[['shift', 'symbols', 'backspace', 'space', 'enter', 'close']]
+        return rows+[['cursor_left', 'cursor_down', 'cursor_up', 'cursor_right', 'home', 'end', 'delete'],
+                     ['shift', 'symbols', 'backspace', 'space', 'enter', 'close']]
 
     def selected(self):
         rows = self.rows()
@@ -56,25 +57,36 @@ class KeyboardModel:
         return None
 
 
-def bindings(config):
+def bindings(config, hat_axes=None):
     """Use Linux event codes recorded by ES; never guess a controller layout."""
     result = {}
     for item in config.findall('input'):
         name, kind = item.get('name'), item.get('type')
         try:
-            code, value = int(item.get('code')), int(item.get('value', '1'))
+            value = int(item.get('value', '1'))
+            code = int(item.get('code', '-1'))
         except (TypeError, ValueError):
             continue
         if kind not in ('button', 'axis', 'hat'): continue
-        if code < 0 or (kind == 'button' and code < 0x100): continue
         if kind == 'hat':
-            # Kernel hat axes are paired X/Y. ES stores the hat's base code.
-            base = code if code % 2 == 0 else code-1
+            # Some ES entries store only the SDL hat id (or code=0), not an
+            # evdev ABS_HAT code. Resolve its index against the actual device's
+            # available X/Y hat pairs instead of confusing it with stick axes.
+            if 16 <= code <= 23:
+                base = code if code % 2 == 0 else code-1
+            else:
+                try: index = int(item.get('id', str(code)))
+                except (TypeError, ValueError): continue
+                pairs = [axis for axis in range(16, 24, 2)
+                         if axis in (hat_axes or []) and axis+1 in (hat_axes or [])]
+                if not 0 <= index < len(pairs): continue
+                base = pairs[index]
             for direction, axis, sign in [('up', base+1, -1), ('down', base+1, 1),
                                            ('left', base, -1), ('right', base, 1)]:
                 bit = {'up': 1, 'right': 2, 'down': 4, 'left': 8}[direction]
                 if value & bit: result[name] = ('axis', axis, sign)
         else:
+            if code < 0 or (kind == 'button' and code < 0x100): continue
             result[name] = (kind, code, 1 if value >= 0 else -1)
     if (result.get('hotkey') is None or result.get('select') is None
             or result['hotkey'] == result['select']):
@@ -84,10 +96,12 @@ def bindings(config):
     for name in ('b', 'a', 'start'):
         if name not in result: raise ValueError(f'Missing Linux input mapping: {name}')
     for source, first, second in [('joystick1left', 'left', 'right'), ('joystick1up', 'up', 'down')]:
-        if source in result and first not in result:
+        if source in result:
             kind, code, sign = result[source]
-            result[first] = kind, code, sign
-            result[second] = kind, code, -sign
+            result.setdefault('joystick1'+second, (kind, code, -sign))
+            if first not in result:
+                result[first] = kind, code, sign
+                result[second] = kind, code, -sign
     return result
 
 
@@ -107,6 +121,8 @@ class Controller:
     def logical(self):
         down = set()
         for name, (kind, code, sign) in self.mapping.items():
+            if name in ('joystick1left', 'joystick1right', 'joystick1up', 'joystick1down'):
+                name = name[len('joystick1'):]
             if kind == 'button':
                 if code in self.down: down.add(name)
             else:
@@ -226,7 +242,7 @@ def controllers(paths=None):
                            or guid_identity(item.get('deviceGUID')) == hardware), None)
             if config is None:
                 device.close(); continue
-            mapping = bindings(config)
+            mapping = bindings(config, hat_axes=caps.get(evdev.ecodes.EV_ABS, []))
             keys = caps.get(evdev.ecodes.EV_KEY, [])
             if any(code not in keys for kind, code, _ in mapping.values() if kind == 'button'):
                 raise ValueError('Recorded button code does not match physical device')
@@ -274,7 +290,9 @@ class KeySender:
             raise
 
     def send(self, action):
-        special = {'backspace': 14, 'space': 57, 'enter': 28}
+        special = {'backspace': 14, 'space': 57, 'enter': 28, 'delete': 111,
+                   'cursor_left': 105, 'cursor_right': 106, 'cursor_up': 103,
+                   'cursor_down': 108, 'home': 102, 'end': 107}
         if action in special: key, mods = special[action], ()
         elif action in self.characters: key, mods = self.characters[action]
         else: raise ValueError('Character unavailable in the current desktop keyboard layout')
@@ -339,7 +357,7 @@ class Overlay:
             self.window.set_keep_above(True)
         bounds = monitor.get_geometry() if monitor else None
         width = min(1040, max(420, bounds.width-40)) if bounds else 960
-        height = min(380, max(240, int(bounds.height*.38))) if bounds else 340
+        height = min(440, max(280, int(bounds.height*.42))) if bounds else 400
         self.window.set_size_request(width, height)
         if not layer and bounds:
             self.window.move(bounds.x+(bounds.width-width)//2, bounds.y+bounds.height-height-16)
@@ -351,7 +369,7 @@ class Overlay:
         box.pack_start(Gtk.Label(label=title), False, False, 0)
         self.grid = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.pack_start(self.grid, True, True, 0)
-        legend = ('Croix/bas : saisir · Rond/droite : fermer · Carré/gauche : effacer · Triangle/haut : espace\nL1 : majuscules · R1 : chiffres · Start : Entrée · PS + Start : quitter le jeu' if french else
+        legend = ('Croix/bas : saisir · Rond/droite : fermer · Carré/gauche : effacer · Triangle/haut : espace\nL1 : majuscules · R1 : chiffres · Start : Entrée · Hotkey + Start : quitter le jeu' if french else
                   'South: type · East: close · West: backspace · North: space\nL1: shift · R1: numbers · Start: Enter · Hotkey + Start: quit game')
         self.message = Gtk.Label(label=legend); self.message.set_line_wrap(True)
         box.pack_start(self.message, False, False, 0)
@@ -359,6 +377,9 @@ class Overlay:
         css.load_from_data(b'window { background-color: #182230; } label { color: #edf4ff; font-size: 14pt; } button { background-image: none; background-color: #304158; color: white; border: 1px solid #59708e; border-radius: 8px; font-size: 19pt; } button.selected { background-color: #148082; border: 3px solid #a7f4e7; }')
         Gtk.StyleContext.add_provider_for_screen(self.window.get_screen(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.labels = {'shift': '⇧', 'symbols': 'ABC / 123', 'backspace': '⌫',
+                       'cursor_left': '←', 'cursor_right': '→', 'cursor_up': '↑', 'cursor_down': '↓',
+                       'home': 'Début' if french else 'Home', 'end': 'Fin' if french else 'End',
+                       'delete': 'Suppr' if french else 'Delete',
                        'space': 'Espace' if french else 'Space', 'enter': 'Entrée' if french else 'Enter',
                        'close': 'Fermer' if french else 'Close'}
         self.render()

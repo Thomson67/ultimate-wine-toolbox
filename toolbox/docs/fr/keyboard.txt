@@ -20,6 +20,9 @@ Bouton de droite (Rond PS / B Xbox) : masquer le clavier.
 Bouton de gauche (Carré PS / X Xbox) : effacer le caractère précédent.
 Bouton du haut (Triangle PS / Y Xbox) : espace.
 L1 : majuscules. R1 : chiffres et signes. Start : Entrée puis masquer.
+Les touches ← → ↑ ↓ déplacent le curseur dans le texte. Début et Fin vont
+au début et à la fin de la ligne ; Suppr efface le caractère suivant.
+Sélectionnez ces touches puis validez avec le bouton du bas.
 Les touches visibles sont aussi cliquables à la souris lorsqu'elle est libre.
 Hotkey + Start conserve la fonction quitter, y compris clavier affiché.
 

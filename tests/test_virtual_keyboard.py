@@ -249,6 +249,45 @@ class ControllerTests(unittest.TestCase):
         with self.assertRaises(ValueError):runtime.bindings(ET.fromstring(xml.replace('code="316"','code="314"')))
         with self.assertRaises(ValueError):runtime.bindings(ET.fromstring(xml.replace('code="316"','id="12"')))
 
+    def hat_config(self, code=None, index=0):
+        buttons = [('hotkey',316),('select',314),('b',304),('a',305),('start',315)]
+        attr = '' if code is None else f' code="{code}"'
+        xml = '<inputConfig>'+''.join(f'<input name="{name}" type="button" code="{button}" value="1"/>' for name,button in buttons)
+        xml += ''.join(f'<input name="{name}" type="hat" id="{index}" value="{value}"{attr}/>'
+                       for name,value in [('up',1),('right',2),('down',4),('left',8)])
+        xml += '<input name="joystick1left" type="axis" code="0" value="-1"/>'
+        xml += '<input name="joystick1up" type="axis" code="1" value="-1"/></inputConfig>'
+        return ET.fromstring(xml)
+
+    def test_hat_without_evdev_code_and_explicit_hat_codes_navigate_with_stick(self):
+        for code in (None,0,16,17):
+            with self.subTest(code=code):
+                mapping = runtime.bindings(self.hat_config(code),hat_axes=[0,1,16,17])
+                device = FakeDevice()
+                device.absinfo = lambda axis: types.SimpleNamespace(min=-1 if axis>=16 else -32768,
+                                                                    max=1 if axis>=16 else 32767,value=0)
+                controller = runtime.Controller(device,mapping,self.e); controller.grab()
+                for direction,axis,value in [('up',17,-1),('down',17,1),('left',16,-1),('right',16,1)]:
+                    device.event(axis,value,kind=3)
+                    self.assertEqual(controller.poll(),[direction])
+                    device.event(axis,0,kind=3); controller.poll()
+                # Stick remains available even though the D-pad owns the
+                # primary direction names in the user's saved config.
+                for direction,axis,value in [('left',0,-32768),('right',0,32767),('up',1,-32768),('down',1,32767)]:
+                    device.event(axis,value,kind=3)
+                    self.assertEqual(controller.poll(),[direction])
+                    device.event(axis,0,kind=3); controller.poll()
+                controller.close()
+
+    def test_hat_index_resolves_actual_available_pairs_and_preserves_remapping(self):
+        config = self.hat_config(None,index=1)
+        config.find('input[@name="up"]').set('value','2')
+        mapping = runtime.bindings(config,hat_axes=[0,1,16,17,20,21])
+        self.assertEqual(mapping['up'],('axis',20,1))
+        self.assertEqual(mapping['left'],('axis',20,-1))
+        mapping = runtime.bindings(self.hat_config(None,index=0),hat_axes=[18,19])
+        self.assertEqual(mapping['up'],('axis',19,-1))
+
     def test_shortcut_follows_user_remapping_instead_of_fixed_ps_buttons(self):
         xml='<inputConfig>'+''.join(f'<input name="{name}" type="button" code="{code}" value="1"/>' for name,code in [('hotkey',310),('select',318),('b',304),('a',305),('start',315)])+'</inputConfig>'
         mapping=runtime.bindings(ET.fromstring(xml))
@@ -318,6 +357,27 @@ class KeyboardTests(unittest.TestCase):
             self.assertIsNone(model.activate('symbols'));self.assertIn('1',model.rows()[0])
             for action in ('close','enter','space','backspace'):
                 self.assertEqual(model.activate(action),action)
+
+    def test_text_navigation_keys_are_available_on_every_keyboard_page(self):
+        expected = {'cursor_left','cursor_right','cursor_up','cursor_down','home','end','delete'}
+        for french in (False,True):
+            model = runtime.KeyboardModel(french)
+            for symbols in (False,True):
+                model.symbols = symbols
+                self.assertTrue(expected <= {key for row in model.rows() for key in row})
+                for key in expected:
+                    self.assertEqual(model.activate(key),key)
+
+    def test_cursor_and_delete_keys_send_balanced_linux_key_events(self):
+        sender = runtime.KeySender.__new__(runtime.KeySender)
+        sender.e = types.SimpleNamespace(EV_KEY=1); sender.characters = {}
+        events = []
+        sender.ui = types.SimpleNamespace(write=lambda kind,code,value:events.append((code,value)),syn=lambda:None)
+        with patch.object(runtime.time,'sleep'):
+            for action,code in [('cursor_left',105),('cursor_right',106),('cursor_up',103),('cursor_down',108),
+                                ('home',102),('end',107),('delete',111)]:
+                events.clear(); sender.send(action)
+                self.assertEqual(events,[(code,1),(code,0)])
 
     def test_key_events_release_modifiers_on_write_failure(self):
         sender=runtime.KeySender.__new__(runtime.KeySender)

@@ -44,3 +44,7 @@ Missing system dependencies are reported, not installed automatically.
 Log: /userdata/system/logs/ultimate-wine-toolbox/virtual-keyboard.log
 Global off does not override games explicitly set to on. Reset those games
 to Follow global setting or Disabled as well when turning everything off.
+
+TEXT EDITING
+The arrow keys move the text caret. Home/End move to the start/end of the
+line; Delete removes the next character. Select a key and press South.
