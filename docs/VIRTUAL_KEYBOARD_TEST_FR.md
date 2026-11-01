@@ -9,6 +9,10 @@ Disponible dans Ultimate Wine Toolbox depuis la version **0.10.0**. Désactivé 
 3. Fermer puis relancer le jeu pour appliquer le changement. Sélectionner le champ de texte avant d’ouvrir le clavier.
 4. Appuyer puis relâcher **Hotkey + Select**, selon la configuration de la manette dans Batocera. Par exemple PS + Create si PS est la Hotkey d’une DualSense. Les deux boutons doivent être distincts.
 
+## Retrouver les jeux configurés
+
+**Gérer les jeux configurés** liste uniquement les règles personnelles activées ou désactivées, sans analyser toute la collection. Sélectionner un jeu pour changer sa règle ou choisir **Suivre le réglage global** afin de retirer son exception. Les jeux activés uniquement par le réglage global ne figurent pas dans cette liste.
+
 ## Saisir et corriger le texte
 
 - Croix directionnelle ou stick gauche : sélectionner une touche.
@@ -32,7 +36,8 @@ Le jeu n’est pas mis en pause. Un jeu lisant directement HIDRAW peut encore re
 
 ## Vérifier ou désactiver
 
-Le menu propose un diagnostic des composants et de la manette ainsi qu’un aperçu sans saisie de 20 secondes. Aucun composant manquant n’est installé automatiquement.
+Le menu propose un aperçu sans saisie qui se ferme après **10 secondes**.
+L’aide intégrée est accessible dans **Documentation > Clavier virtuel à la manette**. Aucun composant manquant n’est installé automatiquement.
 
 Journal : `/userdata/system/logs/ultimate-wine-toolbox/virtual-keyboard.log`.
 

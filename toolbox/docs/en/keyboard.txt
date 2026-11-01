@@ -36,10 +36,9 @@ in EmulationStation with recorded Linux codes and distinct Hotkey/Select.
 No changes to games, prefixes, runners, archives or Pad2Key. Other systems
 are excluded.
 
-DIAGNOSTICS
-The component check verifies GTK, GtkLayerShell on Wayland, python-evdev,
-/dev/uinput and XKB without typing. Preview injects no keys and closes after
-20 seconds. Controller navigation requires an enabled game session.
+PREVIEW AND HELP
+Preview injects no keys and closes after 10 seconds.
+Find this help under Documentation > Controller virtual keyboard. Controller navigation requires an enabled game session.
 Missing system dependencies are reported, not installed automatically.
 Log: /userdata/system/logs/ultimate-wine-toolbox/virtual-keyboard.log
 Global off does not override games explicitly set to on. Reset those games
@@ -48,3 +47,8 @@ to Follow global setting or Disabled as well when turning everything off.
 TEXT EDITING
 The arrow keys move the text caret. Home/End move to the start/end of the
 line; Delete removes the next character. Select a key and press South.
+
+MANAGE CONFIGURED GAMES
+List explicit enabled/disabled rules without scanning the full ROM library.
+Choose a game to edit its rule; Follow global setting removes the override.
+Games enabled only through the global setting are not included.

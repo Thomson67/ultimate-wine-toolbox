@@ -9,22 +9,41 @@ osk_label() {
 }
 
 osk_game_menu() {
-    local rom selected state idx=1
+    local mode="${1:-all}" rom selected state rows idx=1 title prompt empty_message
+    title="$(i18n osk_game)"; prompt="$(i18n osk_game_help)"; empty_message="$(i18n mangohud_no_games)"
     local -a games=() items=()
-    while IFS= read -r rom; do
-        state="$(osk_cmd get --rom "$rom")" || return
-        games+=("$rom")
-        items+=("$idx" "$(basename "$rom") — $(osk_label "$state")")
-        idx=$((idx+1))
-    done < <(mangohud_list_games)
-    if [ "${#games[@]}" -eq 0 ]; then
-        msgbox "$(i18n osk_title)" "$(i18n mangohud_no_games)"; return
+    local -A labels=([on]="$(osk_label on)" [off]="$(osk_label off)" [inherit]="$(osk_label inherit)")
+    local -A WT_MENU_GAME_LABELS=()
+    if [ "$mode" = configured ]; then
+        title="$(i18n osk_configured)"; prompt="$(i18n osk_configured_help)"
+        empty_message="$(i18n osk_no_configured)"
+        if ! rows="$(osk_cmd configured-games)"; then
+            msgbox "$(i18n osk_title)" "$(i18n osk_config_error)"; return
+        fi
+    else
+        if have_dialog; then
+            wt_clear_tty
+            dialog --no-shadow --title "$title" --infobox "$(i18n osk_loading_games)" 8 80 >&2 || true
+        fi
+        if ! rows="$(mangohud_list_games | osk_cmd game-states)"; then
+            msgbox "$(i18n osk_title)" "$(i18n osk_config_error)"; return
+        fi
     fi
-    selected="$(WT_MENU_LIST=1 menu_select "$(i18n osk_game)" "$(i18n osk_game_help)" "${items[@]}" back "$(i18n back)")" || return
+    while IFS=$'\t' read -r state rom; do
+        [ -n "$rom" ] || continue
+        games+=("$rom")
+        WT_MENU_GAME_LABELS["$idx"]="${rom##*/}"
+        items+=("$idx" "${rom##*/} — ${labels[$state]}")
+        idx=$((idx+1))
+    done <<< "$rows"
+    if [ "${#games[@]}" -eq 0 ]; then
+        msgbox "$(i18n osk_title)" "$empty_message"; return
+    fi
+    selected="$(WT_MENU_LIST=1 menu_select "$title" "$prompt" "${items[@]}" back "$(i18n back)")" || return
     [[ "$selected" =~ ^[0-9]+$ ]] || return
     [ "$selected" -ge 1 ] && [ "$selected" -le "${#games[@]}" ] || return
     rom="${games[$((selected-1))]}"
-    state="$(menu_select "$(basename "$rom")" "$(i18n osk_game_help)" \
+    state="$(menu_select "${rom##*/}" "$prompt" \
         inherit "$(i18n osk_inherit)" on "$(i18n enabled)" off "$(i18n disabled)" back "$(i18n back)")" || return
     case "$state" in on|off|inherit) osk_cmd set --rom "$rom" --value "$state" || msgbox "$(i18n osk_title)" "$(i18n osk_config_error)" ;; esac
 }
@@ -35,17 +54,14 @@ virtual_keyboard_menu() {
         global="$(osk_cmd get)" || { msgbox "$(i18n osk_title)" "$(i18n osk_config_error)"; return; }
         choice="$(menu_select "$(i18n osk_title)" "$(i18n osk_intro)\n\n$(i18n osk_global) : $(osk_label "$global")" \
             on "$(i18n osk_global_on)" off "$(i18n osk_global_off)" \
-            games "$(i18n osk_game)" diagnose "$(i18n osk_diagnose)" \
-            preview "$(i18n osk_preview)" help "$(i18n menu_documentation)" back "$(i18n back)")" || return
+            games "$(i18n osk_game)" configured "$(i18n osk_configured)" \
+            preview "$(i18n osk_preview)" back "$(i18n back)")" || return
         case "$choice" in
             on|off) osk_cmd set --value "$choice" || msgbox "$(i18n osk_title)" "$(i18n osk_config_error)" ;;
             games) osk_game_menu ;;
-            diagnose)
-                report="$(osk_cmd diagnose 2>&1)"
-                msgbox "$(i18n osk_diagnose)" "$report" ;;
+            configured) osk_game_menu configured ;;
             preview)
                 report="$(osk_cmd preview 2>&1)" || msgbox "$(i18n osk_title)" "$report" ;;
-            help) documentation_show keyboard ;;
             *) return ;;
         esac
     done

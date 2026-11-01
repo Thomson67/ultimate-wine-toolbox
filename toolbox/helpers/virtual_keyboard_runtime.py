@@ -445,7 +445,7 @@ def preview(home):
             overlay.model.activate(key); overlay.render()
     overlay = Overlay(deps, action, language(home))
     overlay.show()
-    deps[2].timeout_add_seconds(20, lambda: (deps[0].main_quit(), False)[1])
+    deps[2].timeout_add_seconds(10, lambda: (deps[0].main_quit(), False)[1])
     deps[0].main()
     overlay.close()
 
