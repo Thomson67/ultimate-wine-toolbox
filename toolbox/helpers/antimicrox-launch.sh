@@ -28,6 +28,13 @@ export QT_PLUGIN_PATH="$DIR/squashfs-root/usr/plugins"
 export QT_QPA_PLATFORM_PLUGIN_PATH="$QT_PLUGIN_PATH/platforms"
 export DISPLAY="${DISPLAY:-:0}"
 export SDL_VIDEODRIVER=x11
+# Private runtime keyboard sessions must use the evdev backend so EVIOCGRAB
+# suppresses AMX while the keyboard is visible, without reloading a profile.
+if [ "${UWT_AMX_KEYBOARD_EVDEV:-0}" = 1 ]; then
+  for hint in ${!SDL_JOYSTICK_HIDAPI_@}; do unset "$hint"; done
+  export SDL_JOYSTICK_HIDAPI=0 SDL_LINUX_JOYSTICK_CLASSIC=0
+  echo 'Keyboard priority: AntiMicroX uses evdev capture' >&2
+fi
 # Sunshine libvirtualhid can enumerate through SDL HIDAPI without delivering
 # any buttons. evdev receives them correctly. Keep this override local to AMX
 # launches made while a Sunshine controller is present (including its siblings).

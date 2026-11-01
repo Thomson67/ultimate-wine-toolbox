@@ -56,6 +56,16 @@ export WT_SESSION_LOG="$LOG"
     echo "main=$MAIN"
 } >>"$LOG" 2>&1
 
+# BEGIN UWT RETURN FOCUS
+# Activate the existing terminal only for a return, without delaying the UI.
+if [ "${WT_AUTO_RESUME_WSQ:-0}" = 1 ] || \
+   [ "${WT_AUTO_RESUME_AMX:-0}" = 1 ] || \
+   [ "${WT_AUTO_RESUME_RESH:-0}" = 1 ]; then
+    python3 "$ROOT/helpers/toolbox_focus.py" --pid "$PPID" --owner "$$" \
+        >> "$LOG" 2>&1 &
+fi
+# END UWT RETURN FOCUS
+
 if [ ! -s "$MAIN" ]; then
     echo "ERROR: main script missing: $MAIN" | tee -a "$LOG" >&2
     rc=70

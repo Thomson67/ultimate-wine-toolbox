@@ -355,9 +355,11 @@ class Scope:
 def apply_profile(session, profile, binary):
     # Serialise IPC against the existing lifecycle hook's exclusive session lock.
     with (session.home/'state/antimicrox/lock').open('a') as lock:
-        fcntl.flock(lock, fcntl.LOCK_SH)
+        fcntl.flock(lock, fcntl.LOCK_EX)
         if not session.active():
             return False
+        from virtual_keyboard_antimicrox import runtime_profile
+        profile = runtime_profile(session.home, session.rom, profile)
         subprocess.run([str(binary), '--hidden', '--no-tray', '--profile', profile],
                        check=True, timeout=5, stdin=subprocess.DEVNULL,
                        close_fds=True)

@@ -852,3 +852,16 @@ I18N[wsq_update_save_cleanup_progress]="Suppression des copies de sécurité de 
 I18N[wsq_update_save_cleanup_failed]="Certaines copies de sauvegardes n’ont pas pu être vérifiées ou supprimées. Les copies restantes sont conservées pour vérification manuelle. La MAJ a réussi et les sauvegardes actives sont conservées. Journal :\n%s"
 
 I18N[wsq_update_replace_source_links]="La nouvelle version contient des liens aux emplacements de sauvegarde connus :\n\n%s\n\nRemplacer ces liens par ceux de la configuration existante ? Les essais utiliseront les copies de test prévues par le workflow (sauf lien vers la racine partagée).\n\nSeuls les liens seront remplacés : leurs anciens dossiers cibles, y compris les sauvegardes d’un essai précédent, restent intacts. Leur contenu ne sera pas importé. Non interrompt la préparation avant le déplacement du dossier source."
+
+I18N[osk_title]="Clavier virtuel à la manette"
+I18N[osk_intro]="Afficher / masquer : Hotkey + Select, selon votre configuration EmulationStation. Désactivé par défaut. Valable pour les prochains lancements Windows. Les réglages par jeu sont prioritaires. Les raccourcis Batocera existants restent inchangés."
+I18N[osk_inherit]="Suivre le réglage global"
+I18N[osk_global]="Activation globale Windows"
+I18N[osk_global_on]="Activer globalement pour les jeux Windows"
+I18N[osk_global_off]="Désactiver globalement"
+I18N[osk_game]="Régler un jeu : global / activé / désactivé"
+I18N[osk_game_help]="Choisissez le jeu, puis sa règle. Hotkey et Select doivent être distincts. Un conflit Pad2Key ou AntiMicroX bloque le clavier pour ce jeu, sans écraser le mapping. Fermez le jeu pour appliquer un changement."
+I18N[osk_config_error]="Configuration du clavier invalide ou non enregistrée. Consultez le diagnostic ; les réglages existants sont conservés."
+I18N[osk_diagnose]="Vérifier les composants et la manette"
+I18N[osk_preview]="Aperçu sans saisie (fermeture automatique après 20 s)"
+I18N[doc_keyboard]="Clavier virtuel à la manette"

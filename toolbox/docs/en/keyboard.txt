@@ -1,0 +1,50 @@
+CONTROLLER VIRTUAL KEYBOARD
+
+Enable it under Graphics and tools > Controller virtual keyboard, or Settings.
+Off by default. Global activation covers Windows games. Each game can inherit,
+force on or force off. Close and relaunch games after changing settings.
+
+SHORTCUT AND CONTROLS
+Hotkey + Select shows/hides the keyboard after you release the buttons.
+On a DualSense with PS as Hotkey: PS + Create. The buttons must be distinct.
+First select the game's text field, then open the keyboard.
+D-pad or left stick: move. South (Cross/A): type selected key.
+East (Circle/B): hide. West (Square/X): backspace. North (Triangle/Y): space.
+L1: shift. R1: numbers/symbols. Start: Enter and hide.
+Hotkey + Start still quits the game with the keyboard open.
+Visible keys can also be clicked when the mouse pointer is available.
+
+This controller-oriented panel uses GTK and a Wayland overlay layer (labwc)
+or an X11 popup. It does not Alt+Tab or take keyboard focus. uinput sends keys
+to the already-focused Wine window, using the desktop keyboard map. Toolbox
+language selects AZERTY/QWERTY labels; system layout must support the characters.
+Typed text is not stored. No clipboard is used. Native hotkeys are not changed.
+
+Controller event devices are captured temporarily, then released on hide or
+process exit. Games reading HIDRAW directly may still receive controller
+buttons: test this with the game. The game is not paused.
+Select may stay mapped in AntiMicroX. A private runtime profile reserves
+Hotkey + Select. While the keyboard is open, temporary evdev capture blocks AMX output;
+closing it releases the controller without reloading a profile. Saved profiles stay unchanged. Pad2Key
+conflicts still block activation. AMX live editing reserves Select when the keyboard is
+enabled; if R1 is also busy it falls back to its keyboard-only editor shortcut.
+
+SUPPORTED GAMES
+Windows Wine/UMU games with an X11/XWayland window. Native Wine Wayland windows
+are not yet supported. No automatic text-field detection. Controller configured
+in EmulationStation with recorded Linux codes and distinct Hotkey/Select.
+No changes to games, prefixes, runners, archives or Pad2Key. Other systems
+are excluded.
+
+DIAGNOSTICS
+The component check verifies GTK, GtkLayerShell on Wayland, python-evdev,
+/dev/uinput and XKB without typing. Preview injects no keys and closes after
+20 seconds. Controller navigation requires an enabled game session.
+Missing system dependencies are reported, not installed automatically.
+Log: /userdata/system/logs/ultimate-wine-toolbox/virtual-keyboard.log
+Global off does not override games explicitly set to on. Reset those games
+to Follow global setting or Disabled as well when turning everything off.
+
+TEXT EDITING
+The arrow keys move the text caret. Home/End move to the start/end of the
+line; Delete removes the next character. Select a key and press South.

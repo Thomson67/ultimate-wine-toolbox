@@ -20,20 +20,27 @@ def choices(paths=None):
             if identity in seen:
                 continue
             seen.add(identity)
-            inputs = config.findall('input')
-            hotkey = next((item for item in inputs if item.get('name') == 'hotkey'), None)
-            if hotkey is None or hotkey.get('type') != 'button' or hotkey.get('id') is None:
-                continue
-            aliases = [item.get('name') for item in inputs if item is not hotkey
-                       and item.get('type') == 'button' and item.get('id') == hotkey.get('id')]
-            # Batocera exports a standalone Hotkey as SDL Guide; duplicates use
-            # their existing SDL button. Ambiguous aliases need manual editing.
-            if not aliases:
-                button = 'guide'
-            elif len(aliases) == 1 and aliases[0] in BUTTONS:
-                button = aliases[0]
-            else:
+            button = logical_hotkey(config)
+            if button is None:
                 continue
             name = ' '.join((config.get('deviceName') or 'Controller').split())
             found.setdefault(button, []).append(name)
     return [(button, ' / '.join(dict.fromkeys(names))) for button, names in found.items()]
+
+
+def logical_hotkey(config):
+    inputs = config.findall('input')
+    hotkey = next((item for item in inputs if item.get('name') == 'hotkey'), None)
+    if hotkey is None or hotkey.get('type') != 'button' or hotkey.get('id') is None:
+        return None
+    aliases = [item.get('name') for item in inputs if item is not hotkey
+               and item.get('type') == 'button' and item.get('id') == hotkey.get('id')]
+    # Batocera exports a standalone Hotkey as SDL Guide; duplicates use
+    # their existing SDL button. Ambiguous aliases need manual editing.
+    if not aliases:
+        button = 'guide'
+    elif len(aliases) == 1 and aliases[0] in BUTTONS:
+        button = aliases[0]
+    else:
+        return None
+    return button

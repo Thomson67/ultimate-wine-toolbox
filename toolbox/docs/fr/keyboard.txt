@@ -1,0 +1,65 @@
+CLAVIER VIRTUEL À LA MANETTE
+
+OÙ LE TROUVER
+Réglages graphiques et outils > Clavier virtuel à la manette, ou Paramètres.
+Il est désactivé au départ. Le réglage global concerne les jeux Windows.
+Chaque jeu peut suivre le global, forcer l'activation ou la désactivation.
+Fermez le jeu puis relancez-le pour appliquer une modification.
+
+RACCOURCI
+Hotkey + Select affiche et masque le clavier. Sur une DualSense configurée
+avec PS comme Hotkey : PS + Create. Appuyez puis relâchez la combinaison.
+Les deux boutons doivent être distincts ; Select utilisé comme Hotkey n'est
+pas pris en charge par ce raccourci. Aucun raccourci natif n'est réécrit.
+
+SAISIR DU TEXTE
+Placez d'abord le curseur dans le champ du jeu, puis ouvrez le clavier.
+La croix directionnelle ou le stick gauche déplace la sélection.
+Bouton du bas (Croix PS / A Xbox) : saisir la touche sélectionnée.
+Bouton de droite (Rond PS / B Xbox) : masquer le clavier.
+Bouton de gauche (Carré PS / X Xbox) : effacer le caractère précédent.
+Bouton du haut (Triangle PS / Y Xbox) : espace.
+L1 : majuscules. R1 : chiffres et signes. Start : Entrée puis masquer.
+Les touches ← → ↑ ↓ déplacent le curseur dans le texte. Début et Fin vont
+au début et à la fin de la ligne ; Suppr efface le caractère suivant.
+Sélectionnez ces touches puis validez avec le bouton du bas.
+Les touches visibles sont aussi cliquables à la souris lorsqu'elle est libre.
+Hotkey + Start conserve la fonction quitter, y compris clavier affiché.
+
+FONCTIONNEMENT
+Ce panneau est adapté à la manette : il ne dépend pas du clavier tactile
+natif. Il utilise GTK et une couche au-dessus du jeu sous Wayland/labwc,
+sans Alt+Tab ni prise du focus clavier. Les touches sont envoyées par uinput
+à la fenêtre Wine déjà active, selon la disposition clavier du bureau.
+L'AZERTY et le QWERTY sont proposés selon la langue de la Toolbox ; la
+disposition système doit aussi permettre les caractères choisis.
+Aucun texte saisi n'est enregistré. Le presse-papiers n'est pas utilisé.
+
+Les périphériques manette sont capturés temporairement pendant la saisie,
+puis libérés quand le clavier se ferme ou que son processus s'arrête. Certains
+jeux lisant directement HIDRAW peuvent encore recevoir les boutons : ce point
+nécessite un essai avec le jeu. Ne supposez pas que le jeu est mis en pause.
+Select peut rester affecté dans AntiMicroX : seul Hotkey + Select est réservé
+au clavier, dans une copie temporaire du profil. Pendant la saisie, les
+commandes AntiMicroX sont bloquées par la capture temporaire de la manette,
+puis rétablies à la fermeture, sans recharger son profil. Les profils
+enregistrés sont conservés. Un conflit Pad2Key est encore refusé et journalisé. L'éditeur AntiMicroX réserve Select
+si le clavier est activé pour le jeu ; si R1 est aussi occupé, il utilise
+uniquement le raccourci clavier disponible pour son éditeur.
+
+JEUX PRIS EN CHARGE
+Jeux Windows Wine classiques et UMU avec fenêtre X11/XWayland. Un jeu Wine
+en Wayland natif n'est pas encore pris en charge. Pas d'ouverture automatique
+sur détection d'un champ. Manette configurée dans EmulationStation avec ses
+codes Linux enregistrés, Hotkey et Select distincts. Pas de modification des
+runners, préfixes, archives ou fichiers Pad2Key. Les autres systèmes sont exclus.
+
+DÉPANNAGE
+Vérifier les composants et la manette teste GTK, GtkLayerShell sous Wayland,
+python-evdev, /dev/uinput et la disposition XKB sans envoyer de caractères.
+Aperçu affiche le panneau sans injecter de touche et se ferme après 20 secondes.
+La navigation manette ne fonctionne que pendant une session de jeu activée.
+Le menu n'installe pas de dépendance système manquante.
+Journal : /userdata/system/logs/ultimate-wine-toolbox/virtual-keyboard.log
+Désactiver globalement ne supprime pas les exceptions par jeu activées : passez
+ces jeux sur Suivre le réglage global ou Désactivé pour les couper également.

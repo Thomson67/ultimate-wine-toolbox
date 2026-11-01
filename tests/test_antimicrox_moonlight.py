@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class MoonlightInputTests(unittest.TestCase):
-    def launch(self, devices, inherited=None):
+    def launch(self, devices, inherited=None, keyboard=False):
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder)
             sysroot = home/'sys/class/input'; sysroot.mkdir(parents=True)
@@ -18,7 +18,9 @@ class MoonlightInputTests(unittest.TestCase):
                 node.write_text(name+'\n')
             app = home/'tools/antimicrox/squashfs-root/AppRun'
             app.parent.mkdir(parents=True)
-            app.write_text('#!/bin/bash\nprintf "%s\\n" "${SDL_JOYSTICK_HIDAPI-unset}" "$@"\n')
+            app.write_text('#!/bin/bash\nprintf "%s\\n" "${SDL_JOYSTICK_HIDAPI-unset}" "$@"\n'
+                           'if [ "${UWT_AMX_KEYBOARD_EVDEV:-0}" = 1 ]; then\n'
+                           'printf "classic=%s specific=%s\\n" "${SDL_LINUX_JOYSTICK_CLASSIC-unset}" "${SDL_JOYSTICK_HIDAPI_PS5-unset}"\nfi\n')
             app.chmod(0o755)
             source = (ROOT/'toolbox/helpers/antimicrox-launch.sh').read_text()
             source = source.replace('/sys/class/input', str(sysroot))
@@ -26,8 +28,18 @@ class MoonlightInputTests(unittest.TestCase):
             env = dict(os.environ, WT_HOME=folder)
             env.pop('SDL_JOYSTICK_HIDAPI', None)
             if inherited is not None: env['SDL_JOYSTICK_HIDAPI'] = inherited
+            if keyboard:
+                env['UWT_AMX_KEYBOARD_EVDEV'] = '1'
+                env['SDL_JOYSTICK_HIDAPI_PS5'] = '1'
             return subprocess.run(['bash', str(script), '--show', '--eventgen', 'uinput'],
                                   env=env, text=True, capture_output=True, timeout=10)
+
+    def test_keyboard_session_uses_evdev_without_sunshine(self):
+        result = self.launch(['Wireless Controller'],'1',keyboard=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout.splitlines()[0],'0')
+        self.assertIn('Keyboard priority: AntiMicroX uses evdev capture',result.stderr)
+        self.assertIn('classic=0 specific=unset',result.stdout)
 
     def test_virtual_sunshine_controller_uses_confirmed_workaround(self):
         result = self.launch(['Sunshine (libvirtualhid) X-Box Series Controller'])

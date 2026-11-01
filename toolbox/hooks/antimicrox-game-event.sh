@@ -114,6 +114,16 @@ else
   export XDG_CONFIG_HOME="$STATE/runtime-config"
   rm -rf -- "$XDG_CONFIG_HOME"
   mkdir -p "$XDG_CONFIG_HOME"
+  if [ -f "$ROOT/toolbox/helpers/virtual_keyboard.py" ]; then
+    if ! real="$(python3 "$ROOT/toolbox/helpers/virtual_keyboard.py" --home "$ROOT" profile --rom "$rom" --profile "$real" 2>> "$LOG")"; then
+      live_error "Cannot reserve keyboard chord in runtime profile"; exit 0
+    fi
+  fi
+  case "$real" in
+    "$ROOT/state/virtual-keyboard/profiles/"*.amgp)
+      # The keyboard can capture this evdev reader without a second AMX launch.
+      export UWT_AMX_KEYBOARD_EVDEV=1 ;;
+  esac
   args=(--hidden --no-tray --eventgen uinput --log-level info --profile "$real")
 fi
 # Batocera 44 waits for captured hook pipes to reach EOF. A parent wrapper
