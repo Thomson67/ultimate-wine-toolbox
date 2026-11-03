@@ -178,10 +178,12 @@ def prepare(home, rom, exe, dll, version, repos, release_id=''):
         raise ValueError('invalid shader selection')
     release = None
     if release_id:
-        from reshade_versions import selection
+        from reshade_versions import selection, supports_api
         release = selection(release_id)
         if release['version'] != version:
             raise ValueError('ReShade release does not match selected version')
+        if not supports_api(release, dll):
+            raise ValueError('this ReShade version does not support Vulkan; select 4.4.0 or newer')
     exe = relative(exe)
     if exe not in executable_list(rom):
         raise ValueError('select an actual game executable')

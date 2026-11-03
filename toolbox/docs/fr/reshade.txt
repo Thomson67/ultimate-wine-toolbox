@@ -5,7 +5,9 @@ ReShade applique des effets à l’image du jeu : couleurs, netteté, rendu CRT 
 INSTALLER
 Dans Outils et compatibilité → ReShade, choisir le jeu puis Installer / modifier version et shaders. Sélectionner le véritable exécutable du jeu, l’API, la version de ReShade et les packs de shaders.
 
-La version se choisit dans une liste, puis la variante lorsqu’il y en a plusieurs. La variante « Sans bannière de démarrage » provient du projet OverlayDisabledReShade de fienestar et est disponible en 6.4.1. Elle conserve le menu Home et les effets. Certains shaders récents peuvent demander un moteur plus récent. Les réglages et presets existants sont conservés lors du changement de version.
+La version se choisit dans une liste, puis la variante lorsqu’il y en a plusieurs. La variante « Sans bannière de démarrage » provient du projet OverlayDisabledReShade de fienestar et est disponible en 6.4.1 et 6.2.0. Elle conserve le menu Home et les effets. Certains shaders récents peuvent demander un moteur plus récent. Les réglages et presets existants sont conservés lors du changement de version.
+
+Le catalogue propose 62 versions officielles de 4.1.0 à 6.8.0. Pour Vulkan, seules les versions à partir de 4.4.0 sont proposées. Les shaders modernes ne sont pas tous compatibles avec les anciens moteurs.
 
 Les téléchargements des moteurs sont vérifiés par SHA-256 et chaque variante possède son propre cache. Le catalogue est fourni avec les mises à jour de la Toolbox ; aucune mise à niveau du moteur d’un jeu n’est imposée automatiquement.
 

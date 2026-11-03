@@ -56,6 +56,42 @@
       "backend_version": "6.6.2"
     },
     {
+      "id": "6.6.1",
+      "version": "6.6.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.6.1.exe",
+      "sha256": "51a2853fea3ba2e760396d32a9ea6fc9ac28134c044e235b2a81d7f7ffe5bba3",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.6.0",
+      "version": "6.6.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.6.0.exe",
+      "sha256": "5d07ee172fde0b749bd0f9ac86fce640f5e73582a5fe4624321595ef3c57ff83",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.5.1",
+      "version": "6.5.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.5.1.exe",
+      "sha256": "c384e89427865e119db4daf18c2c225b951a4cd07dbff92b65caf68c2a95ace0",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.5.0",
+      "version": "6.5.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.5.0.exe",
+      "sha256": "503a2cef5a3a24400759d9559b36b9100574c09525d8ef1dba7b91b001ff1845",
+      "backend_version": "6.8.0"
+    },
+    {
       "id": "6.4.1",
       "version": "6.4.1",
       "variant": "standard",
@@ -71,6 +107,474 @@
       "provider": "fienestar/OverlayDisabledReShade",
       "url": "https://github.com/fienestar/OverlayDisabledReShade/releases/download/v6.4.1-patched/ReShade.Setup.exe",
       "sha256": "2d914a67481e739788e1d3d1d9ee25a18c143f14bcb20abba039c0ea6b8db366",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.4.0",
+      "version": "6.4.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.4.0.exe",
+      "sha256": "8ef51986120972b7101a0a3cb6884cdc5cfb7443249451a81cfaf336e9c1fd3f",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.3.3",
+      "version": "6.3.3",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.3.3.exe",
+      "sha256": "4ddbdc032a914b567dd8f8caa59a5b785c32b490c0ba3c5040f544824c980a6c",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.3.2",
+      "version": "6.3.2",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.3.2.exe",
+      "sha256": "0b442eae70945e5bf7efe93a27bf44a2cbe31e4faac27efbf4bda398800051db",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.3.1",
+      "version": "6.3.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.3.1.exe",
+      "sha256": "7365deb5da99f948e94230bcf7dd763fe449e8fdc04004845c29aee1c73a4d10",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.3.0",
+      "version": "6.3.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.3.0.exe",
+      "sha256": "5c9cbb6c61ba57895bda9564fe50e234d13d28bc59f8ee416c996ecddacedf82",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.2.0",
+      "version": "6.2.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.2.0.exe",
+      "sha256": "ef8c8388352169e45eba248bbf7bbd9af45d2f947d54729e8e7a533728442042",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.2.0-no-startup-banner",
+      "version": "6.2.0",
+      "variant": "no-startup-banner",
+      "provider": "fienestar/OverlayDisabledReShade",
+      "url": "https://github.com/fienestar/OverlayDisabledReShade/releases/download/v6.2.0-patched/ReShade.Setup.exe",
+      "sha256": "8afeecd0427925f92bcd4f722b279937710070f3adba5cd3e819adca66a38983",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.1.1",
+      "version": "6.1.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.1.1.exe",
+      "sha256": "f427f2d354acd78f2177aaeb78a677d34d7825751dc3abe70d40fd537b70c4d8",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.1.0",
+      "version": "6.1.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.1.0.exe",
+      "sha256": "2db6e9347852a37b599458030d14859575f429b344083be18f5c074d46b39ba3",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.0.1",
+      "version": "6.0.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.0.1.exe",
+      "sha256": "293b4e2a879ec1c2eeb8f7c948f49d7e4cc5c3c0a0637d476bd9097f7e91b52e",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.0.0",
+      "version": "6.0.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.0.0.exe",
+      "sha256": "98f1f6e45c5bae4de34ce38fa84f3c96e76b6a15b35050721a20f33b028ab784",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.9.2",
+      "version": "5.9.2",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.9.2.exe",
+      "sha256": "ec5e9d128d4460e212ca859cb257c95bba3776d412fe7859c4c8c91633e3c9dd",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.9.1",
+      "version": "5.9.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.9.1.exe",
+      "sha256": "b06d5bd69da760fed3eb3171c8ca8375cae5d1bc42aa2449a3592c0f757409b1",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.9.0",
+      "version": "5.9.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.9.0.exe",
+      "sha256": "a9840cbc0af8d9b428a9c60759811b4e6a725ff99f283ce00c61d29a60f6faa8",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.8.0",
+      "version": "5.8.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.8.0.exe",
+      "sha256": "bd9513b6d1cd50a02213549ab46f1b1f66c13c705b0e0515f45007d7b2e47d98",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.7.0",
+      "version": "5.7.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.7.0.exe",
+      "sha256": "d0f00824812b0e6ac45b84966165f9d4232e07dbcbec5de91ea1c5af2e001f61",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.6.0",
+      "version": "5.6.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.6.0.exe",
+      "sha256": "26a7cd9aae702866749a3dcfa342e3bb913212e5357a252bbee2e08f70ded4fc",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.5.2",
+      "version": "5.5.2",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.5.2.exe",
+      "sha256": "42bac664572623e6e4977ed99787cb67b814235d7ad1561167574b00c065a712",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.5.1",
+      "version": "5.5.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.5.1.exe",
+      "sha256": "e67d8f2cb47d10542091d2b3be0da864b401150b86a2294b96442060cb8aa7c0",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.5.0",
+      "version": "5.5.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.5.0.exe",
+      "sha256": "9748d668cdb528cb6b2a542e8105cf498924295042d7efa3d17ee7e06ee80e0b",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.4.2",
+      "version": "5.4.2",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.4.2.exe",
+      "sha256": "d438dbc778833747614b3f91e57454836b7ec80ce4ce8a1ee2565aafd5bdd000",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.4.1",
+      "version": "5.4.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.4.1.exe",
+      "sha256": "06d22f30a53b1db83d24fc4b7f41df7ef42301ce7d56769c43dd70115b8dfde2",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.4.0",
+      "version": "5.4.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.4.0.exe",
+      "sha256": "4446b36edb8cd0cab28b6d2ad257042d2adf769d9edbfdd8b959481e302c8d56",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.3.0",
+      "version": "5.3.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.3.0.exe",
+      "sha256": "d08292644069ec0e48b9fa3c1125f637bf17b223dd2de3316d5787b2777c0c44",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.2.2",
+      "version": "5.2.2",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.2.2.exe",
+      "sha256": "9d9c67b81fc0bb2625c7511ea30755113840fa30870fbd676891fb4871ae2c76",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.2.1",
+      "version": "5.2.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.2.1.exe",
+      "sha256": "62e0be44e6473ed2f8430f26d7ada6601342c4d481ea2ff51ee442022910c250",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.2.0",
+      "version": "5.2.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.2.0.exe",
+      "sha256": "fd1dac2fc46f404db0f8e4540193227c6280d785e7488f5444931dfad6f83ae1",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.1.0",
+      "version": "5.1.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.1.0.exe",
+      "sha256": "7053b645084e3d4fa6cc00dbdf77a6bd69fb9adbab17ced398953bcd5586d74e",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.0.2",
+      "version": "5.0.2",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.0.2.exe",
+      "sha256": "f042c2bad918cddfcdfbb7b7859ed59ad1f7ac7284cd5c8d384ed6dc408d609d",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.0.1",
+      "version": "5.0.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.0.1.exe",
+      "sha256": "91bdb117ca6ddbc8edfe564003ab7daede350c0a3f55c04eaabd57ee950896eb",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "5.0.0",
+      "version": "5.0.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.0.0.exe",
+      "sha256": "a4e822078469e88f37d27cdfb5abb1f0c841c7e4242df1df4ac6eabae0c8d9fe",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.9.1",
+      "version": "4.9.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.9.1.exe",
+      "sha256": "b156f30c7add9bd8f9b82b94b96a70a4908ae5d7fe2f79243353ffad97afeca8",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.9.0",
+      "version": "4.9.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.9.0.exe",
+      "sha256": "fc9b12dd116e2b7a4167fd78efcaa9b46dced2fb4c2b8dbd37f399e60a21e1b1",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.8.2",
+      "version": "4.8.2",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.8.2.exe",
+      "sha256": "c5738502ccc3932e9bec5087e1fb1dbd5054dea0f8a235a9902438b457634a7a",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.8.1",
+      "version": "4.8.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.8.1.exe",
+      "sha256": "50eb1b48e283da3db6f99f2d1ea4815a58ca7b2526a6bcc053e02a0ffa7408d8",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.8.0",
+      "version": "4.8.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.8.0.exe",
+      "sha256": "60083d373374335cca46e67f712c699ad447bb4b14fda6a64bee59bb0793b533",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.7.0",
+      "version": "4.7.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.7.0.exe",
+      "sha256": "0e3ceba664256c7648a6a792a4be539aa23b6c6f1165898529d51d0ad1a8110c",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.6.1",
+      "version": "4.6.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.6.1.exe",
+      "sha256": "d156ba35853dcb4e630233c61ce8f5b6e8a0526bcb01bd345dae60c23c9effb0",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.6.0",
+      "version": "4.6.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.6.0.exe",
+      "sha256": "f8560616eb9fdf931c07f01e002ba8a84a45ba20800fe9504fef97adf904b0e1",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.5.4",
+      "version": "4.5.4",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.5.4.exe",
+      "sha256": "5f26ce490784c29688b2d4cef35d7cc056ba419847d5ab18737b854094f57d4a",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.5.3",
+      "version": "4.5.3",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.5.3.exe",
+      "sha256": "502c9104bec76b41209296d967b6f9ae4068a705db394c8faf1374899ff21bdb",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.5.2",
+      "version": "4.5.2",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.5.2.exe",
+      "sha256": "ecc825d87c50400ef2d7da1d38547d77a2c69fe255605886abd5308a2c95debf",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.5.1",
+      "version": "4.5.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.5.1.exe",
+      "sha256": "f00d4a8aa966c0675a73606f34169710213211b19febe6fc84b174f35cba19a4",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.5.0",
+      "version": "4.5.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.5.0.exe",
+      "sha256": "14a5d7fd3e163bacf26134f5f8f5e0c707c48f93132e94204c7ced2fd043b94c",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.4.2",
+      "version": "4.4.2",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.4.2.exe",
+      "sha256": "7f3536241c76179c8dd6a75752fe4ee7370372fed9464b84f3f4a444273eee72",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.4.1",
+      "version": "4.4.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.4.1.exe",
+      "sha256": "34175b0cc870f0e14e400fc3bfcc21ca2a068c548de723ffffeaeca5d048b0a4",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.4.0",
+      "version": "4.4.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.4.0.exe",
+      "sha256": "31d67b4cd2e24a64128f6adbed93a9c31afde151b714c1fe0f51cded634d3440",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.3.0",
+      "version": "4.3.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.3.0.exe",
+      "sha256": "bdd3c3b91eb893ed05f8fe01a6824d29667e7645a3188f3f1d75a1744b9a498b",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.2.1",
+      "version": "4.2.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.2.1.exe",
+      "sha256": "536196201fd7753f2833c3a62ca44947a6ca7eb5ed14bc834d6fb0295073fbb6",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.2.0",
+      "version": "4.2.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.2.0.exe",
+      "sha256": "cc5a03ce1510b7f31923dc072ca0c2dbcb78d4d3908e25ada607b679355d5826",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.1.1",
+      "version": "4.1.1",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.1.1.exe",
+      "sha256": "4bbde07856d0d5321b50536176d594a35cb2a2de9f772947e2c09f8e54b16943",
+      "backend_version": "6.8.0"
+    },
+    {
+      "id": "4.1.0",
+      "version": "4.1.0",
+      "variant": "standard",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_4.1.0.exe",
+      "sha256": "c92faa4eb41b64e3d4f0c5b359937c10457db2d68ecbe78caa02b43b22115b05",
       "backend_version": "6.8.0"
     }
   ]

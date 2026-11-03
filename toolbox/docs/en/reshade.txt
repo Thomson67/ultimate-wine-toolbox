@@ -5,7 +5,9 @@ ReShade applies effects to the game image: colors, sharpening, CRT rendering or 
 INSTALL
 In Tools and compatibility → ReShade, select the game, then Install / change version and shaders. Choose the actual game executable, API, ReShade version and shader packs.
 
-Select a version from the list, then its variant when several are available. The “No startup banner” variant comes from fienestar’s OverlayDisabledReShade project and is available for 6.4.1. It retains the Home menu and effects. Some recent shaders may require a newer engine. Existing settings and presets are retained when changing versions.
+Select a version from the list, then its variant when several are available. The “No startup banner” variant comes from fienestar’s OverlayDisabledReShade project and is available for 6.4.1 and 6.2.0. It retains the Home menu and effects. Some recent shaders may require a newer engine. Existing settings and presets are retained when changing versions.
+
+The catalogue offers 62 official releases from 4.1.0 through 6.8.0. Vulkan only lists versions 4.4.0 and newer. Modern shaders may not be compatible with older engines.
 
 Engine downloads are checked with SHA-256 and each variant has its own cache. The catalogue ships with Toolbox updates; game engines are never upgraded automatically.
 

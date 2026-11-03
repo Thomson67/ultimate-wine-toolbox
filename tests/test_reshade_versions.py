@@ -28,7 +28,9 @@ class VersionCatalogTests(unittest.TestCase):
 
     def test_catalog_has_only_real_variants_and_rejects_duplicates_and_wrong_source(self):
         entries = v.catalog()
-        self.assertEqual([e['version'] for e in entries if e['variant'] != 'standard'], ['6.4.1'])
+        self.assertEqual(sum(e['variant'] == 'standard' for e in entries), 62)
+        self.assertIn('4.1.0', {e['id'] for e in entries})
+        self.assertEqual({e['version'] for e in entries if e['variant'] != 'standard'}, {'6.4.1', '6.2.0'})
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'catalog.json'
             for bad in (entries + [entries[0]], [dict(entries[0], url='https://example.org/setup.exe')],
@@ -37,8 +39,26 @@ class VersionCatalogTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     v.catalog(path)
 
+    def test_old_vulkan_versions_are_filtered_and_rejected_before_game_changes(self):
+        self.assertFalse(v.supports_api(v.selection('4.3.0'), 'vulkan'))
+        self.assertTrue(v.supports_api(v.selection('4.4.0'), 'vulkan'))
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            rom = home/'Game.wine'
+            rom.mkdir()
+            with self.assertRaisesRegex(ValueError, 'does not support Vulkan'):
+                r.prepare(home, rom, 'Game.exe', 'vulkan', '4.1.0', 'none', '4.1.0')
+            self.assertEqual(list(home.iterdir()), [rom])
+            self.assertEqual(list(rom.iterdir()), [])
+            args = [sys.executable, str(v.CATALOG.parents[1]/'helpers/reshade_versions.py'), 'versions']
+            directx = subprocess.run(args, text=True, capture_output=True, check=True)
+            vulkan = subprocess.run(args+['--api', 'vulkan'], text=True, capture_output=True, check=True)
+            self.assertIn('4.1.0\t0', directx.stdout)
+            self.assertNotIn('4.1.0\t0', vulkan.stdout)
+            self.assertIn('4.4.0\t0', vulkan.stdout)
+
     def test_separate_variants_cache_reuse_and_corruption_repair(self):
-        entries = copy.deepcopy([e for e in v.catalog() if e['version'] == '6.4.1'])
+        entries = copy.deepcopy([e for e in v.catalog() if e['version'] in ('6.4.1', '6.2.0', '4.1.0')])
         with tempfile.TemporaryDirectory() as folder:
             for entry in entries:
                 data = self.setup_bytes(entry['id'].encode())
@@ -82,7 +102,7 @@ menu_select() {
  local count=0; [ ! -f "$COUNT" ] || read -r count < "$COUNT"
  count=$((count+1)); echo "$count" > "$COUNT"
  case "$MODE:$count" in
- official:1) echo 1;; variant:1|back:1) echo 7;;
+ official:1) echo 1;; variant:1|back:1) echo "$VERSION_INDEX";;
  variant:2) echo 2;; back:2) echo back;; back:3) echo 1;;
  *) return 1;; esac
 }
@@ -93,7 +113,8 @@ resh_version_select /unused/game.wine
                 counter.unlink(missing_ok=True)
                 result = subprocess.run(['bash', '-c', script], text=True, capture_output=True,
                     env=dict(os.environ, WT_ROOT=str(ROOT / 'toolbox'), WT_HOME=folder,
-                             COUNT=str(counter), MODE=mode))
+                             COUNT=str(counter), MODE=mode,
+                             VERSION_INDEX=str(sorted({e['version'] for e in v.catalog()}, key=lambda x: tuple(map(int, x.split('.'))), reverse=True).index('6.4.1')+1)))
                 self.assertEqual(result.stdout, expected, result.stderr)
                 self.assertEqual(result.returncode, int(mode == 'cancel'), result.stderr)
 
@@ -102,14 +123,14 @@ resh_version_select /unused/game.wine
         fixture = fixtures.ReShadeTests()
         fixture.setUp()
         self.addCleanup(fixture.doCleanups)
-        entries = copy.deepcopy([e for e in v.catalog() if e['version'] == '6.4.1'])
+        entries = copy.deepcopy([e for e in v.catalog() if e['version'] in ('6.4.1', '6.2.0', '4.1.0')])
         initial = (fixture.profile / 'ReShadePreset.ini').read_bytes()
         for entry in entries:
             data = self.setup_bytes(entry['id'].encode())
             entry['sha256'] = hashlib.sha256(data).hexdigest()
             selected = v.payload(fixture.home, entry['id'], 64, lambda url: data, entries)
             with patch.object(v, 'catalog', return_value=entries):
-                ws = r.prepare(fixture.home, fixture.rom, fixture.exe, 'dxgi', '6.4.1', 'sweetfx-shaders', entry['id'])
+                ws = r.prepare(fixture.home, fixture.rom, fixture.exe, 'dxgi', entry['version'], 'sweetfx-shaders', entry['id'])
                 for name, source in [('dxgi.dll', fixture.runtime), ('d3dcompiler_47.dll', fixture.compiler),
                                      ('ReShade_shaders', fixture.shaders)]:
                     target = ws / name

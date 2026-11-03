@@ -44,6 +44,11 @@ def selection(identity, entries=None):
     raise ValueError(f'unknown ReShade release: {identity}')
 
 
+def supports_api(entry, api):
+    # Vulkan DLLs/manifests first appeared in the official 4.4.0 setup.
+    return api != 'vulkan' or tuple(map(int, entry['version'].split('.'))) >= (4, 4, 0)
+
+
 def download(url):
     request = urllib.request.Request(url, headers={'User-Agent': 'Ultimate-Wine-Toolbox'})
     with urllib.request.urlopen(request, timeout=45) as response:
@@ -115,8 +120,9 @@ def main():
     parser.add_argument('command', choices=('versions', 'variants', 'info'))
     parser.add_argument('value', nargs='?')
     parser.add_argument('--rom', type=Path)
+    parser.add_argument('--api', choices=('dxgi', 'd3d9', 'opengl32', 'vulkan'), default='dxgi')
     args = parser.parse_args()
-    entries = catalog()
+    entries = [entry for entry in catalog() if supports_api(entry, args.api)]
     installed = current(args.home, args.rom) if args.rom else ''
     if args.command == 'versions':
         versions = sorted({e['version'] for e in entries}, key=lambda v: tuple(map(int, v.split('.'))), reverse=True)

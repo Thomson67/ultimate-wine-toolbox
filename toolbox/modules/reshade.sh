@@ -174,10 +174,10 @@ resh_api_select() {
 }
 
 resh_version_select() {
-    local rom="$1" helper="$WT_ROOT/helpers/reshade_versions.py" listing version current choice index identity variant provider label
+    local rom="$1" api="${2:-dxgi}" helper="$WT_ROOT/helpers/reshade_versions.py" listing version current choice index identity variant provider label
     local -a versions options identities
     while true; do
-        listing="$(python3 "$helper" --home "$WT_HOME" versions --rom "$rom" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
+        listing="$(python3 "$helper" --home "$WT_HOME" versions --rom "$rom" --api "$api" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
         versions=(); options=()
         while IFS=$'\t' read -r version current; do
             [ -n "$version" ] || continue
@@ -270,7 +270,7 @@ PY_PENDING
     backend_dll="$dll"
     [ "$dll" != vulkan ] || backend_dll=dxgi
     local release_id variant backend_version selection_info version_label
-    release_id="$(resh_version_select "$rom")" || return 1
+    release_id="$(resh_version_select "$rom" "$dll")" || return 1
     selection_info="$(python3 "$WT_ROOT/helpers/reshade_versions.py" info "$release_id" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
     IFS=$'\t' read -r version variant backend_version <<<"$selection_info"
     [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ "$backend_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
