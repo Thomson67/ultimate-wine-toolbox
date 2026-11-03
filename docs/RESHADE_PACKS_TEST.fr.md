@@ -17,9 +17,9 @@ choisir le jeu Windows (émulateur lancé sous Wine) et :
    un pack ReShade local (ZIP, add-ons et shaders)**, à côté de la recherche
    communautaire. Sélectionner l'archive
    `HM 4K textures OoT.zip`, avec `ReShade.ini`, `citra.addon` et
-   `reshade-shaders` à sa racine. Choisir **Henriko_Ultra_v10.ini** pour reproduire
-   le preset désigné par le ReShade.ini de l'archive ; les autres presets sont
-   également proposés.
+   `reshade-shaders` à sa racine. Tous les presets sont importés, sans étape
+   de sélection. **Henriko_Ultra_v10.ini**, désigné par le ReShade.ini de
+   l'archive, devient automatiquement le preset initial.
 3. Confirmer l'installation des add-ons exécutables et des shaders, puis celle
    de ReShade. La compatibilité version/architecture est vérifiée avant la
    modification du jeu. Le pack fournit ses propres shaders : aucun pack de

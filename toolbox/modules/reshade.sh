@@ -467,9 +467,8 @@ resh_pack_zip_file() {
 }
 
 resh_pack_menu() {
-    local rom="$1" choice archive info summary preset selected name output
+    local rom="$1" choice archive info summary preset output
     local mode="${2:-apply}"
-    local -a presets=() items=()
     info="$(resh_cmd pack-status "$rom" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
     if [ "$info" != '{}' ]; then
         summary="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(d.get("selected", ""))' "$info")"
@@ -484,17 +483,12 @@ resh_pack_menu() {
     fi
     archive="$(resh_pack_zip_file)" || return 1
     if ! info="$(resh_cmd pack-info "$archive" 2>&1)"; then msgbox "$(i18n resh_title)" "$info"; return 1; fi
-    summary="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("ReShade: "+(d["required_release"] or "full add-on support")); print("Add-ons: "+", ".join(n+" ("+str(a)+" bits)" for n,a in d["addons"].items())); print(str(d["files"])+" files / "+str(round(d["bytes"]/1048576,1))+" MiB")' "$info")" || return
-    while IFS= read -r name; do
-        presets+=("$name"); items+=("${#presets[@]}" "$name")
-    done < <(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("\n".join(sorted(d["presets"], key=lambda p:p!=d["preferred"])))' "$info")
-    selected="$(menu_select "$(i18n resh_title)" "$summary" "${items[@]}" back "$(i18n back)")" || return
-    case "$selected" in ''|*[!0-9]*) return 1 ;; esac
-    [ "$selected" -ge 1 ] && [ "$selected" -le "${#presets[@]}" ] || return
-    preset="${presets[$((selected-1))]}"
+    summary="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("ReShade: "+(d["required_release"] or "full add-on support")); print("Add-ons: "+", ".join(n+" ("+str(a)+" bits)" for n,a in d["addons"].items())); print("Presets ("+str(len(d["presets"]))+"): "+", ".join(d["presets"])); print(str(d["files"])+" files / "+str(round(d["bytes"]/1048576,1))+" MiB")' "$info")" || return
+    preset="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["preferred"])' "$info")" || return 1
     yesno_default_no "$(i18n resh_title)" "$summary
 
-$preset
+$(community_txt 'Preset initial :' 'Initial preset:') $preset
+$(community_txt 'Tous les presets détectés seront importés.' 'All detected presets will be imported.')
 $(community_txt 'Installer pour ce jeu les add-ons exécutables et les shaders de cette archive ? Les réglages actuels seront sauvegardés. Le pack Citra nécessite ReShade 6.3.3 avec add-ons.' 'Install the executable add-ons and shaders from this archive for this game? Current settings will be backed up. The Citra bundle requires ReShade 6.3.3 with add-ons.')" || return 1
     if [ "$mode" = select ]; then
         printf '%s\n%s\n' "$archive" "$preset"

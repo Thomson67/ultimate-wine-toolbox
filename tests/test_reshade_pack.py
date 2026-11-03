@@ -260,16 +260,16 @@ resh_install_game '/games/An emulator.wine'
                         self.assertNotIn(enabled, calls)
                         self.assertNotEqual(result.returncode, 0)
 
-    def test_zip_preview_preset_selection_and_confirmation(self):
+    def test_zip_import_uses_default_without_a_preset_selector(self):
         import os
         import subprocess
         import tempfile
         root = Path(__file__).resolve().parents[1]
-        for confirm in ('0', '1'):
-            with self.subTest(confirm=confirm), tempfile.TemporaryDirectory() as tmp:
+        for mode, confirm in (('apply', '0'), ('apply', '1'), ('select', '0'), ('select', '1')):
+            with self.subTest(mode=mode, confirm=confirm), tempfile.TemporaryDirectory() as tmp:
                 base = Path(tmp)
                 env = dict(os.environ, WT_ROOT=str(root / 'toolbox'), WT_HOME=tmp,
-                           WT_LANGUAGE='fr', RESULT=str(base / 'result'), CONFIRM=confirm,
+                           WT_LANGUAGE='fr', RESULT=str(base / 'result'), CONFIRM=confirm, MODE=mode, SUMMARY=str(base / 'summary'),
                            META=json.dumps({'required_release': '6.3.3-addons', 'presets': ['Other.ini', 'Ultra.ini'],
                                             'preferred': 'Ultra.ini', 'addons': {'citra.addon': 64}, 'files': 8, 'bytes': 100}))
                 script = r'''
@@ -279,8 +279,8 @@ i18n() { printf '%s' "$1"; }
 # Force the text picker in this UI test regardless of host packages.
 command() { if [ "${*: -1}" = yad ]; then return 1; else builtin command "$@"; fi; }
 input_text() { printf '/userdata/My bundle.zip'; }
-menu_select() { printf 1; }
-yesno_default_no() { return "$CONFIRM"; }
+menu_select() { echo "Unexpected preset selector" >&2; return 1; }
+yesno_default_no() { printf '%s' "$2" > "$SUMMARY"; return "$CONFIRM"; }
 msgbox() { return 0; }
 resh_cmd() {
  case "$1" in
@@ -289,12 +289,20 @@ resh_cmd() {
   pack-import) printf '%s\n' "$@" > "$RESULT";;
  esac
 }
-resh_pack_menu '/userdata/roms/windows/An emulator.wine'
+resh_pack_menu '/userdata/roms/windows/An emulator.wine' "$MODE"
 '''
                 result = subprocess.run(['bash', '-c', script], env=env, text=True, capture_output=True)
-                if confirm == '0':
+                self.assertEqual(result.stderr, '')
+                summary = (base / 'summary').read_text()
+                self.assertIn('Presets (2): Other.ini, Ultra.ini', summary)
+                self.assertIn('Preset initial : Ultra.ini', summary)
+                if confirm == '0' and mode == 'apply':
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual((base / 'result').read_text().splitlines(),
                                      ['pack-import', '/userdata/roms/windows/An emulator.wine', '/userdata/My bundle.zip', 'Ultra.ini'])
                 else:
                     self.assertFalse((base / 'result').exists())
+                    if confirm == '0':
+                        self.assertEqual(result.stdout.splitlines(), ['/userdata/My bundle.zip', 'Ultra.ini'])
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
