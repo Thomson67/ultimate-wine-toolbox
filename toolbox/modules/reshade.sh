@@ -565,6 +565,93 @@ resh_presets_menu() {
     done
 }
 
+resh_preset_catalog_collection() {
+    local collection="$1" listing rom orphan usable selected action output name destination identity label prompt
+    local -a items=() extra=()
+    while true; do
+        if ! listing="$(resh_cmd presets-global-items "$collection" 2>&1)"; then msgbox "$(i18n resh_title)" "$listing"; return; fi
+        rom="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["rom"])' "$listing")"
+        orphan="$(python3 -c 'import json,sys; print(int(json.loads(sys.argv[1])["orphan"]))' "$listing")"
+        usable=0; [ "$orphan" != 0 ] || usable=1
+        items=(); extra=()
+        while IFS=$'\t' read -r identity label; do
+            [ -n "$identity" ] || continue
+            items+=("$identity" "$label")
+        done < <(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("\n".join(v["id"]+"\t"+v["name"]+(" — "+sys.argv[2] if v["active"] else "") for v in d["items"]))' "$listing" "$(community_txt 'actif' 'active')")
+        if [ "$usable" = 1 ]; then
+            extra+=(game "$(community_txt 'Ouvrir la gestion complète des presets de ce jeu' 'Open full preset management for this game')")
+        else
+            extra+=(forget "$(community_txt 'Supprimer toute la collection et son association' 'Delete the entire collection and its association')")
+        fi
+        prompt="${rom:-$(community_txt 'Collection sans association connue' 'Collection with no known association')}"
+        selected="$(menu_select "$(community_txt 'Gestionnaire de presets' 'Preset manager')" "$prompt" "${items[@]}" "${extra[@]}" back "$(i18n back)")" || return
+        case "$selected" in
+            back|'') return ;;
+            game) resh_presets_menu "$rom"; continue ;;
+            forget)
+                yesno_default_no "$(i18n resh_title)" "$(community_txt 'Supprimer les presets conservés et leur association orpheline ? Les presets et métadonnées seront sauvegardés avant suppression.' 'Delete the retained presets and their orphan association? Presets and metadata will be backed up before deletion.')" || continue
+                if output="$(resh_cmd presets-global-forget "$collection" 2>&1)"; then
+                    msgbox "$(i18n resh_title)" "$(community_txt 'Collection supprimée. Sauvegarde :' 'Collection removed. Backup:') $output"; return
+                else msgbox "$(i18n resh_title)" "$output"; fi
+                continue ;;
+        esac
+        identity="$selected"
+        while true; do
+            if ! output="$(resh_cmd presets-global-info "$collection" "$identity" "$WT_LANGUAGE" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; break; fi
+            extra=()
+            [ "$usable" != 1 ] || extra+=(select "$(community_txt 'Activer pour ce jeu' 'Activate for this game')")
+            action="$(menu_select "$(community_txt 'Détails du preset' 'Preset details')" "$output" "${extra[@]}" \
+                full "$(community_txt 'Afficher tous les paramètres INI' 'Show all INI settings')" \
+                rename "$(community_txt 'Renommer' 'Rename')" copy "$(community_txt 'Dupliquer' 'Duplicate')" \
+                export "$(community_txt 'Exporter ce preset' 'Export this preset')" \
+                delete "$(community_txt 'Supprimer ce preset' 'Delete this preset')" back "$(i18n back)")" || break
+            case "$action" in
+                select)
+                    if ! output="$(resh_cmd presets-select "$rom" "$identity" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; fi
+                    break ;;
+                full)
+                    if output="$(resh_cmd presets-global-info "$collection" "$identity" "$WT_LANGUAGE" full 2>&1)"; then community_report "$(i18n resh_title)" "$output";
+                    else msgbox "$(i18n resh_title)" "$output"; fi ;;
+                rename|copy)
+                    name="$(input_text "$(i18n resh_title)" "$(community_txt 'Nom du preset' 'Preset name')" '')" || continue
+                    if ! output="$(resh_cmd "presets-global-$action" "$collection" "$identity" "$name" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; fi ;;
+                export)
+                    destination="$(resh_preset_file export "${rom:-preset.ini}")" || continue
+                    if output="$(resh_cmd presets-global-export "$collection" "$identity" "$destination" overwrite 2>&1)"; then msgbox "$(i18n resh_title)" "$(i18n resh_export_done "$destination")";
+                    else msgbox "$(i18n resh_title)" "$output"; fi ;;
+                delete)
+                    yesno_default_no "$(i18n resh_title)" "$(community_txt 'Supprimer ce preset ? Pour un jeu encore installé, le preset actif doit être conservé.' 'Delete this preset? For an installed game, the active preset must be retained.')" || continue
+                    if ! output="$(resh_cmd presets-global-delete "$collection" "$identity" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; fi
+                    break ;;
+                *) break ;;
+            esac
+        done
+    done
+}
+
+resh_preset_catalog_menu() {
+    local listing identity label choice query="" filter=all
+    local -a items=()
+    while true; do
+        if ! listing="$(resh_cmd presets-catalog 2>&1)"; then msgbox "$(i18n resh_title)" "$listing"; return; fi
+        if [ "$listing" = '[]' ]; then msgbox "$(i18n resh_title)" "$(community_txt 'Aucun preset conservé.' 'No saved presets.')"; return; fi
+        items=()
+        while IFS=$'\t' read -r identity label; do
+            [ -n "$identity" ] || continue
+            items+=("$identity" "$label")
+        done < <(python3 -c 'import json,sys; rows=json.loads(sys.argv[1]); fr=sys.argv[2]=="fr"; query=sys.argv[3].casefold(); mode=sys.argv[4]; labels={"present":("jeu présent","game present"),"missing":("jeu absent/déplacé","game missing/moved"),"uninstalled":("ReShade désinstallé","ReShade uninstalled"),"unknown":("association inconnue","unknown association")}; print("\n".join(v["id"]+"\t"+v["name"]+" — "+str(v["count"])+" preset(s) — "+labels[v["status"]][0 if fr else 1] for v in rows if query in (v["name"]+v["rom"]).casefold() and (mode=="all" or v["orphan"])))' "$listing" "$WT_LANGUAGE" "$query" "$filter")
+        choice="$(menu_select "$(community_txt 'Gestionnaire de presets installés' 'Installed preset manager')" \
+            "$(community_txt 'Collections conservées, y compris pour les jeux supprimés ou déplacés.' 'Retained collections, including deleted or moved games.')" "${items[@]}" \
+            search "$(community_txt 'Rechercher un jeu' 'Find a game')" filter "$(community_txt 'Basculer entre toutes les collections et les associations orphelines' 'Toggle all collections / orphan associations')" back "$(i18n back)")" || return
+        case "$choice" in
+            back|'') return ;;
+            search) query="$(input_text "$(i18n resh_title)" "$(i18n resh_search_prompt)" "$query")" || query="" ;;
+            filter) if [ "$filter" = all ]; then filter=orphan; else filter=all; fi ;;
+            *) resh_preset_catalog_collection "$choice" ;;
+        esac
+    done
+}
+
 resh_game_menu() {
     local rom="$1" state choice preset profile details version arch dll exe packs prompt
     while true; do
@@ -679,10 +766,12 @@ resh_menu() {
     while true; do
         choice="$(menu_select "$(i18n resh_title)" "$(i18n resh_list_prompt)" \
             all "$(i18n resh_list_all)" installed "$(i18n resh_list_installed)" \
+            presets "$(community_txt 'Gérer les presets installés' 'Manage installed presets')" \
             community "$(i18n resh_community)" \
             scan "$(i18n resh_external_scan)" search "$(i18n resh_list_search)" back "$(i18n back)")" || return
         case "$choice" in
             community) community_menu reshade ;;
+            presets) resh_preset_catalog_menu ;;
             installed|all) resh_pick_game "$choice" ;;
             scan)
                 msgbox "$(i18n resh_title)" "$(i18n resh_external_scan_wait)" || continue

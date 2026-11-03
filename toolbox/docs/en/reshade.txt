@@ -74,3 +74,9 @@ time. Existing custom shortcut assignments are retained.
 The collection enables Auto Save to retain changes made in the overlay.
 If settings appear lost, avoid reimporting; use helpers/reshade_preset_recovery.py
 to preserve remaining files before retrying.
+
+Manage installed presets (main ReShade menu): find saved presets even after
+a game is deleted/moved or ReShade uninstalled. Inspect, rename, duplicate,
+export and delete presets. For present games, activate a preset and open full
+management. Orphan associations and their collections can be removed after
+their presets/metadata have been backed up.

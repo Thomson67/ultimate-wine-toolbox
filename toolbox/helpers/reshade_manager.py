@@ -757,7 +757,9 @@ def main():
     parser.add_argument('--legacy', action='store_true')
     parser.add_argument('command', choices=['backend-packs', 'exes', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'external-scan', 'external-info', 'external-enable', 'external-disable', 'external-release', 'wiki-title', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
                                            'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore', 'pack-info', 'pack-import', 'pack-remove', 'pack-status', 'pack-check',
-                                           'presets-list', 'presets-info', 'presets-select', 'presets-rename', 'presets-delete', 'presets-pack'])
+                                           'presets-list', 'presets-info', 'presets-select', 'presets-rename', 'presets-delete', 'presets-pack',
+                                           'presets-catalog', 'presets-global-items', 'presets-global-info', 'presets-global-rename',
+                                           'presets-global-copy', 'presets-global-export', 'presets-global-delete', 'presets-global-forget'])
     parser.add_argument('rom', nargs='?', type=Path)
     parser.add_argument('args', nargs='*')
     args = parser.parse_args()
@@ -781,7 +783,26 @@ def main():
             print(json.dumps(finish(home, rom)))
         elif args.command.startswith('presets-'):
             import reshade_presets as presets
-            if args.command == 'presets-list':
+            if args.command == 'presets-catalog' or args.command.startswith('presets-global-'):
+                import reshade_preset_catalog as catalog
+                identity = str(args.rom) if args.rom else ''
+                if args.command == 'presets-catalog':
+                    print(json.dumps(catalog.collections(home), ensure_ascii=False))
+                elif args.command == 'presets-global-items':
+                    print(json.dumps(catalog.items(home, identity), ensure_ascii=False))
+                elif args.command == 'presets-global-info':
+                    print(catalog.details(home, identity, args.args[0], args.args[1:2] != ['en'], args.args[-1:] == ['full']))
+                elif args.command == 'presets-global-rename':
+                    catalog.rename(home, identity, args.args[0], args.args[1])
+                elif args.command == 'presets-global-copy':
+                    print(catalog.duplicate(home, identity, args.args[0], args.args[1]))
+                elif args.command == 'presets-global-export':
+                    catalog.export(home, identity, args.args[0], args.args[1], args.args[2:] == ['overwrite'])
+                elif args.command == 'presets-global-delete':
+                    print(catalog.remove(home, identity, args.args[0]))
+                else:
+                    print(catalog.forget(home, identity))
+            elif args.command == 'presets-list':
                 print(json.dumps(presets.listing(home, rom), ensure_ascii=False))
             elif args.command == 'presets-info':
                 print(presets.details(home, rom, args.args[0], args.args[1:2] != ['en'], args.args[-1:] == ['full']))

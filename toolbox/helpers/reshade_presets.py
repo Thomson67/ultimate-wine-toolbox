@@ -22,6 +22,7 @@ def index(home, rom):
 
 
 def save(home, rom, value):
+    value['rom'] = str(Path(rom).absolute())
     m.save_json(folder(home, rom) / 'presets/index.json', value)
 
 

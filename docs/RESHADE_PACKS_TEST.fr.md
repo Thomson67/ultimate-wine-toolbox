@@ -163,3 +163,32 @@ aucun fichier du jeu ou de la collection. Le rapport mentionne AutoSavePreset,
 PresetPath et la provenance des copies pour permettre une récupération examinée.
 Les modifications jamais écrites par ReShade ne peuvent pas être reconstituées
 par une sauvegarde de fichiers.
+
+## Gestionnaire global des presets
+
+Le menu principal **ReShade → Gérer les presets installés** liste les collections
+conservées, y compris lorsque le jeu est absent, déplacé ou que ReShade a été
+désinstallé. La recherche et le filtre des associations orphelines permettent
+de retrouver les anciens jeux. Les nouveaux index conservent leur chemin de
+jeu ; pour les anciens, le gestionnaire recherche l'association dans la
+configuration, les journaux et l'espace de préparation. Une collection sans
+chemin retrouvé reste consultable sous son identifiant.
+
+Après sélection d'une collection et d'un preset, on peut afficher les détails
+et tous les paramètres INI, renommer, dupliquer, exporter ou supprimer ce preset.
+L'export porte sur le preset sélectionné, même s'il est inactif. Pour un jeu
+présent et géré, l'activation et la gestion complète du jeu (imports INI/ZIP)
+restent accessibles depuis ce gestionnaire. Le preset actif d'un jeu présent
+reste protégé contre la suppression.
+
+Pour une association orpheline, le dernier preset actif peut être supprimé,
+et **Supprimer toute la collection et son association** retire aussi les
+réglages conservés et l'ancienne configuration du jeu. Les presets/métadonnées
+sont d'abord archivés dans `reshade/deleted-presets/` sous le dossier de la
+Toolbox ; les fichiers gérés restant dans un préfixe sont restaurés avant
+nettoyage. Un préfixe encore actif bloque cette opération. Les caches communs
+ReShade, les shaders partagés et les autres jeux sont conservés.
+
+Les modifications de nom et les duplications d'un preset lié à un pack gardent
+son contexte de shaders ; l'activation exige toujours ce même contexte. Le
+gestionnaire n'essaie pas de deviner le nouvel emplacement d'un jeu déplacé.
