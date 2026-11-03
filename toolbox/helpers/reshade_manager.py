@@ -759,7 +759,8 @@ def main():
                                            'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore', 'pack-info', 'pack-import', 'pack-remove', 'pack-status', 'pack-check',
                                            'presets-list', 'presets-info', 'presets-select', 'presets-rename', 'presets-delete', 'presets-pack',
                                            'presets-catalog', 'presets-global-items', 'presets-global-info', 'presets-global-rename',
-                                           'presets-global-copy', 'presets-global-export', 'presets-global-delete', 'presets-global-forget'])
+                                           'presets-global-copy', 'presets-global-export', 'presets-global-delete', 'presets-global-forget',
+                                           'presets-clear', 'presets-global-clear'])
     parser.add_argument('rom', nargs='?', type=Path)
     parser.add_argument('args', nargs='*')
     args = parser.parse_args()
@@ -800,8 +801,13 @@ def main():
                     catalog.export(home, identity, args.args[0], args.args[1], args.args[2:] == ['overwrite'])
                 elif args.command == 'presets-global-delete':
                     print(catalog.remove(home, identity, args.args[0]))
+                elif args.command == 'presets-global-clear':
+                    print(catalog.clear_all(home, identity, args.runner, args.bottles, args.legacy))
                 else:
                     print(catalog.forget(home, identity))
+            elif args.command == 'presets-clear':
+                import reshade_preset_catalog as catalog
+                print(catalog.clear_all(home, key(rom), args.runner, args.bottles, args.legacy))
             elif args.command == 'presets-list':
                 print(json.dumps(presets.listing(home, rom), ensure_ascii=False))
             elif args.command == 'presets-info':

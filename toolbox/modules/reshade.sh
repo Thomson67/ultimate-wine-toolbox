@@ -509,6 +509,18 @@ resh_pack_setup_info() {
     msgbox "$(i18n resh_title)" "$(community_txt 'Pack installé. Pour Citra : ouvrez ReShade avec Home, vérifiez citra.addon et choisissez le tampon de profondeur. Réglez la disposition des écrans dans Citra.fx, placé en tête des effets. Le mode performance reste désactivé pour ces réglages. La compatibilité en jeu, notamment Vulkan, reste à vérifier.' 'Bundle installed. For Citra: open ReShade with Home, check citra.addon and select the depth buffer. Set the screen layout in Citra.fx, first in the effect order. Performance mode stays off for setup. In-game compatibility, including Vulkan, still needs testing.')"
 }
 
+resh_clear_all_presets() {
+    local target="$1" mode="${2:-global}" output command=presets-global-clear
+    [ "$mode" != game ] || command=presets-clear
+    yesno_default_no "$(i18n resh_title)" "$(community_txt 'Supprimer tous les presets conservés pour ce jeu, y compris le preset actif ? Une sauvegarde sera créée. Un jeu géré repartira avec un preset vide ; ReShade, les shaders et les add-ons resteront installés. Fermez le jeu avant de continuer.' 'Delete all saved presets for this game, including the active preset? A backup will be created. A managed game will restart with an empty preset; ReShade, shaders and add-ons stay installed. Close the game before continuing.')" || return 1
+    if output="$(resh_cmd "$command" "$target" 2>&1)"; then
+        msgbox "$(i18n resh_title)" "$(community_txt 'Presets supprimés. Sauvegarde :' 'Presets removed. Backup:') $output"
+    else
+        msgbox "$(i18n resh_title)" "$output"
+        return 1
+    fi
+}
+
 resh_presets_menu() {
     local rom="$1" listing identity label choice action output name source
     local -a items=()
@@ -524,9 +536,11 @@ resh_presets_menu() {
         choice="$(menu_select "$(community_txt 'Presets du jeu' 'Game presets') — ${rom##*/}" \
             "$(community_txt 'Sélectionnez un preset pour afficher ses détails. Fermez le jeu avant de changer de preset.' 'Select a preset to see its details. Close the game before changing presets.')" \
             "${items[@]}" import "$(community_txt 'Importer et activer un preset INI' 'Import and activate an INI preset')" \
-            pack-presets "$(community_txt 'Ajouter les presets du pack installé depuis son ZIP' 'Add presets from the installed bundle ZIP')" back "$(i18n back)")" || return
+            pack-presets "$(community_txt 'Ajouter les presets du pack installé depuis son ZIP' 'Add presets from the installed bundle ZIP')" \
+            clear-all "$(community_txt 'Supprimer tous les presets pour ce jeu' 'Delete all presets for this game')" back "$(i18n back)")" || return
         case "$choice" in
             back|'') return ;;
+            clear-all) resh_clear_all_presets "$rom" game; continue ;;
             import)
                 source="$(resh_preset_file import "$rom")" || continue
                 if ! output="$(resh_cmd preset "$rom" "$source" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; fi
@@ -573,7 +587,7 @@ resh_preset_catalog_collection() {
         rom="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["rom"])' "$listing")"
         orphan="$(python3 -c 'import json,sys; print(int(json.loads(sys.argv[1])["orphan"]))' "$listing")"
         usable=0; [ "$orphan" != 0 ] || usable=1
-        items=(); extra=()
+        items=(); extra=(clear-all "$(community_txt 'Supprimer tous les presets pour ce jeu' 'Delete all presets for this game')")
         while IFS=$'\t' read -r identity label; do
             [ -n "$identity" ] || continue
             items+=("$identity" "$label")
@@ -587,6 +601,7 @@ resh_preset_catalog_collection() {
         selected="$(menu_select "$(community_txt 'Gestionnaire de presets' 'Preset manager')" "$prompt" "${items[@]}" "${extra[@]}" back "$(i18n back)")" || return
         case "$selected" in
             back|'') return ;;
+            clear-all) resh_clear_all_presets "$collection"; continue ;;
             game) resh_presets_menu "$rom"; continue ;;
             forget)
                 yesno_default_no "$(i18n resh_title)" "$(community_txt 'Supprimer les presets conservés et leur association orpheline ? Les presets et métadonnées seront sauvegardés avant suppression.' 'Delete the retained presets and their orphan association? Presets and metadata will be backed up before deletion.')" || continue

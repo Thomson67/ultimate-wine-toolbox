@@ -192,3 +192,20 @@ ReShade, les shaders partagés et les autres jeux sont conservés.
 Les modifications de nom et les duplications d'un preset lié à un pack gardent
 son contexte de shaders ; l'activation exige toujours ce même contexte. Le
 gestionnaire n'essaie pas de deviner le nouvel emplacement d'un jeu déplacé.
+
+## Supprimer tous les presets d'un jeu
+
+L'action **Supprimer tous les presets pour ce jeu** est disponible dans la
+collection du gestionnaire global et dans **Presets du jeu et détails**.
+Elle accepte aussi un jeu présent : après confirmation, tous les presets de
+sa collection, y compris l'actif, sont sauvegardés puis retirés. Un jeu géré
+repart avec un unique **Preset vide**, sans effet activé, prêt pour un nouvel
+import. ReShade conserve son état activé/désactivé, sa version, ses shaders et
+ses add-ons. Un jeu absent n'est pas réactivé par cette opération.
+
+La sauvegarde ZIP est indiquée à la fin. Le préfixe doit être inactif. Les
+anciennes copies déployées sont retirées par le mécanisme de restauration avant
+la réinitialisation ; le retrait ultérieur d'un pack ne réintroduit pas les
+presets supprimés. Si la réinstallation du preset vide échoue, la collection
+précédente est restaurée. Cette action conserve l'association du jeu ; pour
+retirer aussi une association orpheline, utiliser l'action dédiée du gestionnaire.

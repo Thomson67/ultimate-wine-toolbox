@@ -80,3 +80,6 @@ même si le jeu a été supprimé/déplacé ou ReShade désinstallé. Consulter,
 dupliquer, exporter et supprimer un preset. Pour les jeux présents, activer un
 preset et ouvrir la gestion complète. Les associations orphelines peuvent être
 retirées avec toute leur collection, après sauvegarde des presets/métadonnées.
+Supprimer tous les presets pour ce jeu : sauvegarder puis retirer toute la
+collection, actif compris. Un jeu géré repart avec un Preset vide, en conservant
+ReShade, sa version, ses shaders/add-ons et son état activé/désactivé. Jeu fermé.

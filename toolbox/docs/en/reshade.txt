@@ -80,3 +80,6 @@ a game is deleted/moved or ReShade uninstalled. Inspect, rename, duplicate,
 export and delete presets. For present games, activate a preset and open full
 management. Orphan associations and their collections can be removed after
 their presets/metadata have been backed up.
+Delete all presets for this game: back up and remove the entire collection,
+including the active preset. A managed game restarts with an empty preset;
+ReShade, its version, shaders/add-ons and enabled state are retained. Close the game.

@@ -124,6 +124,93 @@ class GlobalPresetCatalogTests(unittest.TestCase):
         self.assertFalse(self.profile.exists())
 
 
+class ClearAllPresetTests(unittest.TestCase):
+    setUp = fixture.ReShadeTests.setUp
+    populate = GlobalPresetCatalogTests.populate
+    def test_clear_active_collection_preserves_runtime_and_backs_up_all_variants(self):
+        identity, before, active = self.populate()
+        m.event(self.home, self.rom, 'gameStart')
+        journal = m.read_json(m.journal_path(self.home, self.rom, self.rom, self.rom))
+        old_files = [Path(n) for n in journal['files'] if 'UWT-ReShadePresets' in n]
+        old_version = m.read_json(self.config)['release_id'] if 'release_id' in m.read_json(self.config) else m.read_json(self.config)['version']
+        dll = (self.game / 'dxgi.dll').read_bytes()
+        saved = catalog.clear_all(self.home, identity)
+        rows = p.listing(self.home, self.rom)
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0]['active'])
+        self.assertNotIn(rows[0]['id'], (before, active))
+        self.assertEqual((self.profile / 'ReShadePreset.ini').read_text(), 'Techniques=\n')
+        self.assertEqual((self.game / 'dxgi.dll').read_bytes(), dll)
+        self.assertTrue(m.read_json(self.config)['enabled'])
+        self.assertEqual(m.read_json(self.config).get('release_id', m.read_json(self.config)['version']), old_version)
+        self.assertTrue(all(not v.exists() for v in old_files))
+        with zipfile.ZipFile(saved) as z:
+            self.assertIn('presets/' + before + '.ini', z.namelist())
+            self.assertIn('presets/' + active + '.ini', z.namelist())
+            self.assertIn(b'Amount=7', z.read('presets/' + active + '.ini'))
+
+    def test_clear_disabled_collection_stays_disabled(self):
+        identity, _, _ = self.populate()
+        m.set_enabled(self.home, self.rom, False)
+        catalog.clear_all(self.home, identity)
+        self.assertFalse(m.read_json(self.config)['enabled'])
+        self.assertFalse((self.game / 'dxgi.dll').exists())
+        self.assertEqual(len(p.listing(self.home, self.rom)), 1)
+
+    def test_clear_does_not_restore_deleted_presets_when_pack_is_later_removed(self):
+        import test_reshade_pack as fixture_pack
+        import reshade_pack as pack
+        self.cfg.update(version='6.3.3', release_id='6.3.3-addons')
+        m.save_json(self.config, self.cfg)
+        identity, _, _ = self.populate()
+        archive = fixture_pack.LocalReShadePackTests.bundle(self)
+        pack.install(self.home, self.rom, archive, 'Ultra.ini')
+        old = set(p.index(self.home, self.rom)['items'])
+        addon = (self.game / 'citra.addon').read_bytes()
+        catalog.clear_all(self.home, identity)
+        self.assertEqual((self.game / 'citra.addon').read_bytes(), addon)
+        self.assertTrue(m.read_json(self.config)['pack'])
+        self.assertEqual((self.profile / 'pack/before/ReShadePreset.ini').read_text(), 'Techniques=\n')
+        pack.remove(self.home, self.rom)
+        self.assertFalse(old.intersection(p.index(self.home, self.rom)['items']))
+        self.assertEqual((self.profile / 'ReShadePreset.ini').read_text(), 'Techniques=\n')
+
+    def test_clear_unknown_orphan_and_keep_association(self):
+        identity, _, _ = self.populate()
+        self.config.unlink()
+        shutil.rmtree(self.rom)
+        saved = catalog.clear_all(self.home, identity)
+        self.assertTrue(Path(saved).exists())
+        self.assertEqual(catalog.items(self.home, identity)['items'], [])
+        self.assertEqual(catalog.collections(self.home)[0]['rom'], str(self.rom))
+
+    def test_failed_reenable_restores_old_collection(self):
+        identity, _, active = self.populate()
+        m.event(self.home, self.rom, 'gameStart')
+        before = p.index(self.home, self.rom)
+        original = m.event
+        calls = 0
+        def fail_once(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise OSError('failed to deploy blank preset')
+            return original(*args, **kwargs)
+        with patch.object(m, 'event', side_effect=fail_once), self.assertRaisesRegex(OSError, 'blank preset'):
+            catalog.clear_all(self.home, identity)
+        self.assertEqual(p.index(self.home, self.rom)['active'], active)
+        self.assertEqual(set(p.index(self.home, self.rom)['items']), set(before['items']))
+        self.assertTrue(m.read_json(self.config)['enabled'])
+        self.assertIn('Amount=7', (self.game / 'ReShadePreset.ini').read_text())
+
+    def test_clear_is_blocked_while_game_is_running(self):
+        identity, _, active = self.populate()
+        m.event(self.home, self.rom, 'gameStart')
+        with patch.object(m, 'ensure_idle', side_effect=ValueError('game active')), self.assertRaisesRegex(ValueError, 'active'):
+            catalog.clear_all(self.home, identity)
+        self.assertEqual(p.index(self.home, self.rom)['active'], active)
+
+
 class GlobalPresetCatalogUiTests(unittest.TestCase):
     def test_main_reshade_menu_exposes_global_manager(self):
         import os
@@ -184,3 +271,29 @@ resh_preset_catalog_collection aaaaaaaaaaaaaaaaaaaaaaaa
                 self.assertIn('presets-global-' + operation, calls)
             self.assertIn('My renamed preset', calls)
             self.assertIn('/userdata/Export with spaces.ini', calls)
+
+    def test_clear_all_confirmation_and_both_entry_points(self):
+        import os
+        import subprocess
+        import tempfile
+        root = Path(__file__).resolve().parents[1]
+        for mode in ('game', 'global'):
+            for confirm in ('0', '1'):
+                with self.subTest(mode=mode, confirm=confirm), tempfile.TemporaryDirectory() as tmp:
+                    result_file = Path(tmp) / 'calls'
+                    result = subprocess.run(['bash', '-c', r'''
+source "$WT_ROOT/modules/reshade.sh"
+i18n() { echo "$1"; }
+community_txt() { echo "$1"; }
+yesno_default_no() { return "$CONFIRM"; }
+msgbox() { return 0; }
+resh_cmd() { printf '%s\n' "$@" > "$CALLS"; echo /backup/presets.zip; }
+resh_clear_all_presets '/games/My game.wine' "$MODE"
+'''], env=dict(os.environ, WT_ROOT=str(root / 'toolbox'), CALLS=str(result_file), MODE=mode, CONFIRM=confirm), capture_output=True, text=True)
+                    if confirm == '0':
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertEqual(result_file.read_text().splitlines(),
+                                         ['presets-clear' if mode == 'game' else 'presets-global-clear', '/games/My game.wine'])
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertFalse(result_file.exists())

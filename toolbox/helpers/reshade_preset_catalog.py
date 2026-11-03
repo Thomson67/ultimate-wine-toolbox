@@ -203,3 +203,62 @@ def forget(home, identity):
     shutil.rmtree(root)
     (Path(home) / 'reshade/games' / (identity + '.json')).unlink(missing_ok=True)
     return str(saved)
+
+
+def clear_all(home, identity, runner='', bottles=Path('/userdata/system/wine-bottles/windows'), legacy=False):
+    """Reset this collection, retaining its runtime/shader/add-on configuration."""
+    home = Path(home)
+    root, info, _ = load(home, identity)
+    idle(home, identity)
+    cfgfile = home / 'reshade/games' / (identity + '.json')
+    cfg = m.read_json(cfgfile)
+    was_enabled = bool(cfg.get('enabled'))
+    rom = Path(info['rom']) if info['rom'] else None
+    cache = root / 'presets'
+    if cache.is_symlink():
+        raise ValueError('preset collection must be a real directory')
+    saved = backup(home, identity, root)
+    if cfg:
+        m.set_enabled(home, rom, False)
+    elif list((home / 'reshade/installations' / identity).glob('*.json')):
+        raise ValueError('restore the unfinished ReShade installation before resetting this collection')
+    before = {name: (root / name).read_bytes() if (root / name).is_file() else None
+              for name in ('ReShade.ini', 'ReShadePreset.ini', 'pack/before/ReShadePreset.ini')}
+    retained = root / ('.presets-reset-' + uuid.uuid4().hex)
+    moved = False
+    try:
+        if cache.exists():
+            cache.rename(retained)
+            moved = True
+        m.atomic_bytes(root / 'ReShadePreset.ini', b'Techniques=\n')
+        if before['pack/before/ReShadePreset.ini'] is not None:
+            # Removing the pack later must not reintroduce a deleted preset.
+            m.atomic_bytes(root / 'pack/before/ReShadePreset.ini', b'Techniques=\n')
+        value = {'schema': 1, 'rom': info['rom'], 'active': '', 'items': {}}
+        m.save_json(cache / 'index.json', value)
+        if cfg:
+            identity_blank = p.add(home, rom, b'Techniques=\n', 'Preset vide', 'empty')
+            value = p.index(home, rom)
+            value['active'] = identity_blank
+            p.save(home, rom, value)
+            if was_enabled and info['present']:
+                m.set_enabled(home, rom, True)
+                m.event(home, rom, 'gameStart', runner, bottles, legacy)
+    except Exception:
+        if cfg:
+            m.set_enabled(home, rom, False)
+        shutil.rmtree(cache, ignore_errors=True)
+        if moved:
+            retained.rename(cache)
+        for name, data in before.items():
+            if data is None:
+                (root / name).unlink(missing_ok=True)
+            else:
+                m.atomic_bytes(root / name, data)
+        if cfg and was_enabled and info['present']:
+            m.set_enabled(home, rom, True)
+            m.event(home, rom, 'gameStart', runner, bottles, legacy)
+        raise
+    if moved:
+        shutil.rmtree(retained)
+    return str(saved)
