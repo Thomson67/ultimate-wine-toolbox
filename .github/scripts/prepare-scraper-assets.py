@@ -11,7 +11,11 @@ def prepare(asset_dir: Path) -> None:
         source = asset_dir / f"{stem}.png"
         target = asset_dir / f"{stem}.jpg"
         if not source.is_file():
-            raise FileNotFoundError(source)
+            # Source archives ship the same optimized JPEGs as release packages.
+            with Image.open(target) as image:
+                if image.format != "JPEG":
+                    raise ValueError(f"not a JPEG: {target}")
+            continue
         with Image.open(source) as image:
             image.convert("RGB").save(
                 target, "JPEG", quality=88, optimize=True, progressive=True

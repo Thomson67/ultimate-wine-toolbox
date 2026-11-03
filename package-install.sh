@@ -157,7 +157,7 @@ if [ -n "$OLD_DXVK_BUNDLE" ] && [ -d "$DEST/dxvk/bundles/$OLD_DXVK_BUNDLE" ]; th
     ln -s "$DEST/dxvk/bundles/$OLD_DXVK_BUNDLE" "$DXVK_PATH"
 fi
 
-if ! "$DEST/toolbox/helpers/install-scraper-assets.sh" "$DEST/toolbox/scraper-assets" \
+if ! SCRAPER_LOG_FILE="$LOG_DIR/scraper-install.log" "$DEST/toolbox/helpers/install-scraper-assets.sh" "$DEST/toolbox/scraper-assets" \
     "ultimate-wine-toolbox" "Ultimate Wine Toolbox.sh" "Ultimate Wine Toolbox" \
     "Boîte à outils pour gérer Wine, Proton et UMU sous Batocera : runners, réglages graphiques, préfixes et archives WSquashFS." \
     "Manage Wine, Proton and UMU on Batocera with tools for runners, graphics settings, prefixes and WSquashFS archives." \
@@ -167,7 +167,7 @@ if ! "$DEST/toolbox/helpers/install-scraper-assets.sh" "$DEST/toolbox/scraper-as
         "WARNING: Batocera scraper integration could not be completed."
 fi
 
-command -v batocera-es-swissknife >/dev/null 2>&1 && batocera-es-swissknife --update-gamelists >/dev/null 2>&1 || true
+# Metadata is synchronized by install-scraper-assets.sh; do not reload ES here.
 
 # These scoped experiments are now part of the stable package. Retire their
 # rollback markers after installation succeeds, keeping the recovery backups

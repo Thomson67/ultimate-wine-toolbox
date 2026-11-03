@@ -38,5 +38,16 @@ class PrepareScraperAssetsTests(unittest.TestCase):
                 self.assertEqual(logo.mode, "RGBA")
 
 
+    def test_preoptimized_source_archive_can_be_packaged_again(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            assets = Path(tmp)
+            for stem in ("screenshot", "box2d", "fanart"):
+                Image.new("RGB", (64, 48), "navy").save(assets / f"{stem}.jpg")
+            Image.new("RGBA", (1200, 600), (10, 20, 30, 100)).save(assets / "logo.png")
+            before = {p.name: p.read_bytes() for p in assets.glob("*.jpg")}
+            prepare_assets.prepare(assets)
+            self.assertEqual(before, {p.name: p.read_bytes() for p in assets.glob("*.jpg")})
+
+
 if __name__ == "__main__":
     unittest.main()

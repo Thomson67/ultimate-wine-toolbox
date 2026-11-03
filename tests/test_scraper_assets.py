@@ -45,7 +45,8 @@ class ScraperAssetsTests(unittest.TestCase):
                 '<thumbnail>./media/thumbnails/ultimate-wine-toolbox.png</thumbnail>'
                 '</game></gameList>', encoding="utf-8")
 
-            env = dict(os.environ, SCRAPER_PORTS_DIR=str(ports))
+            env = dict(os.environ, SCRAPER_PORTS_DIR=str(ports),
+                       SCRAPER_ES_URL="http://127.0.0.1:1", SCRAPER_ES_RUNNING="0")
             subprocess.run(["bash", str(HELPER), str(src), "ultimate-wine-toolbox",
                             "Ultimate Wine Toolbox.sh", "Ultimate Wine Toolbox", "desc fr",
                             "desc en", str(state), str(backups)], check=True, env=env,
