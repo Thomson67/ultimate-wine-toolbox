@@ -173,6 +173,51 @@ resh_api_select() {
     done
 }
 
+resh_version_select() {
+    local rom="$1" helper="$WT_ROOT/helpers/reshade_versions.py" listing version current choice index identity variant provider label
+    local -a versions options identities
+    while true; do
+        listing="$(python3 "$helper" --home "$WT_HOME" versions --rom "$rom" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
+        versions=(); options=()
+        while IFS=$'\t' read -r version current; do
+            [ -n "$version" ] || continue
+            versions+=("$version"); label="$version"
+            [ "$current" != 1 ] || label+=" — $(i18n resh_release_installed)"
+            options+=("${#versions[@]}" "$label")
+        done <<<"$listing"
+        [ "${#versions[@]}" -gt 0 ] || return 1
+        choice="$(menu_select "$(i18n resh_title)" "$(i18n resh_versions_prompt)" \
+            "${options[@]}" back "$(i18n back)")" || return 1
+        [ "$choice" != back ] || return 1
+        version=""
+        for index in "${!versions[@]}"; do
+            [ "$choice" != "$((index+1))" ] || { version="${versions[$index]}"; break; }
+        done
+        [ -n "$version" ] || return 1
+        listing="$(python3 "$helper" --home "$WT_HOME" variants "$version" --rom "$rom" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
+        identities=(); options=()
+        while IFS=$'\t' read -r identity variant provider current; do
+            [ -n "$identity" ] || continue
+            case "$variant" in
+                standard) label="$(i18n resh_variant_standard)" ;;
+                no-startup-banner) label="$(i18n resh_variant_no_banner) — $provider" ;;
+                *) return 1 ;;
+            esac
+            [ "$current" != 1 ] || label+=" — $(i18n resh_release_installed)"
+            identities+=("$identity"); options+=("${#identities[@]}" "$label")
+        done <<<"$listing"
+        if [ "${#identities[@]}" -eq 1 ]; then printf '%s' "${identities[0]}"; return; fi
+        [ "${#identities[@]}" -gt 0 ] || return 1
+        choice="$(menu_select "$(i18n resh_title) — $version" "$(i18n resh_variants_prompt)" \
+            "${options[@]}" back "$(i18n back)")" || return 1
+        [ "$choice" != back ] || continue
+        for index in "${!identities[@]}"; do
+            if [ "$choice" = "$((index+1))" ]; then printf '%s' "${identities[$index]}"; return; fi
+        done
+        return 1
+    done
+}
+
 resh_install_game() {
     local rom="$1" exe selected dll backend_dll version packs backend_packs state workspace name label model defaults current
     local resume_exe="${2:-}" community_preset="${3:-}" resumed=0 index apply_community=0
@@ -224,11 +269,19 @@ PY_PENDING
     case "$dll" in dxgi|d3d9|opengl32|vulkan) ;; *) return 1 ;; esac
     backend_dll="$dll"
     [ "$dll" != vulkan ] || backend_dll=dxgi
-    version="$(input_text "$(i18n resh_title)" "$(i18n resh_version_prompt)" latest)" || return 1
-    [[ "$version" =~ ^(latest|[0-9]+\.[0-9]+\.[0-9]+)$ ]] || {
+    local release_id variant backend_version selection_info version_label
+    release_id="$(resh_version_select "$rom")" || return 1
+    selection_info="$(python3 "$WT_ROOT/helpers/reshade_versions.py" info "$release_id" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
+    IFS=$'\t' read -r version variant backend_version <<<"$selection_info"
+    [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ "$backend_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
         msgbox "$(i18n resh_title)" "$(i18n resh_version_invalid)"
         return 1
     }
+    case "$variant" in
+        standard) version_label="$version — $(i18n resh_variant_standard)" ;;
+        no-startup-banner) version_label="$version — $(i18n resh_variant_no_banner)" ;;
+        *) return 1 ;;
+    esac
     resh_backend_ready || return 1
     if [ -n "$community_preset" ]; then
         model=community-preset; defaults=""
@@ -274,7 +327,7 @@ PY_PENDING
         packs="$defaults"
     fi
     backend_packs="$(resh_cmd backend-packs "$packs")" || return 1
-    yesno_default_no "$(i18n resh_title)" "$(i18n resh_install_confirm "$(basename "$rom")" "$exe" "$dll" "$version" "$packs")" || return 1
+    yesno_default_no "$(i18n resh_title)" "$(i18n resh_install_confirm "$(basename "$rom")" "$exe" "$dll" "$version_label" "$packs")" || return 1
     # Reconfiguration starts from restored originals; the saved preset survives.
     state="$(resh_cmd status "$rom")"
     if [ "$state" != missing ]; then
@@ -291,7 +344,7 @@ PY_PENDING
             return 1
         }
     fi
-    workspace="$(resh_cmd prepare "$rom" "$exe" "$dll" "$version" "$packs" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
+    workspace="$(resh_cmd prepare "$rom" "$exe" "$dll" "$version" "$packs" "$release_id" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
         msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"
         return 1
     }
@@ -307,9 +360,10 @@ PY_PENDING
         exec 9> "$WT_HOME/reshade/runtime.lock"
         flock 9
         MAIN_PATH="$WT_HOME/reshade/runtime" WINEPREFIX="" UI_BACKEND=cli \
-            RESHADE_VERSION="$version" RESHADE_ADDON_SUPPORT=0 NO_COLOR=1 PROGRESS_UI=0 \
-            PATH="$shim:$PATH" bash "$RESH_BACKEND" --cli --game-path="$workspace" \
-            --dll-override="$backend_dll" --shader-repos="$backend_packs" <<< i
+            RESHADE_VERSION="$backend_version" RESHADE_ADDON_SUPPORT=0 NO_COLOR=1 PROGRESS_UI=0 \
+            RESHADE_ALLOW_UNPINNED=0 RESHADE_SETUP_SHA256="" \
+            PATH="$shim:$PATH" bash "$RESH_BACKEND" --no-input --game-path="$workspace" \
+            --dll-override="$backend_dll" --shader-repos="$backend_packs"
     ) >> "$log" 2>&1 && resh_cmd finish "$rom" >> "$log" 2>&1 || {
         msgbox "$(i18n resh_title)" "$(i18n resh_failed "$log")"
         return 1
@@ -381,6 +435,9 @@ resh_game_menu() {
         if [ "$state" != missing ]; then
             details="$(resh_cmd details "$rom")" || return
             IFS=$'\t' read -r version arch dll exe packs <<< "$details"
+            case "$version" in
+                *-no-startup-banner) version="${version%-no-startup-banner} — $(i18n resh_variant_no_banner)" ;;
+            esac
             prompt+="\n\n$(i18n resh_details "$version" "$arch" "$dll" "$exe" "$packs")"
         fi
         local -a actions=(install "$(i18n resh_install)")

@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -51,7 +52,17 @@ class VulkanInstallerTests(unittest.TestCase):
                     else:
                         self.assertEqual(value, current.get(key), (path, key))
             elif path.endswith(('.py', '.sh')):
-                self.assertEqual(content, (ROOT / path).read_text(), path)
+                # The historical Vulkan-only installer must not acquire the
+                # later version catalogue and its additional dependencies.
+                historical = {
+                    'toolbox/helpers/reshade_compat.py': 'aefb0fa505e0af11d9b86c476946e5ba72d6a51a04e40402a71d9276f67cb813',
+                    'toolbox/helpers/reshade_manager.py': 'b69a190ddc9c8981c53d29107b7029de324e0934a1badb9b28fcddd297550ab3',
+                    'toolbox/modules/reshade.sh': 'd30489aad7367e05a3b5c83341ea71e8b298bfc08a4ff6d83ff691a3a49e73d8',
+                }
+                if path in historical:
+                    self.assertEqual(hashlib.sha256(content.encode()).hexdigest(), historical[path], path)
+                else:
+                    self.assertEqual(content, (ROOT / path).read_text(), path)
             else:
                 # The scoped 0.8.1 installer keeps its historical help text;
                 # stable releases can append hardware validation to the guides.

@@ -5,6 +5,10 @@ ReShade applies effects to the game image: colors, sharpening, CRT rendering or 
 INSTALL
 In Tools and compatibility → ReShade, select the game, then Install / change version and shaders. Choose the actual game executable, API, ReShade version and shader packs.
 
+Select a version from the list, then its variant when several are available. The “No startup banner” variant comes from fienestar’s OverlayDisabledReShade project and is available for 6.4.1. It retains the Home menu and effects. Some recent shaders may require a newer engine. Existing settings and presets are retained when changing versions.
+
+Engine downloads are checked with SHA-256 and each variant has its own cache. The catalogue ships with Toolbox updates; game engines are never upgraded automatically.
+
 Select the game’s API before DXVK/VKD3D translation: a DirectX 11 game using DXVK remains DirectX 11 for this selection. Launch diagnostics and PCGamingWiki lookups provide hints to confirm.
 
 VULKAN UNDER WINE (EXPERIMENTAL)

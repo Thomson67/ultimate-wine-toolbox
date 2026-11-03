@@ -1,10 +1,10 @@
 #!/bin/bash
-# ReShadeLinux v1.3.5 (GPL-2.0-or-later), unmodified and checksum-pinned.
+# ReShadeLinux v1.4.1 (GPL-2.0-or-later), unmodified and checksum-pinned.
 set -euo pipefail
 ROOT="${WT_HOME:-/userdata/system/ultimate-wine-toolbox}"
 BACKEND="$ROOT/reshade/backend"
-COMMIT=f20e2dee1f5f584cbe5246866554e14406c473e9
-HASH=a4fd90726f540ff21a4fda8886c9abd3f0a87ba75f2c373352112aac92b333ef
+COMMIT=1a58739f7868d385b2b99870efbf7ba48d916859
+HASH=4c47eadb3e95e0f0379e23a7b5c41fd26d16fba2d6f1b9dda833915f18d5def6
 mkdir -p "$ROOT/reshade"
 exec 9> "$ROOT/reshade/backend.lock"
 flock 9

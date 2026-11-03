@@ -170,12 +170,18 @@ def valid_rom(rom):
         raise ValueError('game path is missing or unsupported')
 
 
-def prepare(home, rom, exe, dll, version, repos):
+def prepare(home, rom, exe, dll, version, repos, release_id=''):
     valid_rom(rom)
     if dll not in HOOKS or not re.fullmatch(r'latest|[0-9]+\.[0-9]+\.[0-9]+', version):
         raise ValueError('invalid ReShade hook/version')
     if not re.fullmatch(r'[a-z0-9_-]+(?:,[a-z0-9_-]+)*|none', repos):
         raise ValueError('invalid shader selection')
+    release = None
+    if release_id:
+        from reshade_versions import selection
+        release = selection(release_id)
+        if release['version'] != version:
+            raise ValueError('ReShade release does not match selected version')
     exe = relative(exe)
     if exe not in executable_list(rom):
         raise ValueError('select an actual game executable')
@@ -195,7 +201,9 @@ def prepare(home, rom, exe, dll, version, repos):
                              f'selected_repos={previous[1] if previous else ""}\napp_id=\n').encode())
     save_json(workspace / 'pending.json', {'rom': str(rom), 'exe': exe, 'dll': dll, 'arch': arch,
                                           'version': version, 'repos': repos, 'state_key': state_key,
-                                          'backend_dll': backend_dll})
+                                          'backend_dll': backend_dll,
+                                          **({'release_id': release_id, 'variant': release['variant'],
+                                              'provider': release['provider']} if release else {})})
     return workspace
 
 
@@ -220,6 +228,15 @@ def finish(home, rom):
     requested = set(backend_selection.split(',')) if backend_selection != 'none' else set()
     if not installed or set(filter(None, installed[1].split(','))) != requested:
         raise ValueError('not all requested shader packs were installed; check the log')
+    if pending.get('release_id'):
+        from reshade_versions import payload, selection
+        selected = selection(pending['release_id'])
+        if selected['version'] != pending['version'] or selected['variant'] != pending.get('variant'):
+            raise ValueError('ReShade release selection changed during installation')
+        # The upstream backend prepares compilers and shader packs. For older
+        # unpinned builds its runtime is only a bootstrap; the final game DLL
+        # always comes from the exact checksum-pinned catalogue selection.
+        dll = payload(home, pending['release_id'], pending['arch'])
     if PACK in pending['repos'].split(','):
         install_extra_shaders(home, shaders)
     config = home / 'reshade/games' / (key(rom) + '.json')

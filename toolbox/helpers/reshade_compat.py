@@ -141,7 +141,20 @@ def git_call(args):
         snapshot(args[0], branch, args[1])
         return
     record = json.loads((directory / '.git/uwt-archive.json').read_text())
-    if operation == 'rev-parse' and args == ['@{upstream}']:
+    if operation == 'rev-parse' and args == ['HEAD']:
+        print(record['branch'] if re.fullmatch(r'[a-f0-9]{40}', record['branch']) else 'uwt-snapshot')
+    elif operation == 'for-each-ref' and len(args) == 3 and args[0] == '--contains' and args[2] == 'refs/remotes':
+        if tree_hashes(directory) == record['files']:
+            print('uwt-snapshot')
+    elif operation == 'cat-file' and len(args) == 2 and args[0] == '-e':
+        if args[1] != record['branch'] + '^{commit}':
+            raise ValueError('commit not in snapshot cache')
+    elif operation == 'fetch' and len(args) == 4 and args[:3] == ['--depth', '1', 'origin'] and re.fullmatch(r'[a-f0-9]{40}', args[3]):
+        # checkout below downloads this exact commit; fetch must not move HEAD.
+        pass
+    elif operation == 'checkout' and len(args) == 3 and args[:2] == ['--quiet', '--detach'] and re.fullmatch(r'[a-f0-9]{40}', args[2]):
+        snapshot(record['url'], args[2], directory, update=True)
+    elif operation == 'rev-parse' and args == ['@{upstream}']:
         print('uwt-snapshot')
     elif operation == 'rev-list' and args == ['--count', 'uwt-snapshot..HEAD']:
         print(0)
