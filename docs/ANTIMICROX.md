@@ -386,6 +386,8 @@ If refresh fails, the live session is restored and its error is reported when
 returning to the Toolbox; no repeated refresh or ES restart is attempted.
 ES may still display its own prompt if a scraper or hashing job is running.
 
+The shared Toolbox return helper also reuses an unchanged, already indexed return launcher without reloading the collection. A missing or changed entry still triggers a refresh. It avoids duplicate requests while that launcher is starting and logs HTTP responses, request durations and ES state transitions.
+
 Automated checks cover asset selection, inherited Qt settings, extraction of an
 old download, editor failure reporting, associations, and start/stop locking
 with simulated device/process data. The official AppImage was downloaded and

@@ -45,3 +45,5 @@ Si le dossier source contient des liens aux emplacements de sauvegarde déjà co
 
 ANCIENS LIENS TEMPORAIRES
 Si la configuration existante contient des liens vers un ancien dossier de test .uwt-test-…, la préparation est refusée avant le déplacement des fichiers du jeu. Comparer les copies de sauvegarde et réparer les destinations permanentes avant de recommencer ; aucune progression n’est choisie automatiquement. Un contrôle avant compression bloque aussi les liens temporaires dans les opérations déjà en attente, même si le contrôle d’intégrité est ignoré. Les copies restent conservées pour récupération.
+
+Le lanceur de retour est réutilisé sans recharger la collection lorsqu’il est inchangé et déjà enregistré dans ES. Une actualisation reste nécessaire s’il est absent ou modifié. Une seconde demande n’est pas envoyée lorsque le lanceur démarre déjà. Les durées et les réponses HTTP figurent dans port-launch.log.

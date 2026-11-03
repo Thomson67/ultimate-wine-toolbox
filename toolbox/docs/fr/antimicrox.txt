@@ -59,3 +59,5 @@ DÉPANNAGE
 Texte complet affiche la ligne sans déclencher son action, puis revient à la même sélection.
 
 Journaux : /userdata/system/logs/ultimate-wine-toolbox/antimicrox.log pour les jeux, antimicrox-editor.log pour l’éditeur seul, antimicrox-handoff.log pour le lancement différé. Un AntiMicroX indépendant déjà ouvert bloque le lancement d’une autre instance gérée : le fermer avant de recommencer.
+
+Le lanceur de retour est réutilisé sans recharger la collection lorsqu’il est inchangé et déjà enregistré dans ES. Une actualisation reste nécessaire s’il est absent ou modifié. Une seconde demande n’est pas envoyée lorsque le lanceur démarre déjà. Les durées et les réponses HTTP figurent dans port-launch.log.

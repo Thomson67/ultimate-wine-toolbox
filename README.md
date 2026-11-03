@@ -6,7 +6,7 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.10.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.10.1).**
+**Stable version: [v0.10.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.10.2).**
 
 ## Features
 
@@ -33,6 +33,14 @@ Created by **Thomsonito**.
 - automatic backups before destructive `batocera.conf` operations
 - native Batocera Ports launcher and Pad2Key support
 - update checks at startup and from the toolbox menu
+
+## Fixed in v0.10.2
+
+- More reliable returns after game tests: reuse the existing ES return launcher without reloading the game collection when it is unchanged and already indexed.
+- Avoid duplicate return requests while the Toolbox launcher is starting.
+- More detailed return timings and HTTP status information in the launch log.
+
+[v0.10.2 release notes](release-notes/v0.10.2.md)
 
 ## Fixed in v0.10.1
 

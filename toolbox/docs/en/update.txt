@@ -45,3 +45,5 @@ If the source directory contains links at save locations already known by the ex
 
 STALE TEMPORARY LINKS
 If the existing configuration retains links to an old .uwt-test-… directory, preparation is refused before game files are moved. Compare the save copies and repair their permanent destinations before retrying; no progression is selected automatically. A precompression check also blocks temporary links in pending operations, even when archive integrity verification is skipped. Save copies remain available for recovery.
+
+The return launcher is reused without reloading the collection when it is unchanged and already indexed in ES. Missing or changed entries still require a refresh. No duplicate request is sent while the launcher is already starting. Timings and HTTP responses are recorded in port-launch.log.

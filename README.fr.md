@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.10.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.10.1).**
+**Version stable : [v0.10.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.10.2).**
 
 ## Fonctionnalités
 
@@ -33,6 +33,14 @@ Créée par **Thomsonito**.
 - sauvegarde automatique avant les opérations destructives sur `batocera.conf`
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
+
+## Correctifs de la v0.10.2
+
+- Retour après un test de jeu fiabilisé : réutilisation du lanceur ES existant sans recharger la collection s’il est inchangé et déjà enregistré.
+- Pas de seconde demande de retour lorsque le lanceur de la Toolbox est déjà en cours de démarrage.
+- Journal de retour enrichi avec les durées et les réponses HTTP.
+
+[Notes de version v0.10.2](release-notes/v0.10.2.md)
 
 ## Correctifs de la v0.10.1
 

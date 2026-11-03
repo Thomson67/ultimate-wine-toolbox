@@ -59,3 +59,5 @@ TROUBLESHOOTING
 Full text shows the entry without activating it, then returns to the same selection.
 
 Logs: /userdata/system/logs/ultimate-wine-toolbox/antimicrox.log for games, antimicrox-editor.log for the standalone editor, antimicrox-handoff.log for detached launches. An independent running AntiMicroX prevents another managed instance from starting: close it first.
+
+The return launcher is reused without reloading the collection when it is unchanged and already indexed in ES. Missing or changed entries still require a refresh. No duplicate request is sent while the launcher is already starting. Timings and HTTP responses are recorded in port-launch.log.
