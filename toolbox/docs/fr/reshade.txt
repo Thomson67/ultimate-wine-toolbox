@@ -67,3 +67,7 @@ actifs et tous les paramètres INI, renommer et activer une variante (jeu fermé
 Les imports conservent le preset précédent et les réglages modifiés en jeu.
 Les nouveaux packs ajoutent toutes leurs variantes ; pour un ancien import,
 utiliser Ajouter les presets du pack installé depuis son ZIP.
+
+En jeu : Page haut = preset précédent, Page bas = preset suivant. Les presets
+du même contexte de shaders sont disponibles, et le dernier choix est repris
+au prochain lancement. Les raccourcis personnalisés déjà affectés sont conservés.

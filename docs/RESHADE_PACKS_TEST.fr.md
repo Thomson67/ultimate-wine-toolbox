@@ -99,8 +99,14 @@ Les actions permettent de l'activer, de consulter tout l'INI dans une vue
 défilante, de le renommer ou de retirer une variante inactive de la collection.
 Les paramètres modifiés dans le jeu sont sauvegardés dans la variante active
 au retour et avant de changer de preset. Un seul preset est actif à la fois.
-Fermer le jeu avant une activation ou un import ; le choix se fait dans la
-Toolbox, pas dans une liste de presets déployés dans l'overlay ReShade.
+Fermer le jeu avant une activation ou un import depuis la Toolbox. En jeu,
+**Page haut** choisit le preset précédent et **Page bas** le suivant grâce aux
+commandes natives de ReShade. Seules les variantes du même contexte de shaders
+sont déployées dans leur dossier de sélection. Le dernier choix et les
+modifications sauvegardées dans les différentes variantes sont conservés au
+retour, puis repris au prochain lancement. Les raccourcis ReShade personnalisés
+déjà affectés restent prioritaires ; les touches Page haut/bas sont les valeurs
+par défaut lorsque ces commandes ne sont pas affectées.
 
 Les nouveaux imports de packs ajoutent toutes leurs variantes. Pour un pack
 installé avec le premier test, utiliser **Ajouter les presets du pack installé
@@ -117,3 +123,12 @@ sur le preset actif ; activer la variante souhaitée avant de l'exporter.
 
 Cette collection concerne les installations ReShade gérées par la Toolbox.
 Les injecteurs intégrés gardent leur parcours existant.
+
+Le défilement natif a été vérifié dans les sources ReShade 6.3.3 : les commandes
+`KeyPreviousPreset` et `KeyNextPreset` sélectionnent les presets dans le dossier
+du preset courant. La Toolbox déploie une copie modifiable de chaque variante
+compatible dans un dossier géré, et récupère uniquement ces fichiers connus.
+Les anciennes révisions de ce dossier restent hors du défilement et sont
+retirées avec les fichiers gérés lors de la désactivation/désinstallation.
+Les tests automatisés simulent le changement du PresetPath et les écritures
+faites par ReShade ; les touches physiques et le rendu restent à tester en jeu.

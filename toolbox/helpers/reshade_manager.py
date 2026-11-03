@@ -290,7 +290,7 @@ def rewrite_env(text, old_words, new_words):
     return '\n'.join(lines) + '\n'
 
 
-def profile_ini(base, cfg):
+def profile_ini(base, cfg, preset=None):
     # Preserve UI settings, but keep shader and preset paths under Toolbox control.
     lines = base.replace('\r\n', '\n').splitlines()
     lines = [l for l in lines if not re.match(r'^(EffectSearchPaths|TextureSearchPaths|PresetPath)=', l)]
@@ -301,7 +301,10 @@ def profile_ini(base, cfg):
     shader_root = 'Z:' + cfg['shaders'].replace('/', '\\')
     lines[index:index] = [f'EffectSearchPaths={shader_root}\\Merged\\Shaders\\**',
                            f'TextureSearchPaths={shader_root}\\Merged\\Textures\\**',
-                           'PresetPath=.\\ReShadePreset.ini']
+                           'PresetPath=' + ((preset or './ReShadePreset.ini').replace('/', '\\'))]
+    if preset:
+        lines = [line for line in lines if not re.match(r'^StartupPresetPath=', line)]
+        lines.insert(index+3, 'StartupPresetPath=')
     if cfg.get('pack'):
         # This bundle supplies its own modified shader/include versions. Do not
         # mix them with the global cache or compile duplicate effects.
@@ -313,6 +316,18 @@ def profile_ini(base, cfg):
             lines.extend(['[ADDON]', 'AddonPath=.'])
         else:
             lines.insert(addon, 'AddonPath=.')
+    input_index = next((i+1 for i, line in enumerate(lines) if line == '[INPUT]'), None)
+    if input_index is None:
+        lines.append('[INPUT]')
+        input_index = len(lines)
+    for name, code in [('KeyPreviousPreset', 33), ('KeyNextPreset', 34)]:
+        existing = next((i for i, line in enumerate(lines) if line.startswith(name + '=')), None)
+        if existing is not None:
+            if lines[existing].split('=', 1)[1].strip() not in ('', '0,0,0,0'):
+                continue
+            lines[existing] = f'{name}={code},0,0,0'
+        else:
+            lines.insert(input_index, f'{name}={code},0,0,0')
     return '\n'.join(lines) + '\n'
 
 
@@ -358,6 +373,18 @@ def directory_id(path):
 def profile_save(home, rom, root, cfg):
     profile = home / 'reshade/profiles' / key(rom)
     folder = PurePosixPath(cfg['exe']).parent
+    collection = (profile / 'presets/index.json').is_file()
+    if collection:
+        from reshade_presets import current_runtime
+        if not current_runtime(home, rom, root):
+            return
+    config_source = safe_leaf(root, (folder / 'ReShade.ini').as_posix())
+    if collection and cfg.get('preset_session'):
+        from reshade_presets import capture_session
+        if config_source.is_file() and not config_source.is_symlink():
+            atomic_bytes(profile / 'ReShade.ini', config_source.read_bytes())
+        if capture_session(home, rom, root, folder, cfg['preset_session']):
+            return
     for name in ('ReShade.ini', 'ReShadePreset.ini'):
         source = safe_leaf(root, (folder / name).as_posix())
         if source.is_file() and not source.is_symlink():
@@ -455,11 +482,19 @@ def install_files(home, rom, root, prefix, cfg):
                     (profile / 'ReShadePreset.ini').read_bytes(), True)
         targets = [(safe_leaf(base, rel), data, mutable) for base, rel, data, mutable in files]
     if journal:
-        profile_save(home, rom, root, {'exe': journal['exe']})
+        profile_save(home, rom, root, journal)
         ini = profile_ini((profile / 'ReShade.ini').read_text(), cfg).encode()
         files[2] = (root, (folder / 'ReShade.ini').as_posix(), ini, True)
         files[3] = (root, (folder / 'ReShadePreset.ini').as_posix(), (profile / 'ReShadePreset.ini').read_bytes(), True)
         targets = [(safe_leaf(base, rel), data, mutable) for base, rel, data, mutable in files]
+    # Native previous/next shortcuts cycle only the files in the active preset's
+    # directory. Stage a compatible collection apart from game/config INIs.
+    from reshade_presets import runtime_session, session_path, session_files
+    session = runtime_session(home, rom)
+    files[2] = (root, (folder / 'ReShade.ini').as_posix(),
+                profile_ini((profile / 'ReShade.ini').read_text(), cfg, session_path(session)).encode(), True)
+    files.extend(session_files(home, rom, root, folder, session))
+    targets = [(safe_leaf(base, rel), data, mutable) for base, rel, data, mutable in files]
     old_records = journal.get('files', {})
     for target, data, mutable in targets:
         rec = old_records.get(str(target))
@@ -468,6 +503,7 @@ def install_files(home, rom, root, prefix, cfg):
     if not journal:
         journal = {'rom': str(rom), 'root': str(root), 'prefix': str(prefix), 'exe': cfg['exe'], 'api': cfg['dll'],
                    'files': {}, 'env_words': [], 'root_id': directory_id(root), 'prefix_id': directory_id(prefix)}
+    journal['preset_session'] = session
     backups = jp.parent / (jp.stem + '-backups')
     backups.mkdir(parents=True, exist_ok=True)
     for target, data, mutable in targets:
@@ -513,6 +549,8 @@ def install_files(home, rom, root, prefix, cfg):
     atomic_bytes(autorun, text.encode('utf-8', 'surrogateescape'))
     journal['env_words'] = words
     save_json(jp, journal)
+    from reshade_presets import mark_runtime
+    mark_runtime(home, rom, root, session)
 
 
 def restore_install(home, path):
@@ -525,7 +563,7 @@ def restore_install(home, path):
     root_current = directory_id(root) == journal.get('root_id')
     prefix_current = directory_id(prefix) == journal.get('prefix_id')
     if root_current:
-        profile_save(home, Path(journal['rom']), root, {'exe': journal['exe']})
+        profile_save(home, Path(journal['rom']), root, journal)
     targets = []
     for value, rec in journal['files'].items():
         target = Path(value)
@@ -591,7 +629,7 @@ def event(home, rom, action, runner='', bottles=Path('/userdata/system/wine-bott
         for jp in (home / 'reshade/installations' / key(rom)).glob('*.json'):
             j = read_json(jp)
             if Path(j['root']).exists():
-                profile_save(home, rom, Path(j['root']), {'exe': j['exe']})
+                profile_save(home, rom, Path(j['root']), j)
         return
     if action != 'gameStart':
         return
@@ -684,7 +722,7 @@ def export_preset(home, rom, destination, overwrite=False):
     for jp in journals:
         j = read_json(jp)
         if directory_id(Path(j['root'])) == j.get('root_id'):
-            profile_save(home, rom, Path(j['root']), {'exe': j['exe']})
+            profile_save(home, rom, Path(j['root']), j)
     atomic_bytes(destination, source.read_bytes())
 
 

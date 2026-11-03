@@ -53,7 +53,8 @@ class LocalReShadePackTests(unittest.TestCase):
         shader = self.game / p.STAGE / 'reshade-shaders/Shaders/Glamayre_Fast_Effects.fx'
         self.assertEqual(shader.read_bytes(), b'custom shader')
         preset = (self.game / 'ReShadePreset.ini').read_text() + '\n[Citra.fx]\nScreen=3\n'
-        (self.game / 'ReShadePreset.ini').write_text(preset)
+        active_path = p.ini((self.game / 'ReShade.ini').read_bytes()).get('GENERAL', 'PresetPath')
+        (self.game / active_path.replace('\\', '/')).write_text(preset)
         m.event(self.home, self.rom, 'gameStop')
         m.set_enabled(self.home, self.rom, False)
         self.assertEqual((self.game / 'citra.addon').read_bytes(), b'previous personal add-on')

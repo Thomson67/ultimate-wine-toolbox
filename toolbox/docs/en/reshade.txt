@@ -67,3 +67,7 @@ all INI settings, rename and activate variants (close the game first).
 Imports retain the previous preset and edits saved in game. New bundles add
 all their variants; for an older import, use Add presets from the installed
 bundle ZIP.
+
+In game: Page Up = previous preset, Page Down = next preset. Presets sharing
+the current shader context are available; the last selection is restored next
+time. Existing custom shortcut assignments are retained.
