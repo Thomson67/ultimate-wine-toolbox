@@ -49,6 +49,10 @@ class VulkanInstallerTests(unittest.TestCase):
                     # prefix-preparation diagnostic after the scoped installer.
                     if key == 'wsq_prepare_failed':
                         self.assertIn(key, current)
+                    elif key == 'resh_backend_fetch':
+                        # The historical installer retains its pinned 1.3.5
+                        # backend; current installations now prepare 1.4.1.
+                        self.assertEqual(value.replace('1.3.5', '1.4.1'), current.get(key))
                     else:
                         self.assertEqual(value, current.get(key), (path, key))
             elif path.endswith(('.py', '.sh')):
