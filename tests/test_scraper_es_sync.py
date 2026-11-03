@@ -194,18 +194,17 @@ class ScraperSyncTests(unittest.TestCase):
             result = self.run_install(url, '1')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.imported_paths, [api_path])
-        self.assertIn('import XML=', (self.base / 'scraper.log').read_text())
+        self.assertNotIn('import XML=', (self.base / 'scraper.log').read_text())
 
-    def test_http_204_keeps_failure_and_captures_import_xml(self):
+    def test_http_204_keeps_failure_without_dumping_xml(self):
         self.force_no_content = True
         with self.api() as url:
             result = self.run_install(url, '1')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.xml.read_bytes(), self.before)
-        self.assertIn('ES import returned HTTP 204', result.stdout + result.stderr)
+        self.assertIn('HTTP 204', result.stdout + result.stderr)
         log = (self.base / 'scraper.log').read_text()
-        self.assertIn('import XML=', log)
-        self.assertIn(str(self.ports / ROM), log)
+        self.assertNotIn('<gameList>', log)
         self.assertNotIn('memory and gamelist verified', log)
 
     def test_204_fallback_updates_existing_native_ports_without_reload(self):
@@ -228,7 +227,7 @@ class ScraperSyncTests(unittest.TestCase):
         self.save_live()
         self.assertTrue(ET.parse(self.xml).getroot()[1].findtext('image'))
         self.assertEqual(len([p for p in self.posts if '/media/' in p]), 5)
-        self.assertIn('per-entry API memory and media verified', result.stdout)
+        self.assertIn('mode=api; memory and gamelist verified', result.stdout)
         self.assertFalse(any('uwt_return' in p or 'reload' in p for p in self.posts))
 
     def test_204_fallback_verifies_media_memory_before_writing_xml(self):
@@ -270,7 +269,6 @@ class ScraperSyncTests(unittest.TestCase):
             result = self.run_install(url, '1')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.posts, ['/addgames/ports'])
-        self.assertIn('launcher owner=ports', result.stdout)
         self.save_live()
         self.assertTrue(ET.parse(self.xml).getroot()[1].findtext('image'))
         self.assertEqual(ET.parse(self.xml).getroot()[0].findtext('playcount'), '33')

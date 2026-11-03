@@ -115,7 +115,6 @@ def synchronize(gamelist, proposed, rom_name, fields, backup):
                 matches.append((name, game))
             else:
                 foreign_owners.add(str(owner))
-    print('scraper-assets: native candidate systems=' + ','.join(str(s.get('name')) for s in candidates))
     if len(matches) > 1:
         raise SyncError('multiple owning ES systems found for this launcher; XML left untouched')
 
@@ -132,7 +131,6 @@ def synchronize(gamelist, proposed, rom_name, fields, backup):
     detail_url = None
     if matches:
         system_name, game = matches[0]
-        print(f'scraper-assets: launcher owner={system_name}; exact path matched')
         game_id = game.get('id')
         if not isinstance(game_id, str) or not game_id:
             raise SyncError('missing ES game identifier')
@@ -197,14 +195,12 @@ def synchronize(gamelist, proposed, rom_name, fields, backup):
         payload = ET.Element('gameList')
         payload.append(entry)
         xml_payload = ET.tostring(payload, encoding='utf-8', xml_declaration=True)
-        print(f'scraper-assets: import path={expected["path"]}', flush=True)
-        print('scraper-assets: import XML=' + xml_payload.decode('utf-8'), flush=True)
         try:
             request('/addgames/' + urllib.parse.quote(system_name, safe=''), xml_payload)
         except ImportRejected as exc:
             if exc.status != 204 or not live or not detail_url:
                 raise
-            print(f'scraper-assets: {exc}; trying existing-entry metadata/media APIs', flush=True)
+            print('scraper-assets: XML import unavailable (HTTP 204); using per-entry API', flush=True)
             from scraper_es_fallback import update_existing
             update_existing(request, detail_url, live, expected, entry, proposed,
                             gamelist, equal)

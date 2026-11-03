@@ -121,4 +121,3 @@ def update_existing(request, detail_url, live, expected, entry, proposed, gameli
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
-    print('scraper-assets: per-entry API memory and media verified; XML saved', flush=True)
