@@ -71,3 +71,6 @@ bundle ZIP.
 In game: Page Up = previous preset, Page Down = next preset. Presets sharing
 the current shader context are available; the last selection is restored next
 time. Existing custom shortcut assignments are retained.
+The collection enables Auto Save to retain changes made in the overlay.
+If settings appear lost, avoid reimporting; use helpers/reshade_preset_recovery.py
+to preserve remaining files before retrying.

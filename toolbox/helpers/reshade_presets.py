@@ -31,6 +31,20 @@ def path(home, rom, identity):
     return folder(home, rom) / 'presets' / (identity + '.ini')
 
 
+def replace_variant(home, rom, identity, data):
+    """Keep the preceding on-disk version before accepting a changed preset."""
+    destination = path(home, rom, identity)
+    if destination.is_file():
+        previous = destination.read_bytes()
+        if previous == data:
+            return
+        digest = hashlib.sha256(previous).hexdigest()
+        backup = folder(home, rom) / 'presets/history' / identity / (digest + '.ini')
+        if not backup.exists():
+            m.atomic_bytes(backup, previous)
+    m.atomic_bytes(destination, data)
+
+
 def context(home, rom):
     cfg = m.read_json(Path(home) / 'reshade/games' / (m.key(rom) + '.json'))
     if not cfg:
@@ -100,7 +114,7 @@ def capture(home, rom, adopt=False):
         return
     digest = hashlib.sha256(data).hexdigest()
     if item['sha256'] != digest:
-        m.atomic_bytes(path(home, rom, identity), data)
+        replace_variant(home, rom, identity, data)
         item.update(sha256=digest, updated=datetime.now(timezone.utc).isoformat(timespec='seconds'))
         save(home, rom, value)
 
@@ -161,6 +175,7 @@ def activate(home, rom, identity):
         for target, content in targets:
             m.atomic_bytes(target, content)
         value['active'] = identity
+        value['legacy_selection'] = identity
         save(home, rom, value)
     except Exception:
         for target, old in previous:
@@ -229,6 +244,7 @@ def details(home, rom, identity, fr=True, full=False):
     lines = [item['name'], text('Actif : ', 'Active: ') + text('oui' if active else 'non', 'yes' if active else 'no'),
              text('Origine : ', 'Origin: ') + {'current': text('preset existant', 'existing preset'),
                                               'local': text('fichier importé', 'imported file'),
+                                              'manual': text('sélection manuelle ReShade', 'manual ReShade selection'),
                                               'pack': text('pack local', 'local bundle')}.get(item['origin'], item['origin']),
              text('Nom à l’import : ', 'Original name: ') + item.get('source_name', item['name']),
              text('Contexte shaders : ', 'Shader context: ') + (text('pack local', 'local bundle') if item.get('pack') else text('packs du jeu', 'game shader packs')),
@@ -276,16 +292,22 @@ def session_path(session):
 def session_files(home, rom, root, executable_folder, session):
     if not session:
         return []
-    return [(root, (executable_folder / session['directory'] / name).as_posix(),
-             checked(path(home, rom, identity).read_bytes()), True)
-            for name, identity in sorted(session['files'].items())]
+    files = []
+    session['hashes'] = {}
+    for name, identity in sorted(session['files'].items()):
+        data = checked(path(home, rom, identity).read_bytes())
+        session['hashes'][identity] = hashlib.sha256(data).hexdigest()
+        files.append((root, (executable_folder / session['directory'] / name).as_posix(), data, True))
+    return files
 
 
 def mark_runtime(home, rom, root, session):
     if not session:
         return
     value = index(home, rom)
-    value['runtime'] = {'root': str(root), 'root_id': m.directory_id(root)}
+    value['runtime'] = {'root': str(root), 'root_id': m.directory_id(root),
+                        'directory': session['directory'], 'hashes': dict(session.get('hashes', {}))}
+    value.pop('legacy_selection', None)
     save(home, rom, value)
 
 
@@ -294,7 +316,7 @@ def current_runtime(home, rom, root):
     return (not marker or (marker['root'] == str(root) and marker['root_id'] == m.directory_id(root)))
 
 
-def capture_session(home, rom, root, executable_folder, session):
+def capture_session(home, rom, root, executable_folder, session, records=None):
     """Read only journal-owned files; never follow the INI's arbitrary paths."""
     if not session or session.get('pack', '') != context(home, rom):
         return False
@@ -304,9 +326,18 @@ def capture_session(home, rom, root, executable_folder, session):
     parser = ini(config.read_bytes())
     selected_path = parser.get('GENERAL', 'PresetPath', fallback='').strip().strip('"').replace('\\', '/').removeprefix('./')
     value = index(home, rom)
+    # A Toolbox selection intentionally moves back to the legacy working copy
+    # while idle. Do not replace it with unchanged snapshots from the last game.
+    if (selected_path.casefold() == 'reshadepreset.ini'
+            and value.get('legacy_selection') == value.get('active')):
+        return False
+    runtime = value.setdefault('runtime', {})
+    same_session = (runtime.get('root') == str(root) and runtime.get('root_id') == m.directory_id(root)
+                    and runtime.get('directory') == session['directory'])
+    hashes = runtime.get('hashes', {}) if same_session else {}
+    hashes = dict(hashes)
     selected = None
     selected_data = None
-    changed = False
     for name, identity in session['files'].items():
         if identity not in value['items'] or value['items'][identity].get('pack', '') != session.get('pack', ''):
             continue
@@ -316,22 +347,48 @@ def capture_session(home, rom, root, executable_folder, session):
             continue
         data = checked(target.read_bytes())
         digest = hashlib.sha256(data).hexdigest()
-        if value['items'][identity]['sha256'] != digest:
-            m.atomic_bytes(path(home, rom, identity), data)
+        # Only import a game-side change since the last deployment/capture.
+        # A cache can legitimately be newer after a manual preset selection.
+        baseline = hashes.get(identity, session.get('hashes', {}).get(identity))
+        if baseline is None and records:
+            baseline = records.get(str(target), {}).get('installed', {}).get('sha256')
+        if baseline is None:
+            baseline = value['items'][identity]['sha256']
+        if digest != baseline and value['items'][identity]['sha256'] != digest:
+            replace_variant(home, rom, identity, data)
             value['items'][identity].update(sha256=digest, updated=datetime.now(timezone.utc).isoformat(timespec='seconds'))
-            changed = True
+        hashes[identity] = digest
         # ReShade saves a relative path, but tolerate a Wine drive prefix too.
         if selected_path.casefold() == relative.casefold() or selected_path.casefold().endswith('/' + relative.casefold()):
-            selected, selected_data = identity, data
+            selected, selected_data = identity, path(home, rom, identity).read_bytes()
+    value['runtime'] = {'root': str(root), 'root_id': m.directory_id(root),
+                        'directory': session['directory'], 'hashes': hashes}
+    if selected is None and selected_path.casefold() == 'reshadepreset.ini':
+        # This mirror is a journal-owned file too. A manual browser selection
+        # must become a separate variant when it differs from edited variants.
+        mirror = m.safe_leaf(root, (executable_folder / 'ReShadePreset.ini').as_posix())
+        if mirror.is_file() and not mirror.is_symlink():
+            data = checked(mirror.read_bytes())
+            digest = hashlib.sha256(data).hexdigest()
+            selected = next((i for i, item in value['items'].items()
+                             if item['sha256'] == digest and item.get('pack', '') == session.get('pack', '')), None)
+            if selected is None:
+                save(home, rom, value)
+                selected = add(home, rom, data, 'ReShadePreset.ini', 'manual', session.get('pack', ''))
+                value = index(home, rom)
+            selected_data = data
     if selected:
         value['active'] = selected
         m.atomic_bytes(folder(home, rom) / 'ReShadePreset.ini', selected_data)
         # Maintain the legacy working copy for export and existing tooling.
         m.atomic_bytes(m.safe_leaf(root, (executable_folder / 'ReShadePreset.ini').as_posix()), selected_data)
-        changed = True
-    if changed:
-        save(home, rom, value)
-    return bool(selected)
+    elif value.get('active') in value['items']:
+        # The browser can select an INI outside our collection. Preserve known
+        # variants without falling back to the stale ReShadePreset.ini mirror.
+        active_data = path(home, rom, value['active']).read_bytes()
+        m.atomic_bytes(folder(home, rom) / 'ReShadePreset.ini', active_data)
+    save(home, rom, value)
+    return True
 
 
 def legacy_config(data):

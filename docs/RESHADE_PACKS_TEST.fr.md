@@ -132,3 +132,34 @@ Les anciennes révisions de ce dossier restent hors du défilement et sont
 retirées avec les fichiers gérés lors de la désactivation/désinstallation.
 Les tests automatisés simulent le changement du PresetPath et les écritures
 faites par ReShade ; les touches physiques et le rendu restent à tester en jeu.
+
+## Préservation des réglages lors d'une sélection manuelle
+
+La collection active désormais `[OVERLAY] AutoSavePreset=1` lors du lancement.
+ReShade 6.3.3 peut abandonner les modifications non sauvegardées lorsqu'un autre
+preset est choisi dans son navigateur. Les INI du pack Henriko fourni portent
+`AutoSavePreset=0` ; cette préférence ne doit pas désactiver la sauvegarde de
+la collection. L'utilisateur peut vérifier **Auto Save on** dans l'overlay.
+
+Un cas d'écrasement a été reproduit dans l'ancien adaptateur : après sélection
+manuelle de l'ancien miroir `ReShadePreset.ini`, une variante modifiée pouvait
+être remplacée par ce miroir encore ancien lors de la récupération des fichiers.
+La capture conserve maintenant les variantes séparément, distingue les fichiers
+modifiés des snapshots inchangés, et garde la version précédente dans
+`presets/history/<identifiant>/`. La sélection manuelle du miroir est enregistrée
+comme une variante distincte si son contenu diffère. Aucun fichier arbitraire
+extérieur à la collection n'est lu sur la seule base du PresetPath.
+
+En cas de perte signalée, exécuter d'abord :
+
+```bash
+python3 /userdata/system/ultimate-wine-toolbox/toolbox/helpers/reshade_preset_recovery.py
+```
+
+Ce script autonome copie les presets/configurations, l'index et les copies
+encore présentes dans les installations journalisées vers un dossier daté de
+`/userdata/system/backups/ultimate-wine-toolbox/reshade-presets/`. Il ne change
+aucun fichier du jeu ou de la collection. Le rapport mentionne AutoSavePreset,
+PresetPath et la provenance des copies pour permettre une récupération examinée.
+Les modifications jamais écrites par ReShade ne peuvent pas être reconstituées
+par une sauvegarde de fichiers.

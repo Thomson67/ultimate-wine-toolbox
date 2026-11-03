@@ -305,6 +305,14 @@ def profile_ini(base, cfg, preset=None):
     if preset:
         lines = [line for line in lines if not re.match(r'^StartupPresetPath=', line)]
         lines.insert(index+3, 'StartupPresetPath=')
+        # ReShade's preset browser discards unsaved edits when switching.
+        # Collections must save edits at the time they are made in the overlay.
+        lines = [line for line in lines if not re.match(r'^AutoSavePreset=', line)]
+        overlay = next((i+1 for i, line in enumerate(lines) if line == '[OVERLAY]'), None)
+        if overlay is None:
+            lines.extend(['[OVERLAY]', 'AutoSavePreset=1'])
+        else:
+            lines.insert(overlay, 'AutoSavePreset=1')
     if cfg.get('pack'):
         # This bundle supplies its own modified shader/include versions. Do not
         # mix them with the global cache or compile duplicate effects.
@@ -383,7 +391,7 @@ def profile_save(home, rom, root, cfg):
         from reshade_presets import capture_session
         if config_source.is_file() and not config_source.is_symlink():
             atomic_bytes(profile / 'ReShade.ini', config_source.read_bytes())
-        if capture_session(home, rom, root, folder, cfg['preset_session']):
+        if capture_session(home, rom, root, folder, cfg['preset_session'], cfg.get('files', {})):
             return
     for name in ('ReShade.ini', 'ReShadePreset.ini'):
         source = safe_leaf(root, (folder / name).as_posix())

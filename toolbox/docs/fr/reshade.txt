@@ -71,3 +71,6 @@ utiliser Ajouter les presets du pack installé depuis son ZIP.
 En jeu : Page haut = preset précédent, Page bas = preset suivant. Les presets
 du même contexte de shaders sont disponibles, et le dernier choix est repris
 au prochain lancement. Les raccourcis personnalisés déjà affectés sont conservés.
+La collection active Auto Save pour conserver les changements faits dans
+l'overlay. En cas de problème, évitez une réimportation et conservez les fichiers
+avec helpers/reshade_preset_recovery.py avant une nouvelle tentative.

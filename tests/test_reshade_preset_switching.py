@@ -106,9 +106,99 @@ class NativePresetSwitchingTests(unittest.TestCase):
         self.assertEqual(p.index(self.home, self.rom)['active'], b)
         self.assertIn('Amount=42', p.path(self.home, self.rom, b).read_text())
 
+    def test_browser_selection_of_legacy_mirror_keeps_edited_variant(self):
+        a, b = self.setup_collection()
+        original = self.target(a).read_bytes()
+        self.target(a).write_text('Techniques=A@A.fx\n[A.fx]\nAmount=73\n')
+        config = pack.ini((self.game / 'ReShade.ini').read_bytes())
+        config['GENERAL']['PresetPath'] = '.\\ReShadePreset.ini'
+        (self.game / 'ReShade.ini').write_bytes(pack.encode_ini(config))
+        m.event(self.home, self.rom, 'gameStop')
+        self.assertIn('Amount=73', p.path(self.home, self.rom, a).read_text())
+        selected = p.index(self.home, self.rom)['active']
+        self.assertNotEqual(selected, a)
+        self.assertEqual(p.path(self.home, self.rom, selected).read_bytes(), original)
+        # Repeated list/return operations must never copy the stale mirror over A.
+        p.listing(self.home, self.rom)
+        p.listing(self.home, self.rom)
+        self.assertIn('Amount=73', p.path(self.home, self.rom, a).read_text())
+        backups = list((self.profile / 'presets/history' / a).glob('*.ini'))
+        self.assertTrue(any(v.read_bytes() == original for v in backups))
+
+    def test_browser_unknown_selection_does_not_discard_known_edits(self):
+        a, b = self.setup_collection()
+        self.target(a).write_text('Techniques=A@A.fx\n[A.fx]\nAmount=66\n')
+        config = pack.ini((self.game / 'ReShade.ini').read_bytes())
+        config['GENERAL']['PresetPath'] = 'Z:\\outside\\Other.ini'
+        (self.game / 'ReShade.ini').write_bytes(pack.encode_ini(config))
+        m.event(self.home, self.rom, 'gameStop')
+        self.assertIn('Amount=66', p.path(self.home, self.rom, a).read_text())
+        p.listing(self.home, self.rom)
+        self.assertIn('Amount=66', p.path(self.home, self.rom, a).read_text())
+
+    def test_unchanged_runtime_snapshot_cannot_overwrite_newer_cache(self):
+        a, b = self.setup_collection()
+        self.select_in_game(b)
+        m.event(self.home, self.rom, 'gameStop')
+        newer = b'Techniques=A@A.fx\n[A.fx]\nAmount=88\n'
+        p.replace_variant(self.home, self.rom, a, newer)
+        value = p.index(self.home, self.rom)
+        import hashlib
+        value['items'][a]['sha256'] = hashlib.sha256(newer).hexdigest()
+        p.save(self.home, self.rom, value)
+        m.event(self.home, self.rom, 'gameStop')
+        self.assertEqual(p.path(self.home, self.rom, a).read_bytes(), newer)
+        self.target(a).write_text('Techniques=A@A.fx\n[A.fx]\nAmount=99\n')
+        m.event(self.home, self.rom, 'gameStop')
+        self.assertIn('Amount=99', p.path(self.home, self.rom, a).read_text())
+
+    def test_old_journal_supplies_baseline_before_new_checkpoint_exists(self):
+        a, b = self.setup_collection()
+        value = p.index(self.home, self.rom)
+        value['runtime'].pop('directory', None)
+        value['runtime'].pop('hashes', None)
+        p.save(self.home, self.rom, value)
+        jp = m.journal_path(self.home, self.rom, self.rom, self.rom)
+        journal = m.read_json(jp)
+        journal['preset_session'].pop('hashes', None)
+        m.save_json(jp, journal)
+        self.target(a).write_text('Techniques=A@A.fx\n[A.fx]\nAmount=52\n')
+        m.event(self.home, self.rom, 'gameStop')
+        self.assertIn('Amount=52', p.path(self.home, self.rom, a).read_text())
+
+    def test_collection_enables_autosave_even_when_disabled_in_old_config(self):
+        config = pack.ini(m.profile_ini('[GENERAL]\n[OVERLAY]\nAutoSavePreset=0\nFontSize=22\n', self.cfg, './UWT-ReShadePresets/example/A.ini').encode())
+        self.assertEqual(config['OVERLAY']['AutoSavePreset'], '1')
+        self.assertEqual(config['OVERLAY']['FontSize'], '22')
+
     def test_manual_shortcuts_are_retained_and_startup_override_cleared(self):
         data = m.profile_ini('[GENERAL]\nStartupPresetPath=Old.ini\n[INPUT]\nKeyPreviousPreset=0,0,0,0\nKeyNextPreset=75,1,0,0\n', self.cfg, './UWT-ReShadePresets/test/A.ini')
         config = pack.ini(data.encode())
         self.assertEqual(config['INPUT']['KeyPreviousPreset'], '33,0,0,0')
         self.assertEqual(config['INPUT']['KeyNextPreset'], '75,1,0,0')
         self.assertEqual(config['GENERAL']['StartupPresetPath'], '')
+
+
+class PresetSnapshotTests(unittest.TestCase):
+    def test_snapshot_copies_only_preset_sources_and_never_changes_originals(self):
+        import tempfile
+        import reshade_preset_recovery as recovery
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            home = base / 'home'
+            profile = home / 'reshade/profiles/example'
+            profile.mkdir(parents=True)
+            config = profile / 'ReShade.ini'
+            config.write_text('[GENERAL]\nPresetPath=.\\Custom.ini\n[OVERLAY]\nAutoSavePreset=0\n')
+            (profile / 'ReShadePreset.ini').write_text('Techniques=A@A.fx\n')
+            (profile / 'presets').mkdir()
+            (profile / 'presets/index.json').write_text('{}')
+            outside = base / 'outside.ini'; outside.write_text('private content')
+            (profile / 'presets/link.ini').symlink_to(outside)
+            before = {str(p): p.read_bytes() for p in profile.rglob('*') if p.is_file() and not p.is_symlink()}
+            destination, report = recovery.snapshot(home, base / 'backups')
+            self.assertEqual(report['configs'][0]['AutoSavePreset'], '0')
+            self.assertEqual(len(report['files']), 3)
+            self.assertTrue(all((destination / v['backup']).is_file() for v in report['files']))
+            self.assertEqual(before, {str(p): p.read_bytes() for p in profile.rglob('*') if p.is_file() and not p.is_symlink()})
+            self.assertFalse(any(v['source'].endswith('link.ini') for v in report['files']))
