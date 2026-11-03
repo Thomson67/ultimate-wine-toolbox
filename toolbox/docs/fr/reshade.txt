@@ -61,3 +61,9 @@ Packs locaux (test) : le menu du jeu propose l’import ZIP d’add-ons, shaders
 et presets isolés. Pour Henriko/Citra, installer d’abord ReShade 6.3.3 avec
 add-ons complets. Retirer le pack restaure les réglages précédents. Les
 partages communautaires restent limités aux presets INI.
+
+Presets du jeu et détails : conserver plusieurs presets, afficher les effets
+actifs et tous les paramètres INI, renommer et activer une variante (jeu fermé).
+Les imports conservent le preset précédent et les réglages modifiés en jeu.
+Les nouveaux packs ajoutent toutes leurs variantes ; pour un ancien import,
+utiliser Ajouter les presets du pack installé depuis son ZIP.

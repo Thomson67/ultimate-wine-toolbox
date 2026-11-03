@@ -85,3 +85,35 @@ runtime/architecture, rollback d'un import échoué, modifications externes et
 archives invalides. L'archive fournie a également été importée puis retirée dans
 un préfixe de test simulé : 332 assets déployés, configuration précédente
 restaurée. Aucun add-on ni shader n'a été exécuté dans ces tests.
+
+## Plusieurs presets pour le même jeu
+
+**ReShade → jeu → Presets du jeu et détails** affiche la collection du jeu,
+avec le preset actif et les variantes nécessitant un autre contexte de shaders.
+Le preset existant est conservé lors du premier accès. Les imports INI, y
+compris communautaires, gardent les précédents presets au lieu de les écraser.
+
+Sélectionner un preset affiche son origine, son nom à l'import, sa date de
+sauvegarde, ses techniques actives et le nombre de sections de paramètres.
+Les actions permettent de l'activer, de consulter tout l'INI dans une vue
+défilante, de le renommer ou de retirer une variante inactive de la collection.
+Les paramètres modifiés dans le jeu sont sauvegardés dans la variante active
+au retour et avant de changer de preset. Un seul preset est actif à la fois.
+Fermer le jeu avant une activation ou un import ; le choix se fait dans la
+Toolbox, pas dans une liste de presets déployés dans l'overlay ReShade.
+
+Les nouveaux imports de packs ajoutent toutes leurs variantes. Pour un pack
+installé avec le premier test, utiliser **Ajouter les presets du pack installé
+depuis son ZIP** et sélectionner exactement la même archive : les variantes
+sont ajoutées sans réinstaller les shaders ou l'add-on. Pour changer entre
+elles, il suffit ensuite de les activer dans la collection.
+
+Une variante attachée à un pack reste listée après son retrait, mais ne peut
+être activée que lorsque ce même pack est installé. Les presets ordinaires
+utilisent les packs de shaders configurés pour le jeu. Changer de preset ne
+télécharge pas de shaders et ne change pas les add-ons : la présence des effets
+référencés reste à vérifier en jeu. L'export et le partage communautaire portent
+sur le preset actif ; activer la variante souhaitée avant de l'exporter.
+
+Cette collection concerne les installations ReShade gérées par la Toolbox.
+Les injecteurs intégrés gardent leur parcours existant.

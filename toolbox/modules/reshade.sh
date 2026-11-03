@@ -454,6 +454,18 @@ resh_external_menu() {
     done
 }
 
+resh_pack_zip_file() {
+    local archive
+    if command -v yad >/dev/null 2>&1; then
+        archive="$(DISPLAY="${DISPLAY:-:0}" LANGUAGE="$WT_LANGUAGE" yad --file --filename=/userdata/ \
+            --title="$(community_txt 'Importer un pack ReShade local' 'Import local ReShade bundle')" \
+            --file-filter='ReShade ZIP | *.zip *.ZIP' --width=1000 --height=700)" || return
+    else
+        archive="$(input_text "$(i18n resh_title)" "$(community_txt 'Chemin du pack ReShade ZIP' 'ReShade ZIP bundle path')" /userdata/)" || return
+    fi
+    printf '%s' "$archive"
+}
+
 resh_pack_menu() {
     local rom="$1" choice archive info summary preset selected name output
     local mode="${2:-apply}"
@@ -470,13 +482,7 @@ resh_pack_menu() {
         else msgbox "$(i18n resh_title)" "$output"; fi
         return
     fi
-    if command -v yad >/dev/null 2>&1; then
-        archive="$(DISPLAY="${DISPLAY:-:0}" LANGUAGE="$WT_LANGUAGE" yad --file --filename=/userdata/ \
-            --title="$(community_txt 'Importer un pack ReShade local' 'Import local ReShade bundle')" \
-            --file-filter='ReShade ZIP | *.zip *.ZIP' --width=1000 --height=700)" || return
-    else
-        archive="$(input_text "$(i18n resh_title)" "$(community_txt 'Chemin du pack ReShade ZIP' 'ReShade ZIP bundle path')" /userdata/)" || return
-    fi
+    archive="$(resh_pack_zip_file)" || return 1
     if ! info="$(resh_cmd pack-info "$archive" 2>&1)"; then msgbox "$(i18n resh_title)" "$info"; return 1; fi
     summary="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("ReShade: "+(d["required_release"] or "full add-on support")); print("Add-ons: "+", ".join(n+" ("+str(a)+" bits)" for n,a in d["addons"].items())); print(str(d["files"])+" files / "+str(round(d["bytes"]/1048576,1))+" MiB")' "$info")" || return
     while IFS= read -r name; do
@@ -501,6 +507,62 @@ $(community_txt 'Installer pour ce jeu les add-ons exécutables et les shaders d
 
 resh_pack_setup_info() {
     msgbox "$(i18n resh_title)" "$(community_txt 'Pack installé. Pour Citra : ouvrez ReShade avec Home, vérifiez citra.addon et choisissez le tampon de profondeur. Réglez la disposition des écrans dans Citra.fx, placé en tête des effets. Le mode performance reste désactivé pour ces réglages. La compatibilité en jeu, notamment Vulkan, reste à vérifier.' 'Bundle installed. For Citra: open ReShade with Home, check citra.addon and select the depth buffer. Set the screen layout in Citra.fx, first in the effect order. Performance mode stays off for setup. In-game compatibility, including Vulkan, still needs testing.')"
+}
+
+resh_presets_menu() {
+    local rom="$1" listing identity label choice action output name source
+    local -a items=()
+    while true; do
+        if ! listing="$(resh_cmd presets-list "$rom" 2>&1)"; then
+            msgbox "$(i18n resh_title)" "$listing"; return 1
+        fi
+        items=()
+        while IFS=$'\t' read -r identity label; do
+            [ -n "$identity" ] || continue
+            items+=("$identity" "$label")
+        done < <(python3 -c 'import json,sys; rows=json.loads(sys.argv[1]); active=sys.argv[2]; other=sys.argv[3]; print("\n".join(r["id"]+"\t"+r["name"]+(" — "+active if r["active"] else "")+(" — "+other if not r["compatible"] else "") for r in rows))' "$listing" "$(community_txt 'actif' 'active')" "$(community_txt 'autre contexte de shaders' 'different shader context')")
+        choice="$(menu_select "$(community_txt 'Presets du jeu' 'Game presets') — ${rom##*/}" \
+            "$(community_txt 'Sélectionnez un preset pour afficher ses détails. Fermez le jeu avant de changer de preset.' 'Select a preset to see its details. Close the game before changing presets.')" \
+            "${items[@]}" import "$(community_txt 'Importer et activer un preset INI' 'Import and activate an INI preset')" \
+            pack-presets "$(community_txt 'Ajouter les presets du pack installé depuis son ZIP' 'Add presets from the installed bundle ZIP')" back "$(i18n back)")" || return
+        case "$choice" in
+            back|'') return ;;
+            import)
+                source="$(resh_preset_file import "$rom")" || continue
+                if ! output="$(resh_cmd preset "$rom" "$source" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; fi
+                continue ;;
+            pack-presets)
+                source="$(resh_pack_zip_file)" || continue
+                if ! output="$(resh_cmd presets-pack "$rom" "$source" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; fi
+                continue ;;
+        esac
+        identity="$choice"
+        while true; do
+            if ! output="$(resh_cmd presets-info "$rom" "$identity" "$WT_LANGUAGE" 2>&1)"; then
+                msgbox "$(i18n resh_title)" "$output"; break
+            fi
+            action="$(menu_select "$(community_txt 'Détails du preset' 'Preset details')" "$output" \
+                select "$(community_txt 'Activer ce preset' 'Activate this preset')" \
+                full "$(community_txt 'Afficher tous les paramètres INI' 'Show all INI settings')" \
+                rename "$(community_txt 'Renommer' 'Rename')" delete "$(community_txt 'Supprimer de la liste' 'Delete from collection')" back "$(i18n back)")" || break
+            case "$action" in
+                select)
+                    if ! output="$(resh_cmd presets-select "$rom" "$identity" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; fi
+                    break ;;
+                full)
+                    if output="$(resh_cmd presets-info "$rom" "$identity" "$WT_LANGUAGE" full 2>&1)"; then community_report "$(community_txt 'Paramètres du preset' 'Preset settings')" "$output";
+                    else msgbox "$(i18n resh_title)" "$output"; fi ;;
+                rename)
+                    name="$(input_text "$(i18n resh_title)" "$(community_txt 'Nom du preset' 'Preset name')" '')" || continue
+                    if ! output="$(resh_cmd presets-rename "$rom" "$identity" "$name" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; fi ;;
+                delete)
+                    yesno_default_no "$(i18n resh_title)" "$(community_txt 'Supprimer ce preset de la collection du jeu ? Le preset actif doit être conservé.' 'Delete this preset from the game collection? The active preset must be kept.')" || continue
+                    if ! output="$(resh_cmd presets-delete "$rom" "$identity" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; fi
+                    break ;;
+                *) break ;;
+            esac
+        done
+    done
 }
 
 resh_game_menu() {
@@ -529,7 +591,7 @@ resh_game_menu() {
         if [ "$state" != missing ]; then
             if [ "$state" = disabled ]; then actions+=(enable "$(i18n resh_enable)")
             else actions+=(disable "$(i18n resh_disable)"); fi
-            actions+=(pack "$(community_txt 'Pack ReShade local (ZIP, add-ons et shaders)' 'Local ReShade bundle (ZIP, add-ons and shaders)')" preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)")
+            actions+=(presets "$(community_txt 'Presets du jeu et détails' 'Game presets and details')" pack "$(community_txt 'Pack ReShade local (ZIP, add-ons et shaders)' 'Local ReShade bundle (ZIP, add-ons and shaders)')" preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)")
         fi
         choice="$(menu_select "$(i18n resh_title) — $(basename "$rom")" "$prompt" \
             "${actions[@]}" community "$(i18n resh_community)" back "$(i18n back)")" || return
@@ -537,6 +599,7 @@ resh_game_menu() {
             community) community_menu reshade "$rom" ;;
             install) resh_install_game "$rom" ;;
             pack) resh_pack_menu "$rom" ;;
+            presets) resh_presets_menu "$rom" ;;
             enable|disable)
                 resh_cmd "$choice" "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
                     msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"

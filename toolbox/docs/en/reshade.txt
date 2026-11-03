@@ -61,3 +61,9 @@ Local bundles (test): the game menu imports ZIP add-ons, isolated shaders
 and presets. For Henriko/Citra, install ReShade 6.3.3 with full add-on support
 first. Removing the bundle restores previous settings. Community sharing
 still transfers INI presets only.
+
+Game presets and details: keep multiple presets, inspect enabled effects and
+all INI settings, rename and activate variants (close the game first).
+Imports retain the previous preset and edits saved in game. New bundles add
+all their variants; for an older import, use Add presets from the installed
+bundle ZIP.

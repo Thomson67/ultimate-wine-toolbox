@@ -362,6 +362,9 @@ def profile_save(home, rom, root, cfg):
         source = safe_leaf(root, (folder / name).as_posix())
         if source.is_file() and not source.is_symlink():
             atomic_bytes(profile / name, source.read_bytes())
+    if (profile / 'presets/index.json').is_file():
+        from reshade_presets import capture
+        capture(home, rom)
 
 
 def ensure_idle(rom, root, prefix):
@@ -707,7 +710,8 @@ def main():
     parser.add_argument('--runner', default='')
     parser.add_argument('--legacy', action='store_true')
     parser.add_argument('command', choices=['backend-packs', 'exes', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'external-scan', 'external-info', 'external-enable', 'external-disable', 'external-release', 'wiki-title', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
-                                           'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore', 'pack-info', 'pack-import', 'pack-remove', 'pack-status', 'pack-check'])
+                                           'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore', 'pack-info', 'pack-import', 'pack-remove', 'pack-status', 'pack-check',
+                                           'presets-list', 'presets-info', 'presets-select', 'presets-rename', 'presets-delete', 'presets-pack'])
     parser.add_argument('rom', nargs='?', type=Path)
     parser.add_argument('args', nargs='*')
     args = parser.parse_args()
@@ -729,6 +733,24 @@ def main():
             print(prepare(home, rom, *args.args))
         elif args.command == 'finish':
             print(json.dumps(finish(home, rom)))
+        elif args.command.startswith('presets-'):
+            import reshade_presets as presets
+            if args.command == 'presets-list':
+                print(json.dumps(presets.listing(home, rom), ensure_ascii=False))
+            elif args.command == 'presets-info':
+                print(presets.details(home, rom, args.args[0], args.args[1:2] != ['en'], args.args[-1:] == ['full']))
+            elif args.command == 'presets-select':
+                presets.activate(home, rom, args.args[0])
+            elif args.command == 'presets-rename':
+                presets.rename(home, rom, args.args[0], args.args[1])
+            elif args.command == 'presets-delete':
+                presets.remove(home, rom, args.args[0])
+            else:
+                import reshade_pack
+                source = Path(args.args[0])
+                files, metadata = reshade_pack.archive(source)
+                metadata['archive_sha256'] = hashlib.sha256(source.read_bytes()).hexdigest()
+                print(presets.pack_presets(home, rom, files, metadata))
         elif args.command.startswith('pack-'):
             import reshade_pack
             if args.command == 'pack-info':
@@ -838,21 +860,8 @@ def main():
         elif args.command == 'profile':
             print(home / 'reshade/profiles' / key(rom))
         elif args.command == 'preset':
-            data = Path(args.args[0]).read_bytes()
-            if b'\0' in data or len(data) > 1024*1024:
-                raise ValueError('invalid preset INI')
-            data.decode('utf-8-sig')
-            cfg = read_json(home / 'reshade/games' / (key(rom) + '.json'))
-            for jp in (home / 'reshade/installations' / key(rom)).glob('*.json'):
-                j = read_json(jp)
-                ensure_idle(rom, Path(j['root']), Path(j['prefix']))
-                if directory_id(Path(j['root'])) == j.get('root_id'):
-                    target = safe_leaf(Path(j['root']), (PurePosixPath(j['exe']).parent / 'ReShadePreset.ini').as_posix())
-                    atomic_bytes(target, data)
-            atomic_bytes(home / 'reshade/profiles' / key(rom) / 'ReShadePreset.ini', data)
-            cfg = read_json(home / 'reshade/games' / (key(rom) + '.json'))
-            if cfg.get('enabled'):
-                event(home, rom, 'gameStart', args.runner, args.bottles, args.legacy)
+            from reshade_presets import import_file
+            import_file(home, rom, Path(args.args[0]))
 
 
 if __name__ == '__main__':

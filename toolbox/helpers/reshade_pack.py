@@ -167,11 +167,16 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
         raise ValueError('remove the current pack before importing another one')
     # Validate all output before touching the game, profile or enabled state.
     chosen = preset_bytes(files[preset], meta)
+    # Validate every variant before modifying an existing installation.
+    for name in meta['presets']:
+        preset_bytes(files[name], meta)
     merged = merge_config((p / 'ReShade.ini').read_bytes(), files['ReShade.ini'])
     payload = {n: data for n, data in files.items() if n.startswith('reshade-shaders/') or n in meta['addons']}
     meta.update(selected=preset, archive_sha256=hashlib.sha256(Path(source).read_bytes()).hexdigest(),
                 hashes={n: hashlib.sha256(d).hexdigest() for n, d in payload.items()})
     was_enabled = cfg.get('enabled', False)
+    from reshade_presets import sync
+    sync(home, rom)
     # Disable captures current in-game edits before taking the profile snapshot.
     m.set_enabled(home, rom, False)
     merged = merge_config((p / 'ReShade.ini').read_bytes(), files['ReShade.ini'])
@@ -192,6 +197,8 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
         m.set_enabled(home, rom, was_enabled)
         if was_enabled:
             m.event(home, rom, 'gameStart', runner, bottles, legacy)
+        from reshade_presets import pack_presets
+        pack_presets(home, rom, files, meta, preset)
     except Exception:
         m.set_enabled(home, rom, False)
         for n, data in old.items():
@@ -235,6 +242,8 @@ def remove(home, rom, runner='', bottles=Path('/userdata/system/wine-bottles/win
         m.save_json(config_path, cfg)
         raise
     shutil.rmtree(p / 'pack')
+    from reshade_presets import capture
+    capture(home, rom, adopt=True)
 
 
 def stage_files(home, rom, root, folder, cfg):
