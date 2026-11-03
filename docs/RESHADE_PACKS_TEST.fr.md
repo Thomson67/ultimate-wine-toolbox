@@ -209,3 +209,46 @@ la réinitialisation ; le retrait ultérieur d'un pack ne réintroduit pas les
 presets supprimés. Si la réinstallation du preset vide échoue, la collection
 précédente est restaurée. Cette action conserve l'association du jeu ; pour
 retirer aussi une association orpheline, utiliser l'action dédiée du gestionnaire.
+
+## Vérifier les shaders lors de l'import d'un INI
+
+Pour une installation gérée par la Toolbox, les imports INI locaux et
+communautaires vérifient les effets de `Techniques` contre les fichiers `.fx`
+réellement disponibles. Les effets désactivés conservés dans `TechniqueSorting`
+ou les anciennes sections de paramètres ne provoquent pas de téléchargement.
+Les effets personnalisés déjà présents sont reconnus comme disponibles.
+
+Si un effet manque, l'index local propose son pack connu. Une ambiguïté entre
+plusieurs sources demande un choix ; les effets inconnus sont signalés avant
+application, avec possibilité d'annuler. Si l'utilisateur accepte le
+téléchargement, les packs complets et leurs dépendances sont préparés avant
+l'import du preset. Une annulation ou un téléchargement incomplet laisse le
+preset précédent en place. Le jeu doit être fermé.
+
+Seules les fonctions de shaders du backend ReShadeLinux épinglé sont utilisées,
+sans installation de DLL ni changement de version ReShade. Les nouveaux packs
+sont téléchargés dans un cache séparé et une vue propre au jeu combine les
+fichiers existants et les ajouts. Les versions existantes (notamment les shaders
+modifiés d'un pack custom) gardent la priorité sur les homonymes des nouveaux
+packs. Les textures et includes sont conservés avec les effets. Les chemins
+sont appliqués au prochain lancement via le hook existant.
+
+Le preset et la configuration sont revérifiés après téléchargement : une
+modification concurrente interrompt la validation. La configuration n'est
+changée qu'une fois les effets reconnus trouvés dans la nouvelle vue. Le
+contrôle confirme la présence des fichiers, pas leur compilation ni leur rendu
+sur chaque version ReShade, GPU ou API. Certains presets privés/modifiés
+nécessitent toujours leur archive d'origine : un INI seul ne permet pas de
+retrouver automatiquement une variante privée portant le même nom qu'un effet
+public.
+
+Pour un injecteur intégré qui n'est pas géré par la Toolbox, le parcours existant
+conserve ses DLL et shaders et demande que les effets requis soient présents ;
+il ne prend pas automatiquement en charge son installation de shaders.
+
+Tests : détection réelle des fichiers, effets personnalisés, sources ambiguës,
+import après téléchargement, annulation/échec, changement du preset ou de la
+configuration pendant le téléchargement, conservation des DLL et des shaders
+modifiés, et restauration de la vue de shaders précédente après retrait d'un
+pack custom. Les fonctions du backend épinglé ont aussi été exécutées avec des
+clones locaux simulés pour vérifier le chemin de téléchargement/fusion seul.

@@ -157,6 +157,7 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
     files, meta = archive(source)
     config_path = home / 'reshade/games' / (m.key(rom) + '.json')
     cfg = m.read_json(config_path)
+    previous_cfg = dict(cfg)
     if not cfg:
         raise ValueError('install ReShade for this game first')
     check_release(cfg, meta)
@@ -174,6 +175,8 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
     payload = {n: data for n, data in files.items() if n.startswith('reshade-shaders/') or n in meta['addons']}
     meta.update(selected=preset, archive_sha256=hashlib.sha256(Path(source).read_bytes()).hexdigest(),
                 hashes={n: hashlib.sha256(d).hexdigest() for n, d in payload.items()})
+    if cfg.get('preset_shaders'):
+        meta['previous_preset_shaders'] = cfg['preset_shaders']
     was_enabled = cfg.get('enabled', False)
     from reshade_presets import sync
     sync(home, rom)
@@ -193,6 +196,7 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
         m.atomic_bytes(p / 'ReShade.ini', merged)
         m.atomic_bytes(p / 'ReShadePreset.ini', chosen)
         cfg.update(pack=True, enabled=False)
+        cfg.pop('preset_shaders', None)
         m.save_json(config_path, cfg)
         m.set_enabled(home, rom, was_enabled)
         if was_enabled:
@@ -203,7 +207,7 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
         m.set_enabled(home, rom, False)
         for n, data in old.items():
             m.atomic_bytes(p / n, data)
-        cfg.pop('pack', None)
+        cfg = dict(previous_cfg)
         cfg['enabled'] = False
         m.save_json(config_path, cfg)
         shutil.rmtree(p / 'pack', ignore_errors=True)
@@ -217,6 +221,7 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
 def remove(home, rom, runner='', bottles=Path('/userdata/system/wine-bottles/windows'), legacy=False):
     config_path = home / 'reshade/games' / (m.key(rom) + '.json')
     cfg = m.read_json(config_path)
+    previous_cfg = dict(cfg)
     if not cfg.get('pack'):
         raise ValueError('no local ReShade pack installed')
     p = profile(home, rom)
@@ -229,6 +234,10 @@ def remove(home, rom, runner='', bottles=Path('/userdata/system/wine-bottles/win
         for n, data in old.items():
             m.atomic_bytes(p / n, data)
         cfg.pop('pack')
+        cfg.pop('preset_shaders', None)
+        previous_view = manifest(home, rom).get('previous_preset_shaders')
+        if previous_view:
+            cfg['preset_shaders'] = previous_view
         cfg['enabled'] = False
         m.save_json(config_path, cfg)
         if was_enabled:
@@ -238,7 +247,8 @@ def remove(home, rom, runner='', bottles=Path('/userdata/system/wine-bottles/win
         m.set_enabled(home, rom, False)
         for n, data in active.items():
             m.atomic_bytes(p / n, data)
-        cfg.update(pack=True, enabled=False)
+        cfg = dict(previous_cfg)
+        cfg['enabled'] = False
         m.save_json(config_path, cfg)
         raise
     shutil.rmtree(p / 'pack')

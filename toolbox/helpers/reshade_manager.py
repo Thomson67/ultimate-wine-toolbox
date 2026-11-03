@@ -324,6 +324,14 @@ def profile_ini(base, cfg, preset=None):
             lines.extend(['[ADDON]', 'AddonPath=.'])
         else:
             lines.insert(addon, 'AddonPath=.')
+    if cfg.get('preset_shaders'):
+        # Additional effects use a private combined view, preserving existing
+        # and custom shaders rather than replacing them with standard copies.
+        extra_root = 'Z:' + cfg['preset_shaders']['root'].replace('/', '\\')
+        lines = [line for line in lines if not re.match(r'^(EffectSearchPaths|TextureSearchPaths)=', line)]
+        general = next(i+1 for i, line in enumerate(lines) if line == '[GENERAL]')
+        lines[general:general] = [f'EffectSearchPaths={extra_root}\\Shaders\\**',
+                                  f'TextureSearchPaths={extra_root}\\Textures\\**']
     input_index = next((i+1 for i, line in enumerate(lines) if line == '[INPUT]'), None)
     if input_index is None:
         lines.append('[INPUT]')
@@ -424,6 +432,14 @@ def ensure_idle(rom, root, prefix):
 
 def install_files(home, rom, root, prefix, cfg):
     ensure_idle(rom, root, prefix)
+    if cfg.get('preset_shaders'):
+        from reshade_preset_dependencies import overlay
+        cfg = dict(cfg)
+        view = overlay(home, rom, cfg)
+        if view:
+            cfg['preset_shaders'] = view
+        else:
+            cfg.pop('preset_shaders', None)
     if root.is_symlink() or prefix.is_symlink():
         raise ValueError("game/bottle root must be a real directory")
     for name, field in [('runtime', 'runtime_hash'), ('compiler', 'compiler_hash')]:
@@ -760,7 +776,7 @@ def main():
                                            'presets-list', 'presets-info', 'presets-select', 'presets-rename', 'presets-delete', 'presets-pack',
                                            'presets-catalog', 'presets-global-items', 'presets-global-info', 'presets-global-rename',
                                            'presets-global-copy', 'presets-global-export', 'presets-global-delete', 'presets-global-forget',
-                                           'presets-clear', 'presets-global-clear'])
+                                           'presets-clear', 'presets-global-clear', 'dependency-check', 'dependency-prepare', 'dependency-finish'])
     parser.add_argument('rom', nargs='?', type=Path)
     parser.add_argument('args', nargs='*')
     args = parser.parse_args()
@@ -782,6 +798,14 @@ def main():
             print(prepare(home, rom, *args.args))
         elif args.command == 'finish':
             print(json.dumps(finish(home, rom)))
+        elif args.command.startswith('dependency-'):
+            import reshade_preset_dependencies as dependencies
+            if args.command == 'dependency-check':
+                print(json.dumps(dependencies.analyze(home, rom, Path(args.args[0])), ensure_ascii=False))
+            elif args.command == 'dependency-prepare':
+                print(dependencies.prepare(home, rom, Path(args.args[0]), args.args[1], args.args[2], args.runner, args.bottles, args.legacy))
+            else:
+                print(json.dumps(dependencies.finish(home, rom, Path(args.args[0]), args.runner, args.bottles, args.legacy), ensure_ascii=False))
         elif args.command.startswith('presets-'):
             import reshade_presets as presets
             if args.command == 'presets-catalog' or args.command.startswith('presets-global-'):
@@ -929,10 +953,15 @@ def main():
         elif args.command == 'details':
             cfg = read_json(home / 'reshade/games' / (key(rom) + '.json'))
             if cfg:
-                print('\t'.join(map(str, [Path(cfg['runtime']).parent.name, cfg['arch'], cfg['dll'], cfg['exe'], cfg['repos']])))
+                repos = cfg['repos']
+                if cfg.get('preset_shaders'):
+                    repos = ','.join(sorted((set(repos.split(',')) - {'none'}) | set(cfg['preset_shaders'].get('packs', []))))
+                print('\t'.join(map(str, [Path(cfg['runtime']).parent.name, cfg['arch'], cfg['dll'], cfg['exe'], repos])))
         elif args.command == 'profile':
             print(home / 'reshade/profiles' / key(rom))
         elif args.command == 'preset':
+            if args.args[1:] and hashlib.sha256(Path(args.args[0]).read_bytes()).hexdigest() != args.args[1]:
+                raise ValueError('preset changed during review; select it again')
             from reshade_presets import import_file
             import_file(home, rom, Path(args.args[0]))
 

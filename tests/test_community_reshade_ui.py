@@ -169,7 +169,7 @@ menu_select() {
 community_cmd() { [ "$1" = games ] || return 1; printf '%s\tUn jeu de la gamelist ES\n' "$TEST_ROM"; }
 resh_cmd() {
  [ "$2" = "$TEST_ROM" ] || return 1
- case "$1" in status) echo enabled;; export) cp "$WT_HOME/current.ini" "$3";; preset) cp "$3" "$WT_HOME/current.ini";; *) return 1;; esac
+ case "$1" in dependency-check) echo '{"sha256":"0000000000000000000000000000000000000000000000000000000000000000","packs":[],"unknown":[],"ambiguous":{}}';; status) echo enabled;; export) cp "$WT_HOME/current.ini" "$3";; preset) cp "$3" "$WT_HOME/current.ini";; *) return 1;; esac
 }
 community_import_actions reshade "$TEST_INI" 'ReShade — Presets communautaires'
 ''')
@@ -191,6 +191,7 @@ resh_cmd() {
  printf '%s\n' "$1" >> "$WT_HOME/calls"
  [ "$2" = "$TEST_ROM" ] || return 1
  case "$1" in
+ dependency-check) echo '{"sha256":"0000000000000000000000000000000000000000000000000000000000000000","packs":[],"unknown":[],"ambiguous":{}}';;
  status) if [ -f "$WT_HOME/configured" ]; then echo enabled; else echo missing; fi;;
  external-info) echo EXTERNAL_STATE;;
  export) cp "$WT_HOME/current.ini" "$3";;
@@ -201,7 +202,7 @@ community_import_actions reshade "$TEST_INI" ReShade "$TEST_ROM"
 '''.replace('EXTERNAL_STATE', external))
                 self.assertEqual((self.home/'current.ini').read_bytes(), PRESET)
                 calls = (self.home/'calls').read_text().splitlines()
-                self.assertEqual(calls, ['status', 'external-info', 'wizard', 'status', 'export', 'preset'])
+                self.assertEqual(calls, ['status', 'external-info', 'wizard', 'status', 'export', 'dependency-check', 'preset'])
                 self.assertNotIn('AntiMicroX', ui)
                 self.assertIn('ReShade intégré' if external.startswith('external') else 'Installer/configurer ReShade', ui)
 
@@ -270,6 +271,7 @@ community_import_actions reshade "$TEST_INI" ReShade "$TEST_ROM"
 menu_select() { echo apply; }
 resh_cmd() {
  case "$1" in
+ dependency-check) echo '{"sha256":"0000000000000000000000000000000000000000000000000000000000000000","packs":[],"unknown":[],"ambiguous":{}}';;
  status) echo disabled;;
  export) cp "$WT_HOME/current.ini" "$3";;
  preset) cp "$3" "$WT_HOME/current.ini";;

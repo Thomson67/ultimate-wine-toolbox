@@ -83,3 +83,9 @@ retirées avec toute leur collection, après sauvegarde des presets/métadonnée
 Supprimer tous les presets pour ce jeu : sauvegarder puis retirer toute la
 collection, actif compris. Un jeu géré repart avec un Preset vide, en conservant
 ReShade, sa version, ses shaders/add-ons et son état activé/désactivé. Jeu fermé.
+
+Import INI sur un jeu géré : les effets actifs sont vérifiés et les packs
+manquants reconnus sont proposés avant application. Les effets inconnus sont
+signalés. Une annulation ou un échec conserve le preset actuel. Le téléchargement
+ajoute les shaders sans changer la version ReShade ; les fichiers personnalisés
+existants ont priorité. Les injecteurs intégrés non gérés gardent leur parcours.

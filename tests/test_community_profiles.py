@@ -264,6 +264,7 @@ resh_cmd() {
     preset) echo attempted >> "$WT_HOME/applied"; [ "$FAIL" != preset ] || return 1; cat "$3" > "$WT_HOME/new-preset";;
   esac
 }
+resh_import_ini() { resh_cmd preset "$1" "$2"; }
 community_import_actions reshade "$WT_HOME/download.ini" ReShade /userdata/roms/windows/Game.wine
 '''
                 result = subprocess.run(['bash', '-c', script], capture_output=True, text=True,

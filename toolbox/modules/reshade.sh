@@ -48,6 +48,57 @@ resh_prepare_tools() {
     chmod +x "$shim/7z"
 }
 
+resh_import_ini() {
+    local rom="$1" source="$2" report output hash packs unknown file options selected job log backend_packs
+    local -a choices=() selected_packs=()
+    if ! report="$(resh_cmd dependency-check "$rom" "$source" 2>&1)"; then msgbox "$(i18n resh_title)" "$report"; return 1; fi
+    hash="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["sha256"])' "$report")" || return 1
+    packs="$(python3 -c 'import json,sys; print(",".join(json.loads(sys.argv[1])["packs"]))' "$report")" || return 1
+    unknown="$(python3 -c 'import json,sys; print(", ".join(json.loads(sys.argv[1])["unknown"]))' "$report")" || return 1
+    while IFS=$'\t' read -r file options; do
+        [ -n "$file" ] || continue
+        choices=()
+        IFS=',' read -r -a selected_packs <<< "$options"
+        for selected in "${selected_packs[@]}"; do choices+=("$selected" "$selected"); done
+        selected="$(menu_select "$(i18n resh_title)" "$(community_txt 'Plusieurs packs proposent cet effet manquant. Choisir sa source :' 'Several packs provide this missing effect. Choose its source:') $file" "${choices[@]}" back "$(i18n back)")" || return 1
+        [[ ",$options," = *",$selected,"* ]] || return 1
+        packs="${packs:+$packs,}$selected"
+    done < <(python3 -c 'import json,sys; print("\n".join(n+"\t"+",".join(v) for n,v in json.loads(sys.argv[1])["ambiguous"].items()))' "$report")
+    if [ -n "$unknown" ]; then
+        yesno_default_no "$(i18n resh_title)" "$(community_txt 'Ces effets manquants ne sont pas reconnus et ne peuvent pas être installés automatiquement :' 'These missing effects are unknown and cannot be installed automatically:')
+$unknown
+
+$(community_txt 'Continuer malgré ces dépendances non résolues ? Les effets concernés pourront rester désactivés ou en erreur.' 'Continue despite these unresolved dependencies? These effects may remain disabled or report errors.')" || return 1
+    fi
+    if [ -n "$packs" ]; then
+        yesno_default_no "$(i18n resh_title)" "$(community_txt 'Installer les packs de shaders manquants avant d’importer le preset ?' 'Install the missing shader packs before importing the preset?')
+$packs
+
+$(community_txt 'Les packs complets et leurs dépendances seront téléchargés. La version ReShade et les presets existants seront conservés.' 'Complete packs and their dependencies will be downloaded. The ReShade version and existing presets will be retained.')" || return 1
+        resh_backend_ready || return 1
+        resh_prepare_tools || return 1
+        job="$(resh_cmd dependency-prepare "$rom" "$source" "$packs" "$hash" 2>&1)" || { msgbox "$(i18n resh_title)" "$job"; return 1; }
+        log="${WT_LOG_DIR:-/userdata/system/logs/ultimate-wine-toolbox}/reshade-shaders-$(date +%Y%m%d-%H%M%S)-$$.log"
+        mkdir -p "${log%/*}"
+        backend_packs="$(resh_cmd backend-packs "$packs")" || return 1
+        [ "$backend_packs" != none ] || backend_packs=reshade-shaders
+        msgbox "$(i18n resh_title)" "$(i18n resh_download_wait "$log")" || return 1
+        if ! (
+            exec 9> "$WT_HOME/reshade/runtime.lock"
+            flock 9
+            PATH="$WT_HOME/reshade/bin:$PATH" bash "$WT_ROOT/helpers/reshade_shader_download.sh" \
+                "$WT_HOME/reshade/backend" "$job/cache" "$backend_packs"
+        ) >> "$log" 2>&1; then
+            msgbox "$(i18n resh_title)" "$(i18n resh_failed "$log")"; return 1
+        fi
+        if ! output="$(resh_cmd dependency-finish "$rom" "$job" 2>&1)"; then
+            printf '%s\n' "$output" >> "$log"
+            msgbox "$(i18n resh_title)" "$output"; return 1
+        fi
+    fi
+    if ! output="$(resh_cmd preset "$rom" "$source" "$hash" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; return 1; fi
+}
+
 resh_model_packs() {
     case "$1" in
         standard) printf '%s' 'reshade-shaders,sweetfx-shaders' ;;
@@ -537,7 +588,7 @@ resh_presets_menu() {
             clear-all) resh_clear_all_presets "$rom" game; continue ;;
             import)
                 source="$(resh_preset_file import "$rom")" || continue
-                if ! output="$(resh_cmd preset "$rom" "$source" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; fi
+                resh_import_ini "$rom" "$source" || continue
                 continue ;;
             pack-presets)
                 source="$(resh_pack_zip_file)" || continue
@@ -712,9 +763,7 @@ resh_game_menu() {
                 fi
                 if [ "$choice" = preset ]; then
                     preset="$(resh_preset_file import "$rom")" || continue
-                    resh_cmd preset "$rom" "$preset" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
-                        msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"
-                    }
+                    resh_import_ini "$rom" "$preset" || continue
                 else
                     preset="$(resh_preset_file export "$rom")" || continue
                     resh_cmd export "$rom" "$preset" overwrite >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 && {

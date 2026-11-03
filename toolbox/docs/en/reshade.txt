@@ -83,3 +83,9 @@ their presets/metadata have been backed up.
 Delete all presets for this game: back up and remove the entire collection,
 including the active preset. A managed game restarts with an empty preset;
 ReShade, its version, shaders/add-ons and enabled state are retained. Close the game.
+
+INI import for managed games: enabled effects are checked and recognized missing
+packs are offered before applying. Unknown effects are reported. Cancelling or
+a failed download retains the current preset. Shader additions keep the ReShade
+version and prioritize existing custom files. Unmanaged integrated injectors
+retain their existing workflow.

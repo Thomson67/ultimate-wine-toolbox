@@ -105,15 +105,15 @@ Install/configure ReShade and the required packs now, then apply the downloaded 
         case "$details" in enabled|disabled) : ;; *) msgbox "$title" "$(community_txt 'Configuration ReShade non terminée. Le preset téléchargé est conservé.' 'ReShade configuration is incomplete. The downloaded preset is retained.')"; continue ;; esac
       fi
       yesno "$title" "$(community_txt "Appliquer à $(basename "$rom") et activer ReShade ?
-Le preset actuel sera exporté dans les sauvegardes communautaires avant remplacement. Les packs de shaders doivent être installés." "Apply to $(basename "$rom") and enable ReShade?
-The current preset will be exported to the community backups before replacement. Shader packs must be installed.")" || continue
+Le preset actuel sera exporté dans les sauvegardes communautaires avant remplacement. Les effets seront vérifiés et les packs manquants reconnus seront proposés." "Apply to $(basename "$rom") and enable ReShade?
+The current preset will be exported to the community backups before replacement. Effects will be checked and recognized missing packs will be offered.")" || continue
       local backup_dir="$WT_HOME/exports/community-backups" backup
       mkdir -p "$backup_dir"
       backup="$(mktemp "$backup_dir/reshade-XXXXXX.ini")" || return 1
       if ! output="$(resh_cmd export "$rom" "$backup" overwrite 2>&1)"; then
         rm -f -- "$backup"; msgbox "$title" "$output"; continue
       fi
-      if output="$(resh_cmd preset "$rom" "$path" 2>&1)"; then
+      if resh_import_ini "$rom" "$path"; then
         if [ "$details" = disabled ] && ! output="$(resh_cmd enable "$rom" 2>&1)"; then
           msgbox "$title" "$(community_txt "Preset importé mais activation de ReShade impossible.
 Sauvegarde : $backup
