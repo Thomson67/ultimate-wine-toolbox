@@ -37,6 +37,8 @@ class ScraperSyncTests(unittest.TestCase):
         self.posts = []
         self.imported_paths = []
         self.force_no_content = False
+        self.entry_update = False
+        self.ignore_media_update = False
         self.ignore_post = False
         self.fail_post = False
         self.grouped = False
@@ -99,6 +101,30 @@ class ScraperSyncTests(unittest.TestCase):
                 if owner.fail_post:
                     return self.send({}, 500)
                 payload = self.rfile.read(int(self.headers['Content-Length']))
+                name = 'windowsports' if owner.grouped else 'ports'
+                endpoint = f'/systems/{name}/games/opaque-api-id'
+                if self.path == endpoint or self.path.startswith(endpoint + '/media/'):
+                    if not owner.entry_update:
+                        return self.send({}, 404)
+                    if self.path == endpoint:
+                        updates = json.loads(payload)
+                        # Like ES v43: only non-path metadata is writable here.
+                        for key, value in updates.items():
+                            if key not in MEDIA and key != 'path':
+                                owner.live[key] = value
+                    elif not owner.ignore_media_update:
+                        key = self.path.rsplit('/', 1)[1]
+                        suffix = {'image': 'image', 'boxart': 'box', 'thumbnail': 'thumb',
+                                  'fanart': 'fanart', 'marquee': 'marquee'}[key]
+                        ext = '.jpg' if self.headers['Content-Type'] == 'image/jpeg' else '.png'
+                        dest = owner.ports / 'images' / (Path(ROM).stem + '-' + suffix + ext)
+                        dest.parent.mkdir(exist_ok=True)
+                        dest.write_bytes(payload)
+                        owner.live[key] = str(dest)
+                    # These APIs update memory/recovery, not gamelist.xml.
+                    return self.send('OK')
+                if self.path != '/addgames/' + name:
+                    return self.send({}, 404)
                 g = ET.fromstring(payload).find('game')
                 import_path = g.findtext('path', '')
                 owner.imported_paths.append(import_path)
@@ -181,6 +207,52 @@ class ScraperSyncTests(unittest.TestCase):
         self.assertIn('import XML=', log)
         self.assertIn(str(self.ports / ROM), log)
         self.assertNotIn('memory and gamelist verified', log)
+
+    def test_204_fallback_updates_existing_native_ports_without_reload(self):
+        self.force_no_content = True
+        self.entry_update = True
+        self.native_group = True
+        self.live['systemName'] = 'ports'
+        before_other = ET.tostring(ET.parse(self.xml).getroot()[0])
+        with self.api() as url:
+            result = self.run_install(url, '1')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        root = ET.parse(self.xml).getroot()
+        self.assertEqual(ET.tostring(root[0]), before_other)
+        self.assertEqual(root[1].findtext('playcount'), '70')
+        self.assertEqual(root[1].findtext('gametime'), '29000')
+        for key in MEDIA:
+            file = Path(root[1].findtext(key))
+            self.assertTrue(file.is_file(), key)
+            self.assertEqual(root[1].findtext(key), self.live[key])
+        self.save_live()
+        self.assertTrue(ET.parse(self.xml).getroot()[1].findtext('image'))
+        self.assertEqual(len([p for p in self.posts if '/media/' in p]), 5)
+        self.assertIn('per-entry API memory and media verified', result.stdout)
+        self.assertFalse(any('uwt_return' in p or 'reload' in p for p in self.posts))
+
+    def test_204_fallback_verifies_media_memory_before_writing_xml(self):
+        self.force_no_content = True
+        self.entry_update = True
+        self.ignore_media_update = True
+        with self.api() as url:
+            result = self.run_install(url, '1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.xml.read_bytes(), self.before)
+        self.assertNotIn('memory and gamelist verified', result.stdout)
+
+    def test_204_fallback_preserves_conflicting_existing_media(self):
+        self.force_no_content = True
+        self.entry_update = True
+        custom = self.ports / 'images' / (Path(ROM).stem + '-image.jpg')
+        custom.parent.mkdir()
+        custom.write_bytes(b'custom-art-do-not-overwrite')
+        with self.api() as url:
+            result = self.run_install(url, '1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(custom.read_bytes(), b'custom-art-do-not-overwrite')
+        self.assertEqual(self.xml.read_bytes(), self.before)
+        self.assertEqual(self.posts, ['/addgames/ports'])
 
     def test_grouped_ports_imports_only_into_owning_real_system(self):
         self.grouped = True

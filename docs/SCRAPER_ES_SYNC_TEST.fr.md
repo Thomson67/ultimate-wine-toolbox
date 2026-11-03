@@ -17,6 +17,12 @@ Cette branche conserve les ajouts ReShade et les thèmes de la branche
 - Quand ES tourne mais que son API est indisponible, l'installation de la Toolbox
   continue avec un avertissement pour le scrap. Le XML n'est pas modifié par une
   méthode susceptible d'être écrasée. Réinstaller une fois l'API accessible.
+- Si l’import XML renvoie HTTP 204 pour une entrée existante, les API dédiées
+  aux métadonnées et aux médias sont utilisées. Les chemins choisis par ES et
+  le contenu des fichiers sont vérifiés avant d’enregistrer uniquement cette
+  entrée dans le XML. Aucun rechargement global n’est demandé. Un fichier
+  personnalisé différent déjà présent à la destination d’ES est conservé et
+  signalé comme conflit.
 - L’import utilise le chemin absolu exact renvoyé par ES. Le XML envoyé est
   inclus dans le journal afin de diagnostiquer les refus, notamment HTTP 204.
 - Le journal persistant est dans

@@ -37,6 +37,12 @@ def es_running():
         return True
 
 
+class ImportRejected(SyncError):
+    def __init__(self, status):
+        self.status = status
+        super().__init__(f'ES import returned HTTP {status}')
+
+
 def synchronize(gamelist, proposed, rom_name, fields, backup):
     """Return True after verified online sync, False only when ES is stopped.
 
@@ -47,16 +53,16 @@ def synchronize(gamelist, proposed, rom_name, fields, backup):
     base = os.environ.get('SCRAPER_ES_URL', 'http://127.0.0.1:1234').rstrip('/')
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
-    def request(path, payload=None):
+    def request(path, payload=None, content_type="application/xml"):
         req = urllib.request.Request(base + path, data=payload,
-            headers={'Content-Type': 'application/xml'} if payload else {})
+            headers={'Content-Type': content_type} if payload else {})
         with opener.open(req, timeout=3) as response:
             raw = response.read(8 * 1024 * 1024 + 1)
             if len(raw) > 8 * 1024 * 1024:
                 raise SyncError('ES response exceeds limit')
             if payload is not None:
                 if response.status != 200:
-                    raise SyncError(f'ES import returned HTTP {response.status}')
+                    raise ImportRejected(response.status)
                 return raw
             return json.loads(raw)
 
@@ -193,7 +199,15 @@ def synchronize(gamelist, proposed, rom_name, fields, backup):
         xml_payload = ET.tostring(payload, encoding='utf-8', xml_declaration=True)
         print(f'scraper-assets: import path={expected["path"]}', flush=True)
         print('scraper-assets: import XML=' + xml_payload.decode('utf-8'), flush=True)
-        request('/addgames/' + urllib.parse.quote(system_name, safe=''), xml_payload)
+        try:
+            request('/addgames/' + urllib.parse.quote(system_name, safe=''), xml_payload)
+        except ImportRejected as exc:
+            if exc.status != 204 or not live or not detail_url:
+                raise
+            print(f'scraper-assets: {exc}; trying existing-entry metadata/media APIs', flush=True)
+            from scraper_es_fallback import update_existing
+            update_existing(request, detail_url, live, expected, entry, proposed,
+                            gamelist, equal)
         games = request('/systems/' + urllib.parse.quote(system_name, safe='') + '/games')
         games = [g for g in games if isinstance(g, dict) and isinstance(g.get('path'), str) and canon(g['path']) == target]
         if len(games) != 1 or not isinstance(games[0].get('id'), str):
