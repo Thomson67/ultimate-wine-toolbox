@@ -35,6 +35,8 @@ class ScraperSyncTests(unittest.TestCase):
                      'gametime': '29000', 'lastplayed': '20261103T120000',
                      'favorite': 'true', 'scraperId': 'original-scraper-id'}
         self.posts = []
+        self.imported_paths = []
+        self.force_no_content = False
         self.ignore_post = False
         self.fail_post = False
         self.grouped = False
@@ -97,8 +99,15 @@ class ScraperSyncTests(unittest.TestCase):
                 if owner.fail_post:
                     return self.send({}, 500)
                 payload = self.rfile.read(int(self.headers['Content-Length']))
+                g = ET.fromstring(payload).find('game')
+                import_path = g.findtext('path', '')
+                owner.imported_paths.append(import_path)
+                # ES imports by exact fileMap key after resolving the root;
+                # require the API's absolute spelling here, including aliases.
+                expected_path = owner.live.get('path', str(owner.ports / ROM))
+                if owner.force_no_content or import_path != expected_path:
+                    return self.send('No game added / updated', 204)
                 if not owner.ignore_post:
-                    g = ET.fromstring(payload).find('game')
                     owner.live = {c.tag: c.text or '' for c in g}
                     if 'id' in owner.live:
                         owner.live['scraperId'] = owner.live.pop('id')
@@ -149,6 +158,29 @@ class ScraperSyncTests(unittest.TestCase):
         self.assertEqual(self.run_install().returncode, 0)
         self.save_live()
         self.assertFalse(ET.parse(self.xml).getroot()[1].findtext('image'))
+
+    def test_import_uses_literal_api_path_with_symlink_spelling(self):
+        alias = self.base / 'ports-alias'
+        alias.symlink_to(self.ports, target_is_directory=True)
+        api_path = str(alias / ROM)
+        self.live['path'] = api_path
+        with self.api() as url:
+            result = self.run_install(url, '1')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.imported_paths, [api_path])
+        self.assertIn('import XML=', (self.base / 'scraper.log').read_text())
+
+    def test_http_204_keeps_failure_and_captures_import_xml(self):
+        self.force_no_content = True
+        with self.api() as url:
+            result = self.run_install(url, '1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.xml.read_bytes(), self.before)
+        self.assertIn('ES import returned HTTP 204', result.stdout + result.stderr)
+        log = (self.base / 'scraper.log').read_text()
+        self.assertIn('import XML=', log)
+        self.assertIn(str(self.ports / ROM), log)
+        self.assertNotIn('memory and gamelist verified', log)
 
     def test_grouped_ports_imports_only_into_owning_real_system(self):
         self.grouped = True

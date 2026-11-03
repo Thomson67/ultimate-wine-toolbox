@@ -167,6 +167,15 @@ def synchronize(gamelist, proposed, rom_name, fields, backup):
             raise SyncError('real Ports system unavailable; XML left untouched')
         system_name = 'ports'
 
+    # Match ES's fileMap using the literal absolute path returned by its API.
+    # A relative path is resolved against ES's configured root, which need not
+    # have the same spelling as the on-disk Ports directory (symlinks/groups).
+    expected['path'] = live['path'] if live else str(ports.absolute() / rom_name)
+    for key in ('image', 'boxart', 'fanart', 'marquee', 'thumbnail'):
+        value = expected.get(key, '')
+        if value and not os.path.isabs(value) and not value.startswith('~/'):
+            expected[key] = os.path.abspath(ports / value)
+
     for key, value in expected.items():
         node = entry.find(key)
         if node is None:
@@ -181,7 +190,10 @@ def synchronize(gamelist, proposed, rom_name, fields, backup):
         backup()
         payload = ET.Element('gameList')
         payload.append(entry)
-        request('/addgames/' + urllib.parse.quote(system_name, safe=''), ET.tostring(payload, encoding='utf-8'))
+        xml_payload = ET.tostring(payload, encoding='utf-8', xml_declaration=True)
+        print(f'scraper-assets: import path={expected["path"]}', flush=True)
+        print('scraper-assets: import XML=' + xml_payload.decode('utf-8'), flush=True)
+        request('/addgames/' + urllib.parse.quote(system_name, safe=''), xml_payload)
         games = request('/systems/' + urllib.parse.quote(system_name, safe='') + '/games')
         games = [g for g in games if isinstance(g, dict) and isinstance(g.get('path'), str) and canon(g['path']) == target]
         if len(games) != 1 or not isinstance(games[0].get('id'), str):

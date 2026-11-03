@@ -17,6 +17,8 @@ Cette branche conserve les ajouts ReShade et les thèmes de la branche
 - Quand ES tourne mais que son API est indisponible, l'installation de la Toolbox
   continue avec un avertissement pour le scrap. Le XML n'est pas modifié par une
   méthode susceptible d'être écrasée. Réinstaller une fois l'API accessible.
+- L’import utilise le chemin absolu exact renvoyé par ES. Le XML envoyé est
+  inclus dans le journal afin de diagnostiquer les refus, notamment HTTP 204.
 - Le journal persistant est dans
   `/userdata/system/logs/ultimate-wine-toolbox/scraper-install.log`.
   Le manifeste SHA-256 reste uniquement la preuve de la copie des médias.
