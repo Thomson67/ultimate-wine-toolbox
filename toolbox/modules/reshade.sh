@@ -229,6 +229,12 @@ resh_version_select() {
 
 resh_install_game() {
     local rom="$1" exe selected dll backend_dll version packs backend_packs state workspace name label model defaults current
+    local current_pack
+    current_pack="$(resh_cmd pack-status "$rom" 2>>"${WT_SESSION_LOG:-/dev/null}")" || current_pack=""
+    if [ -n "$current_pack" ] && [ "$current_pack" != '{}' ]; then
+        msgbox "$(i18n resh_title)" "$(community_txt 'Retirez le pack local avant de changer la version, les shaders ou l’exécutable ReShade.' 'Remove the local bundle before changing the ReShade version, shaders or executable.')"
+        return 1
+    fi
     local resume_exe="${2:-}" community_preset="${3:-}" resumed=0 index apply_community=0
     local -a exes=() items=() shaders=()
     local listing
@@ -429,6 +435,46 @@ resh_external_menu() {
     done
 }
 
+resh_pack_menu() {
+    local rom="$1" choice archive info summary preset selected name output
+    local -a presets=() items=()
+    info="$(resh_cmd pack-status "$rom" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
+    if [ "$info" != '{}' ]; then
+        summary="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(d.get("selected", ""))' "$info")"
+        choice="$(menu_select "$(i18n resh_title)" "$(community_txt 'Pack local installé' 'Installed local bundle'): $summary" \
+            remove "$(community_txt 'Retirer le pack et restaurer les réglages précédents' 'Remove bundle and restore previous settings')" back "$(i18n back)")" || return
+        [ "$choice" = remove ] || return
+        yesno_default_no "$(i18n resh_title)" "$(community_txt 'Retirer ce pack et restaurer le preset et la configuration précédents ?' 'Remove this bundle and restore the previous preset and configuration?')" || return
+        if output="$(resh_cmd pack-remove "$rom" 2>&1)"; then
+            msgbox "$(i18n resh_title)" "$(community_txt 'Pack retiré. Réglages précédents restaurés.' 'Bundle removed. Previous settings restored.')"
+        else msgbox "$(i18n resh_title)" "$output"; fi
+        return
+    fi
+    if command -v yad >/dev/null 2>&1; then
+        archive="$(DISPLAY="${DISPLAY:-:0}" LANGUAGE="$WT_LANGUAGE" yad --file --filename=/userdata/ \
+            --title="$(community_txt 'Importer un pack ReShade local' 'Import local ReShade bundle')" \
+            --file-filter='ReShade ZIP | *.zip *.ZIP' --width=1000 --height=700)" || return
+    else
+        archive="$(input_text "$(i18n resh_title)" "$(community_txt 'Chemin du pack ReShade ZIP' 'ReShade ZIP bundle path')" /userdata/)" || return
+    fi
+    if ! info="$(resh_cmd pack-info "$archive" 2>&1)"; then msgbox "$(i18n resh_title)" "$info"; return 1; fi
+    summary="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("ReShade: "+(d["required_release"] or "full add-on support")); print("Add-ons: "+", ".join(n+" ("+str(a)+" bits)" for n,a in d["addons"].items())); print(str(d["files"])+" files / "+str(round(d["bytes"]/1048576,1))+" MiB")' "$info")" || return
+    while IFS= read -r name; do
+        presets+=("$name"); items+=("${#presets[@]}" "$name")
+    done < <(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("\n".join(sorted(d["presets"], key=lambda p:p!=d["preferred"])))' "$info")
+    selected="$(menu_select "$(i18n resh_title)" "$summary" "${items[@]}" back "$(i18n back)")" || return
+    case "$selected" in ''|*[!0-9]*) return ;; esac
+    [ "$selected" -ge 1 ] && [ "$selected" -le "${#presets[@]}" ] || return
+    preset="${presets[$((selected-1))]}"
+    yesno_default_no "$(i18n resh_title)" "$summary
+
+$preset
+$(community_txt 'Installer pour ce jeu les add-ons exécutables et les shaders de cette archive ? Les réglages actuels seront sauvegardés. Pour le pack Citra, installez au préalable ReShade 6.3.3 avec add-ons.' 'Install the executable add-ons and shaders from this archive for this game? Current settings will be backed up. For the Citra bundle, install ReShade 6.3.3 with add-ons first.')" || return
+    if output="$(resh_cmd pack-import "$rom" "$archive" "$preset" 2>&1)"; then
+        msgbox "$(i18n resh_title)" "$(community_txt 'Pack installé. Pour Citra : ouvrez ReShade avec Home, vérifiez citra.addon et choisissez le tampon de profondeur. Réglez la disposition des écrans dans Citra.fx, placé en tête des effets. Le mode performance reste désactivé pour ces réglages. La compatibilité en jeu, notamment Vulkan, reste à vérifier.' 'Bundle installed. For Citra: open ReShade with Home, check citra.addon and select the depth buffer. Set the screen layout in Citra.fx, first in the effect order. Performance mode stays off for setup. In-game compatibility, including Vulkan, still needs testing.')"
+    else msgbox "$(i18n resh_title)" "$output"; return 1; fi
+}
+
 resh_game_menu() {
     local rom="$1" state choice preset profile details version arch dll exe packs prompt
     while true; do
@@ -455,13 +501,14 @@ resh_game_menu() {
         if [ "$state" != missing ]; then
             if [ "$state" = disabled ]; then actions+=(enable "$(i18n resh_enable)")
             else actions+=(disable "$(i18n resh_disable)"); fi
-            actions+=(preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)")
+            actions+=(pack "$(community_txt 'Pack ReShade local (ZIP, add-ons et shaders)' 'Local ReShade bundle (ZIP, add-ons and shaders)')" preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)")
         fi
         choice="$(menu_select "$(i18n resh_title) — $(basename "$rom")" "$prompt" \
             "${actions[@]}" community "$(i18n resh_community)" back "$(i18n back)")" || return
         case "$choice" in
             community) community_menu reshade "$rom" ;;
             install) resh_install_game "$rom" ;;
+            pack) resh_pack_menu "$rom" ;;
             enable|disable)
                 resh_cmd "$choice" "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
                     msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"

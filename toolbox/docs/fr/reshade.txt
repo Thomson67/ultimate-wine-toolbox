@@ -56,3 +56,8 @@ L’espace validateur s’ouvre par appairage avec un code dans un navigateur. I
 
 VALIDATION MATÉRIELLE
 Un utilisateur a validé Azahar Windows sous Wine en Vulkan sur sa configuration AMD : ouverture de ReShade, création d’un preset et coexistence avec MangoHud/Mailbox sans problème constaté. Ce retour ne valide pas tous les GPU, runners ou effets.
+
+Packs locaux (test) : le menu du jeu propose l’import ZIP d’add-ons, shaders
+et presets isolés. Pour Henriko/Citra, installer d’abord ReShade 6.3.3 avec
+add-ons complets. Retirer le pack restaure les réglages précédents. Les
+partages communautaires restent limités aux presets INI.

@@ -2,6 +2,7 @@
 """Batocera adapter: stage ReShadeLinux installs and journal reversible game files."""
 import argparse
 import contextlib
+import configparser
 import fcntl
 import hashlib
 import json
@@ -14,6 +15,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import zipfile
 
 HOOKS = {'dxgi', 'd3d9', 'opengl32', 'vulkan'}
 COMPILER_HASH = {32: '2ad0d4987fc4624566b190e747c9d95038443956ed816abfd1e2d389b5ec0851',
@@ -172,6 +174,9 @@ def valid_rom(rom):
 
 def prepare(home, rom, exe, dll, version, repos, release_id=''):
     valid_rom(rom)
+    current = read_json(home / 'reshade/games' / (key(rom) + '.json'))
+    if current.get('pack'):
+        raise ValueError('remove the local ReShade pack before reconfiguring its runtime or executable')
     if dll not in HOOKS or not re.fullmatch(r'latest|[0-9]+\.[0-9]+\.[0-9]+', version):
         raise ValueError('invalid ReShade hook/version')
     if not re.fullmatch(r'[a-z0-9_-]+(?:,[a-z0-9_-]+)*|none', repos):
@@ -297,6 +302,17 @@ def profile_ini(base, cfg):
     lines[index:index] = [f'EffectSearchPaths={shader_root}\\Merged\\Shaders\\**',
                            f'TextureSearchPaths={shader_root}\\Merged\\Textures\\**',
                            'PresetPath=.\\ReShadePreset.ini']
+    if cfg.get('pack'):
+        # This bundle supplies its own modified shader/include versions. Do not
+        # mix them with the global cache or compile duplicate effects.
+        lines[index] = 'EffectSearchPaths=.\\UWT-ReShadePack\\reshade-shaders\\Shaders\\**'
+        lines[index+1] = 'TextureSearchPaths=.\\UWT-ReShadePack\\reshade-shaders\\Textures\\**'
+        lines = [line for line in lines if not re.match(r'^AddonPath=', line)]
+        addon = next((i+1 for i, line in enumerate(lines) if line == '[ADDON]'), None)
+        if addon is None:
+            lines.extend(['[ADDON]', 'AddonPath=.'])
+        else:
+            lines.insert(addon, 'AddonPath=.')
     return '\n'.join(lines) + '\n'
 
 
@@ -391,6 +407,9 @@ def install_files(home, rom, root, prefix, cfg):
              (root, (folder / 'd3dcompiler_47.dll').as_posix(), Path(cfg['compiler']).read_bytes(), False),
              (root, (folder / 'ReShade.ini').as_posix(), ini, True),
              (root, (folder / 'ReShadePreset.ini').as_posix(), (profile / 'ReShadePreset.ini').read_bytes(), True)]
+    if cfg.get('pack'):
+        from reshade_pack import stage_files
+        files.extend(stage_files(home, rom, root, folder, cfg))
     # ReShade >=6.5 needs the compiler in system32/syswow64 too.
     win32 = False
     try:
@@ -688,7 +707,7 @@ def main():
     parser.add_argument('--runner', default='')
     parser.add_argument('--legacy', action='store_true')
     parser.add_argument('command', choices=['backend-packs', 'exes', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'external-scan', 'external-info', 'external-enable', 'external-disable', 'external-release', 'wiki-title', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
-                                           'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore'])
+                                           'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore', 'pack-info', 'pack-import', 'pack-remove', 'pack-status'])
     parser.add_argument('rom', nargs='?', type=Path)
     parser.add_argument('args', nargs='*')
     args = parser.parse_args()
@@ -710,6 +729,17 @@ def main():
             print(prepare(home, rom, *args.args))
         elif args.command == 'finish':
             print(json.dumps(finish(home, rom)))
+        elif args.command.startswith('pack-'):
+            import reshade_pack
+            if args.command == 'pack-info':
+                print(json.dumps(reshade_pack.archive(rom)[1], ensure_ascii=False))
+            elif args.command == 'pack-status':
+                print(json.dumps(reshade_pack.manifest(home, rom), ensure_ascii=False))
+            elif args.command == 'pack-import':
+                print(json.dumps(reshade_pack.install(home, rom, Path(args.args[0]), args.args[1],
+                                                     args.runner, args.bottles, args.legacy), ensure_ascii=False))
+            else:
+                reshade_pack.remove(home, rom, args.runner, args.bottles, args.legacy)
         elif args.command == 'status-list':
             paths = sys.stdin.read().splitlines()
             for path, state in list_statuses(home, paths):
@@ -779,6 +809,9 @@ def main():
                     set_enabled(home, rom, False)
                     raise
             elif args.command == 'uninstall':
+                if read_json(home / 'reshade/games' / (key(rom) + '.json')).get('pack'):
+                    import reshade_pack
+                    reshade_pack.remove(home, rom, args.runner, args.bottles, args.legacy)
                 (home / 'reshade/games' / (key(rom) + '.json')).unlink()
         elif args.command in ('gameStart', 'gameStop'):
             event(home, rom, args.command, args.runner, args.bottles, args.legacy)
@@ -818,6 +851,6 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (ValueError, OSError, subprocess.CalledProcessError, KeyError) as exc:
+    except (ValueError, OSError, subprocess.CalledProcessError, KeyError, configparser.Error, zipfile.BadZipFile) as exc:
         print(str(exc), file=sys.stderr)
         sys.exit(1)
