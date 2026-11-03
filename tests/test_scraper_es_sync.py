@@ -38,6 +38,8 @@ class ScraperSyncTests(unittest.TestCase):
         self.ignore_post = False
         self.fail_post = False
         self.grouped = False
+        self.native_group = False
+        self.group_alias = False
 
     def save_live(self):
         # ES replaces a dirty entry from memory when saving/reloading.
@@ -68,12 +70,22 @@ class ScraperSyncTests(unittest.TestCase):
             def do_GET(self):
                 name = 'windowsports' if owner.grouped else 'ports'
                 if self.path == '/systems':
-                    systems = [{'name': name, 'group': 'ports', 'groupsystem': 'false'}]
+                    systems = [{'name': name, 'group': 'ports', 'gamesystem': 'true',
+                                'groupsystem': 'true' if owner.native_group else 'false'}]
                     if owner.grouped:
-                        systems.insert(0, {'name': 'ports', 'groupsystem': 'true'})
+                        systems.insert(0, {'name': 'ports', 'groupsystem': 'true',
+                                           'gamesystem': 'true' if owner.group_alias else 'false'})
                     return self.send(systems)
                 if self.path == f'/systems/{name}/games':
-                    return self.send([owner.live] if owner.live else [])
+                    games = [owner.live] if owner.live else []
+                    if owner.native_group:
+                        games = games + [{'path': str(owner.ports / 'UMU Runner Toolbox.sh'),
+                                          'systemName': 'ports', 'id': 'umu-id', 'playcount': '33'},
+                                         {'path': '/userdata/system/ultimate-wine-toolbox/runtime/es-return-proxy/Ultimate Wine Toolbox Return.sh',
+                                          'systemName': 'uwt_return', 'id': 'return-id'}]
+                    return self.send(games)
+                if owner.group_alias and self.path == '/systems/ports/games':
+                    return self.send([dict(owner.live, systemName=name)])
                 if self.path.startswith(f'/systems/{name}/games/opaque-api-id?'):
                     if 'localpaths=true' not in self.path:
                         return self.send({}, 400)
@@ -145,6 +157,40 @@ class ScraperSyncTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertEqual(self.posts, ['/addgames/windowsports'])
 
+    def test_native_ports_also_marked_as_group_owns_its_toolbox(self):
+        # User's ES v43.1 response: Ports is a group AND owns Toolbox entries;
+        # other listed games, such as uwt_return, belong to child systems.
+        self.native_group = True
+        self.live['systemName'] = 'ports'
+        with self.api() as url:
+            result = self.run_install(url, '1')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.posts, ['/addgames/ports'])
+        self.assertIn('launcher owner=ports', result.stdout)
+        self.save_live()
+        self.assertTrue(ET.parse(self.xml).getroot()[1].findtext('image'))
+        self.assertEqual(ET.parse(self.xml).getroot()[0].findtext('playcount'), '33')
+
+    def test_group_alias_does_not_count_as_second_owner(self):
+        self.grouped = True
+        self.group_alias = True
+        self.live['systemName'] = 'windowsports'
+        with self.api() as url:
+            result = self.run_install(url, '1')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.posts, ['/addgames/windowsports'])
+
+    def test_native_group_does_not_adopt_a_child_with_same_path(self):
+        self.native_group = True
+        self.live['systemName'] = 'uwt_return'
+        # A child alias must not be mistaken for a fresh native launcher.
+        self.ignore_post = True
+        with self.api() as url:
+            result = self.run_install(url, '1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.xml.read_bytes(), self.before)
+        self.assertEqual(self.posts, [])
+
     def test_live_custom_media_and_name_are_preserved(self):
         self.live.update(image=str(self.ports / 'my-art.jpg'), name='My Toolbox')
         with self.api() as url:
@@ -159,6 +205,7 @@ class ScraperSyncTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.xml.read_bytes(), self.before)
         self.assertIn('API is unavailable', (self.base / 'scraper.log').read_text())
+        self.assertNotIn('corrected missing', result.stdout)
 
     def test_failed_sync_keeps_legacy_media_and_manifest(self):
         import hashlib

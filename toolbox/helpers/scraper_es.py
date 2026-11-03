@@ -84,8 +84,12 @@ def synchronize(gamelist, proposed, rom_name, fields, backup):
     candidates = [s for s in systems if isinstance(s, dict)
                   and (s.get('name') == 'ports' or s.get('group') == 'ports')
                   and str(s.get('collection', 'false')).lower() != 'true'
-                  and str(s.get('groupsystem', 'false')).lower() != 'true']
+                  # ES can turn an existing native Ports system into a group
+                  # without removing its own games or gamelist. Only a purely
+                  # virtual group has gamesystem=false.
+                  and str(s.get('gamesystem', 'true')).lower() != 'false']
     matches = []
+    foreign_owners = set()
     for system in candidates:
         name = system.get('name')
         if not isinstance(name, str):
@@ -94,10 +98,23 @@ def synchronize(gamelist, proposed, rom_name, fields, backup):
         if not isinstance(games, list):
             raise SyncError('invalid ES game list')
         for game in games:
-            if isinstance(game, dict) and isinstance(game.get('path'), str) and canon(game['path']) == target:
+            if not isinstance(game, dict) or not isinstance(game.get('path'), str) or canon(game['path']) != target:
+                continue
+            # A group lists child-system games too. Never import a child entry
+            # into the group's own gamelist, or count its alias as a duplicate.
+            owner = game.get('systemName')
+            if owner is None and str(system.get('groupsystem', 'false')).lower() != 'true':
+                owner = name  # Compatibility with older non-group API responses.
+            if owner == name:
                 matches.append((name, game))
+            else:
+                foreign_owners.add(str(owner))
+    print('scraper-assets: native candidate systems=' + ','.join(str(s.get('name')) for s in candidates))
     if len(matches) > 1:
-        raise SyncError('multiple real ES systems own this launcher; XML left untouched')
+        raise SyncError('multiple owning ES systems found for this launcher; XML left untouched')
+
+    if not matches and foreign_owners:
+        raise SyncError('launcher belongs to another system (' + ','.join(sorted(foreign_owners)) + '); XML left untouched')
 
     proposed_root = ET.fromstring(proposed)
     entries = [g for g in proposed_root.findall('game') if canon(g.findtext('path', '')) == target]
@@ -109,12 +126,13 @@ def synchronize(gamelist, proposed, rom_name, fields, backup):
     detail_url = None
     if matches:
         system_name, game = matches[0]
+        print(f'scraper-assets: launcher owner={system_name}; exact path matched')
         game_id = game.get('id')
         if not isinstance(game_id, str) or not game_id:
             raise SyncError('missing ES game identifier')
         detail_url = '/systems/' + urllib.parse.quote(system_name, safe='') + '/games/' + urllib.parse.quote(game_id, safe='') + '?localpaths=true'
         live = request(detail_url)
-        if not isinstance(live, dict) or canon(live.get('path', '')) != target:
+        if not isinstance(live, dict) or canon(live.get('path', '')) != target or live.get('systemName', system_name) != system_name:
             raise SyncError('ES returned a different launcher')
         # Prefer a user-selected live value over a managed/default value.
         for key in fields:
@@ -143,8 +161,8 @@ def synchronize(gamelist, proposed, rom_name, fields, backup):
                     node = ET.SubElement(entry, key)
                 node.text = value
     else:
-        # Fresh installs can be imported into the real Ports system before a
-        # filesystem scan. Never import into the virtual Ports group.
+        # A native Ports system (possibly also a group) can import a fresh
+        # launcher before a scan. A purely virtual group cannot.
         if not any(s.get('name') == 'ports' for s in candidates):
             raise SyncError('real Ports system unavailable; XML left untouched')
         system_name = 'ports'

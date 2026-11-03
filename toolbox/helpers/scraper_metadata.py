@@ -106,7 +106,6 @@ if not new_file:
             block_changed = block_changed or did_change
         if block_changed:
             changed = True
-            print(f"scraper-assets: corrected missing/managed fields for {rom_name}")
             return match.group(1) + body + match.group(3)
         return block
 

@@ -7,6 +7,9 @@ Cette branche conserve les ajouts ReShade et les thèmes de la branche
 
 - Les archives sources et les releases contiennent les JPG optimisés ; aucune
   conversion ni dépendance d'imagerie supplémentaire n'est nécessaire sur Batocera.
+- Un système Ports natif peut aussi être marqué comme groupe. La détection
+  vérifie `gamesystem` et le `systemName` de chaque entrée, sans confondre les
+  jeux propres à Ports avec ceux de ses sous-systèmes.
 - Quand ES tourne, l'installateur importe l'entrée via son API locale. Il conserve
   les statistiques et les personnalisations en mémoire et vérifie les champs
   sur disque ainsi que dans ES. Il n'envoie aucun rechargement global des jeux.
