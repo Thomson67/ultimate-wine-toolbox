@@ -5,7 +5,7 @@ ReShade applies effects to the game image: colors, sharpening, CRT rendering or 
 INSTALL
 In Tools and compatibility → ReShade, select the game, then Install / change version and shaders. Choose the actual game executable, API, ReShade version and shader packs.
 
-Select a version from the list, then its variant when several are available. The “No startup banner” variant comes from fienestar’s OverlayDisabledReShade project and is available for 6.4.1 and 6.2.0. It retains the Home menu and effects. Some recent shaders may require a newer engine. Existing settings and presets are retained when changing versions.
+Select a version from the list, then its variant and provider when several are available. The catalogue distinguishes standard builds, 41 official full add-on versions (5.0.0–6.8.0) and 11 no-startup-banner distributions from multiple repositories. These retain the Home menu and effects; add-on support depends on the build and is shown in its details. Some recent shaders may require a newer engine. Existing settings and presets are retained when changing versions.
 
 The catalogue offers 62 official releases from 4.1.0 through 6.8.0. Vulkan only lists versions 4.4.0 and newer. Modern shaders may not be compatible with older engines.
 
@@ -57,7 +57,7 @@ The validator area uses a pairing code and a browser page. Validators can approv
 HARDWARE VALIDATION
 A user validated Windows Azahar under Wine using Vulkan on their AMD configuration: ReShade opened, a preset was created and MangoHud/Mailbox coexisted without reported issues. This does not validate every GPU, runner or effect.
 
-Local bundles (test): the game menu imports ZIP add-ons, isolated shaders
+Local bundles: the game menu imports ZIP add-ons, isolated shaders
 and presets. For Henriko/Citra, install ReShade 6.3.3 with full add-on support
 first. Removing the bundle restores previous settings. Community sharing
 still transfers INI presets only.

@@ -6,7 +6,7 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.10.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.10.2).**
+**Version stable : [v0.11.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.0).**
 
 ## Fonctionnalités
 
@@ -33,6 +33,20 @@ Créée par **Thomsonito**.
 - sauvegarde automatique avant les opérations destructives sur `batocera.conf`
 - lanceur natif Batocera dans Ports avec prise en charge Pad2Key
 - recherche de mises à jour au démarrage et depuis le menu de la toolbox
+
+## Nouveautés de la v0.11.0
+
+- Catalogue ReShade étendu : versions officielles standard, avec add-ons complets et variantes sans bandeau de démarrage, avec contrôles des DLL et sommes de contrôle.
+- Import de packs ZIP locaux : add-ons, shaders, textures, configuration et tous les presets ; prise en charge du pack Henriko/Citra avec ReShade 6.3.3 avec add-ons.
+- Plusieurs presets par jeu, détails, renommage, duplication, export et suppression, y compris pour les jeux absents, depuis le gestionnaire global.
+- Bascule en jeu avec Page haut / Page bas, sauvegarde automatique et conservation des réglages lors d'une sélection manuelle.
+- Détection des effets manquants à l'import d'un preset INI et proposition d'installation des packs de shaders reconnus.
+- Thèmes d'affichage sélectionnables et couleurs corrigées sous Xorg.
+- Installation des médias et synchronisation de la gamelist avec EmulationStation corrigées, y compris avec Ports regroupé.
+
+Le partage communautaire ReShade reste limité aux presets `.ini` ; les packs ZIP complets s'importent localement.
+
+[Notes de version v0.11.0](release-notes/v0.11.0.md) · [Guide des packs et presets](docs/RESHADE_PACKS.fr.md)
 
 ## Correctifs de la v0.10.2
 

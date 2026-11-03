@@ -6,7 +6,7 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.10.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.10.2).**
+**Stable version: [v0.11.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.0).**
 
 ## Features
 
@@ -33,6 +33,20 @@ Created by **Thomsonito**.
 - automatic backups before destructive `batocera.conf` operations
 - native Batocera Ports launcher and Pad2Key support
 - update checks at startup and from the toolbox menu
+
+## New in v0.11.0
+
+- Expanded ReShade catalogue: official standard, full add-on and no-startup-banner builds, with DLL inspection and pinned checksums.
+- Local ZIP bundles: add-ons, shaders, textures, configuration and all presets; Henriko/Citra support with ReShade 6.3.3 full add-on support.
+- Multiple presets per game, details, rename, duplicate, export and removal, including missing games, through a global manager.
+- In-game Page Up / Page Down switching, autosave and retained edits when manually selecting presets.
+- Missing-effect detection when importing an INI preset, with optional installation of recognized shader packs.
+- Selectable display themes and corrected Xorg terminal colors.
+- Fixed artwork installation and live EmulationStation gamelist synchronization, including grouped Ports.
+
+Community ReShade sharing still supports `.ini` presets; complete ZIP bundles are imported locally.
+
+[v0.11.0 release notes](release-notes/v0.11.0.md) · [Bundle and preset guide (French)](docs/RESHADE_PACKS.fr.md)
 
 ## Fixed in v0.10.2
 

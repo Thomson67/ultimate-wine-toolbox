@@ -1,7 +1,7 @@
-# Test : import local de packs ReShade
+# Packs locaux et gestion des presets ReShade
 
-Branche `fix/scraper-es-sync`, sans nouvelle release stable. Ce premier test
-concerne l'import local ; les échanges communautaires restent des presets `.ini`.
+Disponible depuis la version stable **v0.11.0**. Les packs ZIP s’importent
+localement ; les échanges communautaires restent des presets `.ini`.
 Aucun fichier du pack Henriko n'est livré dans le dépôt.
 
 ## Essai Henriko / Citra

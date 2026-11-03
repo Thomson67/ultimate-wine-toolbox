@@ -1,19 +1,18 @@
 # Documentation — Ultimate Wine Toolbox
 
-Ces guides décrivent Ultimate Wine Toolbox **v0.8.0**, avec les profils
-launcher/jeu, les transferts complets AntiMicroX et le choix de nettoyage des
-backups de sauvegardes après MAJ WSquashFS. La mise à jour normale conserve les
-configurations créées pendant les tests. Les anciennes notes de release restent
-propres à leur version.
+Ces guides décrivent Ultimate Wine Toolbox **v0.11.0**, avec le catalogue
+ReShade étendu, les packs locaux, les collections de presets et leur gestion.
+La mise à jour normale conserve les configurations créées pendant les tests.
+Les anciennes notes de release restent propres à leur version.
 
-These guides describe **v0.8.0**, including launcher profiles, complete
-configuration transfers and optional cleanup of update save-data backups.
-Normal updates retain configurations created during testing. A successful test
-on one setup does not establish compatibility with every game and runner.
+These guides describe **v0.11.0**, including the expanded ReShade catalogue,
+local bundles and preset collection management. Normal updates retain existing
+configurations. A successful test on one setup does not establish compatibility
+with every game and runner.
 
 ## Guides disponibles / Available guides
 
-Les huit rubriques du menu **Documentation** sont disponibles hors ligne dans
+Les rubriques du menu **Documentation** sont disponibles hors ligne dans
 la langue choisie. Les fichiers techniques ci-dessous complètent ces guides.
 
 | Rubrique / Topic | Aide FR | English help | Détails |
@@ -23,7 +22,7 @@ la langue choisie. Les fichiers techniques ci-dessous complètent ces guides.
 | Mise à jour WSquashFS / Update | [FR](../toolbox/docs/fr/update.txt) | [EN](../toolbox/docs/en/update.txt) | [Présentation](../README.fr.md#mettre-à-jour-un-wsquashfs) |
 | MangoHud | [FR](../toolbox/docs/fr/mangohud.txt) | [EN](../toolbox/docs/en/mangohud.txt) | Réglages globaux et par jeu / Global and per-game settings |
 | DXVK / VKD3D / NVAPI | [FR](../toolbox/docs/fr/dxvk.txt) | [EN](../toolbox/docs/en/dxvk.txt) | [Présentation](../README.fr.md#dxvk-vkd3d-proton-et-nvapi) |
-| ReShade | [FR](../toolbox/docs/fr/reshade.txt) | [EN](../toolbox/docs/en/reshade.txt) | [Échanges communautaires](COMMUNITY_PROFILES.md), [builds et contrôles](RESHADE_BUILDS.fr.md), [test packs locaux](RESHADE_PACKS_TEST.fr.md) |
+| ReShade | [FR](../toolbox/docs/fr/reshade.txt) | [EN](../toolbox/docs/en/reshade.txt) | [Échanges communautaires](COMMUNITY_PROFILES.md), [builds et contrôles](RESHADE_BUILDS.fr.md), [packs et presets](RESHADE_PACKS.fr.md) |
 | Winetricks / Wine Mono / .NET | [FR](../toolbox/docs/fr/dotnet.txt) | [EN](../toolbox/docs/en/dotnet.txt) | Installation, copie locale et restauration / Installation, staging and recovery |
 | AntiMicroX | [FR](../toolbox/docs/fr/antimicrox.txt) | [EN](../toolbox/docs/en/antimicrox.txt) | [Guide technique](ANTIMICROX.md), [parcours launcher FR](ANTIMICROX-LAUNCHERS-TEST.fr.md) |
 

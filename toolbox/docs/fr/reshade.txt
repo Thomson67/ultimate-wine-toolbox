@@ -5,7 +5,7 @@ ReShade applique des effets à l’image du jeu : couleurs, netteté, rendu CRT 
 INSTALLER
 Dans Outils et compatibilité → ReShade, choisir le jeu puis Installer / modifier version et shaders. Sélectionner le véritable exécutable du jeu, l’API, la version de ReShade et les packs de shaders.
 
-La version se choisit dans une liste, puis la variante lorsqu’il y en a plusieurs. La variante « Sans bannière de démarrage » provient du projet OverlayDisabledReShade de fienestar et est disponible en 6.4.1 et 6.2.0. Elle conserve le menu Home et les effets. Certains shaders récents peuvent demander un moteur plus récent. Les réglages et presets existants sont conservés lors du changement de version.
+La version se choisit dans une liste, puis la variante et son fournisseur lorsqu’il y en a plusieurs. Le catalogue distingue les éditions standard, 41 versions officielles avec add-ons complets (5.0.0 à 6.8.0) et 11 distributions sans bandeau de démarrage issues de plusieurs dépôts. Ces dernières conservent le menu Home et les effets ; la prise en charge des add-ons dépend du build et figure dans ses détails. Certains shaders récents peuvent demander un moteur plus récent. Les réglages et presets existants sont conservés lors du changement de version.
 
 Le catalogue propose 62 versions officielles de 4.1.0 à 6.8.0. Pour Vulkan, seules les versions à partir de 4.4.0 sont proposées. Les shaders modernes ne sont pas tous compatibles avec les anciens moteurs.
 
@@ -57,7 +57,7 @@ L’espace validateur s’ouvre par appairage avec un code dans un navigateur. I
 VALIDATION MATÉRIELLE
 Un utilisateur a validé Azahar Windows sous Wine en Vulkan sur sa configuration AMD : ouverture de ReShade, création d’un preset et coexistence avec MangoHud/Mailbox sans problème constaté. Ce retour ne valide pas tous les GPU, runners ou effets.
 
-Packs locaux (test) : le menu du jeu propose l’import ZIP d’add-ons, shaders
+Packs locaux : le menu du jeu propose l’import ZIP d’add-ons, shaders
 et presets isolés. Pour Henriko/Citra, installer d’abord ReShade 6.3.3 avec
 add-ons complets. Retirer le pack restaure les réglages précédents. Les
 partages communautaires restent limités aux presets INI.
