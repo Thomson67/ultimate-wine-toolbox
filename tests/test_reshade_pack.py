@@ -197,6 +197,68 @@ class LocalReShadePackTests(unittest.TestCase):
 
 
 class LocalReShadePackUiTests(unittest.TestCase):
+    def test_installation_offers_bundle_and_imports_before_enable(self):
+        import os
+        import subprocess
+        import tempfile
+        root = Path(__file__).resolve().parents[1]
+        for mode in ('install', 'cancel', 'incompatible', 'import-fails'):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                base = Path(tmp)
+                backend = base / 'backend.sh'
+                backend.write_text('#!/bin/bash\nexit 0\n')
+                env = dict(os.environ, WT_ROOT=str(root / 'toolbox'), WT_HOME=tmp, WT_LANGUAGE='fr',
+                           RESULT=str(base / 'result'), OPTIONS=str(base / 'options'), MODE=mode,
+                           BACKEND=str(backend), WT_LOG_DIR=str(base / 'logs'))
+                script = r'''
+source "$WT_ROOT/modules/reshade.sh"
+RESH_BACKEND="$BACKEND"
+community_txt() { printf '%s' "$1"; }
+i18n() { printf '%s' "$1"; }
+resh_api_select() { printf vulkan; }
+resh_version_select() { printf 6.3.3-addons; }
+resh_backend_ready() { mkdir -p "$WT_HOME/reshade/runtime"; }
+resh_prepare_tools() { mkdir -p "$WT_HOME/reshade/bin"; }
+menu_select() { printf '%s\n' "$@" > "$OPTIONS"; printf local-pack; }
+resh_pack_menu() { [ "$MODE" != cancel ] || return 1; printf '/userdata/My bundle.zip\nUltra.ini'; }
+yesno_default_no() { return 0; }
+msgbox() { return 0; }
+resh_cmd() {
+ case "$1" in
+  exes) echo Game.exe;;
+  details) :;;
+  pack-status) echo '{}';;
+  pack-check) [ "$MODE" != incompatible ];;
+  backend-packs) printf '%s' "$2";;
+  status) echo enabled;;
+  prepare) printf '%s\n' "$*" >> "$RESULT"; echo "$WT_HOME/workspace";;
+  pack-import) printf '%s\n' "$*" >> "$RESULT"; [ "$MODE" != import-fails ];;
+  *) printf '%s\n' "$*" >> "$RESULT";;
+ esac
+}
+resh_install_game '/games/An emulator.wine'
+'''
+                result = subprocess.run(['bash', '-c', script], env=env, text=True, capture_output=True)
+                self.assertEqual(result.stderr, '')
+                options = (base / 'options').read_text()
+                self.assertIn('community\n', options)
+                self.assertIn('local-pack\n', options)
+                if mode in ('cancel', 'incompatible'):
+                    self.assertFalse((base / 'result').exists())
+                    self.assertNotEqual(result.returncode, 0)
+                else:
+                    calls = (base / 'result').read_text().splitlines()
+                    self.assertIn('prepare /games/An emulator.wine Game.exe vulkan 6.3.3 none 6.3.3-addons', calls)
+                    imported = 'pack-import /games/An emulator.wine /userdata/My bundle.zip Ultra.ini'
+                    self.assertIn(imported, calls)
+                    enabled = 'enable /games/An emulator.wine'
+                    if mode == 'install':
+                        self.assertEqual(result.returncode, 0)
+                        self.assertLess(calls.index(imported), calls.index(enabled))
+                    else:
+                        self.assertNotIn(enabled, calls)
+                        self.assertNotEqual(result.returncode, 0)
+
     def test_zip_preview_preset_selection_and_confirmation(self):
         import os
         import subprocess

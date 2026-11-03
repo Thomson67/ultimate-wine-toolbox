@@ -13,12 +13,18 @@ choisir le jeu Windows (émulateur lancé sous Wine) et :
    **Officielle avec add-ons complets**. Conserver l'API graphique réellement
    utilisée par l'émulateur. Le choix du modèle de shaders n'affecte pas les
    shaders du pack, qui seront ensuite isolés.
-2. **Pack ReShade local (ZIP, add-ons et shaders)** : sélectionner l'archive
+2. Dans le choix des modèles/shaders qui suit la version, choisir **Installer
+   un pack ReShade local (ZIP, add-ons et shaders)**, à côté de la recherche
+   communautaire. Sélectionner l'archive
    `HM 4K textures OoT.zip`, avec `ReShade.ini`, `citra.addon` et
    `reshade-shaders` à sa racine. Choisir **Henriko_Ultra_v10.ini** pour reproduire
    le preset désigné par le ReShade.ini de l'archive ; les autres presets sont
    également proposés.
-3. Confirmer l'installation des add-ons exécutables et des shaders.
+3. Confirmer l'installation des add-ons exécutables et des shaders, puis celle
+   de ReShade. La compatibilité version/architecture est vérifiée avant la
+   modification du jeu. Le pack fournit ses propres shaders : aucun pack de
+   shaders commun supplémentaire n'est téléchargé pour ce choix. L'import
+   intervient avant l'activation de ReShade.
 4. Lancer le jeu et ouvrir ReShade avec **Home**. Dans Add-ons, vérifier que
    **citra.addon** est chargé et **Generic Depth** désactivé. Choisir le tampon
    de profondeur selon les indications du README fourni par l'auteur.
@@ -34,7 +40,8 @@ préprocesseur. Les raccourcis, l'interface et les chemins du PC de l'auteur ne
 remplacent pas ceux de l'utilisateur. Les recherches de shaders/textures sont
 redirigées vers le dossier isolé du pack pour ce jeu.
 
-**Pack ReShade local → Retirer le pack** restaure le preset et la configuration
+Le menu du jeu conserve aussi **Pack ReShade local** pour importer après une
+installation existante. **Pack ReShade local → Retirer le pack** restaure le preset et la configuration
 sauvegardés au moment de l'import, et retire les fichiers gérés. La désactivation
 et la désinstallation ReShade utilisent aussi les sauvegardes des fichiers du
 jeu. Retirer le pack avant de changer la version, l'API ou l'exécutable ReShade.

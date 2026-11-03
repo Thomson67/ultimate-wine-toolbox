@@ -707,7 +707,7 @@ def main():
     parser.add_argument('--runner', default='')
     parser.add_argument('--legacy', action='store_true')
     parser.add_argument('command', choices=['backend-packs', 'exes', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'external-scan', 'external-info', 'external-enable', 'external-disable', 'external-release', 'wiki-title', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
-                                           'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore', 'pack-info', 'pack-import', 'pack-remove', 'pack-status'])
+                                           'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore', 'pack-info', 'pack-import', 'pack-remove', 'pack-status', 'pack-check'])
     parser.add_argument('rom', nargs='?', type=Path)
     parser.add_argument('args', nargs='*')
     args = parser.parse_args()
@@ -735,6 +735,13 @@ def main():
                 print(json.dumps(reshade_pack.archive(rom)[1], ensure_ascii=False))
             elif args.command == 'pack-status':
                 print(json.dumps(reshade_pack.manifest(home, rom), ensure_ascii=False))
+            elif args.command == 'pack-check':
+                files, metadata = reshade_pack.archive(Path(args.args[0]))
+                if args.args[1] not in metadata['presets']:
+                    raise ValueError('select a preset from the pack')
+                reshade_pack.check_release({'release_id': args.args[2],
+                                            'arch': pe_arch(source_header(rom, relative(args.args[3])))}, metadata)
+                reshade_pack.preset_bytes(files[args.args[1]], metadata)
             elif args.command == 'pack-import':
                 print(json.dumps(reshade_pack.install(home, rom, Path(args.args[0]), args.args[1],
                                                      args.runner, args.bottles, args.legacy), ensure_ascii=False))

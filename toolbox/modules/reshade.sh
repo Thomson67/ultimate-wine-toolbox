@@ -236,6 +236,7 @@ resh_install_game() {
         return 1
     fi
     local resume_exe="${2:-}" community_preset="${3:-}" resumed=0 index apply_community=0
+    local local_pack="" local_pack_preset="" pack_selection pack_error
     local -a exes=() items=() shaders=()
     local listing
     listing="$(resh_cmd exes "$rom" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
@@ -306,10 +307,20 @@ PY_PENDING
         current="$(resh_cmd details "$rom")"
         [ -z "$current" ] || items+=(current "$(i18n resh_model_current)")
         items+=(community "$(community_txt 'Rechercher un preset dans la base communautaire' 'Find a preset in the community catalogue')")
+        items+=(local-pack "$(community_txt 'Installer un pack ReShade local (ZIP, add-ons et shaders)' 'Install a local ReShade bundle (ZIP, add-ons and shaders)')")
         model="$(WT_MENU_LIST=1 menu_select "$(i18n resh_title)" "$(i18n resh_model_prompt)" "${items[@]}")" || return 1
         case "$model" in
             standard|retro|thomson|manual) defaults="$(resh_model_packs "$model")" ;;
             community) community_preset="$(community_choose_reshade_preset "$(i18n resh_title)")" || return 1; model=community-preset; defaults=""; apply_community=1 ;;
+            local-pack)
+                pack_selection="$(resh_pack_menu "$rom" select)" || return 1
+                local_pack="${pack_selection%%$'\n'*}"
+                local_pack_preset="${pack_selection#*$'\n'}"
+                if ! pack_error="$(resh_cmd pack-check "$rom" "$local_pack" "$local_pack_preset" "$release_id" "$exe" 2>&1)"; then
+                    msgbox "$(i18n resh_title)" "$pack_error"
+                    return 1
+                fi
+                defaults=none ;;
             current) defaults="${current##*$'\t'}" ;;
             *) return 1 ;;
         esac
@@ -384,11 +395,19 @@ PY_PENDING
         msgbox "$(i18n resh_title)" "$(i18n resh_failed "$log")"
         return 1
     }
+    if [ -n "$local_pack" ]; then
+        if ! pack_error="$(resh_cmd pack-import "$rom" "$local_pack" "$local_pack_preset" 2>&1)"; then
+            printf '%s\n' "$pack_error" >> "$log"
+            msgbox "$(i18n resh_title)" "$pack_error"
+            return 1
+        fi
+    fi
     if ! resh_cmd enable "$rom" >> "$log" 2>&1; then
         msgbox "$(i18n resh_title)" "$(i18n resh_failed "$log")"
         return 1
     fi
     msgbox "$(i18n resh_title)" "$(i18n resh_installed "$log")"
+    if [ -n "$local_pack" ]; then resh_pack_setup_info; fi
     if [ "$apply_community" -eq 1 ]; then
         community_import_actions reshade "$community_preset" "$(i18n resh_title)" "$rom"
     fi
@@ -437,6 +456,7 @@ resh_external_menu() {
 
 resh_pack_menu() {
     local rom="$1" choice archive info summary preset selected name output
+    local mode="${2:-apply}"
     local -a presets=() items=()
     info="$(resh_cmd pack-status "$rom" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
     if [ "$info" != '{}' ]; then
@@ -463,16 +483,24 @@ resh_pack_menu() {
         presets+=("$name"); items+=("${#presets[@]}" "$name")
     done < <(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("\n".join(sorted(d["presets"], key=lambda p:p!=d["preferred"])))' "$info")
     selected="$(menu_select "$(i18n resh_title)" "$summary" "${items[@]}" back "$(i18n back)")" || return
-    case "$selected" in ''|*[!0-9]*) return ;; esac
+    case "$selected" in ''|*[!0-9]*) return 1 ;; esac
     [ "$selected" -ge 1 ] && [ "$selected" -le "${#presets[@]}" ] || return
     preset="${presets[$((selected-1))]}"
     yesno_default_no "$(i18n resh_title)" "$summary
 
 $preset
-$(community_txt 'Installer pour ce jeu les add-ons exécutables et les shaders de cette archive ? Les réglages actuels seront sauvegardés. Pour le pack Citra, installez au préalable ReShade 6.3.3 avec add-ons.' 'Install the executable add-ons and shaders from this archive for this game? Current settings will be backed up. For the Citra bundle, install ReShade 6.3.3 with add-ons first.')" || return
+$(community_txt 'Installer pour ce jeu les add-ons exécutables et les shaders de cette archive ? Les réglages actuels seront sauvegardés. Le pack Citra nécessite ReShade 6.3.3 avec add-ons.' 'Install the executable add-ons and shaders from this archive for this game? Current settings will be backed up. The Citra bundle requires ReShade 6.3.3 with add-ons.')" || return 1
+    if [ "$mode" = select ]; then
+        printf '%s\n%s\n' "$archive" "$preset"
+        return 0
+    fi
     if output="$(resh_cmd pack-import "$rom" "$archive" "$preset" 2>&1)"; then
-        msgbox "$(i18n resh_title)" "$(community_txt 'Pack installé. Pour Citra : ouvrez ReShade avec Home, vérifiez citra.addon et choisissez le tampon de profondeur. Réglez la disposition des écrans dans Citra.fx, placé en tête des effets. Le mode performance reste désactivé pour ces réglages. La compatibilité en jeu, notamment Vulkan, reste à vérifier.' 'Bundle installed. For Citra: open ReShade with Home, check citra.addon and select the depth buffer. Set the screen layout in Citra.fx, first in the effect order. Performance mode stays off for setup. In-game compatibility, including Vulkan, still needs testing.')"
+        resh_pack_setup_info
     else msgbox "$(i18n resh_title)" "$output"; return 1; fi
+}
+
+resh_pack_setup_info() {
+    msgbox "$(i18n resh_title)" "$(community_txt 'Pack installé. Pour Citra : ouvrez ReShade avec Home, vérifiez citra.addon et choisissez le tampon de profondeur. Réglez la disposition des écrans dans Citra.fx, placé en tête des effets. Le mode performance reste désactivé pour ces réglages. La compatibilité en jeu, notamment Vulkan, reste à vérifier.' 'Bundle installed. For Citra: open ReShade with Home, check citra.addon and select the depth buffer. Set the screen layout in Citra.fx, first in the effect order. Performance mode stays off for setup. In-game compatibility, including Vulkan, still needs testing.')"
 }
 
 resh_game_menu() {
