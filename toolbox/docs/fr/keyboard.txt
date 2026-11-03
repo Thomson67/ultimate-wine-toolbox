@@ -1,7 +1,7 @@
 CLAVIER VIRTUEL À LA MANETTE
 
 OÙ LE TROUVER
-Réglages graphiques et outils > Clavier virtuel à la manette, ou Paramètres.
+Outils et compatibilité > Clavier virtuel à la manette.
 Il est désactivé au départ. Le réglage global concerne les jeux Windows.
 Chaque jeu peut suivre le global, forcer l'activation ou la désactivation.
 Gérer les jeux configurés affiche seulement les règles personnelles activées

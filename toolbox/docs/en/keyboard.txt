@@ -1,6 +1,6 @@
 CONTROLLER VIRTUAL KEYBOARD
 
-Enable it under Graphics and tools > Controller virtual keyboard, or Settings.
+Enable it under Tools and compatibility > Controller virtual keyboard.
 Off by default. Global activation covers Windows games. Each game can inherit,
 force on or force off. Close and relaunch games after changing settings.
 

@@ -16,6 +16,35 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class MenuReadabilityTests(unittest.TestCase):
+    def test_monochrome_defaults_enable_private_colors_for_every_widget(self):
+        widgets = ('menu', 'checklist', 'radiolist', 'msgbox', 'yesno', 'inputbox',
+                   'passwordbox', 'textbox', 'tailbox', 'dselect', 'fselect', 'infobox', 'gauge')
+        for widget in widgets:
+            with self.subTest(widget=widget), tempfile.TemporaryDirectory() as folder:
+                home = Path(folder)
+                original = 'use_colors = OFF\nscreen_color = (CYAN,BLUE,OFF)\ndialog_color = (BLACK,WHITE,OFF)\n'
+                (home/'original.rc').write_text(original)
+                executable = home/'dialog'
+                executable.write_text('''#!/bin/bash
+if [ "$1" = --create-rc ]; then cp "$DIALOGRC" "$2"; exit; fi
+cp "$DIALOGRC" "$TEST_HOME/used.rc"
+printf '%s' "$DIALOGRC" > "$TEST_HOME/theme-path"
+printf '%s' "$*" > "$TEST_HOME/arguments"
+printf '%s' selected-value
+exit 7
+''')
+                executable.chmod(0o755)
+                result = self.shell(home, 'tput() { echo 120; }; dialog --"$WIDGET" Text 10 50 3',
+                    PATH=str(home)+os.pathsep+os.environ['PATH'], WIDGET=widget,
+                    DIALOGRC=str(home/'original.rc'))
+                self.assertEqual(result.returncode, 7, result.stderr)
+                self.assertEqual(result.stdout, 'selected-value')
+                self.assertIn('use_colors = ON', (home/'used.rc').read_text())
+                self.assertIn('dialog_color = (BLACK,WHITE,OFF)', (home/'used.rc').read_text())
+                self.assertEqual((home/'original.rc').read_text(), original)
+                self.assertEqual((home/'arguments').read_text(), '--'+widget+' Text 10 50 3')
+                self.assertFalse(Path((home/'theme-path').read_text()).exists())
+
     def shell(self, home, code, **extra):
         return subprocess.run(['bash', '-c', 'source "$WT_ROOT/lib/common.sh"\nWT_LANGUAGE=fr\nload_i18n\nwt_clear_tty() { :; }\n'+code],
             env=dict(os.environ, WT_ROOT=str(ROOT/'toolbox'), TEST_HOME=str(home), **extra),

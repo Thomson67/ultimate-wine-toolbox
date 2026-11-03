@@ -25,13 +25,14 @@ display_mode_menu() {
         case "$mode" in fullscreen) ;; *) mode=normal ;; esac
         case "$font" in 11|13|16|18|20) ;; *) font=11 ;; esac
         if [ "$WT_LANGUAGE" = fr ]; then
-            prompt="Fenêtre : $mode | Police : $font. Relancer depuis Ports pour appliquer."
-            choice="$(menu_select "Affichage" "$prompt" "w" "Fenêtre : Normal / Plein écran" "f" "Taille de police : 11 / 13 / 16 / 18 / 20" "0" "Retour")" || return
+            prompt="Fenêtre : $mode | Police : $font. Relancer depuis Ports après un changement de fenêtre ou de police. Le thème s’applique immédiatement."
+            choice="$(menu_select "Affichage" "$prompt" "w" "Fenêtre : Normal / Plein écran" "f" "Taille de police : 11 / 13 / 16 / 18 / 20" "t" "$(i18n theme_title)" "0" "Retour")" || return
         else
-            prompt="Window: $mode | Font: $font. Relaunch from Ports to apply."
-            choice="$(menu_select "Display" "$prompt" "w" "Window: Normal / Fullscreen" "f" "Font size: 11 / 13 / 16 / 18 / 20" "0" "Back")" || return
+            prompt="Window: $mode | Font: $font. Relaunch from Ports after changing the window or font. Themes apply immediately."
+            choice="$(menu_select "Display" "$prompt" "w" "Window: Normal / Fullscreen" "f" "Font size: 11 / 13 / 16 / 18 / 20" "t" "$(i18n theme_title)" "0" "Back")" || return
         fi
         case "$choice" in
+            t) theme_menu ;;
             w)
                 if [ "$WT_LANGUAGE" = fr ]; then
                     choice="$(WT_MENU_LIST=1 menu_select "Fenêtre" "Mode de fenêtre" "normal" "Normal" "fullscreen" "Plein écran" "0" "Retour")" || continue
@@ -57,16 +58,46 @@ display_mode_menu() {
     done
 }
 
+theme_menu() {
+    local choice previous label id
+    local -a options
+    while true; do
+        previous="$(wt_theme_name)"
+        options=()
+        for id in standard dark colorblind contrast; do
+            label="$(i18n "theme_$id")"
+            [ "$id" != "$previous" ] || label+=" — $(i18n theme_current)"
+            options+=("$id" "$label")
+        done
+        choice="$(menu_select "$(i18n theme_title)" "$(i18n theme_prompt)" "${options[@]}" back "$(i18n back)")" || return
+        case "$choice" in
+            standard|dark|colorblind|contrast) ;;
+            *) return ;;
+        esac
+        [ "$choice" != "$previous" ] || continue
+        mkdir -p "$WT_CONFIG"
+        if ! { printf '%s\n' "$choice" > "$WT_CONFIG/theme.tmp.$$" && mv -f -- "$WT_CONFIG/theme.tmp.$$" "$WT_CONFIG/theme"; }; then
+            rm -f -- "$WT_CONFIG/theme.tmp.$$"
+            msgbox "$(i18n theme_title)" "$(i18n theme_failed)"
+            continue
+        fi
+        # Confirmation uses the new palette immediately. Escape/No restores
+        # the previous palette without restarting or touching system files.
+        if ! yesno_default_no "$(i18n theme_title)" "$(i18n theme_keep)"; then
+            printf '%s\n' "$previous" > "$WT_CONFIG/theme.tmp.$$" && mv -f -- "$WT_CONFIG/theme.tmp.$$" "$WT_CONFIG/theme"
+        fi
+    done
+}
+
 settings_menu() {
     while true; do
         local choice
-        choice="$(menu_select "$(i18n settings_title)" "$(i18n settings_title)"             "u" "$(i18n update_check_action)"             "l" "$(i18n settings_language)"             "k" "$(i18n osk_title)"             "d" "Affichage / Display"             "0" "$(i18n back)")" || return
+        choice="$(menu_select "$(i18n settings_title)" "$(i18n settings_title)"             "u" "$(i18n update_check_action)"             "l" "$(i18n settings_language)"             "d" "Affichage / Display"             "0" "$(i18n back)")" || return
 
         case "$choice" in
             u) manual_update_check ;;
             l) language_menu ;;
             d) display_mode_menu ;;
-            k) virtual_keyboard_menu ;;
             0|"") return ;;
         esac
     done

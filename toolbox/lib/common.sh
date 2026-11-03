@@ -44,6 +44,46 @@ save_language() {
 
 have_dialog() { command -v dialog >/dev/null 2>&1; }
 
+wt_theme_name() {
+    local selected
+    selected="$(head -n 1 "$WT_CONFIG/theme" 2>/dev/null || true)"
+    case "$selected" in standard|dark|colorblind|contrast) printf '%s' "$selected" ;; *) printf standard ;; esac
+}
+
+wt_apply_dialog_theme() {
+    local file="$1" base accent selected selected_text border background gauge preset
+    preset="$(wt_theme_name)"
+    case "$preset" in
+        standard) return 0 ;;
+        dark)
+            base='WHITE,BLACK,OFF'; accent='CYAN,BLACK,ON'
+            selected='BLACK,CYAN,ON'; selected_text='BLACK,CYAN,OFF'
+            border='CYAN,BLACK,OFF'; background='WHITE,BLACK,OFF'; gauge='BLACK,CYAN,OFF' ;;
+        colorblind)
+            base='BLACK,WHITE,OFF'; accent='BLUE,WHITE,ON'
+            selected='YELLOW,BLUE,ON'; selected_text='WHITE,BLUE,OFF'
+            border='BLUE,WHITE,OFF'; background='WHITE,BLUE,OFF'; gauge='WHITE,BLUE,OFF' ;;
+        contrast)
+            base='WHITE,BLACK,OFF'; accent='WHITE,BLACK,ON'
+            selected='BLACK,WHITE,ON'; selected_text='BLACK,WHITE,OFF'
+            border='WHITE,BLACK,OFF'; background='WHITE,BLACK,OFF'; gauge='BLACK,WHITE,OFF' ;;
+    esac
+    # Explicitly replace all color roles, including inherited red/green hotkeys.
+    # Selection also reverses the background; checkboxes retain their markers.
+    sed -i -E \
+        -e "s/^([[:space:]]*[a-z0-9_]+_color)[[:space:]]*=.*/\\1 = ($base)/" \
+        -e "s/^screen_color[[:space:]]*=.*/screen_color = ($background)/" \
+        -e 's/^shadow_color[[:space:]]*=.*/shadow_color = (BLACK,BLACK,OFF)/' \
+        -e "s/^(title_color|searchbox_title_color|position_indicator_color|button_key_inactive_color|button_label_inactive_color|uarrow_color|darrow_color)[[:space:]]*=.*/\\1 = ($accent)/" \
+        -e "s/^(border_color|border2_color|inputbox_border_color|inputbox_border2_color|searchbox_border_color|searchbox_border2_color|menubox_border_color|menubox_border2_color)[[:space:]]*=.*/\\1 = ($border)/" \
+        -e "s/^(button_active_color|button_key_active_color|button_label_active_color|tag_selected_color|tag_key_selected_color)[[:space:]]*=.*/\\1 = ($selected)/" \
+        -e "s/^(item_selected_color|check_selected_color|form_active_text_color)[[:space:]]*=.*/\\1 = ($selected_text)/" \
+        -e "s/^gauge_color[[:space:]]*=.*/gauge_color = ($gauge)/" "$file" || return 1
+    if [ "${WT_MENU_GAME_COLUMNS:-0}" = 1 ]; then
+        sed -i -E "s/^tag_color[[:space:]]*=.*/tag_color = (${base%,OFF},ON)/" "$file" || return 1
+    fi
+}
+
 
 # Fit Dialog windows to the current terminal while preserving desktop sizes.
 # Only defined when the real Dialog executable is available.
@@ -89,15 +129,18 @@ dialog() {
                 ;;
         esac
     done
-    # Regular black menu entries, with the original bold title and selection.
-    # With --no-tags, Dialog uses tag_color to draw the entire item label.
-    # Adjust a temporary theme copy; never rewrite the user's configuration.
-    if [[ "${widget:-}" = --menu || "${widget:-}" = --checklist || "${widget:-}" = --radiolist ]]; then
-        theme="$(mktemp /tmp/uwt-menu-theme.XXXXXX)" || theme=""
-        if [ -n "$theme" ] && command dialog --create-rc "$theme" 2>/dev/null &&
-           sed -i -E -e '/^[[:space:]]*title_color[[:space:]]*=/b' \
+    # Some Batocera Dialog defaults disable colors despite a color-capable
+    # xterm. Enable them for every Toolbox widget in a private theme only;
+    # curses still handles terminals that cannot display colors.
+    theme="$(mktemp /tmp/uwt-menu-theme.XXXXXX)" || theme=""
+    if [ -n "$theme" ] && command dialog --create-rc "$theme" 2>/dev/null &&
+       sed -i -E 's/^[[:space:]]*use_colors[[:space:]]*=.*/use_colors = ON/' "$theme"; then
+        # Regular black menu entries, with the original bold title and selection.
+        # With --no-tags, Dialog uses tag_color to draw the entire item label.
+        if [[ "${widget:-}" = --menu || "${widget:-}" = --checklist || "${widget:-}" = --radiolist ]]; then
+            sed -i -E -e '/^[[:space:]]*title_color[[:space:]]*=/b' \
                -e 's/(=[[:space:]]*\([^,]*,[^,]*,)[[:space:]]*ON/\1OFF/' \
-               -e 's/^(item_color|tag_color)[[:space:]]*=.*/\1 = dialog_color/' "$theme"; then
+               -e 's/^(item_color|tag_color)[[:space:]]*=.*/\1 = dialog_color/' "$theme"
             if [[ "${WT_MENU_LIST:-0}" = 1 || "$widget" != --menu ]]; then
                 # Data rows retain keyboard navigation without a red initial.
                 sed -i -E -e 's/^tag_key_color[[:space:]]*=.*/tag_key_color = tag_color/' \
@@ -108,13 +151,18 @@ dialog() {
                 sed -i -E -e 's/^tag_color[[:space:]]*=.*/tag_color = (BLACK,WHITE,ON)/' \
                     -e 's/^tag_selected_color[[:space:]]*=.*/tag_selected_color = (YELLOW,BLUE,ON)/' "$theme"
             fi
-            DIALOGRC="$theme" command dialog "${args[@]}"
-            rc=$?
-            rm -f -- "$theme"
-            return "$rc"
         fi
-        [ -z "$theme" ] || rm -f -- "$theme"
+        if ! wt_apply_dialog_theme "$theme"; then
+            rm -f -- "$theme"
+            command dialog "${args[@]}"
+            return $?
+        fi
+        DIALOGRC="$theme" command dialog "${args[@]}"
+        rc=$?
+        rm -f -- "$theme"
+        return "$rc"
     fi
+    [ -z "$theme" ] || rm -f -- "$theme"
     command dialog "${args[@]}"
 }
 fi
