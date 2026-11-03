@@ -107,7 +107,20 @@
       "provider": "fienestar/OverlayDisabledReShade",
       "url": "https://github.com/fienestar/OverlayDisabledReShade/releases/download/v6.4.1-patched/ReShade.Setup.exe",
       "sha256": "2d914a67481e739788e1d3d1d9ee25a18c143f14bcb20abba039c0ea6b8db366",
-      "backend_version": "6.8.0"
+      "backend_version": "6.8.0",
+      "tag": "v6.4.1-patched",
+      "asset": "ReShade.Setup.exe",
+      "containers": [],
+      "dll_sha256": {
+        "32": "beaf98da17204f0c02a6e1d42b470932043b0d340634e47454d79c52ac3b1741",
+        "64": "6d4fcc5fb7b0658a27aa93bd3eeea51cbc1330e66fb75e671351c8354602b787"
+      },
+      "binary_versions": {
+        "32": "6.4.1.1",
+        "64": "6.4.1.2"
+      },
+      "addon_support": "full",
+      "source_available": true
     },
     {
       "id": "6.4.0",
@@ -170,7 +183,20 @@
       "provider": "fienestar/OverlayDisabledReShade",
       "url": "https://github.com/fienestar/OverlayDisabledReShade/releases/download/v6.2.0-patched/ReShade.Setup.exe",
       "sha256": "8afeecd0427925f92bcd4f722b279937710070f3adba5cd3e819adca66a38983",
-      "backend_version": "6.8.0"
+      "backend_version": "6.8.0",
+      "tag": "v6.2.0-patched",
+      "asset": "ReShade.Setup.exe",
+      "containers": [],
+      "dll_sha256": {
+        "32": "2f3bfc821e482619ceb62f063b321cbab89c84c3b4ce53ad15775ad25c1a0db5",
+        "64": "9f2ac6c3ee3da480a3c1f6d76b89feec1958f83f4c6bfaf707ab93fb91e71027"
+      },
+      "binary_versions": {
+        "32": "6.2.0.1",
+        "64": "6.2.0.2"
+      },
+      "addon_support": "full",
+      "source_available": true
     },
     {
       "id": "6.1.1",
@@ -576,6 +602,994 @@
       "url": "https://reshade.me/downloads/ReShade_Setup_4.1.0.exe",
       "sha256": "c92faa4eb41b64e3d4f0c5b359937c10457db2d68ecbe78caa02b43b22115b05",
       "backend_version": "6.8.0"
+    },
+    {
+      "id": "6.5.0-ovitus-no-startup-banner",
+      "version": "6.5.0",
+      "variant": "no-startup-banner",
+      "provider": "ovitus/OverlayDisabledReShade",
+      "url": "https://github.com/ovitus/OverlayDisabledReShade/releases/download/v6.5.0-patched/ReShade.Setup.exe",
+      "sha256": "a1dc778a6c8a05e0d7eb2889f61e1df0b7b2e6f4a0e0339e33022611d7221ae7",
+      "backend_version": "6.8.0",
+      "tag": "v6.5.0-patched",
+      "asset": "ReShade.Setup.exe",
+      "containers": [],
+      "dll_sha256": {
+        "32": "3a17e006e628b6cfb2cf14085d1ff4fa3bba371b55e3a075b74305085c691f86",
+        "64": "d650006a62b4b13bec2796b23af6181c232bd33d8abb04ac3c9c44c445e5869c"
+      },
+      "binary_versions": {
+        "32": "6.5.0.1",
+        "64": "6.5.0.2"
+      },
+      "addon_support": "full",
+      "source_available": true,
+      "source_note": "gui-6.4.1"
+    },
+    {
+      "id": "6.5.1-knitby-no-startup-banner",
+      "version": "6.5.1",
+      "variant": "no-startup-banner",
+      "provider": "Knitby/OverlayDisabledReShade",
+      "url": "https://github.com/Knitby/OverlayDisabledReShade/releases/download/v6.5.1-patched/ReShade.Setup.exe",
+      "sha256": "196b63ac2808be20d5656dc1d90b63e99d190ec4a5a0e2004d495766160ff739",
+      "backend_version": "6.8.0",
+      "tag": "v6.5.1-patched",
+      "asset": "ReShade.Setup.exe",
+      "containers": [],
+      "dll_sha256": {
+        "32": "07c4c8e9ad70ca45d652fbad6d191c044e5548c7cce6fcb8a92fa9643ff08af9",
+        "64": "1834d9f4ea615d4eb0578ad04e47cb6da5dd8a37c414bee6de607a19969ddc28"
+      },
+      "binary_versions": {
+        "32": "6.5.1.1",
+        "64": "6.5.1.2"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.8.0-adam-darlow-no-startup-banner",
+      "version": "6.8.0",
+      "variant": "no-startup-banner",
+      "provider": "Adam-Darlow/OverlayDisabledReShade",
+      "url": "https://github.com/Adam-Darlow/OverlayDisabledReShade/releases/download/v6.8.0-no-banner/ReShade.Setup.exe",
+      "sha256": "5307d3399509b6709eb284114727f0eece328e74fe21de288803003d9a97d46c",
+      "backend_version": "6.8.0",
+      "tag": "v6.8.0-no-banner",
+      "asset": "ReShade.Setup.exe",
+      "containers": [],
+      "dll_sha256": {
+        "32": "7f19325b612d374af5cb5d4ee2d6f8e371a1defb94cf6fd8bfc91da161c99a68",
+        "64": "ac0455e3ac05d82e3da1560135177ce27174f540772960c27a2f08765af47ba3"
+      },
+      "binary_versions": {
+        "32": "6.8.0.1",
+        "64": "6.8.0.2"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.6.2-andrewgdx-no-startup-banner",
+      "version": "6.6.2",
+      "variant": "no-startup-banner",
+      "provider": "AndrewGDX/OverlayDisabledReShade",
+      "url": "https://github.com/AndrewGDX/OverlayDisabledReShade/releases/download/v6.6.2-patched/v6.6.2-patched.zip",
+      "sha256": "6f112bf1560b1d3f3fd3c81377d2b804ec97a04257b82f634e9226f39b30eb5a",
+      "backend_version": "6.6.2",
+      "tag": "v6.6.2-patched",
+      "asset": "v6.6.2-patched.zip",
+      "containers": [
+        "ReShade Setup.exe"
+      ],
+      "dll_sha256": {
+        "32": "d81334304a50479fd0d22099ba44dd2451ef5c88a4106c8a8ec8c96fa18267d1",
+        "64": "c0cffe4035498a3c1c2c572dbb9bc0a2901afc4897d300a77213407da0644b70"
+      },
+      "binary_versions": {
+        "32": "6.6.2.1",
+        "64": "6.6.2.2"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.5.1-andrewgdx-no-startup-banner",
+      "version": "6.5.1",
+      "variant": "no-startup-banner",
+      "provider": "AndrewGDX/OverlayDisabledReShade",
+      "url": "https://github.com/AndrewGDX/OverlayDisabledReShade/releases/download/v6.5.1-patched/v6.5.1-patched.zip",
+      "sha256": "a3290121da278751ceaacc9bd62ba3040a846e0bf875771eefc620a8ef66a0b1",
+      "backend_version": "6.8.0",
+      "tag": "v6.5.1-patched",
+      "asset": "v6.5.1-patched.zip",
+      "containers": [
+        "ReShade Setup.exe"
+      ],
+      "dll_sha256": {
+        "32": "00d18371fa616db17f1bdd7c4d82b783c788bd7a1fcf2bfd41df47ba17742848",
+        "64": "241316763fec52a8a0248258302c01a0c74f268f62535f52143144c5aa6e63d4"
+      },
+      "binary_versions": {
+        "32": "6.5.1.1",
+        "64": "6.5.1.2"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.7.3-altes21-no-startup-banner",
+      "version": "6.7.3",
+      "variant": "no-startup-banner",
+      "provider": "altes21/OverlayDisabledReShade",
+      "url": "https://github.com/altes21/OverlayDisabledReShade/releases/download/v6.7.3-patched/v6.7.3-patched.zip",
+      "sha256": "517b77f1bfe5776f37d20fd8bd70f5d8947d3b2cb8579fee06cce965e1eb1697",
+      "backend_version": "6.7.3",
+      "tag": "v6.7.3-patched",
+      "asset": "v6.7.3-patched.zip",
+      "containers": [
+        "ReShade Setup.exe"
+      ],
+      "dll_sha256": {
+        "32": "43d1e2699cc9baebe1a2e41e0a37950aa113baf06240c91f9e5397b43f9840b9",
+        "64": "586510773288537974c7039728d88539922addc6e91349adafa9a074b3675e80"
+      },
+      "binary_versions": {
+        "32": "6.7.3.1",
+        "64": "6.7.3.2"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.7.1-altes21-no-startup-banner",
+      "version": "6.7.1",
+      "variant": "no-startup-banner",
+      "provider": "altes21/OverlayDisabledReShade",
+      "url": "https://github.com/altes21/OverlayDisabledReShade/releases/download/v6.7.1-patched/v6.7.1-patched.zip",
+      "sha256": "00d61cbbe19db61330cf75c40721162a4f2ebe2f887506f6d9beaa477602ae5b",
+      "backend_version": "6.7.1",
+      "tag": "v6.7.1-patched",
+      "asset": "v6.7.1-patched.zip",
+      "containers": [
+        "ReShade Setup.exe"
+      ],
+      "dll_sha256": {
+        "32": "26e557a9d2bf994e47335d7b5e9ed94ea3a1a566d17d3c412118254a6eb4854c",
+        "64": "75e9fd4fae1c6ea221b69ba3c205cb708251d763051a7ecf49e53b0faacb5052"
+      },
+      "binary_versions": {
+        "32": "6.7.1.1",
+        "64": "6.7.1.2"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.6.2-altes21-no-startup-banner",
+      "version": "6.6.2",
+      "variant": "no-startup-banner",
+      "provider": "altes21/OverlayDisabledReShade",
+      "url": "https://github.com/altes21/OverlayDisabledReShade/releases/download/v6.6.2-patched/v6.6.2-patched.zip",
+      "sha256": "8d9db924893905ca6a3d0254fd5f73556fd4486fed816421eff4df25967aec02",
+      "backend_version": "6.6.2",
+      "tag": "v6.6.2-patched",
+      "asset": "v6.6.2-patched.zip",
+      "containers": [
+        "ReShade Setup.exe"
+      ],
+      "dll_sha256": {
+        "32": "dcb629cd8479c3f4d1dbc988a38d5f8a97fa19399adcc9d478caedd41ea2e1a4",
+        "64": "dcd6adae203f015e5d7a0d037ccd7f6061a6981a74213980c5bb64d64bee257f"
+      },
+      "binary_versions": {
+        "32": "6.6.2.1",
+        "64": "6.6.2.2"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.2.0-mjd4219-no-startup-banner",
+      "version": "6.2.0",
+      "variant": "no-startup-banner",
+      "provider": "mjd4219/reshade-no-intro",
+      "url": "https://github.com/mjd4219/reshade-no-intro/releases/download/v1.0.0-archive/ReShade.Setup.NO.INTRO.exe",
+      "sha256": "4cb367daaee4ad2fd71f67bf4674b8fe5024fec53926795d1bb15b8bd10c0fe2",
+      "backend_version": "6.8.0",
+      "tag": "v1.0.0-archive",
+      "asset": "ReShade.Setup.NO.INTRO.exe",
+      "containers": [],
+      "dll_sha256": {
+        "32": "b1774883df42827f0f2482f292dc6f07f739ffdf293bdd2c35167c26ae5d709b",
+        "64": "1899b77e81f720cec73d0bd84f4d89b7b274a9d0983c26f3de60f5774c891b7d"
+      },
+      "binary_versions": {
+        "32": "6.2.0.1",
+        "64": "6.2.0.2"
+      },
+      "addon_support": "unknown",
+      "source_available": false
+    },
+    {
+      "id": "6.8.0-addons",
+      "version": "6.8.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe",
+      "sha256": "afe4c8f13048306307983b8b3d41d5bf00a86820440b0e57dea10950e1176445",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "da430e0a9c6eecefa0d1b27d05e16c426fb5d04e808b194d914eaac4b31bc0f8",
+        "64": "0cee63f9c9f13f3ac909c5b4903f4dbb4b719a7ab3b4f13b0deaf83c814b94f7"
+      },
+      "binary_versions": {
+        "32": "6.8.0.2156",
+        "64": "6.8.0.2155"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.7.3-addons",
+      "version": "6.7.3",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.7.3_Addon.exe",
+      "sha256": "c78db69bd127e98054bd496fb422655f4a1cc664e28f8d12ce9835b2647bc571",
+      "backend_version": "6.7.3",
+      "dll_sha256": {
+        "32": "b0a0fa7472d9a153816edcf7606902eb9c8f262e6100fc9973ec495634dca2c2",
+        "64": "ec9245d05c11751f2ac0d2256e6921ad8fb36be9172ef6d587856591eb729a25"
+      },
+      "binary_versions": {
+        "32": "6.7.3.2147",
+        "64": "6.7.3.2148"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.7.2-addons",
+      "version": "6.7.2",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.7.2_Addon.exe",
+      "sha256": "47d841b1cd03dd2032aa14f6b1365f1e8221f8399e4f2ad6f4629cbef4a14ef0",
+      "backend_version": "6.7.2",
+      "dll_sha256": {
+        "32": "c3213fc0f688a78a57d543f00057ba399992fbeebe10a65890644a602b83627b",
+        "64": "608512a2ea4baf7582423c8be55a9596e4bec06f6e241ecda9bb26231e9eaacc"
+      },
+      "binary_versions": {
+        "32": "6.7.2.2143",
+        "64": "6.7.2.2144"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.7.1-addons",
+      "version": "6.7.1",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.7.1_Addon.exe",
+      "sha256": "fc55c5c62d0bc43bf02c40ec9aef69e0b74f22a6017403af1897ec32e5cd0e8f",
+      "backend_version": "6.7.1",
+      "dll_sha256": {
+        "32": "a1ba732b5e31e0405cde322cc5ec62cf972b3fbaefbb6cbdc8a24da00d58ae24",
+        "64": "91800ce4b6fdea7d8fd5402dc1844953105e888abe044435e889e896a35464fa"
+      },
+      "binary_versions": {
+        "32": "6.7.1.2131",
+        "64": "6.7.1.2132"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.7.0-addons",
+      "version": "6.7.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.7.0_Addon.exe",
+      "sha256": "107ec2b5cf4327145671bcbecc51d93a9f122d323e7cdd7e497d82474952f295",
+      "backend_version": "6.7.0",
+      "dll_sha256": {
+        "32": "a56bc02252874ac5420a92e259dc3601f0984f250a2ab6f7ef50bdb43e0678c4",
+        "64": "2107ab1a30166026bab6a902673d32fdde56c3e6f00281548bdaa7bca7623b0d"
+      },
+      "binary_versions": {
+        "32": "6.7.0.2119",
+        "64": "6.7.0.2120"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.6.2-addons",
+      "version": "6.6.2",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.6.2_Addon.exe",
+      "sha256": "208d710e21e15cd871fe37256bf97aad587620b4602c389453b7e099b7ba3217",
+      "backend_version": "6.6.2",
+      "dll_sha256": {
+        "32": "29491a682a37143de9cd343b13fca363b5aa74a7435ea7812ce7c37161ebad7b",
+        "64": "c289a1be9e39fa56f1760e9ed6207edc4b96f5b87a433acbf74c6d249a06ea39"
+      },
+      "binary_versions": {
+        "32": "6.6.2.2080",
+        "64": "6.6.2.2081"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.6.1-addons",
+      "version": "6.6.1",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.6.1_Addon.exe",
+      "sha256": "e86f748c38e636714202b0bbd1171be260d02d34d7290d4f3c235ffa9c917a46",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "5fac7dde1c4d656de1aa61a656026eec66de150585775f2c7bca043634be5b6c",
+        "64": "318ee0b7ae7028f5100cc08f7acb194a863c4a037dede4bee6656223518a2604"
+      },
+      "binary_versions": {
+        "32": "6.6.1.2076",
+        "64": "6.6.1.2077"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.6.0-addons",
+      "version": "6.6.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.6.0_Addon.exe",
+      "sha256": "55c79580323479c4679dd42681ae2c15f7b638dffe22888093de0d5dc7361d36",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "f419b9a324f75ca58c1f374fe427ee025d8145b4be7c9136ddbb805450d17320",
+        "64": "e1d0d036f20ebe18b3331c97202a9f354d29906b66575d6990d1cf8761228d76"
+      },
+      "binary_versions": {
+        "32": "6.6.0.2072",
+        "64": "6.6.0.2073"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.5.1-addons",
+      "version": "6.5.1",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.5.1_Addon.exe",
+      "sha256": "3be164186103dcf126af3d75d8efdf850c4ed9f88919505c16a52e6d0ef135a7",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "edb7ce00559ba2dff6ffa23f0c03eda03e414240a8ece77d973cd448d2048c78",
+        "64": "0595627092ba9b47e0931900233648dfc1ec384aff59ec3e449a15d19a7e4a13"
+      },
+      "binary_versions": {
+        "32": "6.5.1.2009",
+        "64": "6.5.1.2008"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.5.0-addons",
+      "version": "6.5.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.5.0_Addon.exe",
+      "sha256": "9ac89947607ebe01724f4f7a71788023fa458d12beed0435c8362190af1e5a6b",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "5b399e3345193eddc3a10897b16316b50cd43f73ebf44fe39be65ac1c4c51953",
+        "64": "48fca221a70f9167a34b878598a9d3580dd95a629834354e0bf15a1a155a4edb"
+      },
+      "binary_versions": {
+        "32": "6.5.0.2001",
+        "64": "6.5.0.2000"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.4.1-addons",
+      "version": "6.4.1",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.4.1_Addon.exe",
+      "sha256": "130800ad62ee9743f85f24542a7b97fd29b2c18d427f5ad3540cddfeb6ce6e62",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "4be7ca0633c37c404f67960d0767c2f026872ca4209c77c71c6e39f76a656adc",
+        "64": "53823d4ef6423828ded2171e92efecd3249605f81d129b10c25d0d124ed99637"
+      },
+      "binary_versions": {
+        "32": "6.4.1.1966",
+        "64": "6.4.1.1965"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.4.0-addons",
+      "version": "6.4.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.4.0_Addon.exe",
+      "sha256": "baf2af876e46d0321627a2f78347d97000c9925e327e141b469c4998836362b3",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "3336f98d701954c3b45f1d2b2beea5f1a18da3b56cc634b13cc7376c87eca3bc",
+        "64": "3029e62f398eab3840b1262ac8e8112d96c51d053a5926e07996474b233332ef"
+      },
+      "binary_versions": {
+        "32": "6.4.0.1956",
+        "64": "6.4.0.1955"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.3.3-addons",
+      "version": "6.3.3",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.3.3_Addon.exe",
+      "sha256": "7999737f7bd01f0f380311ca4f48c5a3ddce046043b23481f9e0027c9f562b37",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "94ddadbae44ca4a7be5b797753a8323d985948b0480c383d22ef402c00e031f2",
+        "64": "8b38372587aab7289954ed9ca1bdb298adc9435292e0c0111632832b75ddc49a"
+      },
+      "binary_versions": {
+        "32": "6.3.3.1922",
+        "64": "6.3.3.1921"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.3.2-addons",
+      "version": "6.3.2",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.3.2_Addon.exe",
+      "sha256": "d410fb7c815d46324d33b410e13a417d3d542030ae7633cb24f1481d060e253f",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "415708256abaaf11b1c955f8ee361497f2b58128193c0b0a978a25db3ff4b2e6",
+        "64": "356c152b2235a5e4175e790dd4ade97db0212f347479499bae21758499f6cad4"
+      },
+      "binary_versions": {
+        "32": "6.3.2.1918",
+        "64": "6.3.2.1917"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.3.1-addons",
+      "version": "6.3.1",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.3.1_Addon.exe",
+      "sha256": "e479aef6d7cf6d022c3494fe4c819fbc5ea489bf9d5624ea1df942f6cd5c90d5",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "4ef5d5e17085a82d3f9c906d4d02e3360845f78a35f9bcb66b05778d6034fed1",
+        "64": "52f7a431b8c3b23752a8cf21bd01f2d730bd8e931c1c795083697a66a6d69939"
+      },
+      "binary_versions": {
+        "32": "6.3.1.1916",
+        "64": "6.3.1.1915"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.3.0-addons",
+      "version": "6.3.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.3.0_Addon.exe",
+      "sha256": "e85d8226f0a3bae1f30932b91539d41bb3815842166dea93d99b40fdc33acd45",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "2ee974fb3dcb83d077d75a7b9fcfe1e45d15fb6ffc7d97700c16cf8c41ec05a7",
+        "64": "ab91c984bca6422fe86ff679c46f02f3713432cb33a99a4bc1156b5928971472"
+      },
+      "binary_versions": {
+        "32": "6.3.0.1903",
+        "64": "6.3.0.1902"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.2.0-addons",
+      "version": "6.2.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.2.0_Addon.exe",
+      "sha256": "f574bcf414e738374f2200cf42eda27b51324a5b9b61c8a9e892014789c8d17e",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "3517779e866e2f32ed0a9dea00d6eec81920c685532a1fcac69a44e9c32fbc40",
+        "64": "7a91de04782e9e6dc47310b2ffce045fbd76ba73a3aef92290b148de4be64b03"
+      },
+      "binary_versions": {
+        "32": "6.2.0.1879",
+        "64": "6.2.0.1878"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.1.1-addons",
+      "version": "6.1.1",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.1.1_Addon.exe",
+      "sha256": "928aa45e2588afc18d99920fa9d53388242d6e59a0f796c3ea001e6b5061ca06",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "2c65ac178f0a08f12a522db73810aed2c0a6d0e5e334468469ea6f3794e055c6",
+        "64": "4ebf00ab422430966f19a533e1f54b0ecfd530a8f85de1f35b188a623b27a118"
+      },
+      "binary_versions": {
+        "32": "6.1.1.1846",
+        "64": "6.1.1.1845"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.1.0-addons",
+      "version": "6.1.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.1.0_Addon.exe",
+      "sha256": "1c0f98e3b0bc0b79ebaa95fb266c7762f7aba6ca418d4515a5644a3c82210a47",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "336b3048d99b3e55a073692451f37ca9a0e2e12b01b392c69771b709868abe16",
+        "64": "f59d068f06b13f96fb8e4f3776a9b1c4f9047fe8fae026d4d25b9397873084ec"
+      },
+      "binary_versions": {
+        "32": "6.1.0.1833",
+        "64": "6.1.0.1834"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.0.1-addons",
+      "version": "6.0.1",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.0.1_Addon.exe",
+      "sha256": "7850068460fa81c35ba0c3ff44d27cb09608a02cba76a396bbb128cf22fb8800",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "242e754ad0905ff7594bc8a7c5039859ba54db801938d797e9de78aaa8d0eac8",
+        "64": "e31aace9026f45fba3b3ab8158539dbdaf51774cc11b4d14ba3613d614eaf9e2"
+      },
+      "binary_versions": {
+        "32": "6.0.1.1826",
+        "64": "6.0.1.1825"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "6.0.0-addons",
+      "version": "6.0.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.0.0_Addon.exe",
+      "sha256": "f97f5a1968dfd0b9480e4762cdba219ada8e0decb3cca7eb5e1ea7f3ea7beeb2",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "a8c020a50e8fa5cbe1066d32515500310a36269808495110e2974e62be445d48",
+        "64": "a41c045579dcf32285061e0b15549409af792ff2663dcfc5cdd66baefff283cf"
+      },
+      "binary_versions": {
+        "32": "6.0.0.1817",
+        "64": "6.0.0.1816"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.9.2-addons",
+      "version": "5.9.2",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.9.2_Addon.exe",
+      "sha256": "1ca9addc1adff77e996499c8d9bdf5fce24fadf1a4584e5e43cc51f1a527a56a",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "a9fe21e46fabb648f72b48b188a07c2bc4bfa0015ca6e47792e5aea4e74ac10a",
+        "64": "5cc2b43b10bf33bf06bdfe6b4834a0f7b5a852961fdb810063f8901eb8f92348"
+      },
+      "binary_versions": {
+        "32": "5.9.2.1761",
+        "64": "5.9.2.1760"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.9.1-addons",
+      "version": "5.9.1",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.9.1_Addon.exe",
+      "sha256": "d249ef9f7887340cd9a6355d48df60007a56fdf64242ec6b943a2f217051f0f3",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "b63fd1085d98b9372335fdd670802542ccf738763094cc4ea4b8223ccd067234",
+        "64": "ab8b2dabcb8b40e4dc39cd55685841e7673f26489e3f427b9356417219e53724"
+      },
+      "binary_versions": {
+        "32": "5.9.1.1757",
+        "64": "5.9.1.1756"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.9.0-addons",
+      "version": "5.9.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.9.0_Addon.exe",
+      "sha256": "8fb1f7c6cb6d895dd1181819e9bb03db6e8dce161b44bbeb8f09ece104437f15",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "dc81d5af0038948dab4df8e8225c9bf19b49c1c713e32e6c255fa6617c5d6e5d",
+        "64": "643dfdd1ba9a49b2907f82c08e20f54c64ddee5d931e71024039408fc6535f31"
+      },
+      "binary_versions": {
+        "32": "5.9.0.1753",
+        "64": "5.9.0.1752"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.8.0-addons",
+      "version": "5.8.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.8.0_Addon.exe",
+      "sha256": "afc1211f7d732c49af35170b760d437397b09d15fdba5bee9a9b8839a4dfadf0",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "354c404100965f90127ff488d59487eb88a60610aad61ed97c9e87262c0fec3e",
+        "64": "a701cf8c59eaa0feb537097f857bf3dce880f817c18188117dbf15dc888fad90"
+      },
+      "binary_versions": {
+        "32": "5.8.0.1729",
+        "64": "5.8.0.1728"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.7.0-addons",
+      "version": "5.7.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.7.0_Addon.exe",
+      "sha256": "36be6121c6203e93c3e081705b2c4fcc6327ba231769c618bf821e28a8c2cdc2",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "ff27d8e612ea349ab4949d84c84cfbdcce4cf9befff3b7113e15dad2121b4e98",
+        "64": "dd5d6b654e0d576375dd11392ae6201c1f601ce92502a6cfcb1ec265e8dca3a1"
+      },
+      "binary_versions": {
+        "32": "5.7.0.1714",
+        "64": "5.7.0.1713"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.6.0-addons",
+      "version": "5.6.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.6.0_Addon.exe",
+      "sha256": "855a118eed4838b7522450ffed21a0b1b7e20dbee4eb2295766cbfd229947b3b",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "cfc1f9bc6e46f9e788e083f5f7052f64d426e00859c137133539a4bbfbe14fef",
+        "64": "9939ec49eb374a68aa4aa4087a2279cc56e6918fc8c9f6f075cacedf64f8c0d9"
+      },
+      "binary_versions": {
+        "32": "5.6.0.1693",
+        "64": "5.6.0.1692"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.5.2-addons",
+      "version": "5.5.2",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.5.2_Addon.exe",
+      "sha256": "e1a04be98ce8a3bd1b30133cb7f71228a78afdcc6348dd9408912dceafd527fc",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "3624b9e9dea1809e207c55b751ff862d92b6bd43cb5221801fe314c59388b4a8",
+        "64": "13b45a2371bb8d21d6aa6bed478fb8dd757723d8215484f0c7a34c38c5eaf21e"
+      },
+      "binary_versions": {
+        "32": "5.5.2.1679",
+        "64": "5.5.2.1678"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.5.1-addons",
+      "version": "5.5.1",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.5.1_Addon.exe",
+      "sha256": "b7b2cda8df3347baecc2a794520a6869477675083d7439c9adf1842e32279ee2",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "ac97ea9c45a61f638a6b8791c427f5c033da4b04c1803acc153cd2a96e570009",
+        "64": "a99d323c31e458662619dc7f5b27c4196cab56b3fe58aab958d9c595b94377d6"
+      },
+      "binary_versions": {
+        "32": "5.5.1.1661",
+        "64": "5.5.1.1660"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.5.0-addons",
+      "version": "5.5.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.5.0_Addon.exe",
+      "sha256": "ceb70958ca63384312d148fcadf478f5198f69f80b5acde962d705a4984e860a",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "d27923c6c44a67f11a6c8b348531122b1e686d2e546c69064a2ed0e4c1cb0937",
+        "64": "5cb688c316bc8237e38972a02948fd2cc6c6720af1724b7cfe7320a80e0b50ca"
+      },
+      "binary_versions": {
+        "32": "5.5.0.1630",
+        "64": "5.5.0.1629"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.4.2-addons",
+      "version": "5.4.2",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.4.2_Addon.exe",
+      "sha256": "2a1adc97e1b96bd30f94338d778510d14ae35876e5edb0b8c815237e048af2fd",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "6f08b320a3c02d60d61835f6e8d370eb912af81c3846e707d4bf37b635874160",
+        "64": "50fb24cee14e807b9dc74003da36b4a54951748f87ec6654a622fd1619df3e2c"
+      },
+      "binary_versions": {
+        "32": "5.4.2.1607",
+        "64": "5.4.2.1606"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.4.1-addons",
+      "version": "5.4.1",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.4.1_Addon.exe",
+      "sha256": "b55099ccedb704b7fbce7a5991043f3f3845d10440c4b007a3fc13d2070cc98c",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "b81f0768b478959207a3f17fcf6595ca2d6c5e4b3daf195669f896e421af9fdd",
+        "64": "f71e0271cc0ecc7338f3f81c15eb7c0ef095f61284ca153ba5cfa9fd022af010"
+      },
+      "binary_versions": {
+        "32": "5.4.1.1592",
+        "64": "5.4.1.1591"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.4.0-addons",
+      "version": "5.4.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.4.0_Addon.exe",
+      "sha256": "3c1e9e9ce419753d02eac5c942afdc41705c94fc8f31b7d800ef2e31122f772f",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "7f6d143d13648e968629c6f2fc7223060d30b965db7dfda702ba3a5e26cf5286",
+        "64": "78f8f245a10cabe61cf7d8d531a3903e67a5903578be200a7fd74f9e2bc8f5f1"
+      },
+      "binary_versions": {
+        "32": "5.4.0.1575",
+        "64": "5.4.0.1574"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.3.0-addons",
+      "version": "5.3.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.3.0_Addon.exe",
+      "sha256": "7444229a6b56f46b045b8de39d9607adbe5ca41e34bcbc5c095ec06c30409791",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "1d479a56844bce90f5cb462f455af0f033842e76e540f750412b618173cc526d",
+        "64": "4426c20174ed2f89bf090f80a4e0b0a28b1a3c17275d99a5f4c8488d7a4977b2"
+      },
+      "binary_versions": {
+        "32": "5.3.0.1559",
+        "64": "5.3.0.1558"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.2.2-addons",
+      "version": "5.2.2",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.2.2_Addon.exe",
+      "sha256": "911804843246d4dd9036714603d17ae05b1fb28dc507d75e273f4fd5ccef01ad",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "141735b3f75d2d60c58f75a3a257ddba20d885e00bf3117073920a1030826d27",
+        "64": "d378cc92ac120d82adc32c2f8d14106f73c8e10174bde00710a11f697678212b"
+      },
+      "binary_versions": {
+        "32": "5.2.2.1536",
+        "64": "5.2.2.1535"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.2.1-addons",
+      "version": "5.2.1",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.2.1_Addon.exe",
+      "sha256": "8f51834863aed857f9ea066b3424ccc9fd919565721a60f8d383c464dcfdedae",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "e8860693642dd7630fa814447a922b7f0a61ba9806ec873576319884a6a8dcf2",
+        "64": "954dbff3cb764180f25621abe3f04c4370ec54c887ccae961cbd49ce2cd76684"
+      },
+      "binary_versions": {
+        "32": "5.2.1.1513",
+        "64": "5.2.1.1512"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.2.0-addons",
+      "version": "5.2.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.2.0_Addon.exe",
+      "sha256": "1d10d63efb41d0ec6ba3eb0247bbc57d73b7ad03b4a50e87b87aece1454e4708",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "0abab065ce3a00af359543b9d707f25db840b159ce944ba234227c219962ac5c",
+        "64": "b8b454f0cb22dec09eaeb95bdf0fc56f1ff11f875391e7cbc402b842bded40a6"
+      },
+      "binary_versions": {
+        "32": "5.2.0.1509",
+        "64": "5.2.0.1508"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.1.0-addons",
+      "version": "5.1.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.1.0_Addon.exe",
+      "sha256": "e68df210dbf31cb4e111c7712f04df0228638f7e117ce0ef7a64b53b856365ef",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "b4fb741bb754cc9587c3656595873762d00262690f8cac7c3e5b24e6ca2f64a0",
+        "64": "ddc65f4fdcaadb93b18dc7238d299cc020250a0a85c07433ccabf9f6edd6f3fd"
+      },
+      "binary_versions": {
+        "32": "5.1.0.1456",
+        "64": "5.1.0.1455"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.0.2-addons",
+      "version": "5.0.2",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.0.2_Addon.exe",
+      "sha256": "d3bd1d1eb1996302f168db18b2cb8d45599d0df06197bead7f47a3fbb8e6b27f",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "9e1fa59f75b695213688ad36f9e680ddce5c1399d77f940a7f853ea37efd41d7",
+        "64": "f20883f6af23e375b29fc3cadde69e2b8a948e604263cd9345c6de25b97c7e47"
+      },
+      "binary_versions": {
+        "32": "5.0.2.1431",
+        "64": "5.0.2.1430"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.0.1-addons",
+      "version": "5.0.1",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.0.1_Addon.exe",
+      "sha256": "6dee522ce42f797d38ca85e28b70941156ff9a4f8a4851de1e0290f2da4efaa1",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "4863ba3c61a20f3e3e916a425fc66434199a2798cb5222749714e8e412c36f73",
+        "64": "1a0d6defe4102d45fd60367ce08282c61767313af36b23bd634fcd116a380c5f"
+      },
+      "binary_versions": {
+        "32": "5.0.1.1419",
+        "64": "5.0.1.1418"
+      },
+      "addon_support": "full",
+      "source_available": true
+    },
+    {
+      "id": "5.0.0-addons",
+      "version": "5.0.0",
+      "variant": "standard-addons",
+      "provider": "crosire/reshade",
+      "url": "https://reshade.me/downloads/ReShade_Setup_5.0.0_Addon.exe",
+      "sha256": "fe4f06af6beca1d1679c81feac85e06e419c39f768a7e13e6d3e3178ff9b6e25",
+      "backend_version": "6.8.0",
+      "dll_sha256": {
+        "32": "0ec693ff639a25b747192686cfc3bb2cc345f7afe59e2d5c4a6c36f35294da64",
+        "64": "e1382bf1aec1a779e07cd7abb7c57250670131566b452f0e3e2828b73e115584"
+      },
+      "binary_versions": {
+        "32": "5.0.0.1397",
+        "64": "5.0.0.1396"
+      },
+      "addon_support": "full",
+      "source_available": true
     }
   ]
 }

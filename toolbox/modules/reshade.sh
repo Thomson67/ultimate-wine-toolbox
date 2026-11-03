@@ -174,7 +174,7 @@ resh_api_select() {
 }
 
 resh_version_select() {
-    local rom="$1" api="${2:-dxgi}" helper="$WT_ROOT/helpers/reshade_versions.py" listing version current no_banner choice index identity variant provider label
+    local rom="$1" api="${2:-dxgi}" helper="$WT_ROOT/helpers/reshade_versions.py" listing version current no_banner choice index identity variant provider label notes note
     local -a versions options identities
     while true; do
         listing="$(python3 "$helper" --home "$WT_HOME" versions --rom "$rom" --api "$api" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
@@ -197,13 +197,21 @@ resh_version_select() {
         [ -n "$version" ] || return 1
         listing="$(python3 "$helper" --home "$WT_HOME" variants "$version" --rom "$rom" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
         identities=(); options=()
-        while IFS=$'\t' read -r identity variant provider current; do
+        while IFS=$'\t' read -r identity variant provider current notes; do
             [ -n "$identity" ] || continue
             case "$variant" in
                 standard) label="$(i18n resh_variant_standard)" ;;
-                no-startup-banner) label="$(i18n resh_variant_no_banner) — $provider" ;;
+                standard-addons) label="$(i18n resh_variant_addons)" ;;
+                no-startup-banner) label="$(i18n resh_variant_no_banner) — ${provider%%/*}" ;;
                 *) return 1 ;;
             esac
+            for note in ${notes//,/ }; do
+                case "$note" in
+                    full-addons) label+=" — $(i18n resh_full_addons)" ;;
+                    binary-archive) label+=" — $(i18n resh_binary_archive)" ;;
+                    older-gui) label+=" — $(i18n resh_older_gui)" ;;
+                esac
+            done
             [ "$current" != 1 ] || label+=" — $(i18n resh_release_installed)"
             identities+=("$identity"); options+=("${#identities[@]}" "$label")
         done <<<"$listing"
@@ -280,6 +288,7 @@ PY_PENDING
     }
     case "$variant" in
         standard) version_label="$version — $(i18n resh_variant_standard)" ;;
+        standard-addons) version_label="$version — $(i18n resh_variant_addons)" ;;
         no-startup-banner) version_label="$version — $(i18n resh_variant_no_banner)" ;;
         *) return 1 ;;
     esac
@@ -438,6 +447,7 @@ resh_game_menu() {
             IFS=$'\t' read -r version arch dll exe packs <<< "$details"
             case "$version" in
                 *-no-startup-banner) version="${version%-no-startup-banner} — $(i18n resh_variant_no_banner)" ;;
+                *-addons) version="${version%-addons} — $(i18n resh_variant_addons)" ;;
             esac
             prompt+="\n\n$(i18n resh_details "$version" "$arch" "$dll" "$exe" "$packs")"
         fi

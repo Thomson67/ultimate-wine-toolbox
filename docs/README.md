@@ -23,7 +23,7 @@ la langue choisie. Les fichiers techniques ci-dessous complètent ces guides.
 | Mise à jour WSquashFS / Update | [FR](../toolbox/docs/fr/update.txt) | [EN](../toolbox/docs/en/update.txt) | [Présentation](../README.fr.md#mettre-à-jour-un-wsquashfs) |
 | MangoHud | [FR](../toolbox/docs/fr/mangohud.txt) | [EN](../toolbox/docs/en/mangohud.txt) | Réglages globaux et par jeu / Global and per-game settings |
 | DXVK / VKD3D / NVAPI | [FR](../toolbox/docs/fr/dxvk.txt) | [EN](../toolbox/docs/en/dxvk.txt) | [Présentation](../README.fr.md#dxvk-vkd3d-proton-et-nvapi) |
-| ReShade | [FR](../toolbox/docs/fr/reshade.txt) | [EN](../toolbox/docs/en/reshade.txt) | [Échanges communautaires](COMMUNITY_PROFILES.md) |
+| ReShade | [FR](../toolbox/docs/fr/reshade.txt) | [EN](../toolbox/docs/en/reshade.txt) | [Échanges communautaires](COMMUNITY_PROFILES.md), [builds et contrôles](RESHADE_BUILDS.fr.md) |
 | Winetricks / Wine Mono / .NET | [FR](../toolbox/docs/fr/dotnet.txt) | [EN](../toolbox/docs/en/dotnet.txt) | Installation, copie locale et restauration / Installation, staging and recovery |
 | AntiMicroX | [FR](../toolbox/docs/fr/antimicrox.txt) | [EN](../toolbox/docs/en/antimicrox.txt) | [Guide technique](ANTIMICROX.md), [parcours launcher FR](ANTIMICROX-LAUNCHERS-TEST.fr.md) |
 

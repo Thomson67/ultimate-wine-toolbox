@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path
 import re
+import struct
 import urllib.request
 import zipfile
 
@@ -19,20 +20,51 @@ def catalog(path=CATALOG):
         raise ValueError('unsupported ReShade catalogue')
     entries = data['entries']
     seen = set()
+    providers = {
+        'fienestar/OverlayDisabledReShade', 'ovitus/OverlayDisabledReShade',
+        'Knitby/OverlayDisabledReShade', 'Adam-Darlow/OverlayDisabledReShade',
+        'AndrewGDX/OverlayDisabledReShade', 'altes21/OverlayDisabledReShade',
+        'mjd4219/reshade-no-intro',
+    }
     for entry in entries:
-        if (not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-no-startup-banner)?', entry['id'])
+        if (not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?', entry['id'])
                 or entry['id'] in seen or not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', entry['version'])
-                or entry['variant'] not in ('standard', 'no-startup-banner')
+                or entry['variant'] not in ('standard', 'standard-addons', 'no-startup-banner')
                 or not re.fullmatch(r'[a-f0-9]{64}', entry['sha256'])
                 or not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', entry['backend_version'])):
             raise ValueError('invalid ReShade catalogue entry')
-        expected = entry['version'] + ('-no-startup-banner' if entry['variant'] != 'standard' else '')
+        if entry['variant'] in ('standard', 'standard-addons'):
+            addons = entry['variant'] == 'standard-addons'
+            if addons and tuple(map(int, entry['version'].split('.'))) < (5, 0, 0):
+                raise ValueError('full add-ons require ReShade 5.0 or newer')
+            expected = entry['version'] + ('-addons' if addons else '')
+            url = f'https://reshade.me/downloads/ReShade_Setup_{entry["version"]}' + ('_Addon.exe' if addons else '.exe')
+            if entry['provider'] != 'crosire/reshade' or entry['url'] != url:
+                raise ValueError('unexpected ReShade download source')
+        else:
+            if entry['provider'] not in providers:
+                raise ValueError('unexpected ReShade download source')
+            owner = entry['provider'].split('/')[0].lower()
+            expected = entry['version'] + ('' if owner == 'fienestar' else '-' + owner) + '-no-startup-banner'
+            tag = entry.get('tag', 'v' + entry['version'] + '-patched')
+            asset = entry.get('asset', 'ReShade.Setup.exe')
+            if not re.fullmatch(r'[A-Za-z0-9_.-]+', tag) or not re.fullmatch(r'[A-Za-z0-9_.-]+\.(?:exe|zip)', asset):
+                raise ValueError('invalid ReShade release asset')
+            url = f'https://github.com/{entry["provider"]}/releases/download/{tag}/{asset}'
+            if entry['url'] != url:
+                raise ValueError('unexpected ReShade download source')
         if entry['id'] != expected:
-            raise ValueError('inconsistent ReShade version/variant')
-        urls = (f'https://reshade.me/downloads/ReShade_Setup_{entry["version"]}.exe',
-                f'https://github.com/fienestar/OverlayDisabledReShade/releases/download/v{entry["version"]}-patched/ReShade.Setup.exe')
-        if entry['url'] != urls[entry['variant'] != 'standard']:
-            raise ValueError('unexpected ReShade download source')
+            raise ValueError('inconsistent ReShade version/variant/provider')
+        containers = entry.get('containers', [])
+        if not isinstance(containers, list) or len(containers) > 2 or any(
+                not isinstance(n, str) or not re.fullmatch(r'[A-Za-z0-9_. /-]+', n)
+                or n.startswith('/') or '..' in n.split('/') for n in containers):
+            raise ValueError('invalid nested ReShade container')
+        for name in ('dll_sha256', 'binary_versions'):
+            if name in entry:
+                pattern = r'[a-f0-9]{64}' if name == 'dll_sha256' else re.escape(entry['version']) + r'\.[0-9]+'
+                if set(entry[name]) != {'32', '64'} or any(not re.fullmatch(pattern, v) for v in entry[name].values()):
+                    raise ValueError('invalid ReShade binary verification data')
         seen.add(entry['id'])
     return entries
 
@@ -58,6 +90,23 @@ def download(url):
     return data
 
 
+def binary_matches(content, entry, bits):
+    expected_hash = entry.get('dll_sha256', {}).get(str(bits))
+    if expected_hash and hashlib.sha256(content).hexdigest() != expected_hash:
+        return False
+    expected_version = entry.get('binary_versions', {}).get(str(bits))
+    if expected_version:
+        versions = []
+        for match in re.finditer(b'\xbd\x04\xef\xfe\x00\x00\x01\x00', content):
+            if match.start() + 16 > len(content):
+                continue
+            ms, ls = struct.unpack_from('<II', content, match.start() + 8)
+            versions.append('.'.join(map(str, (ms >> 16, ms & 65535, ls >> 16, ls & 65535))))
+        if versions != [expected_version]:
+            return False
+    return True
+
+
 def payload(home, identity, arch, fetch=download, entries=None):
     from reshade_manager import atomic_bytes, pe_arch, read_json, save_json
     entry = selection(identity, entries)
@@ -80,12 +129,18 @@ def payload(home, identity, arch, fetch=download, entries=None):
             raise ValueError('redirected ReShade DLL cache')
         valid = (valid and path.is_file()
                  and hashlib.sha256(path.read_bytes()).hexdigest() == manifest.get(str(bits))
-                 and pe_arch(path.read_bytes()) == bits)
+                 and pe_arch(path.read_bytes()) == bits
+                 and binary_matches(path.read_bytes(), entry, bits))
     if valid:
         return target / f'ReShade{arch}.dll'
     data = fetch(entry['url'])
     if len(data) > LIMIT or hashlib.sha256(data).hexdigest() != entry['sha256']:
         raise ValueError('ReShade setup checksum mismatch; existing installation preserved')
+    for name in entry.get('containers', []):
+        with zipfile.ZipFile(io.BytesIO(data)) as outer:
+            if outer.namelist().count(name) != 1 or outer.getinfo(name).file_size > LIMIT:
+                raise ValueError('missing, duplicated or oversized ReShade container')
+            data = outer.read(name)
     payloads = {}
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         for bits in (32, 64):
@@ -95,6 +150,8 @@ def payload(home, identity, arch, fetch=download, entries=None):
             content = archive.read(name)
             if pe_arch(content) != bits:
                 raise ValueError('wrong ReShade DLL architecture')
+            if not binary_matches(content, entry, bits):
+                raise ValueError('ReShade DLL version or checksum mismatch')
             payloads[bits] = content
     # Validate both architectures before writing either one. Variants never
     # replace the standard build's cache and existing game configs are untouched.
@@ -105,6 +162,8 @@ def payload(home, identity, arch, fetch=download, entries=None):
     atomic_bytes(target / 'LICENSE.md', license_path.read_bytes())
     save_json(manifest_path, dict(id=entry['id'], version=entry['version'], variant=entry['variant'],
                                  source=entry['url'], provider=entry['provider'], setup_sha256=entry['sha256'],
+                                 addon_support=entry.get('addon_support', 'restricted'),
+                                 source_available=entry.get('source_available', True),
                                  **{str(bits): hashlib.sha256(content).hexdigest() for bits, content in payloads.items()}))
     return target / f'ReShade{arch}.dll'
 
@@ -131,9 +190,13 @@ def main():
             no_banner = any(e['version'] == version and e['variant'] == 'no-startup-banner' for e in entries)
             print('\t'.join((version, str(int(present)), str(int(no_banner)))))
     elif args.command == 'variants':
-        for entry in entries:
+        for entry in sorted(entries, key=lambda e: {'standard': 0, 'standard-addons': 1, 'no-startup-banner': 2}[e['variant']]):
             if entry['version'] == args.value:
-                print('\t'.join((entry['id'], entry['variant'], entry['provider'], str(int(entry['id'] == installed)))))
+                print('\t'.join((entry['id'], entry['variant'], entry['provider'], str(int(entry['id'] == installed)),
+                                 ','.join(note for note, condition in (
+                                     ('full-addons', entry.get('addon_support') == 'full' and entry['variant'] != 'standard-addons'),
+                                     ('binary-archive', entry.get('source_available') is False),
+                                     ('older-gui', entry.get('source_note') == 'gui-6.4.1')) if condition))))
     else:
         entry = selection(args.value, entries)
         print('\t'.join((entry['version'], entry['variant'], entry['backend_version'])))
