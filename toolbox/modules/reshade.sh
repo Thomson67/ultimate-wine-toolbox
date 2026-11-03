@@ -174,14 +174,15 @@ resh_api_select() {
 }
 
 resh_version_select() {
-    local rom="$1" api="${2:-dxgi}" helper="$WT_ROOT/helpers/reshade_versions.py" listing version current choice index identity variant provider label
+    local rom="$1" api="${2:-dxgi}" helper="$WT_ROOT/helpers/reshade_versions.py" listing version current no_banner choice index identity variant provider label
     local -a versions options identities
     while true; do
         listing="$(python3 "$helper" --home "$WT_HOME" versions --rom "$rom" --api "$api" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
         versions=(); options=()
-        while IFS=$'\t' read -r version current; do
+        while IFS=$'\t' read -r version current no_banner; do
             [ -n "$version" ] || continue
             versions+=("$version"); label="$version"
+            [ "$no_banner" != 1 ] || label+=" — $(i18n resh_no_banner_available)"
             [ "$current" != 1 ] || label+=" — $(i18n resh_release_installed)"
             options+=("${#versions[@]}" "$label")
         done <<<"$listing"

@@ -19,6 +19,22 @@ import reshade_versions as v
 
 
 class VersionCatalogTests(unittest.TestCase):
+    def test_version_menu_marks_only_releases_with_a_no_banner_variant(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            result = subprocess.run(['bash', '-c', '''source "$WT_ROOT/lib/common.sh"
+WT_LANGUAGE=fr; load_i18n
+source "$WT_ROOT/modules/reshade.sh"
+menu_select() { printf '%s\\n' "$@" > "$MENU_LOG"; return 1; }
+resh_version_select /unused/Game.wine
+'''], capture_output=True, text=True, env=dict(os.environ, WT_ROOT=str(ROOT/'toolbox'),
+                   WT_HOME=folder, MENU_LOG=str(home/'menu')))
+            self.assertEqual(result.returncode, 1, result.stderr)
+            labels = (home/'menu').read_text().splitlines()
+            marked = [label for label in labels if 'sans bannière disponible' in label]
+            self.assertEqual(marked, ['6.4.1 — sans bannière disponible', '6.2.0 — sans bannière disponible'])
+            self.assertIn('6.8.0', labels)
+
     def setup_bytes(self, marker=b''):
         stream = io.BytesIO()
         with zipfile.ZipFile(stream, 'w') as archive:

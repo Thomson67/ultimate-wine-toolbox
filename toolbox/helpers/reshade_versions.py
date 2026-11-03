@@ -128,7 +128,8 @@ def main():
         versions = sorted({e['version'] for e in entries}, key=lambda v: tuple(map(int, v.split('.'))), reverse=True)
         for version in versions:
             present = any(e['id'] == installed and e['version'] == version for e in entries)
-            print(version + '\t' + str(int(present)))
+            no_banner = any(e['version'] == version and e['variant'] == 'no-startup-banner' for e in entries)
+            print('\t'.join((version, str(int(present)), str(int(no_banner)))))
     elif args.command == 'variants':
         for entry in entries:
             if entry['version'] == args.value:

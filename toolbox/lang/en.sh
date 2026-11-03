@@ -95,6 +95,7 @@ declare -gA I18N=(
   [resh_variant_standard]="Official"
   [resh_variant_no_banner]="No startup banner"
   [resh_release_installed]="configured for this game"
+  [resh_no_banner_available]="no startup banner variant available"
   [resh_version_invalid]="Invalid version. Use latest or X.Y.Z."
   [resh_shaders_prompt]="Choose this game’s shader packs. Custom selection lets you choose individual packs. Enable effects in ReShade in-game; no effects are forced. More packs can be added later."
   [resh_install_confirm]="Install for %s?\n\nEXE: %s\nDLL: %s\nVersion: %s\nPacks: %s\n\nReplaced files will be backed up. An existing ReShade configuration will be disabled during preparation."

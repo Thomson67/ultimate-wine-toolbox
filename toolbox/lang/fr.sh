@@ -95,6 +95,7 @@ declare -gA I18N=(
   [resh_variant_standard]="Officielle"
   [resh_variant_no_banner]="Sans bannière de démarrage"
   [resh_release_installed]="configurée pour ce jeu"
+  [resh_no_banner_available]="sans bannière disponible"
   [resh_version_invalid]="Version invalide. Utilisez latest ou un numéro X.Y.Z."
   [resh_shaders_prompt]="Choisissez les packs de shaders de ce jeu. La sélection libre permet de choisir chaque pack. Les effets seront à activer dans ReShade en jeu ; aucun effet n’est imposé. Vous pourrez ajouter des packs ensuite."
   [resh_install_confirm]="Installer pour %s ?\n\nEXE : %s\nDLL : %s\nVersion : %s\nPacks : %s\n\nLes fichiers remplacés seront sauvegardés. Une configuration ReShade existante sera désactivée pendant la préparation."
