@@ -586,6 +586,58 @@ $output"; fi
         fi
 }
 
+community_export_reshade_pack() {
+  local title="$1" rom="${2:-}" choice selected source plan output name author description credits game expected token label
+  local -a origin=() items=() presets=() addons=() preset_names=() addon_names=()
+  choice="$(menu_select "$title" "$(community_txt 'Préparer un pack personnalisé pour partage manuel (ZIP)' 'Prepare a customized bundle for manual sharing (ZIP)')" \
+    game "$(community_txt 'Depuis un jeu géré par la Toolbox' 'From a Toolbox-managed game')" \
+    source "$(community_txt 'Depuis un ZIP ou dossier personnalisé' 'From a custom ZIP or directory')" back "$(i18n back)")" || return
+  case "$choice" in
+    game)
+      if [ -z "$rom" ]; then
+        selected="$(community_pick_reshade_game "$title" managed)" || return
+        rom="${selected%%$'\t'*}"; game="${selected#*$'\t'}"
+      fi
+      origin=(--rom "$rom") ;;
+    source) source="$(resh_pack_source)" || return; origin=(--source "$source") ;;
+    *) return ;;
+  esac
+  plan="$(community_cmd reshade-pack-plan "${origin[@]}" 2>&1)" || { msgbox "$title" "$plan"; return 1; }
+  while IFS=$'\t' read -r token label; do
+    [ -n "$token" ] && { preset_names+=("$token"); items+=("${#preset_names[@]}" "$label" on); }
+  done < <(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("\n".join(k+"\t"+v for k,v in d["names"].items()))' "$plan")
+  selected="$(checklist_select "$title" "$(community_txt 'Presets à partager : seuls leurs effets actifs et dépendances résolues seront exportés.' 'Presets to share: only their active effects and resolved dependencies will be exported.')" "${items[@]}")" || return
+  while IFS= read -r token; do
+    [ -n "$token" ] || continue
+    [[ "$token" =~ ^[0-9]+$ ]] && [ "$token" -ge 1 ] && [ "$token" -le "${#preset_names[@]}" ] || return 1
+    presets+=(--preset "${preset_names[$((10#$token-1))]}")
+  done <<< "$selected"
+  [ "${#presets[@]}" -gt 0 ] || return
+  items=()
+  while IFS=$'\t' read -r token label; do
+    [ -n "$token" ] && { addon_names+=("$token"); items+=("${#addon_names[@]}" "$label" off); }
+  done < <(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("\n".join(k+"\t"+k+" ("+str(v)+" bits)" for k,v in d["addons"].items()))' "$plan")
+  if [ "${#items[@]}" -gt 0 ]; then
+    selected="$(checklist_select "$title" "$(community_txt 'Cochez uniquement les add-ons nécessaires à ces presets. Leur utilisation ne peut pas être déduite automatiquement.' 'Select only add-ons required by these presets. Their use cannot be inferred automatically.')" "${items[@]}")" || return
+    while IFS= read -r token; do
+      [ -n "$token" ] || continue
+      [[ "$token" =~ ^[0-9]+$ ]] && [ "$token" -ge 1 ] && [ "$token" -le "${#addon_names[@]}" ] || return 1
+      addons+=(--addon "${addon_names[$((10#$token-1))]}")
+    done <<< "$selected"
+  fi
+  game="$(input_text "$title" "$(community_txt 'Nom public du jeu' 'Public game name')" "${game:-${rom##*/}}")" || return
+  name="$(input_text "$title" "$(community_txt 'Nom du pack' 'Bundle title')" "$game")" || return
+  author="$(input_text "$title" "$(community_txt 'Votre pseudo public' 'Your public nickname')" '')" || return
+  description="$(input_text "$title" "$(community_txt 'Description et prérequis' 'Description and requirements')" '')" || return
+  credits="$(input_text "$title" "$(community_txt 'Crédits, provenance et licences autorisant le partage des fichiers sélectionnés' 'Credits, sources and licenses permitting redistribution of the selected files')" '')" || return
+  yesno_default_no "$title" "$(community_txt 'Créer ce ZIP pour partage manuel ? Confirmez être autorisé à redistribuer les fichiers sélectionnés. Aucun envoi au catalogue ne sera effectué.' 'Create this ZIP for manual sharing? Confirm you may redistribute the selected files. Nothing will be sent to the catalogue.')" || return
+  expected="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["sha256"])' "$plan")" || return
+  if output="$(community_cmd reshade-pack-export "${origin[@]}" "${presets[@]}" "${addons[@]}" --expected "$expected" \
+      --game "$game" --title "$name" --author "$author" --credits "$credits" --description "$description" 2>&1)"; then
+    msgbox "$title" "$(community_txt 'Pack portable créé avec manifeste et somme SHA-256. Partagez le ZIP manuellement ; le service communautaire actuel accepte uniquement les presets INI. Réimport : ReShade → Pack local → ZIP.' 'Portable bundle created with manifest and SHA-256 checksum. Share the ZIP manually; the current community service only accepts INI presets. Reimport: ReShade → Local bundle → ZIP.')\n$output"
+  else msgbox "$title" "$output"; return 1; fi
+}
+
 community_share_menu() {
   local title="$1" rom="${2:-}" choice
   while true; do
@@ -618,7 +670,7 @@ community_menu() {
   if [ "$kind" = antimicrox ]; then title="AntiMicroX — $(community_txt 'Profils communautaires' 'Community profiles')"; else title="ReShade — $(community_txt 'Presets communautaires' 'Community presets')"; fi
   if [ "$kind" = reshade ]; then
     share_label="$(community_txt 'Partager mon preset ReShade' 'Share my ReShade preset')"
-    import_options=(import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')")
+    import_options=(export-pack "$(community_txt 'Préparer un pack ReShade pour partage (ZIP)' 'Prepare a ReShade bundle for sharing (ZIP)')" import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')")
     management_options=(validate "$(community_txt 'Valider les partages (modérateurs)' 'Review submissions (moderators)')"
       forget "$(community_txt 'Retirer l’accès modérateur de ce PC' 'Remove moderator access from this PC')")
     browse_label="$(community_txt 'Voir les presets disponibles' 'Browse available presets')"
@@ -651,6 +703,7 @@ $output"; fi
         if [ "$kind" = antimicrox ]; then community_share_menu "$title" "$rom";
         else community_share "$kind" "$title" "$rom"; fi
         continue ;;
+      export-pack) community_export_reshade_pack "$title" "$rom"; continue ;;
       import) community_import_package "$kind" "$title" "$rom"; continue ;;
       validate) community_validate "$kind" "$title"; continue ;;
       forget) community_forget_access "$title"; continue ;;

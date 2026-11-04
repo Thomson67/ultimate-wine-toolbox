@@ -271,3 +271,48 @@ configuration pendant le téléchargement, conservation des DLL et des shaders
 modifiés, et restauration de la vue de shaders précédente après retrait d'un
 pack custom. Les fonctions du backend épinglé ont aussi été exécutées avec des
 clones locaux simulés pour vérifier le chemin de téléchargement/fusion seul.
+
+## Préparer un pack personnalisé pour partage (branche de test)
+
+Dans **ReShade → Presets communautaires → Préparer un pack ReShade pour partage
+(ZIP)**, choisir un jeu géré par la Toolbox ou un ZIP/dossier personnalisé.
+Fermer le jeu avant d’exporter ses réglages. Cocher les presets à partager, puis
+uniquement les add-ons indispensables : aucun add-on n’est coché par défaut,
+les modules désactivés sont exclus et l’utilisation d’un add-on ne peut pas être
+déduite d’un preset. Le couple Citra.fx/citra.addon connu est contrôlé.
+
+L’export part exclusivement de `Techniques=` des presets choisis, jamais de
+`TechniqueSorting=` ni des sections d’effets désactivés. Il inclut leurs `.fx`,
+les inclusions littérales récursives et les textures déclarées par ces shaders.
+Les autres effets, textures, presets et add-ons installés ne sont pas exportés.
+Les bibliothèques de shaders du jeu sont indexées sans charger les fichiers
+inutilisés. Les copies de shaders personnalisées du contexte du jeu sont
+conservées telles quelles. Pour partager des fichiers retouchés dans un dossier
+externe, choisir ce dossier comme source.
+
+Une technique sans fichier explicite doit avoir une définition unique. Une
+inclusion ou texture dynamique, une dépendance absente ou ambiguë provoque un
+refus détaillé : il faut résoudre cette dépendance dans les sources puis
+recommencer. Les dépendances conditionnelles littérales du shader utilisé sont
+incluses de manière conservatrice ; ce contrôle statique n’est pas une trace
+GPU des ressources effectivement lues pendant une partie. Les ressources
+annexes spécifiques à un add-on, non référencées par les shaders, ne peuvent pas
+être découvertes automatiquement et leurs formats ne sont pas encore pris en
+charge. Un essai de réimport et en jeu reste nécessaire.
+
+Renseigner le jeu, le titre, le pseudo, une description des prérequis et les
+crédits/provenances/licences autorisant la redistribution des fichiers choisis.
+Le ZIP conserve les paramètres des presets et la configuration ReShade portable
+prise en charge ; il exclut les DLL du moteur, exécutables, caches, chemins
+locaux et raccourcis personnels. Le manifeste `uwt-pack.json` contient les noms,
+la version/API/architecture connues, les add-ons sélectionnés et les SHA-256.
+Depuis un ZIP/dossier, préciser dans la description les prérequis qui ne peuvent
+pas être déduits. Les crédits sont déclarés par l’auteur, pas vérifiés par UWT.
+
+Le ZIP et son fichier `.sha256` sont créés dans
+`exports/community/reshade-packs/`. Le ZIP se réimporte par **Pack ReShade local
+→ Archive ZIP** après installation de la version et de l’API indiquées.
+L’export ne modifie pas les sources. Le service communautaire en ligne actuel
+accepte uniquement les petits profils texte : cette préparation n’envoie aucun
+pack au catalogue. Le partage manuel du ZIP est disponible ; la réception,
+le stockage et la modération des packs binaires restent à ajouter au service.

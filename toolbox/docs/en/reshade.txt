@@ -91,3 +91,5 @@ version and prioritize existing custom files. Unmanaged integrated injectors
 retain their existing workflow.
 
 For a directory, select the root containing ReShade.ini and reshade-shaders/Shaders. Required files are copied; the source directory stays unchanged.
+
+Prepare a ReShade bundle for sharing (ZIP), under Community presets: select presets and only the required add-ons. Export includes active effects, their resolved includes/textures, settings, credits and requirements. Dynamic/ambiguous dependencies block export. The ZIP under exports/community/reshade-packs can be shared manually and reimported as a local bundle. No catalogue submission; the current service still only accepts INI presets.

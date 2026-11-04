@@ -676,6 +676,18 @@ def main():
     sub.add_parser('reshade-scan')
     arg = sub.add_parser('reshade-presets'); arg.add_argument('rom')
     arg = sub.add_parser('reshade-export'); arg.add_argument('rom'); arg.add_argument('identifier'); arg.add_argument('destination')
+    for command in ('reshade-pack-plan', 'reshade-pack-export'):
+        arg = sub.add_parser(command)
+        group = arg.add_mutually_exclusive_group(required=True)
+        group.add_argument('--rom'); group.add_argument('--source')
+        if command.endswith('export'):
+            arg.add_argument('--preset', action='append', default=[])
+            arg.add_argument('--addon', action='append', default=[])
+            arg.add_argument('--expected', required=True)
+            for name in ('game', 'title', 'author', 'credits'):
+                arg.add_argument('--' + name, required=True)
+            for name in ('description', 'tested-on'):
+                arg.add_argument('--' + name, default='')
     arg = sub.add_parser('preset-info'); arg.add_argument('source')
     arg = sub.add_parser('preset-packs'); arg.add_argument('source')
     arg = sub.add_parser('suggest-game'); arg.add_argument('kind', choices=KINDS); arg.add_argument('source'); arg.add_argument('--rom', default='')
@@ -708,6 +720,15 @@ def main():
     if args.command == 'reshade-scan':
         from reshade_manager import scan_external_games
         print(' / '.join(map(str, scan_external_games(Path(args.home), [path for path, _ in es_games()])))); return
+    if args.command in ('reshade-pack-plan', 'reshade-pack-export'):
+        import reshade_pack_export as packs
+        if args.command.endswith('plan'):
+            print(json.dumps(packs.plan(args.home, args.rom, args.source), ensure_ascii=False))
+        else:
+            print(packs.export(args.home, rom=args.rom, local=args.source, selected=args.preset,
+                               addons=args.addon, expected=args.expected, game=args.game, title=args.title,
+                               author=args.author, credits=args.credits, description=args.description, tested_on=args.tested_on))
+        return
     if args.command == 'reshade-presets':
         from community_reshade import presets
         for item in presets(args.home, args.rom, args.language == 'fr'): print(item['id']+'\t'+item['label'])

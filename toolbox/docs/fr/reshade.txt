@@ -91,3 +91,5 @@ ajoute les shaders sans changer la version ReShade ; les fichiers personnalisés
 existants ont priorité. Les injecteurs intégrés non gérés gardent leur parcours.
 
 Pour un dossier, sélectionner la racine contenant ReShade.ini et reshade-shaders/Shaders. Les fichiers utiles sont copiés ; le dossier source reste intact.
+
+Préparer un pack ReShade pour partage (ZIP), dans Presets communautaires : sélectionner les presets et les seuls add-ons requis. Seuls les effets actifs, leurs inclusions et textures résolues sont exportés, avec les réglages, crédits et prérequis. Les dépendances dynamiques/ambiguës bloquent l’export. Le ZIP créé dans exports/community/reshade-packs se partage manuellement et se réimporte comme pack local. Aucun envoi au catalogue, dont le service reste limité aux presets INI.
