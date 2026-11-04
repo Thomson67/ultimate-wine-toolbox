@@ -230,7 +230,7 @@ def finish(home, rom):
         raise ValueError('d3dcompiler_47 integrity check failed')
     backend_state = (cache / 'game-state' / (pending['state_key'] + '.state')).read_text()
     installed = re.search(r'^selected_repos=(.*)$', backend_state, re.M)
-    from reshade_extra_shaders import PACK, backend_packs, install as install_extra_shaders
+    from reshade_extra_shaders import backend_packs, install_selected as install_extra_shaders
     backend_selection = backend_packs(pending['repos'])
     requested = set(backend_selection.split(',')) if backend_selection != 'none' else set()
     if not installed or set(filter(None, installed[1].split(','))) != requested:
@@ -244,8 +244,7 @@ def finish(home, rom):
         # unpinned builds its runtime is only a bootstrap; the final game DLL
         # always comes from the exact checksum-pinned catalogue selection.
         dll = payload(home, pending['release_id'], pending['arch'])
-    if PACK in pending['repos'].split(','):
-        install_extra_shaders(home, shaders)
+    install_extra_shaders(home, shaders, pending['repos'])
     config = home / 'reshade/games' / (key(rom) + '.json')
     old = read_json(config)
     pending.update(enabled=old.get('enabled', False), runtime=str(dll), compiler=str(compiler),

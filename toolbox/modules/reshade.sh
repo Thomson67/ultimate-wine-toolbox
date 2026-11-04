@@ -401,6 +401,9 @@ PY_PENDING
             items+=("$name" "$label" "$state")
         done < <(MAIN_PATH="$WT_HOME/reshade/runtime" UI_BACKEND=cli NO_COLOR=1 \
             bash "$RESH_BACKEND" --cli --list-shader-repos 2>> "${WT_SESSION_LOG:-/dev/null}")
+        state=off
+        [[ ",$defaults," != *",uwt-insane-dev,"* ]] || state=on
+        items+=(uwt-insane-dev "$(community_txt 'Insane-Shaders : développement / anciens (FastFourierTransform)' 'Insane-Shaders: development / older (FastFourierTransform)')" "$state")
         [ "${#items[@]}" -gt 0 ] || return 1
         selected="$(checklist_select "$(i18n resh_title)" "$(i18n resh_shaders_prompt)" "${items[@]}")" || return 1
         while IFS= read -r name; do

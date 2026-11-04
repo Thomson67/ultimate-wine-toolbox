@@ -562,6 +562,9 @@
       "5XBR_NoBlend.fx",
       "4xBRZ.fx",
       "AnomalousPixelBlending.fx"
+    ],
+    "uwt-insane-dev": [
+      "FastFourierTransform.fx"
     ]
   }
 }

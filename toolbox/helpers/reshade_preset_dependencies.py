@@ -178,9 +178,8 @@ def finish(home, rom, job, runner='', bottles=Path('/userdata/system/wine-bottle
     extra = job / 'cache/game-shaders/preset/Merged'
     if not (extra / 'Shaders').is_dir():
         raise ValueError('shader download did not produce the expected files')
-    from reshade_extra_shaders import PACK, install as install_extra_shaders
-    if PACK in pending['packs']:
-        install_extra_shaders(home, extra.parent)
+    from reshade_extra_shaders import install_selected as install_extra_shaders
+    install_extra_shaders(home, extra.parent, pending['packs'])
     combined = job / 'Combined'
     if combined.exists():
         raise ValueError('shader workspace was already finalized; retry the import')

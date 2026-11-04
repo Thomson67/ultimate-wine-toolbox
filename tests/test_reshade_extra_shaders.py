@@ -80,6 +80,35 @@ class ExtraShaderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             e.backend_packs('bad;selection')
 
+    def test_development_supplement_is_separate_and_checks_core_include(self):
+        data = b'#include "ReShade.fxh"\ntechnique DoNothing {}'
+        catalog = self.base / 'development.json'
+        entry = dict(file='FastFourierTransform.fx', sha256=e.digest(data),
+                     url='https://raw.githubusercontent.com/LordOfLunacy/Insane-Shaders/' + 'a'*40 + '/Shaders/DevShaders/FastFourierTransform.fx',
+                     requires=['ReShade.fxh'])
+        catalog.write_text(json.dumps({'effects': [entry]}))
+        self.assertEqual(e.backend_packs('uwt-insane-dev,reshade-shaders,uwt-retro-extras'), 'reshade-shaders')
+        self.assertEqual(e.backend_packs('uwt-insane-dev'), 'none')
+        with patch.object(e, 'DEV_CATALOG', catalog), patch.object(e, 'payload', return_value=data) as fetch:
+            with self.assertRaisesRegex(ValueError, 'ReShade.fxh'):
+                e.install_selected(self.home, self.shaders, 'uwt-insane-dev')
+            fetch.assert_not_called()
+            include = self.shaders / 'Merged/Shaders/ReShade.fxh'
+            include.parent.mkdir(parents=True, exist_ok=True); include.write_text('core include')
+            e.install_selected(self.home, self.shaders, 'uwt-insane-dev')
+            fetch.assert_called_once()
+        self.assertEqual((self.shaders/'Merged/Shaders/FastFourierTransform.fx').read_bytes(), data)
+        self.assertFalse((self.shaders/'uwt-extra-shaders.json').exists())
+        self.assertEqual(r.read_json(self.shaders/'uwt-insane-dev-shaders.json')['pack'], 'uwt-insane-dev')
+
+    def test_fft_catalog_is_pinned_to_author_and_not_added_to_retro_pack(self):
+        entry = json.loads(e.DEV_CATALOG.read_text())['effects'][0]
+        self.assertEqual(entry['file'], 'FastFourierTransform.fx')
+        self.assertIn('LordOfLunacy/Insane-Shaders/71ac8cd50824413a695155b44e39d2888135731d/', entry['url'])
+        self.assertEqual(entry['sha256'], 'e4b7aa672c2867863f3fd99a18bf7dffdb7be9e3c560ee2b44c759f0b0ecddcb')
+        self.assertEqual(entry['requires'], ['ReShade.fxh'])
+        self.assertNotIn('FastFourierTransform.fx', [v['file'] for v in json.loads(e.CATALOG.read_text())['effects']])
+
     def test_backend_selection_cli_needs_no_userdata_directory(self):
         home = self.base/'not-created'
         result=subprocess.run([sys.executable,str(ROOT/'toolbox/helpers/reshade_manager.py'),

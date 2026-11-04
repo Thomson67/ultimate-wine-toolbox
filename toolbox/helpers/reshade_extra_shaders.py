@@ -10,13 +10,16 @@ import tempfile
 PACK = 'uwt-retro-extras'
 CATALOG = Path(__file__).resolve().parents[1] / 'data/reshade-extra-shaders.json'
 BUNDLED = CATALOG.parent / 'reshade-retro'
+DEV_PACK = 'uwt-insane-dev'
+DEV_CATALOG = CATALOG.parent / 'reshade-insane-dev-shaders.json'
+SUPPLEMENTS = {PACK, DEV_PACK}
 
 
 def backend_packs(selection):
     names = selection.split(',')
     if not all(re.fullmatch(r'[a-z0-9_-]+', name) for name in names):
         raise ValueError('invalid shader selection')
-    return ','.join(name for name in names if name != PACK) or 'none'
+    return ','.join(name for name in names if name not in SUPPLEMENTS) or 'none'
 
 
 def digest(data):
@@ -54,10 +57,12 @@ def payload(home, entry):
         return data
 
 
-def install(home, shaders, catalog=CATALOG):
+def install(home, shaders, catalog=CATALOG, pack=PACK):
     from reshade_manager import atomic_bytes, read_json, save_json, safe_leaf
     entries = json.loads(catalog.read_text())['effects']
-    journal = shaders / 'uwt-extra-shaders.json'
+    if pack not in SUPPLEMENTS:
+        raise ValueError('invalid supplemental shader pack')
+    journal = shaders / ('uwt-extra-shaders.json' if pack == PACK else 'uwt-insane-dev-shaders.json')
     previous = read_json(journal).get('files', {})
     planned = []
     for entry in entries:
@@ -75,8 +80,28 @@ def install(home, shaders, catalog=CATALOG):
         if target.exists() and digest(target.read_bytes()) not in (
                 entry['sha256'], previous.get(entry['file'], {}).get('sha256')):
             raise ValueError(f'extra shader edited; existing file preserved: {target}')
+        for required in entry.get('requires', []):
+            if not re.fullmatch(r'[A-Za-z0-9_-]+\.fxh', required):
+                raise ValueError('invalid extra shader dependency')
+            header = safe_leaf(shaders, 'Merged/Shaders/' + required)
+            if not header.is_file():
+                legacy = safe_leaf(shaders, 'Merged/' + required)
+                if not legacy.is_file():
+                    raise ValueError('extra shader dependency missing: ' + required)
+                # Some backend views keep core headers at the Merged root.
+                # Also expose that same header beside the supplemental effect.
+                planned.append((header, legacy.read_bytes()))
         planned.append((target, payload(home, entry)))
     # Verify all downloads and collisions before changing the merged effects.
     for target, data in planned:
         atomic_bytes(target, data)
-    save_json(journal, {'pack': PACK, 'files': {e['file']: e for e in entries}})
+    save_json(journal, {'pack': pack, 'files': {e['file']: e for e in entries}})
+
+
+def install_selected(home, shaders, selection):
+    """Supplemental packs remain separate from the backend's own repository IDs."""
+    names = set(selection.split(',')) if isinstance(selection, str) else set(selection)
+    if PACK in names:
+        install(home, shaders)
+    if DEV_PACK in names:
+        install(home, shaders, DEV_CATALOG, pack=DEV_PACK)

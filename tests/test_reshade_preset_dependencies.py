@@ -174,6 +174,39 @@ if [ "$MODE" = pack ]; then resh_pack_complete_shaders "$ROM"; else resh_import_
         pack.install(self.home, self.rom, archive, 'Ultra.ini')
         return pack.dependency_source(self.home, self.rom)
 
+    def test_fft_from_non_active_pack_variant_is_recognized_installed_and_exportable(self):
+        import reshade_extra_shaders as extra
+        import reshade_pack_export as exporter
+        source = self.installed_pack_with_extra_variant('DoNothing@FastFourierTransform.fx')
+        report = d.analyze(self.home, self.rom, source)
+        self.assertEqual(report['packs'], ['uwt-insane-dev'])
+        self.assertEqual(report['unknown'], [])
+        before = (self.profile / 'ReShadePreset.ini').read_bytes()
+        active = p.index(self.home, self.rom)['active']
+        job = d.prepare(self.home, self.rom, source, 'uwt-insane-dev', report['sha256'])
+        shader = b'#include "ReShade.fxh"\ntechnique DoNothing {}'
+        catalog = self.base / 'dev-catalog.json'
+        entry = dict(json.loads(extra.DEV_CATALOG.read_text())['effects'][0], sha256=hashlib.sha256(shader).hexdigest())
+        catalog.write_text(json.dumps({'effects': [entry]}))
+        target = job / 'cache/game-shaders/preset/Merged/Shaders'
+        target.mkdir(parents=True); (target/'ReShade.fxh').write_text('standard include')
+        def download(args, **kwargs):
+            Path(args[args.index('-o')+1]).write_bytes(shader)
+        with patch.object(extra, 'DEV_CATALOG', catalog), patch.object(extra.subprocess, 'run', side_effect=download):
+            d.finish(self.home, self.rom, job)
+        self.assertEqual(d.analyze(self.home, self.rom, source)['missing'], [])
+        self.assertEqual((self.profile/'ReShadePreset.ini').read_bytes(), before)
+        self.assertEqual(p.index(self.home, self.rom)['active'], active)
+        root = Path(m.read_json(self.config)['preset_shaders']['root'])
+        self.assertEqual((root/'Shaders/Glamayre_Fast_Effects.fx').read_text(), 'custom shader')
+        self.assertTrue((root/'Shaders/FastFourierTransform.fx').is_file())
+        plan = exporter.plan(self.home, rom=self.rom)
+        selected = [k for k,v in plan['names'].items() if v == 'Inactive variant.ini']
+        path = exporter.export(self.home, rom=self.rom, selected=selected, addons=['citra.addon'], expected=plan['sha256'],
+                               title='Custom variant', game='Game', author='Test', credits='Private validation')
+        exported, _ = pack.archive(path)
+        self.assertTrue(any(n.endswith('/FastFourierTransform.fx') for n in exported))
+
     def test_pack_checks_all_variants_and_downloads_without_switching_active_preset(self):
         self.backend()
         source = self.installed_pack_with_extra_variant()
@@ -212,10 +245,10 @@ if [ "$MODE" = pack ]; then resh_pack_complete_shaders "$ROM"; else resh_import_
             self.assertIn('Le pack reste installé', (self.home / 'messages').read_text())
 
     def test_pack_unknown_effect_in_non_active_variant_requires_explicit_confirmation(self):
-        source = self.installed_pack_with_extra_variant('DoNothing@FastFourierTransform.fx')
+        source = self.installed_pack_with_extra_variant('Private@UnknownPrivate.fx')
         result = self.run_import(source, consent='1', mode='pack')
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('FastFourierTransform.fx', (self.home / 'confirmations').read_text())
+        self.assertIn('UnknownPrivate.fx', (self.home / 'confirmations').read_text())
         self.assertTrue(m.read_json(self.config)['pack'])
         self.assertNotIn('preset_shaders', m.read_json(self.config))
 

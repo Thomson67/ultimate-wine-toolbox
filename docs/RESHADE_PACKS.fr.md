@@ -347,7 +347,23 @@ sont vérifiés avant publication de la nouvelle vue. Retirer le pack restaure
 le contexte de shaders antérieur.
 
 Dans l’archive Henriko utilisée pour les essais, `ReShadePreset.ini` référence
-notamment `FastFourierTransform.fx`, absent du ZIP et de notre index de packs.
-Les trois variantes Henriko N64, Ultra et Vibrant ont leurs dépendances dans le
-ZIP. L’import ne supprime pas les références du preset générique incomplet et
-ne présente pas son téléchargement comme résolu automatiquement.
+notamment `FastFourierTransform.fx`, absent du ZIP. Depuis `0.11.1-dev4`,
+il est reconnu via le complément `uwt-insane-dev` : source originale de Lord Of
+Lunacy, branche `DevAndOldShaders`, commit
+`71ac8cd50824413a695155b44e39d2888135731d`, fichier téléchargé avec contrôle
+SHA-256 et vérification de `ReShade.fxh`. Il est aussi proposé dans la sélection
+manuelle des shaders, séparément des compléments rétro. Les paramètres des
+presets ne sont pas réécrits pour masquer ce manque. Les trois variantes
+Henriko N64, Ultra et Vibrant ont déjà leurs dépendances dans le ZIP.
+
+Ce complément fournit le fichier entier, dont les techniques `DoNothing`,
+`ButterflyTable` et `FastFourierTransform`, sans les activer automatiquement.
+La version ReShade n’est pas modifiée. La compilation et le rendu du shader
+restent à vérifier dans le jeu ; sa présence et ses empreintes ont été
+contrôlées, pas son exécution GPU.
+
+Après ajout de FFT, les références FX des quatre presets du ZIP Henriko d’essai
+sont présentes. L’export statique du preset générique peut néanmoins signaler
+la texture conditionnelle de `FXShaders/NeoBloom.fx` : c’est une limitation
+distincte du résolveur de textures dynamiques, pas un échec du téléchargement
+FFT. Les trois variantes Henriko restent exportables.
