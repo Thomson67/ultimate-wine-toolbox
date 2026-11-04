@@ -273,8 +273,8 @@ clones locaux simulés pour vérifier le chemin de téléchargement/fusion seul.
 
 ## Préparer un pack personnalisé pour partage (branche de test)
 
-Dans **ReShade → Presets communautaires → Préparer un pack ReShade pour partage
-(ZIP)**, choisir un jeu géré par la Toolbox ou un ZIP/dossier personnalisé.
+Dans **ReShade → Presets communautaires → Exporter un pack ReShade (ZIP) →
+Préparer pour le partage**, choisir un jeu géré par la Toolbox ou un ZIP/dossier personnalisé.
 Fermer le jeu avant d’exporter ses réglages. Le preset actif est seul coché par
 défaut ; s’il est incomplet, le premier preset valide est proposé. Les presets
 incomplets restent visibles et marqués, avec le nom du fichier manquant ou les
@@ -379,12 +379,12 @@ l’activation, le renommage, la consultation et la suppression.
 - **Ajouter les variantes du pack installé (ZIP ou dossier)**.
 - **Exporter un preset INI (actif ou autre)** : choisir la variante sans
   l’activer, puis choisir le fichier de destination.
-- **Exporter un pack local (presets, add-ons et shaders utilisés)** : le jeu
-  sélectionné est repris directement ; choisir les presets, les add-ons requis
-  et le nom du pack. Le ZIP réimportable et sa somme SHA-256 sont créés dans
+- **Exporter un pack ReShade (ZIP) → Usage personnel / transfert local** : le
+  jeu sélectionné est repris directement ; choisir les presets, les add-ons
+  requis et le nom du pack. Le ZIP réimportable et sa somme SHA-256 sont créés dans
   `exports/reshade-packs/`. Aucun formulaire public ou envoi au catalogue.
-- **Partager un preset INI avec la communauté** et **Préparer un pack pour
-  partage manuel (ZIP)** : parcours de partage avec métadonnées et crédits.
+- **Partager un preset INI avec la communauté**, ou **Exporter un pack ReShade
+  (ZIP) → Préparer pour le partage** : parcours avec métadonnées et crédits.
 - **Importer un paquet communautaire ZIP (preset)** et **Rechercher un preset
   dans la base communautaire**.
 
@@ -394,3 +394,11 @@ propose les parcours communautaires pouvant conduire à l’installation ; les
 exports de jeu et imports de packs apparaissent une fois ReShade installé.
 L’assistant d’installation initial garde ses choix directs de modèle, pack
 local et preset communautaire.
+
+Depuis `0.11.1-dev6`, une seule entrée **Exporter un pack ReShade (ZIP)** est
+présente, dans Import / Export comme dans le menu communautaire. Le choix
+suivant distingue **Usage personnel / transfert local** et **Préparer pour le
+partage**. Lorsque le jeu est déjà choisi, les deux parcours le reprennent sans
+redemander le jeu ou la source. Le choix de source ZIP/dossier reste disponible
+pour un export lancé sans contexte de jeu. Aucun de ces parcours n’envoie de
+pack au catalogue en ligne actuel.

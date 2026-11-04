@@ -586,10 +586,21 @@ $output"; fi
         fi
 }
 
+community_export_reshade_pack_menu() {
+  local title="$1" rom="${2:-}" mode
+  mode="$(menu_select "$title" "$(community_txt 'Exporter un pack ReShade (ZIP)' 'Export a ReShade bundle (ZIP)')" \
+    local "$(community_txt 'Usage personnel / transfert local' 'Personal use / local transfer')" \
+    community "$(community_txt 'Préparer pour le partage' 'Prepare for sharing')" back "$(i18n back)")" || return
+  case "$mode" in
+    local|community) community_export_reshade_pack "$title" "$rom" "$mode" ;;
+    *) return ;;
+  esac
+}
+
 community_export_reshade_pack() {
   local title="$1" rom="${2:-}" destination="${3:-community}" choice selected source plan output name author description credits game expected token label checked warnings
   local -a origin=() items=() presets=() addons=() preset_names=() addon_names=()
-  if [ "$destination" = local ] && [ -n "$rom" ]; then
+  if [ -n "$rom" ]; then
     choice=game
   else
     choice="$(menu_select "$title" "$(community_txt 'Préparer un pack personnalisé pour partage manuel (ZIP)' 'Prepare a customized bundle for manual sharing (ZIP)')" \
@@ -689,7 +700,7 @@ community_menu() {
   if [ "$kind" = antimicrox ]; then title="AntiMicroX — $(community_txt 'Profils communautaires' 'Community profiles')"; else title="ReShade — $(community_txt 'Presets communautaires' 'Community presets')"; fi
   if [ "$kind" = reshade ]; then
     share_label="$(community_txt 'Partager mon preset ReShade' 'Share my ReShade preset')"
-    import_options=(export-pack "$(community_txt 'Préparer un pack ReShade pour partage (ZIP)' 'Prepare a ReShade bundle for sharing (ZIP)')" import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')")
+    import_options=(export-pack "$(community_txt 'Exporter un pack ReShade (ZIP)' 'Export a ReShade bundle (ZIP)')" import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')")
     management_options=(validate "$(community_txt 'Valider les partages (modérateurs)' 'Review submissions (moderators)')"
       forget "$(community_txt 'Retirer l’accès modérateur de ce PC' 'Remove moderator access from this PC')")
     browse_label="$(community_txt 'Voir les presets disponibles' 'Browse available presets')"
@@ -722,7 +733,7 @@ $output"; fi
         if [ "$kind" = antimicrox ]; then community_share_menu "$title" "$rom";
         else community_share "$kind" "$title" "$rom"; fi
         continue ;;
-      export-pack) community_export_reshade_pack "$title" "$rom"; continue ;;
+      export-pack) community_export_reshade_pack_menu "$title" "$rom"; continue ;;
       import) community_import_package "$kind" "$title" "$rom"; continue ;;
       validate) community_validate "$kind" "$title"; continue ;;
       forget) community_forget_access "$title"; continue ;;

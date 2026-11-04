@@ -92,7 +92,7 @@ existants ont priorité. Les injecteurs intégrés non gérés gardent leur parc
 
 Pour un dossier, sélectionner la racine contenant ReShade.ini et reshade-shaders/Shaders. Les fichiers utiles sont copiés ; le dossier source reste intact.
 
-Préparer un pack ReShade pour partage (ZIP), dans Presets communautaires : sélectionner les presets et les seuls add-ons requis. Seuls les effets actifs, leurs inclusions et textures résolues sont exportés, avec les réglages, crédits et prérequis. Les dépendances dynamiques/ambiguës bloquent l’export. Le ZIP créé dans exports/community/reshade-packs se partage manuellement et se réimporte comme pack local. Aucun envoi au catalogue, dont le service reste limité aux presets INI.
+Exporter un pack ReShade (ZIP) > Préparer pour le partage, dans Presets communautaires : sélectionner les presets et les seuls add-ons requis. Seuls les effets actifs, leurs inclusions et textures résolues sont exportés, avec les réglages, crédits et prérequis. Les dépendances dynamiques/ambiguës bloquent l’export. Le ZIP créé dans exports/community/reshade-packs se partage manuellement et se réimporte comme pack local. Aucun envoi au catalogue, dont le service reste limité aux presets INI.
 
 Export de pack : seul le preset actif valide est coché par défaut (sinon, le premier valide). Les presets incomplets sont signalés avec leur dépendance et restent décochés. Ils ne bloquent pas l’export des autres presets ; les sélectionner bloque toujours l’export sans modifier leurs effets.
 
@@ -102,3 +102,5 @@ FastFourierTransform.fx : complément Insane-Shaders développement / anciens (u
 
 MENU DU JEU : IMPORT / EXPORT
 Les imports et exports sont regroupés dans Import / Export : preset INI, pack local ZIP/dossier, ajout des variantes, export INI (actif ou autre), export de pack local, partage et catalogue communautaire. L’export local reprend directement le jeu choisi et crée le ZIP + SHA-256 dans exports/reshade-packs, sans formulaire public ni envoi. Presets du jeu et détails conserve la gestion et la suppression. Le contrôle/complément des shaders du pack se trouve dans Import / Export > Pack local : importer / gérer.
+
+Export de pack simplifié : une seule option Exporter un pack ReShade (ZIP), puis Usage personnel / transfert local ou Préparer pour le partage. Le jeu choisi est conservé dans les deux modes.

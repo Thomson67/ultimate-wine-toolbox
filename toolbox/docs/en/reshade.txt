@@ -91,7 +91,7 @@ retain their existing workflow.
 
 For a directory, select the root containing ReShade.ini and reshade-shaders/Shaders. Required files are copied; the source directory stays unchanged.
 
-Prepare a ReShade bundle for sharing (ZIP), under Community presets: select presets and only the required add-ons. Export includes active effects, their resolved includes/textures, settings, credits and requirements. Dynamic/ambiguous dependencies block export. The ZIP under exports/community/reshade-packs can be shared manually and reimported as a local bundle. No catalogue submission; the current service still only accepts INI presets.
+Export a ReShade bundle (ZIP) > Prepare for sharing, under Community presets: select presets and only the required add-ons. Export includes active effects, their resolved includes/textures, settings, credits and requirements. Dynamic/ambiguous dependencies block export. The ZIP under exports/community/reshade-packs can be shared manually and reimported as a local bundle. No catalogue submission; the current service still only accepts INI presets.
 
 Bundle export: only the valid active preset is selected by default (otherwise, the first valid preset). Incomplete presets are flagged with their dependency and remain unchecked. They do not block exporting other presets; explicitly selecting one still blocks export without changing its effects.
 
@@ -101,3 +101,5 @@ FastFourierTransform.fx: Insane-Shaders development / older supplement (uwt-insa
 
 GAME MENU: IMPORT / EXPORT
 Transfers are grouped under Import / Export: INI preset, local ZIP/directory bundle, add variants, export INI (active or another), export local bundle, sharing and community catalogue. Local bundle export keeps the selected game and writes ZIP + SHA-256 to exports/reshade-packs, without a public submission form or upload. Game presets and details retains management and removal. Check/complete bundle shaders is under Import / Export > Local bundle: import / manage.
+
+Simplified bundle export: one Export a ReShade bundle (ZIP) entry, then Personal use / local transfer or Prepare for sharing. Both modes retain the selected game.

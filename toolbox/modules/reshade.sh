@@ -780,9 +780,8 @@ resh_import_export_menu() {
                 import-pack "$(community_txt 'Pack local : importer / gérer (ZIP ou dossier)' 'Local bundle: import / manage (ZIP or directory)')"
                 pack-presets "$(community_txt 'Ajouter les variantes du pack installé (ZIP ou dossier)' 'Add variants from the installed bundle (ZIP or directory)')"
                 export-ini "$(community_txt 'Exporter un preset INI (actif ou autre)' 'Export an INI preset (active or other)')"
-                export-pack "$(community_txt 'Exporter un pack local (presets, add-ons et shaders utilisés)' 'Export a local bundle (presets, used add-ons and shaders)')"
-                share-ini "$(community_txt 'Partager un preset INI avec la communauté' 'Share an INI preset with the community')"
-                share-pack "$(community_txt 'Préparer un pack pour partage manuel (ZIP)' 'Prepare a bundle for manual sharing (ZIP)')")
+                export-pack "$(community_txt 'Exporter un pack ReShade (ZIP)' 'Export a ReShade bundle (ZIP)')"
+                share-ini "$(community_txt 'Partager un preset INI avec la communauté' 'Share an INI preset with the community')")
         fi
         items+=(import-package "$(community_txt 'Importer un paquet communautaire ZIP (preset)' 'Import a community ZIP package (preset)')"
             community "$(community_txt 'Rechercher un preset dans la base communautaire' 'Find a preset in the community catalogue')")
@@ -796,9 +795,8 @@ resh_import_export_menu() {
                 source="$(resh_pack_source)" || continue
                 if ! output="$(resh_cmd presets-pack "$rom" "$source" 2>&1)"; then msgbox "$title" "$output"; fi ;;
             export-ini) resh_export_game_preset "$rom" ;;
-            export-pack) community_export_reshade_pack "$title" "$rom" local ;;
+            export-pack) community_export_reshade_pack_menu "$title" "$rom" ;;
             share-ini) community_share reshade "$title" "$rom" ;;
-            share-pack) community_export_reshade_pack "$title" "$rom" ;;
             import-package) community_import_package reshade "$title" "$rom" ;;
             community) community_menu reshade "$rom" ;;
             *) return ;;

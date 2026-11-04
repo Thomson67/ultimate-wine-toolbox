@@ -190,7 +190,7 @@ class PackExportUiTests(unittest.TestCase):
 source "$ROOT/toolbox/modules/community.sh"
 community_txt() { printf '%s' "$1"; }
 i18n() { printf '%s' "$1"; }
-menu_select() { printf source; }
+menu_select() { if [ "$2" = 'Exporter un pack ReShade (ZIP)' ]; then printf community; else printf source; fi; }
 resh_pack_source() { printf '/userdata/My custom folder'; }
 checklist_select() { printf '%s\n' "$@" >> "$CHECKLIST"; printf '1\n'; }
 community_report() { :; }
@@ -205,7 +205,7 @@ community_cmd() {
   *) return 1 ;;
  esac
 }
-community_export_reshade_pack Title
+community_export_reshade_pack_menu Title
 '''
             result = subprocess.run(['bash', '-c', script], text=True, capture_output=True,
                                     env=dict(os.environ, ROOT=str(Path(__file__).resolve().parents[1]),
@@ -231,7 +231,7 @@ community_export_reshade_pack Title
             script = r'''
 source "$ROOT/toolbox/modules/community.sh"
 i18n() { printf '%s' "$1"; }
-menu_select() { echo 'Unexpected game/source picker' >&2; return 1; }
+menu_select() { if [ "$2" = 'Exporter un pack ReShade (ZIP)' ]; then printf local; else echo 'Unexpected game/source picker' >&2; return 1; fi; }
 checklist_select() { printf 1; }
 input_text() { printf '%s\n' "$2" >> "$QUESTIONS"; printf 'My local pack'; }
 yesno_default_no() { printf '%s' "$2" > "$CONFIRMATION"; return 0; }
@@ -243,7 +243,7 @@ community_cmd() {
   reshade-pack-export) python3 -c 'import json,os,sys;open(os.environ["ARGS"],"w").write(json.dumps(sys.argv[1:]))' "$@"; printf '/userdata/export.zip';;
  esac
 }
-community_export_reshade_pack Title '/games/My Game.wine' local
+community_export_reshade_pack_menu Title '/games/My Game.wine'
 '''
             result = subprocess.run(['bash','-c',script],capture_output=True,text=True,env=dict(os.environ,
                 ROOT=str(Path(__file__).resolve().parents[1]), WT_LANGUAGE='fr', PLAN=json.dumps(plan), ARGS=str(args),
