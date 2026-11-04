@@ -587,11 +587,15 @@ $output"; fi
 }
 
 community_export_reshade_pack() {
-  local title="$1" rom="${2:-}" choice selected source plan output name author description credits game expected token label checked warnings
+  local title="$1" rom="${2:-}" destination="${3:-community}" choice selected source plan output name author description credits game expected token label checked warnings
   local -a origin=() items=() presets=() addons=() preset_names=() addon_names=()
-  choice="$(menu_select "$title" "$(community_txt 'Préparer un pack personnalisé pour partage manuel (ZIP)' 'Prepare a customized bundle for manual sharing (ZIP)')" \
-    game "$(community_txt 'Depuis un jeu géré par la Toolbox' 'From a Toolbox-managed game')" \
-    source "$(community_txt 'Depuis un ZIP ou dossier personnalisé' 'From a custom ZIP or directory')" back "$(i18n back)")" || return
+  if [ "$destination" = local ] && [ -n "$rom" ]; then
+    choice=game
+  else
+    choice="$(menu_select "$title" "$(community_txt 'Préparer un pack personnalisé pour partage manuel (ZIP)' 'Prepare a customized bundle for manual sharing (ZIP)')" \
+      game "$(community_txt 'Depuis un jeu géré par la Toolbox' 'From a Toolbox-managed game')" \
+      source "$(community_txt 'Depuis un ZIP ou dossier personnalisé' 'From a custom ZIP or directory')" back "$(i18n back)")" || return
+  fi
   case "$choice" in
     game)
       if [ -z "$rom" ]; then
@@ -629,16 +633,27 @@ community_export_reshade_pack() {
       addons+=(--addon "${addon_names[$((10#$token-1))]}")
     done <<< "$selected"
   fi
-  game="$(input_text "$title" "$(community_txt 'Nom public du jeu' 'Public game name')" "${game:-${rom##*/}}")" || return
-  name="$(input_text "$title" "$(community_txt 'Nom du pack' 'Bundle title')" "$game")" || return
-  author="$(input_text "$title" "$(community_txt 'Votre pseudo public' 'Your public nickname')" '')" || return
-  description="$(input_text "$title" "$(community_txt 'Description et prérequis' 'Description and requirements')" '')" || return
-  credits="$(input_text "$title" "$(community_txt 'Crédits, provenance et licences autorisant le partage des fichiers sélectionnés' 'Credits, sources and licenses permitting redistribution of the selected files')" '')" || return
-  yesno_default_no "$title" "$(community_txt 'Créer ce ZIP pour partage manuel ? Confirmez être autorisé à redistribuer les fichiers sélectionnés. Aucun envoi au catalogue ne sera effectué.' 'Create this ZIP for manual sharing? Confirm you may redistribute the selected files. Nothing will be sent to the catalogue.')" || return
+  if [ "$destination" = local ]; then
+    game="${game:-${rom##*/}}"
+    name="$(input_text "$title" "$(community_txt 'Nom du pack local' 'Local bundle title')" "$game")" || return
+    author=Local; credits="Local personal export"; description=""
+    yesno_default_no "$title" "$(community_txt 'Exporter les presets sélectionnés et leurs fichiers nécessaires dans un ZIP local ? Aucun envoi au service communautaire.' 'Export selected presets and their required files to a local ZIP? Nothing is sent to the community service.')" || return
+  else
+    game="$(input_text "$title" "$(community_txt 'Nom public du jeu' 'Public game name')" "${game:-${rom##*/}}")" || return
+    name="$(input_text "$title" "$(community_txt 'Nom du pack' 'Bundle title')" "$game")" || return
+    author="$(input_text "$title" "$(community_txt 'Votre pseudo public' 'Your public nickname')" '')" || return
+    description="$(input_text "$title" "$(community_txt 'Description et prérequis' 'Description and requirements')" '')" || return
+    credits="$(input_text "$title" "$(community_txt 'Crédits, provenance et licences autorisant le partage des fichiers sélectionnés' 'Credits, sources and licenses permitting redistribution of the selected files')" '')" || return
+    yesno_default_no "$title" "$(community_txt 'Créer ce ZIP pour partage manuel ? Confirmez être autorisé à redistribuer les fichiers sélectionnés. Aucun envoi au catalogue ne sera effectué.' 'Create this ZIP for manual sharing? Confirm you may redistribute the selected files. Nothing will be sent to the catalogue.')" || return
+  fi
   expected="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["sha256"])' "$plan")" || return
   if output="$(community_cmd reshade-pack-export "${origin[@]}" "${presets[@]}" "${addons[@]}" --expected "$expected" \
-      --game "$game" --title "$name" --author "$author" --credits "$credits" --description "$description" 2>&1)"; then
+      --game "$game" --title "$name" --author "$author" --credits "$credits" --description "$description" --destination "$destination" 2>&1)"; then
+    if [ "$destination" = local ]; then
+      msgbox "$title" "$(community_txt 'Pack local exporté avec manifeste et somme SHA-256. Réimport : Import / Export → Pack local → Archive ZIP.' 'Local bundle exported with manifest and SHA-256 checksum. Reimport: Import / Export → Local bundle → ZIP archive.')\n$output"
+    else
     msgbox "$title" "$(community_txt 'Pack portable créé avec manifeste et somme SHA-256. Partagez le ZIP manuellement ; le service communautaire actuel accepte uniquement les presets INI. Réimport : ReShade → Pack local → ZIP.' 'Portable bundle created with manifest and SHA-256 checksum. Share the ZIP manually; the current community service only accepts INI presets. Reimport: ReShade → Local bundle → ZIP.')\n$output"
+    fi
   else msgbox "$title" "$output"; return 1; fi
 }
 

@@ -128,8 +128,7 @@ déjà affectés restent prioritaires ; les touches Page haut/bas sont les valeu
 par défaut lorsque ces commandes ne sont pas affectées.
 
 Les nouveaux imports de packs ajoutent toutes leurs variantes. Pour un pack
-installé avec le premier test, utiliser **Ajouter les presets du pack installé
-depuis un ZIP ou dossier** et sélectionner la même source que lors de l’installation : les variantes
+installé avec le premier test, utiliser **Import / Export → Ajouter les variantes du pack installé (ZIP ou dossier)** et sélectionner la même source que lors de l’installation : les variantes
 sont ajoutées sans réinstaller les shaders ou l'add-on. Pour changer entre
 elles, il suffit ensuite de les activer dans la collection.
 
@@ -339,7 +338,7 @@ effets actifs ; il ne prouve pas leur compilation GPU ni le fonctionnement
 d’un add-on. Une dépendance privée ou absente du catalogue n’est pas téléchargée
 au hasard. L’export continue de vérifier ses dépendances statiques plus fines.
 
-Pour un pack déjà installé, choisir **Pack ReShade local → Vérifier / compléter
+Pour un pack déjà installé, choisir **Import / Export → Pack local : importer / gérer → Vérifier / compléter
 les shaders de tous les presets**. Une annulation ou un échec laisse le pack
 installé, signale que le complément n’est pas terminé et permet de réessayer.
 Les réglages et le preset actif sont conservés ; les téléchargements achevés
@@ -367,3 +366,31 @@ sont présentes. L’export statique du preset générique peut néanmoins signa
 la texture conditionnelle de `FXShaders/NeoBloom.fx` : c’est une limitation
 distincte du résolveur de textures dynamiques, pas un échec du téléchargement
 FFT. Les trois variantes Henriko restent exportables.
+
+## Import / Export par jeu (depuis 0.11.1-dev5)
+
+Le menu principal d’un jeu géré propose désormais **Import / Export**. Les
+options de transfert y sont regroupées ; **Presets du jeu et détails** garde
+l’activation, le renommage, la consultation et la suppression.
+
+- **Importer un preset INI**, avec contrôle des effets manquants.
+- **Pack local : importer / gérer (ZIP ou dossier)** : installation, complément
+  des shaders des variantes et retrait/restauration du pack existant.
+- **Ajouter les variantes du pack installé (ZIP ou dossier)**.
+- **Exporter un preset INI (actif ou autre)** : choisir la variante sans
+  l’activer, puis choisir le fichier de destination.
+- **Exporter un pack local (presets, add-ons et shaders utilisés)** : le jeu
+  sélectionné est repris directement ; choisir les presets, les add-ons requis
+  et le nom du pack. Le ZIP réimportable et sa somme SHA-256 sont créés dans
+  `exports/reshade-packs/`. Aucun formulaire public ou envoi au catalogue.
+- **Partager un preset INI avec la communauté** et **Préparer un pack pour
+  partage manuel (ZIP)** : parcours de partage avec métadonnées et crédits.
+- **Importer un paquet communautaire ZIP (preset)** et **Rechercher un preset
+  dans la base communautaire**.
+
+L’import ZIP d’un pack local et l’import d’un paquet communautaire contenant un
+preset INI restent deux formats distincts. Sans installation gérée, le sous-menu
+propose les parcours communautaires pouvant conduire à l’installation ; les
+exports de jeu et imports de packs apparaissent une fois ReShade installé.
+L’assistant d’installation initial garde ses choix directs de modèle, pack
+local et preset communautaire.

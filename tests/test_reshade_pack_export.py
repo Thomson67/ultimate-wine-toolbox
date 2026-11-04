@@ -104,6 +104,13 @@ class PackExportTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'ambiguous shader dependency:'):
             self.prepare(source)
 
+    def test_local_export_has_a_dedicated_directory_and_remains_importable(self):
+        path = self.prepare(self.source(), destination='local')
+        self.assertEqual(path.parent, self.home/'exports/reshade-packs')
+        self.assertTrue(path.with_suffix('.zip.sha256').is_file())
+        self.assertEqual(pack.archive(path)[1]['presets'], ['My preset.ini'])
+        self.assertFalse((self.home/'exports/community/reshade-packs').exists())
+
     def test_presets_union_and_explicit_no_addons(self):
         path = self.prepare(self.source(), selected=['My preset.ini', 'Other.ini'], addons=[])
         files, meta = pack.archive(path)
@@ -214,6 +221,40 @@ community_export_reshade_pack Title
             self.assertIn('1\nMy custom preset\non', choices)
             self.assertIn('2\nOther — incomplet\noff', choices)
             self.assertIn('1\nmy addon.addon64 (64 bits)\noff', choices)
+
+    def test_local_game_pack_export_keeps_context_without_public_submission_form(self):
+        import os
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            args = Path(tmp)/'args.json'
+            plan = {'names': {'My preset.ini': 'My custom preset'}, 'addons': {}, 'sha256': 'abc', 'default': 'My preset.ini'}
+            script = r'''
+source "$ROOT/toolbox/modules/community.sh"
+i18n() { printf '%s' "$1"; }
+menu_select() { echo 'Unexpected game/source picker' >&2; return 1; }
+checklist_select() { printf 1; }
+input_text() { printf '%s\n' "$2" >> "$QUESTIONS"; printf 'My local pack'; }
+yesno_default_no() { printf '%s' "$2" > "$CONFIRMATION"; return 0; }
+msgbox() { :; }
+community_service_cmd() { echo 'Unexpected submission' >&2; return 1; }
+community_cmd() {
+ case "$1" in
+  reshade-pack-plan) printf '%s' "$PLAN";;
+  reshade-pack-export) python3 -c 'import json,os,sys;open(os.environ["ARGS"],"w").write(json.dumps(sys.argv[1:]))' "$@"; printf '/userdata/export.zip';;
+ esac
+}
+community_export_reshade_pack Title '/games/My Game.wine' local
+'''
+            result = subprocess.run(['bash','-c',script],capture_output=True,text=True,env=dict(os.environ,
+                ROOT=str(Path(__file__).resolve().parents[1]), WT_LANGUAGE='fr', PLAN=json.dumps(plan), ARGS=str(args),
+                QUESTIONS=str(Path(tmp)/'questions'),CONFIRMATION=str(Path(tmp)/'confirmation')))
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(result.stderr,'')
+            actual=json.loads(args.read_text())
+            self.assertEqual(actual[actual.index('--rom')+1],'/games/My Game.wine')
+            self.assertEqual(actual[actual.index('--destination')+1],'local')
+            self.assertEqual((Path(tmp)/'questions').read_text().splitlines(),['Nom du pack local'])
+            self.assertNotIn('redistribuer',(Path(tmp)/'confirmation').read_text())
 
 
 if __name__ == '__main__':

@@ -192,8 +192,10 @@ def dependencies(files, selected):
     return result
 
 
-def export(home, *, rom=None, local=None, selected=(), addons=(), expected='', game='', title='', author='', credits='', description='', tested_on=''):
+def export(home, *, rom=None, local=None, selected=(), addons=(), expected='', game='', title='', author='', credits='', description='', tested_on='', destination='community'):
     home = Path(home)
+    if destination not in ('local', 'community'):
+        raise ValueError('invalid export destination')
     public = {k: text(v, k in ('game', 'title', 'author', 'credits')) for k, v in
               dict(game=game, title=title, author=author, credits=credits, description=description, tested_on=tested_on).items()}
     files, context = source(home, rom, local)
@@ -235,7 +237,7 @@ def export(home, *, rom=None, local=None, selected=(), addons=(), expected='', g
         'Import via ReShade > Pack local > ZIP. Install the specified ReShade version/API first.\n'
         'Public community API upload is not supported yet; share this ZIP manually.\n'
         'Add-ons were explicitly selected by the author; they are executable Windows modules.\n').encode()
-    folder = home / 'exports/community/reshade-packs'
+    folder = home / ('exports/reshade-packs' if destination == 'local' else 'exports/community/reshade-packs')
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / ('reshade-pack-' + uuid.uuid4().hex[:12] + '.zip')
     fd, temporary = tempfile.mkstemp(prefix='.pack-export-', dir=folder)

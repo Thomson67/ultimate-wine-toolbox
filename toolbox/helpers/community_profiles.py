@@ -684,6 +684,7 @@ def main():
             arg.add_argument('--preset', action='append', default=[])
             arg.add_argument('--addon', action='append', default=[])
             arg.add_argument('--expected', required=True)
+            arg.add_argument('--destination', choices=('local', 'community'), default='community')
             for name in ('game', 'title', 'author', 'credits'):
                 arg.add_argument('--' + name, required=True)
             for name in ('description', 'tested-on'):
@@ -727,7 +728,7 @@ def main():
         else:
             print(packs.export(args.home, rom=args.rom, local=args.source, selected=args.preset,
                                addons=args.addon, expected=args.expected, game=args.game, title=args.title,
-                               author=args.author, credits=args.credits, description=args.description, tested_on=args.tested_on))
+                               author=args.author, credits=args.credits, description=args.description, tested_on=args.tested_on, destination=args.destination))
         return
     if args.command == 'reshade-presets':
         from community_reshade import presets

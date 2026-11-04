@@ -593,7 +593,7 @@ resh_pack_complete_shaders() {
         msgbox "$(i18n resh_title)" "$source"; return 1
     fi
     if ! resh_import_ini "$rom" "$source" pack; then
-        msgbox "$(i18n resh_title)" "$(community_txt 'Le pack reste installé, mais la vérification ou l’ajout des shaders de tous ses presets n’est pas terminé. Reprenez « Vérifier / compléter les shaders de tous les presets » dans Pack ReShade local. Le preset actif est conservé.' 'The bundle remains installed, but checking or adding shaders for all its presets is incomplete. Use “Check / complete shaders for all presets” in Local ReShade bundle to retry. The active preset is retained.')"
+        msgbox "$(i18n resh_title)" "$(community_txt 'Le pack reste installé, mais la vérification ou l’ajout des shaders de tous ses presets n’est pas terminé. Reprenez « Vérifier / compléter les shaders de tous les presets » dans Import / Export → Pack local : importer / gérer. Le preset actif est conservé.' 'The bundle remains installed, but checking or adding shaders for all its presets is incomplete. Use “Check / complete shaders for all presets” under Import / Export → Local bundle: import / manage to retry. The active preset is retained.')"
         return 1
     fi
 }
@@ -628,20 +628,11 @@ resh_presets_menu() {
         done < <(python3 -c 'import json,sys; rows=json.loads(sys.argv[1]); active=sys.argv[2]; other=sys.argv[3]; print("\n".join(r["id"]+"\t"+r["name"]+(" — "+active if r["active"] else "")+(" — "+other if not r["compatible"] else "") for r in rows))' "$listing" "$(community_txt 'actif' 'active')" "$(community_txt 'autre contexte de shaders' 'different shader context')")
         choice="$(menu_select "$(community_txt 'Presets du jeu' 'Game presets') — ${rom##*/}" \
             "$(community_txt 'Sélectionnez un preset pour afficher ses détails. Fermez le jeu avant de changer de preset.' 'Select a preset to see its details. Close the game before changing presets.')" \
-            "${items[@]}" import "$(community_txt 'Importer et activer un preset INI' 'Import and activate an INI preset')" \
-            pack-presets "$(community_txt 'Ajouter les presets du pack installé depuis un ZIP ou dossier' 'Add presets from the installed bundle ZIP or directory')" \
+            "${items[@]}" \
             clear-all "$(community_txt 'Supprimer tous les presets pour ce jeu' 'Delete all presets for this game')" back "$(i18n back)")" || return
         case "$choice" in
             back|'') return ;;
             clear-all) resh_clear_all_presets "$rom" game; continue ;;
-            import)
-                source="$(resh_preset_file import "$rom")" || continue
-                resh_import_ini "$rom" "$source" || continue
-                continue ;;
-            pack-presets)
-                source="$(resh_pack_source)" || continue
-                if ! output="$(resh_cmd presets-pack "$rom" "$source" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; fi
-                continue ;;
         esac
         identity="$choice"
         while true; do
@@ -760,6 +751,61 @@ resh_preset_catalog_menu() {
     done
 }
 
+resh_export_game_preset() {
+    local rom="$1" listing identity label destination profile output
+    local -a items=()
+    listing="$(resh_cmd presets-list "$rom" 2>&1)" || { msgbox "$(i18n resh_title)" "$listing"; return 1; }
+    while IFS=$'\t' read -r identity label; do
+        [ -n "$identity" ] && items+=("$identity" "$label")
+    done < <(python3 -c 'import json,sys; print("\n".join(r["id"]+"\t"+r["name"]+(" — "+sys.argv[2] if r["active"] else "") for r in json.loads(sys.argv[1])))' "$listing" "$(community_txt 'actif' 'active')")
+    [ "${#items[@]}" -gt 0 ] || return 1
+    identity="$(menu_select "$(i18n resh_title)" "$(community_txt 'Choisir le preset à exporter en INI' 'Choose the preset to export as INI')" "${items[@]}" back "$(i18n back)")" || return
+    [ "$identity" != back ] || return
+    destination="$(resh_preset_file export "$rom")" || return
+    profile="$(resh_cmd profile "$rom")" || return
+    if output="$(resh_cmd presets-global-export "${profile##*/}" "$identity" "$destination" overwrite 2>&1)"; then
+        msgbox "$(i18n resh_title)" "$(i18n resh_export_done "$destination")"
+    else msgbox "$(i18n resh_title)" "$output"; return 1; fi
+}
+
+resh_import_export_menu() {
+    local rom="$1" state choice source output
+    local title="$(i18n resh_title) — Import / Export"
+    local -a items=()
+    while true; do
+        state="$(resh_cmd status "$rom")" || return
+        items=()
+        if [ "$state" != missing ]; then
+            items+=(import-ini "$(community_txt 'Importer un preset INI' 'Import an INI preset')"
+                import-pack "$(community_txt 'Pack local : importer / gérer (ZIP ou dossier)' 'Local bundle: import / manage (ZIP or directory)')"
+                pack-presets "$(community_txt 'Ajouter les variantes du pack installé (ZIP ou dossier)' 'Add variants from the installed bundle (ZIP or directory)')"
+                export-ini "$(community_txt 'Exporter un preset INI (actif ou autre)' 'Export an INI preset (active or other)')"
+                export-pack "$(community_txt 'Exporter un pack local (presets, add-ons et shaders utilisés)' 'Export a local bundle (presets, used add-ons and shaders)')"
+                share-ini "$(community_txt 'Partager un preset INI avec la communauté' 'Share an INI preset with the community')"
+                share-pack "$(community_txt 'Préparer un pack pour partage manuel (ZIP)' 'Prepare a bundle for manual sharing (ZIP)')")
+        fi
+        items+=(import-package "$(community_txt 'Importer un paquet communautaire ZIP (preset)' 'Import a community ZIP package (preset)')"
+            community "$(community_txt 'Rechercher un preset dans la base communautaire' 'Find a preset in the community catalogue')")
+        choice="$(menu_select "$title — ${rom##*/}" "$(community_txt 'Importer, exporter ou partager les réglages ReShade de ce jeu. Fermez le jeu avant toute modification.' 'Import, export or share ReShade settings for this game. Close the game before making changes.')" "${items[@]}" back "$(i18n back)")" || return
+        case "$choice" in
+            import-ini)
+                source="$(resh_preset_file import "$rom")" || continue
+                resh_import_ini "$rom" "$source" ;;
+            import-pack) resh_pack_menu "$rom" ;;
+            pack-presets)
+                source="$(resh_pack_source)" || continue
+                if ! output="$(resh_cmd presets-pack "$rom" "$source" 2>&1)"; then msgbox "$title" "$output"; fi ;;
+            export-ini) resh_export_game_preset "$rom" ;;
+            export-pack) community_export_reshade_pack "$title" "$rom" local ;;
+            share-ini) community_share reshade "$title" "$rom" ;;
+            share-pack) community_export_reshade_pack "$title" "$rom" ;;
+            import-package) community_import_package reshade "$title" "$rom" ;;
+            community) community_menu reshade "$rom" ;;
+            *) return ;;
+        esac
+    done
+}
+
 resh_game_menu() {
     local rom="$1" state choice preset profile details version arch dll exe packs prompt
     while true; do
@@ -786,14 +832,13 @@ resh_game_menu() {
         if [ "$state" != missing ]; then
             if [ "$state" = disabled ]; then actions+=(enable "$(i18n resh_enable)")
             else actions+=(disable "$(i18n resh_disable)"); fi
-            actions+=(presets "$(community_txt 'Presets du jeu et détails' 'Game presets and details')" pack "$(community_txt 'Pack ReShade local (ZIP ou dossier, add-ons et shaders)' 'Local ReShade bundle (ZIP or directory, add-ons and shaders)')" preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)")
+            actions+=(presets "$(community_txt 'Presets du jeu et détails' 'Game presets and details')" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)")
         fi
         choice="$(menu_select "$(i18n resh_title) — $(basename "$rom")" "$prompt" \
-            "${actions[@]}" community "$(i18n resh_community)" back "$(i18n back)")" || return
+            "${actions[@]}" import-export "Import / Export" back "$(i18n back)")" || return
         case "$choice" in
-            community) community_menu reshade "$rom" ;;
+            import-export) resh_import_export_menu "$rom" ;;
             install) resh_install_game "$rom" ;;
-            pack) resh_pack_menu "$rom" ;;
             presets) resh_presets_menu "$rom" ;;
             enable|disable)
                 resh_cmd "$choice" "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
@@ -804,20 +849,6 @@ resh_game_menu() {
                 resh_cmd uninstall "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {
                     msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"
                 } ;;
-            preset|export)
-                if [ "$state" = missing ]; then
-                    msgbox "$(i18n resh_title)" "$(i18n resh_install_first)"
-                    continue
-                fi
-                if [ "$choice" = preset ]; then
-                    preset="$(resh_preset_file import "$rom")" || continue
-                    resh_import_ini "$rom" "$preset" || continue
-                else
-                    preset="$(resh_preset_file export "$rom")" || continue
-                    resh_cmd export "$rom" "$preset" overwrite >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 && {
-                        msgbox "$(i18n resh_title)" "$(i18n resh_export_done "$preset")"
-                    } || msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"
-                fi ;;
             profile)
                 profile="$(resh_cmd profile "$rom")" || continue
                 msgbox "$(i18n resh_title)" "$(i18n resh_profile_path "$profile")" ;;

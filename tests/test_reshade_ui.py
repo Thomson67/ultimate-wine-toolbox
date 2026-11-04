@@ -34,10 +34,75 @@ resh_game_menu /games/Game.wine
                 self.assertEqual(result.returncode, 0, result.stderr)
                 actions = (base/'checklist').read_text().splitlines()[2::2]
                 self.assertIn('install', actions)
-                self.assertIn('community', actions)
-                self.assertEqual('preset' in actions, state != 'missing')
+                self.assertIn('import-export', actions)
+                self.assertNotIn('community', actions)
+                self.assertNotIn('preset', actions)
+                self.assertNotIn('export', actions)
+                self.assertNotIn('pack', actions)
+                self.assertEqual('presets' in actions, state != 'missing')
                 self.assertEqual('enable' in actions, state == 'disabled')
                 self.assertEqual('disable' in actions, state == 'enabled')
+
+    def test_import_export_routes_actions_with_the_selected_game_context(self):
+        expected = {
+            'import-ini': ['import-ini', '/games/My Game.wine', '/userdata/My preset.ini'],
+            'import-pack': ['pack', '/games/My Game.wine'],
+            'export-ini': ['export-ini', '/games/My Game.wine'],
+            'export-pack': ['pack-export', 'resh_title — Import / Export', '/games/My Game.wine', 'local'],
+            'share-pack': ['pack-export', 'resh_title — Import / Export', '/games/My Game.wine'],
+            'share-ini': ['share', 'reshade', 'resh_title — Import / Export', '/games/My Game.wine'],
+            'community': ['catalogue', 'reshade', '/games/My Game.wine'],
+            'import-package': ['package', 'reshade', 'resh_title — Import / Export', '/games/My Game.wine'],
+            'pack-presets': ['presets-pack', '/games/My Game.wine', '/userdata/My bundle'],
+        }
+        for action, arguments in expected.items():
+            with self.subTest(action=action), tempfile.TemporaryDirectory() as folder:
+                base = Path(folder)
+                script = r'''
+source "$WT_ROOT/modules/reshade.sh"
+community_txt() { printf '%s' "$1"; }
+i18n() { printf '%s' "$1"; }
+record() { printf '%s\n' "$@" > "$SUMMARY"; }
+resh_cmd() { if [ "$1" = status ]; then printf enabled; else record "$@"; fi; }
+menu_select() { if [ -f "$CHECKLIST" ]; then printf back; else printf '%s\n' "$@" > "$CHECKLIST"; printf '%s' "$ACTION"; fi; }
+resh_preset_file() { printf '/userdata/My preset.ini'; }
+resh_pack_source() { printf '/userdata/My bundle'; }
+resh_import_ini() { record import-ini "$@"; }
+resh_pack_menu() { record pack "$@"; }
+resh_export_game_preset() { record export-ini "$@"; }
+community_export_reshade_pack() { record pack-export "$@"; }
+community_share() { record share "$@"; }
+community_menu() { record catalogue "$@"; }
+community_import_package() { record package "$@"; }
+resh_import_export_menu '/games/My Game.wine'
+'''
+                result = subprocess.run(['bash', '-c', script], env=dict(self.environment(base), ACTION=action), capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual((base/'summary').read_text().splitlines(), arguments)
+
+    def test_local_ini_export_can_choose_an_inactive_variant_without_activating_it(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            script = r'''
+source "$WT_ROOT/modules/reshade.sh"
+community_txt() { printf '%s' "$1"; }
+i18n() { printf '%s' "$1"; }
+resh_cmd() {
+ case "$1" in
+  presets-list) printf '[{"id":"active","name":"Current","active":true},{"id":"other","name":"Other","active":false}]';;
+  profile) printf '/userdata/profiles/0123456789abcdef';;
+  presets-global-export) printf '%s\n' "$@" > "$SUMMARY";;
+  *) echo 'Unexpected mutation' >&2; return 1;;
+ esac
+}
+menu_select() { printf other; }
+resh_preset_file() { printf '/userdata/Other preset.ini'; }
+msgbox() { :; }
+resh_export_game_preset '/games/My Game.wine'
+'''
+            result = subprocess.run(['bash','-c',script], env=self.environment(base), capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual((base/'summary').read_text().splitlines(), ['presets-global-export','0123456789abcdef','other','/userdata/Other preset.ini','overwrite'])
 
     def test_diagnostic_resume_returns_to_api_for_the_chosen_executable(self):
         for remembered, changed in [('drive_c/game/Chosen Game.exe',False),('drive_c/game/Removed.exe',True)]:

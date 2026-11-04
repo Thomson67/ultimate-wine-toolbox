@@ -66,7 +66,7 @@ Presets du jeu et détails : conserver plusieurs presets, afficher les effets
 actifs et tous les paramètres INI, renommer et activer une variante (jeu fermé).
 Les imports conservent le preset précédent et les réglages modifiés en jeu.
 Les nouveaux packs ajoutent toutes leurs variantes ; pour un ancien import,
-utiliser Ajouter les presets du pack installé depuis un ZIP ou dossier.
+utiliser Import / Export > Ajouter les variantes du pack installé (ZIP ou dossier).
 
 En jeu : Page haut = preset précédent, Page bas = preset suivant. Les presets
 du même contexte de shaders sont disponibles, et le dernier choix est repris
@@ -96,6 +96,9 @@ Préparer un pack ReShade pour partage (ZIP), dans Presets communautaires : sél
 
 Export de pack : seul le preset actif valide est coché par défaut (sinon, le premier valide). Les presets incomplets sont signalés avec leur dépendance et restent décochés. Ils ne bloquent pas l’export des autres presets ; les sélectionner bloque toujours l’export sans modifier leurs effets.
 
-Import de pack : les effets actifs de tous les presets sont vérifiés après import, puis les packs manquants reconnus sont proposés. Les shaders personnalisés gardent la priorité et le preset actif reste choisi. Pour un pack existant : Pack ReShade local > Vérifier / compléter les shaders de tous les presets. Si vous annulez ou si un téléchargement échoue, le pack reste installé et le complément peut être repris. Les effets inconnus nécessitent une confirmation ; ils ne peuvent pas être téléchargés automatiquement.
+Import de pack : les effets actifs de tous les presets sont vérifiés après import, puis les packs manquants reconnus sont proposés. Les shaders personnalisés gardent la priorité et le preset actif reste choisi. Pour un pack existant : Import / Export > Pack local : importer / gérer > Vérifier / compléter les shaders de tous les presets. Si vous annulez ou si un téléchargement échoue, le pack reste installé et le complément peut être repris. Les effets inconnus nécessitent une confirmation ; ils ne peuvent pas être téléchargés automatiquement.
 
 FastFourierTransform.fx : complément Insane-Shaders développement / anciens (uwt-insane-dev), proposé automatiquement pour les presets qui le réclament et dans la sélection manuelle des shaders. Téléchargement depuis le dépôt original à un commit fixe avec SHA-256 et vérification de ReShade.fxh. Ni changement de version ReShade ni activation forcée des effets ; compilation à vérifier en jeu.
+
+MENU DU JEU : IMPORT / EXPORT
+Les imports et exports sont regroupés dans Import / Export : preset INI, pack local ZIP/dossier, ajout des variantes, export INI (actif ou autre), export de pack local, partage et catalogue communautaire. L’export local reprend directement le jeu choisi et crée le ZIP + SHA-256 dans exports/reshade-packs, sans formulaire public ni envoi. Presets du jeu et détails conserve la gestion et la suppression. Le contrôle/complément des shaders du pack se trouve dans Import / Export > Pack local : importer / gérer.
