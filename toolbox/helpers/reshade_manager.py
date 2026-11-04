@@ -846,7 +846,7 @@ def main():
                 import reshade_pack
                 source = Path(args.args[0])
                 files, metadata = reshade_pack.archive(source)
-                metadata['archive_sha256'] = hashlib.sha256(source.read_bytes()).hexdigest()
+                metadata['archive_sha256'] = reshade_pack.source_digest(source, files)
                 print(presets.pack_presets(home, rom, files, metadata))
         elif args.command.startswith('pack-'):
             import reshade_pack

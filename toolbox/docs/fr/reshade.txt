@@ -57,7 +57,7 @@ L’espace validateur s’ouvre par appairage avec un code dans un navigateur. I
 VALIDATION MATÉRIELLE
 Un utilisateur a validé Azahar Windows sous Wine en Vulkan sur sa configuration AMD : ouverture de ReShade, création d’un preset et coexistence avec MangoHud/Mailbox sans problème constaté. Ce retour ne valide pas tous les GPU, runners ou effets.
 
-Packs locaux : le menu du jeu propose l’import ZIP d’add-ons, shaders
+Packs locaux : choisir Archive ZIP ou Dossier pour importer add-ons, shaders
 et presets isolés. Pour Henriko/Citra, installer d’abord ReShade 6.3.3 avec
 add-ons complets. Retirer le pack restaure les réglages précédents. Les
 partages communautaires restent limités aux presets INI.
@@ -66,7 +66,7 @@ Presets du jeu et détails : conserver plusieurs presets, afficher les effets
 actifs et tous les paramètres INI, renommer et activer une variante (jeu fermé).
 Les imports conservent le preset précédent et les réglages modifiés en jeu.
 Les nouveaux packs ajoutent toutes leurs variantes ; pour un ancien import,
-utiliser Ajouter les presets du pack installé depuis son ZIP.
+utiliser Ajouter les presets du pack installé depuis un ZIP ou dossier.
 
 En jeu : Page haut = preset précédent, Page bas = preset suivant. Les presets
 du même contexte de shaders sont disponibles, et le dernier choix est repris
@@ -89,3 +89,5 @@ manquants reconnus sont proposés avant application. Les effets inconnus sont
 signalés. Une annulation ou un échec conserve le preset actuel. Le téléchargement
 ajoute les shaders sans changer la version ReShade ; les fichiers personnalisés
 existants ont priorité. Les injecteurs intégrés non gérés gardent leur parcours.
+
+Pour un dossier, sélectionner la racine contenant ReShade.ini et reshade-shaders/Shaders. Les fichiers utiles sont copiés ; le dossier source reste intact.

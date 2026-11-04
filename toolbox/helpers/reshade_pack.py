@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Local ReShade bundles. Never load add-ons while inspecting an archive."""
 import configparser
+import contextlib
 import hashlib
 import io
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
@@ -40,37 +42,88 @@ def encode_ini(parser, preset=False):
     return text.encode()
 
 
+@contextlib.contextmanager
+def pack_entries(path):
+    """Expose a ZIP or directory through the same bounded payload validator."""
+    path = Path(path)
+    if path.is_symlink():
+        raise ValueError('pack links are not supported')
+    if not path.is_dir():
+        with zipfile.ZipFile(path) as z:
+            items = z.infolist()
+            if len(items) > 4096:
+                raise ValueError('too many pack files')
+            yield ((item.filename, item.file_size, stat.S_ISLNK(item.external_attr >> 16),
+                    item.is_dir(), lambda item=item: z.read(item)) for item in items)
+        return
+
+    def members():
+        count = 0
+
+        def fail(error):
+            raise error
+
+        for root, dirs, names in os.walk(path, followlinks=False, onerror=fail):
+            for name in sorted(dirs + names):
+                count += 1
+                if count > 4096:
+                    raise ValueError('too many pack files')
+                member = Path(root) / name
+                info = member.lstat()
+                mode = info.st_mode
+                if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
+                    raise ValueError('pack links and special files are not supported')
+                def read(member=member):
+                    fd = os.open(member, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                    with os.fdopen(fd, 'rb') as stream:
+                        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                            raise ValueError('pack member is not a regular file')
+                        return stream.read(FILE_LIMIT + 1)
+                yield member.relative_to(path).as_posix(), info.st_size, False, stat.S_ISDIR(mode), read
+    yield members()
+
+
+def source_digest(source, files):
+    """Retain ZIP identities; directories use deterministic imported content."""
+    if not Path(source).is_dir():
+        return hashlib.sha256(Path(source).read_bytes()).hexdigest()
+    digest = hashlib.sha256(b'UWT-ReShade-directory-v1\0')
+    for name, data in sorted(files.items()):
+        digest.update(name.encode('utf-8') + b'\0' + hashlib.sha256(data).digest())
+    return digest.hexdigest()
+
+
 def archive(path):
     """Read allowlisted payloads into memory, with bounds and Windows path checks."""
     files, seen, total = {}, set(), 0
-    with zipfile.ZipFile(path) as z:
-        if len(z.infolist()) > 4096:
-            raise ValueError('too many pack files')
-        for item in z.infolist():
-            name = item.filename
+    with pack_entries(path) as entries:
+        for name, size, link, directory, read in entries:
             p = PurePosixPath(name)
             if (p.is_absolute() or '..' in p.parts or '\\' in name or any(c in name for c in ':*?"<>|')
                     or any(ord(c) < 32 for c in name) or len(name) > 240
                     or any(part.rstrip(' .') != part for part in p.parts)
                     or any(re.fullmatch(r'(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?', part) for part in p.parts)):
                 raise ValueError('unsafe pack archive path')
-            if stat.S_ISLNK(item.external_attr >> 16):
+            if link:
                 raise ValueError('pack links are not supported')
-            if item.is_dir():
+            if directory:
                 continue
             if p.as_posix().casefold() in seen:
                 raise ValueError('duplicate pack filename')
             seen.add(p.as_posix().casefold())
-            total += item.file_size
-            if total > LIMIT or item.file_size > FILE_LIMIT:
+            total += size
+            if total > LIMIT or size > FILE_LIMIT:
                 raise ValueError('pack exceeds size limit')
             # No executables, runtime DLLs or scripts are imported from bundles.
             allowed = ((len(p.parts) == 1 and p.suffix.lower() in ('.ini', '.addon', '.addon32', '.addon64'))
                        or (p.parts[:1] == ('reshade-shaders',) and p.suffix.lower() in ASSETS))
             if allowed:
-                files[p.as_posix()] = z.read(item)
+                data = read()
+                if len(data) != size or len(data) > FILE_LIMIT:
+                    raise ValueError('pack member changed or exceeds size limit')
+                files[p.as_posix()] = data
     if 'ReShade.ini' not in files or not any(n.startswith('reshade-shaders/Shaders/') for n in files):
-        raise ValueError('ZIP requires ReShade.ini and reshade-shaders/Shaders at its root')
+        raise ValueError('Pack requires ReShade.ini and reshade-shaders/Shaders at its root')
     config = ini(files['ReShade.ini'])
     presets = []
     for name, data in files.items():
@@ -173,7 +226,7 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
         preset_bytes(files[name], meta)
     merged = merge_config((p / 'ReShade.ini').read_bytes(), files['ReShade.ini'])
     payload = {n: data for n, data in files.items() if n.startswith('reshade-shaders/') or n in meta['addons']}
-    meta.update(selected=preset, archive_sha256=hashlib.sha256(Path(source).read_bytes()).hexdigest(),
+    meta.update(selected=preset, archive_sha256=source_digest(source, files),
                 hashes={n: hashlib.sha256(d).hexdigest() for n, d in payload.items()})
     if cfg.get('preset_shaders'):
         meta['previous_preset_shaders'] = cfg['preset_shaders']

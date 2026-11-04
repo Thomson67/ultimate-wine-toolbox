@@ -57,7 +57,7 @@ The validator area uses a pairing code and a browser page. Validators can approv
 HARDWARE VALIDATION
 A user validated Windows Azahar under Wine using Vulkan on their AMD configuration: ReShade opened, a preset was created and MangoHud/Mailbox coexisted without reported issues. This does not validate every GPU, runner or effect.
 
-Local bundles: the game menu imports ZIP add-ons, isolated shaders
+Local bundles: choose ZIP archive or Directory to import add-ons, isolated shaders
 and presets. For Henriko/Citra, install ReShade 6.3.3 with full add-on support
 first. Removing the bundle restores previous settings. Community sharing
 still transfers INI presets only.
@@ -66,7 +66,7 @@ Game presets and details: keep multiple presets, inspect enabled effects and
 all INI settings, rename and activate variants (close the game first).
 Imports retain the previous preset and edits saved in game. New bundles add
 all their variants; for an older import, use Add presets from the installed
-bundle ZIP.
+bundle ZIP or directory.
 
 In game: Page Up = previous preset, Page Down = next preset. Presets sharing
 the current shader context are available; the last selection is restored next
@@ -89,3 +89,5 @@ packs are offered before applying. Unknown effects are reported. Cancelling or
 a failed download retains the current preset. Shader additions keep the ReShade
 version and prioritize existing custom files. Unmanaged integrated injectors
 retain their existing workflow.
+
+For a directory, select the root containing ReShade.ini and reshade-shaders/Shaders. Required files are copied; the source directory stays unchanged.

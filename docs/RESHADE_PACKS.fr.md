@@ -4,6 +4,25 @@ Disponible depuis la version stable **v0.11.0**. Les packs ZIP s’importent
 localement ; les échanges communautaires restent des presets `.ini`.
 Aucun fichier du pack Henriko n'est livré dans le dépôt.
 
+## Import depuis un dossier (branche de test)
+
+Après **Pack ReShade local (ZIP ou dossier, add-ons et shaders)**, choisir
+**Archive ZIP** ou **Dossier**. Ce choix est également disponible pendant
+l’installation initiale et pour l’ajout des variantes d’un pack déjà installé.
+Sélectionner le dossier contenant directement `ReShade.ini`, les presets `.ini`
+et `reshade-shaders/Shaders`, avec les add-ons éventuels à cette même racine.
+Un dossier parent contenant plusieurs packs n’est pas détecté automatiquement.
+
+Tous les presets sont importés et la configuration du pack choisit le preset
+initial, comme pour un ZIP. Les fichiers nécessaires sont copiés dans le profil
+du jeu : le dossier source n’est pas modifié et peut ensuite être déplacé ou
+supprimé. Les limites restent 4 096 entrées, 32 Mio par fichier et 256 Mio au total.
+Les liens symboliques et fichiers spéciaux sont refusés. Pour ajouter plus tard
+les variantes d’un pack installé depuis un dossier, sélectionner un dossier au
+contenu importable identique ; les dates et le nom du dossier n’affectent pas
+son identité. Les packs précédemment installés depuis un ZIP conservent leur
+identité ZIP et utilisent leur archive d’origine pour cet ajout.
+
 ## Essai Henriko / Citra
 
 Fermer le jeu avant toute modification. Dans **Outils et compatibilité → ReShade**,
@@ -14,7 +33,7 @@ choisir le jeu Windows (émulateur lancé sous Wine) et :
    utilisée par l'émulateur. Le choix du modèle de shaders n'affecte pas les
    shaders du pack, qui seront ensuite isolés.
 2. Dans le choix des modèles/shaders qui suit la version, choisir **Installer
-   un pack ReShade local (ZIP, add-ons et shaders)**, à côté de la recherche
+   un pack ReShade local (ZIP ou dossier, add-ons et shaders)**, à côté de la recherche
    communautaire. Sélectionner l'archive
    `HM 4K textures OoT.zip`, avec `ReShade.ini`, `citra.addon` et
    `reshade-shaders` à sa racine. Tous les presets sont importés, sans étape
@@ -63,14 +82,14 @@ plutôt que d'être écrasé.
   La cohérence des binaires ne garantit ni leur chargement sous Wine, ni la
   disponibilité de la profondeur, ni la compatibilité Vulkan/Azahar/TriAevum.
   Ces points nécessitent un essai en jeu.
-- Le format local accepte un ZIP plat contenant `ReShade.ini`, des presets,
+- Le format local accepte un ZIP plat ou un dossier contenant `ReShade.ini`, des presets,
   des `.addon`, `.addon32` ou `.addon64`, et `reshade-shaders`. Un seul jeu
   d'architecture et un seul pack peuvent être actifs par jeu. Les fichiers
   shaders/includes et images reconnus sont importés ; EXE, DLL runtime et
   scripts ne sont pas importés. La configuration additionnelle prise en charge
   est celle de ReShade.ini ; les INI annexes propres à d'autres add-ons ne sont
   pas encore gérés.
-- Les chemins ZIP dangereux, liens, doublons Windows et dépassements de taille
+- Les chemins dangereux, liens, fichiers spéciaux, doublons Windows et dépassements de taille
   sont refusés. Les fichiers installés sont inventoriés avec leur SHA-256.
   Ce contrôle ne constitue pas un audit du code exécuté par un add-on.
 - Le partage communautaire de packs complets, les recettes de téléchargement
@@ -110,7 +129,7 @@ par défaut lorsque ces commandes ne sont pas affectées.
 
 Les nouveaux imports de packs ajoutent toutes leurs variantes. Pour un pack
 installé avec le premier test, utiliser **Ajouter les presets du pack installé
-depuis son ZIP** et sélectionner exactement la même archive : les variantes
+depuis un ZIP ou dossier** et sélectionner la même source que lors de l’installation : les variantes
 sont ajoutées sans réinstaller les shaders ou l'add-on. Pour changer entre
 elles, il suffit ensuite de les activer dans la collection.
 

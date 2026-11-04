@@ -28,6 +28,73 @@ class LocalReShadePackTests(unittest.TestCase):
                 z.writestr(name, data)
         return path
 
+    def directory_bundle(self, overrides=None):
+        source = self.bundle(overrides)
+        target = self.base / 'Extracted bundle with spaces'
+        with zipfile.ZipFile(source) as z:
+            z.extractall(target)
+        return target
+
+    def test_directory_import_keeps_all_presets_and_survives_source_removal(self):
+        import shutil
+        import reshade_presets as presets
+        self.configure()
+        directory = self.directory_bundle({'Other.ini': b'Techniques=Citra@Citra.fx\n[Citra.fx]\nScreen=2\n',
+                                           'unused.dll': b'never import this'})
+        files, metadata = p.archive(directory)
+        self.assertNotIn('unused.dll', files)
+        self.assertEqual(metadata['presets'], ['Other.ini', 'Ultra.ini'])
+        original = (self.profile / 'ReShadePreset.ini').read_bytes()
+        result = p.install(self.home, self.rom, directory, metadata['preferred'])
+        self.assertEqual(result['archive_sha256'], p.source_digest(directory, files))
+        self.assertEqual(len(presets.index(self.home, self.rom)['items']), 3)
+        self.assertFalse((self.game / 'unused.dll').exists())
+        m.event(self.home, self.rom, 'gameStop')
+        m.set_enabled(self.home, self.rom, False)
+        shutil.rmtree(directory)
+        m.set_enabled(self.home, self.rom, True)
+        m.event(self.home, self.rom, 'gameStart')
+        self.assertTrue((self.game / 'citra.addon').exists())
+        self.assertTrue((self.game / p.STAGE / 'reshade-shaders/Shaders/Citra.fx').exists())
+        m.event(self.home, self.rom, 'gameStop')
+        p.remove(self.home, self.rom)
+        self.assertEqual((self.profile / 'ReShadePreset.ini').read_bytes(), original)
+
+    def test_directory_identity_and_later_preset_addition(self):
+        import reshade_presets as presets
+        self.configure()
+        directory = self.directory_bundle()
+        files, metadata = p.archive(directory)
+        identity = p.source_digest(directory, files)
+        p.install(self.home, self.rom, directory, metadata['preferred'])
+        metadata['archive_sha256'] = identity
+        self.assertEqual(presets.pack_presets(self.home, self.rom, files, metadata), 1)
+        (directory / 'Ultra.ini').write_bytes(files['Ultra.ini'])
+        self.assertEqual(p.source_digest(directory, p.archive(directory)[0]), identity)
+        (directory / 'Ultra.ini').write_text('Techniques=Citra@Citra.fx\n')
+        self.assertNotEqual(p.source_digest(directory, p.archive(directory)[0]), identity)
+
+    def test_directory_rejects_links_special_files_collisions_and_limits_before_install(self):
+        import os
+        self.configure()
+        directory = self.directory_bundle()
+        invalid = directory / 'invalid'
+        for kind in ('file-link', 'directory-link', 'fifo', 'case', 'size', 'total-size'):
+            with self.subTest(kind=kind):
+                if kind == 'file-link': invalid.symlink_to(directory / 'Ultra.ini')
+                elif kind == 'directory-link': invalid.symlink_to(directory / 'reshade-shaders', target_is_directory=True)
+                elif kind == 'fifo': os.mkfifo(invalid)
+                elif kind == 'case': invalid = directory / 'ULTRA.ini'; invalid.write_text('Techniques=')
+                else: invalid.write_bytes(b'ignored')
+                before = self.config.read_bytes()
+                limit = patch.object(p, 'FILE_LIMIT', 1) if kind == 'size' else patch.object(p, 'LIMIT', 1) if kind == 'total-size' else patch.object(p, 'LIMIT', p.LIMIT)
+                with limit, self.assertRaises(ValueError):
+                    p.install(self.home, self.rom, directory, 'Ultra.ini')
+                self.assertEqual(self.config.read_bytes(), before)
+                self.assertFalse((self.profile / 'pack').exists())
+                invalid.unlink()
+                invalid = directory / 'invalid'
+
     def configure(self):
         self.cfg.update(version='6.3.3', release_id='6.3.3-addons', variant='standard-addons')
         m.save_json(self.config, self.cfg)
@@ -260,16 +327,40 @@ resh_install_game '/games/An emulator.wine'
                         self.assertNotIn(enabled, calls)
                         self.assertNotEqual(result.returncode, 0)
 
-    def test_zip_import_uses_default_without_a_preset_selector(self):
+    def test_directory_picker_uses_yad_directory_mode_and_propagates_cancel(self):
         import os
         import subprocess
         import tempfile
         root = Path(__file__).resolve().parents[1]
-        for mode, confirm in (('apply', '0'), ('apply', '1'), ('select', '0'), ('select', '1')):
-            with self.subTest(mode=mode, confirm=confirm), tempfile.TemporaryDirectory() as tmp:
+        for cancel in ('0', '1'):
+            with self.subTest(cancel=cancel), tempfile.TemporaryDirectory() as tmp:
+                args = Path(tmp) / 'picker-args'
+                script = r'''
+source "$WT_ROOT/modules/reshade.sh"
+community_txt() { printf '%s' "$1"; }
+i18n() { printf '%s' "$1"; }
+menu_select() { printf directory; }
+yad() { printf '%s\n' "$@" > "$ARGS"; [ "$CANCEL" = 0 ] || return 1; printf '/userdata/A local bundle'; }
+resh_pack_source
+'''
+                result = subprocess.run(['bash', '-c', script], text=True, capture_output=True,
+                                        env=dict(os.environ, WT_ROOT=str(root / 'toolbox'), WT_LANGUAGE='fr',
+                                                 ARGS=str(args), CANCEL=cancel))
+                self.assertIn('--directory', args.read_text().splitlines())
+                self.assertEqual(result.returncode, int(cancel))
+                self.assertEqual(result.stdout, '/userdata/A local bundle' if cancel == '0' else '')
+
+    def test_zip_and_directory_import_use_default_without_a_preset_selector(self):
+        import os
+        import subprocess
+        import tempfile
+        root = Path(__file__).resolve().parents[1]
+        from itertools import product
+        for mode, confirm, kind in product(('apply', 'select'), ('0', '1'), ('zip', 'directory')):
+            with self.subTest(mode=mode, confirm=confirm, kind=kind), tempfile.TemporaryDirectory() as tmp:
                 base = Path(tmp)
                 env = dict(os.environ, WT_ROOT=str(root / 'toolbox'), WT_HOME=tmp,
-                           WT_LANGUAGE='fr', RESULT=str(base / 'result'), CONFIRM=confirm, MODE=mode, SUMMARY=str(base / 'summary'),
+                           KIND=kind, WT_LANGUAGE='fr', RESULT=str(base / 'result'), CONFIRM=confirm, MODE=mode, SUMMARY=str(base / 'summary'),
                            META=json.dumps({'required_release': '6.3.3-addons', 'presets': ['Other.ini', 'Ultra.ini'],
                                             'preferred': 'Ultra.ini', 'addons': {'citra.addon': 64}, 'files': 8, 'bytes': 100}))
                 script = r'''
@@ -278,8 +369,8 @@ community_txt() { printf '%s' "$1"; }
 i18n() { printf '%s' "$1"; }
 # Force the text picker in this UI test regardless of host packages.
 command() { if [ "${*: -1}" = yad ]; then return 1; else builtin command "$@"; fi; }
-input_text() { printf '/userdata/My bundle.zip'; }
-menu_select() { echo "Unexpected preset selector" >&2; return 1; }
+input_text() { if [ "$KIND" = zip ]; then printf '/userdata/My bundle.zip'; else printf '/userdata/My bundle'; fi; }
+menu_select() { printf '%s' "$KIND"; }
 yesno_default_no() { printf '%s' "$2" > "$SUMMARY"; return "$CONFIRM"; }
 msgbox() { return 0; }
 resh_cmd() {
@@ -299,10 +390,10 @@ resh_pack_menu '/userdata/roms/windows/An emulator.wine' "$MODE"
                 if confirm == '0' and mode == 'apply':
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual((base / 'result').read_text().splitlines(),
-                                     ['pack-import', '/userdata/roms/windows/An emulator.wine', '/userdata/My bundle.zip', 'Ultra.ini'])
+                                     ['pack-import', '/userdata/roms/windows/An emulator.wine', ('/userdata/My bundle.zip' if kind == 'zip' else '/userdata/My bundle'), 'Ultra.ini'])
                 else:
                     self.assertFalse((base / 'result').exists())
                     if confirm == '0':
-                        self.assertEqual(result.stdout.splitlines(), ['/userdata/My bundle.zip', 'Ultra.ini'])
+                        self.assertEqual(result.stdout.splitlines(), [('/userdata/My bundle.zip' if kind == 'zip' else '/userdata/My bundle'), 'Ultra.ini'])
                     else:
                         self.assertNotEqual(result.returncode, 0)

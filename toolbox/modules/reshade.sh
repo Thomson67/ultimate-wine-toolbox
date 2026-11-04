@@ -358,7 +358,7 @@ PY_PENDING
         current="$(resh_cmd details "$rom")"
         [ -z "$current" ] || items+=(current "$(i18n resh_model_current)")
         items+=(community "$(community_txt 'Rechercher un preset dans la base communautaire' 'Find a preset in the community catalogue')")
-        items+=(local-pack "$(community_txt 'Installer un pack ReShade local (ZIP, add-ons et shaders)' 'Install a local ReShade bundle (ZIP, add-ons and shaders)')")
+        items+=(local-pack "$(community_txt 'Installer un pack ReShade local (ZIP ou dossier, add-ons et shaders)' 'Install a local ReShade bundle (ZIP or directory, add-ons and shaders)')")
         model="$(WT_MENU_LIST=1 menu_select "$(i18n resh_title)" "$(i18n resh_model_prompt)" "${items[@]}")" || return 1
         case "$model" in
             standard|retro|thomson|manual) defaults="$(resh_model_packs "$model")" ;;
@@ -517,6 +517,26 @@ resh_pack_zip_file() {
     printf '%s' "$archive"
 }
 
+resh_pack_source() {
+    local kind folder
+    kind="$(menu_select "$(i18n resh_title)" "$(community_txt 'Source du pack ReShade local' 'Local ReShade bundle source')" \
+        zip "$(community_txt 'Archive ZIP' 'ZIP archive')" directory "$(community_txt 'Dossier' 'Directory')" back "$(i18n back)")" || return 1
+    case "$kind" in
+        zip) resh_pack_zip_file ;;
+        directory)
+            if command -v yad >/dev/null 2>&1; then
+                folder="$(DISPLAY="${DISPLAY:-:0}" LANGUAGE="$WT_LANGUAGE" yad --file --directory --filename=/userdata/ \
+                    --title="$(community_txt 'Dossier contenant ReShade.ini et reshade-shaders' 'Directory containing ReShade.ini and reshade-shaders')" \
+                    --width=1000 --height=700)" || return 1
+            else
+                folder="$(input_text "$(i18n resh_title)" "$(community_txt 'Dossier contenant ReShade.ini et reshade-shaders' 'Directory containing ReShade.ini and reshade-shaders')" /userdata/)" || return 1
+            fi
+            [ -n "$folder" ] || return 1
+            printf '%s' "$folder" ;;
+        *) return 1 ;;
+    esac
+}
+
 resh_pack_menu() {
     local rom="$1" choice archive info summary preset output
     local mode="${2:-apply}"
@@ -532,7 +552,7 @@ resh_pack_menu() {
         else msgbox "$(i18n resh_title)" "$output"; fi
         return
     fi
-    archive="$(resh_pack_zip_file)" || return 1
+    archive="$(resh_pack_source)" || return 1
     if ! info="$(resh_cmd pack-info "$archive" 2>&1)"; then msgbox "$(i18n resh_title)" "$info"; return 1; fi
     summary="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("ReShade: "+(d["required_release"] or "full add-on support")); print("Add-ons: "+", ".join(n+" ("+str(a)+" bits)" for n,a in d["addons"].items())); print("Presets ("+str(len(d["presets"]))+"): "+", ".join(d["presets"])); print(str(d["files"])+" files / "+str(round(d["bytes"]/1048576,1))+" MiB")' "$info")" || return
     preset="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["preferred"])' "$info")" || return 1
@@ -540,7 +560,7 @@ resh_pack_menu() {
 
 $(community_txt 'Preset initial :' 'Initial preset:') $preset
 $(community_txt 'Tous les presets détectés seront importés.' 'All detected presets will be imported.')
-$(community_txt 'Installer pour ce jeu les add-ons exécutables et les shaders de cette archive ? Les réglages actuels seront sauvegardés. Le pack Citra nécessite ReShade 6.3.3 avec add-ons.' 'Install the executable add-ons and shaders from this archive for this game? Current settings will be backed up. The Citra bundle requires ReShade 6.3.3 with add-ons.')" || return 1
+$(community_txt 'Installer pour ce jeu les add-ons exécutables et les shaders de ce pack ? Les réglages actuels seront sauvegardés. Le pack Citra nécessite ReShade 6.3.3 avec add-ons.' 'Install the executable add-ons and shaders from this bundle for this game? Current settings will be backed up. The Citra bundle requires ReShade 6.3.3 with add-ons.')" || return 1
     if [ "$mode" = select ]; then
         printf '%s\n%s\n' "$archive" "$preset"
         return 0
@@ -581,7 +601,7 @@ resh_presets_menu() {
         choice="$(menu_select "$(community_txt 'Presets du jeu' 'Game presets') — ${rom##*/}" \
             "$(community_txt 'Sélectionnez un preset pour afficher ses détails. Fermez le jeu avant de changer de preset.' 'Select a preset to see its details. Close the game before changing presets.')" \
             "${items[@]}" import "$(community_txt 'Importer et activer un preset INI' 'Import and activate an INI preset')" \
-            pack-presets "$(community_txt 'Ajouter les presets du pack installé depuis son ZIP' 'Add presets from the installed bundle ZIP')" \
+            pack-presets "$(community_txt 'Ajouter les presets du pack installé depuis un ZIP ou dossier' 'Add presets from the installed bundle ZIP or directory')" \
             clear-all "$(community_txt 'Supprimer tous les presets pour ce jeu' 'Delete all presets for this game')" back "$(i18n back)")" || return
         case "$choice" in
             back|'') return ;;
@@ -591,7 +611,7 @@ resh_presets_menu() {
                 resh_import_ini "$rom" "$source" || continue
                 continue ;;
             pack-presets)
-                source="$(resh_pack_zip_file)" || continue
+                source="$(resh_pack_source)" || continue
                 if ! output="$(resh_cmd presets-pack "$rom" "$source" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; fi
                 continue ;;
         esac
@@ -738,7 +758,7 @@ resh_game_menu() {
         if [ "$state" != missing ]; then
             if [ "$state" = disabled ]; then actions+=(enable "$(i18n resh_enable)")
             else actions+=(disable "$(i18n resh_disable)"); fi
-            actions+=(presets "$(community_txt 'Presets du jeu et détails' 'Game presets and details')" pack "$(community_txt 'Pack ReShade local (ZIP, add-ons et shaders)' 'Local ReShade bundle (ZIP, add-ons and shaders)')" preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)")
+            actions+=(presets "$(community_txt 'Presets du jeu et détails' 'Game presets and details')" pack "$(community_txt 'Pack ReShade local (ZIP ou dossier, add-ons et shaders)' 'Local ReShade bundle (ZIP or directory, add-ons and shaders)')" preset "$(i18n resh_preset)" export "$(i18n resh_export_title)" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)")
         fi
         choice="$(menu_select "$(i18n resh_title) — $(basename "$rom")" "$prompt" \
             "${actions[@]}" community "$(i18n resh_community)" back "$(i18n back)")" || return
