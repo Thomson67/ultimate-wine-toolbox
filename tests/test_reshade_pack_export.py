@@ -205,7 +205,7 @@ community_cmd() {
   *) return 1 ;;
  esac
 }
-community_export_reshade_pack_menu Title
+community_export_reshade_pack Title
 '''
             result = subprocess.run(['bash', '-c', script], text=True, capture_output=True,
                                     env=dict(os.environ, ROOT=str(Path(__file__).resolve().parents[1]),
@@ -243,7 +243,7 @@ community_cmd() {
   reshade-pack-export) python3 -c 'import json,os,sys;open(os.environ["ARGS"],"w").write(json.dumps(sys.argv[1:]))' "$@"; printf '/userdata/export.zip';;
  esac
 }
-community_export_reshade_pack_menu Title '/games/My Game.wine'
+community_export_reshade_pack Title '/games/My Game.wine' local
 '''
             result = subprocess.run(['bash','-c',script],capture_output=True,text=True,env=dict(os.environ,
                 ROOT=str(Path(__file__).resolve().parents[1]), WT_LANGUAGE='fr', PLAN=json.dumps(plan), ARGS=str(args),

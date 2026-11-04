@@ -34,8 +34,8 @@ resh_game_menu /games/Game.wine
                 self.assertEqual(result.returncode, 0, result.stderr)
                 actions = (base/'checklist').read_text().splitlines()[2::2]
                 self.assertIn('install', actions)
-                self.assertIn('import-export', actions)
-                self.assertNotIn('community', actions)
+                self.assertEqual('import-export' in actions, state != 'missing')
+                self.assertIn('community', actions)
                 self.assertNotIn('preset', actions)
                 self.assertNotIn('export', actions)
                 self.assertNotIn('pack', actions)
@@ -48,11 +48,7 @@ resh_game_menu /games/Game.wine
             'import-ini': ['import-ini', '/games/My Game.wine', '/userdata/My preset.ini'],
             'import-pack': ['pack', '/games/My Game.wine'],
             'export-ini': ['export-ini', '/games/My Game.wine'],
-            'export-pack': ['pack-export', 'resh_title — Import / Export', '/games/My Game.wine'],
-            'share-ini': ['share', 'reshade', 'resh_title — Import / Export', '/games/My Game.wine'],
-            'community': ['catalogue', 'reshade', '/games/My Game.wine'],
-            'import-package': ['package', 'reshade', 'resh_title — Import / Export', '/games/My Game.wine'],
-            'pack-presets': ['presets-pack', '/games/My Game.wine', '/userdata/My bundle'],
+            'export-pack': ['pack-export', 'resh_title — Import / Export', '/games/My Game.wine', 'local'],
         }
         for action, arguments in expected.items():
             with self.subTest(action=action), tempfile.TemporaryDirectory() as folder:
@@ -69,7 +65,7 @@ resh_pack_source() { printf '/userdata/My bundle'; }
 resh_import_ini() { record import-ini "$@"; }
 resh_pack_menu() { record pack "$@"; }
 resh_export_game_preset() { record export-ini "$@"; }
-community_export_reshade_pack_menu() { record pack-export "$@"; }
+community_export_reshade_pack() { record pack-export "$@"; }
 community_share() { record share "$@"; }
 community_menu() { record catalogue "$@"; }
 community_import_package() { record package "$@"; }
@@ -78,7 +74,8 @@ resh_import_export_menu '/games/My Game.wine'
                 result = subprocess.run(['bash', '-c', script], env=dict(self.environment(base), ACTION=action), capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual((base/'summary').read_text().splitlines(), arguments)
-                self.assertNotIn('share-pack', (base/'checklist').read_text().splitlines())
+                for redundant in ('share-pack','share-ini','community','import-package','pack-presets'):
+                    self.assertNotIn(redundant,(base/'checklist').read_text().splitlines())
 
     def test_local_ini_export_can_choose_an_inactive_variant_without_activating_it(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -778,27 +778,17 @@ resh_import_export_menu() {
         if [ "$state" != missing ]; then
             items+=(import-ini "$(community_txt 'Importer un preset INI' 'Import an INI preset')"
                 import-pack "$(community_txt 'Pack local : importer / gérer (ZIP ou dossier)' 'Local bundle: import / manage (ZIP or directory)')"
-                pack-presets "$(community_txt 'Ajouter les variantes du pack installé (ZIP ou dossier)' 'Add variants from the installed bundle (ZIP or directory)')"
                 export-ini "$(community_txt 'Exporter un preset INI (actif ou autre)' 'Export an INI preset (active or other)')"
-                export-pack "$(community_txt 'Exporter un pack ReShade (ZIP)' 'Export a ReShade bundle (ZIP)')"
-                share-ini "$(community_txt 'Partager un preset INI avec la communauté' 'Share an INI preset with the community')")
+                export-pack "$(community_txt 'Exporter un pack ReShade (ZIP)' 'Export a ReShade bundle (ZIP)')")
         fi
-        items+=(import-package "$(community_txt 'Importer un paquet communautaire ZIP (preset)' 'Import a community ZIP package (preset)')"
-            community "$(community_txt 'Rechercher un preset dans la base communautaire' 'Find a preset in the community catalogue')")
-        choice="$(menu_select "$title — ${rom##*/}" "$(community_txt 'Importer, exporter ou partager les réglages ReShade de ce jeu. Fermez le jeu avant toute modification.' 'Import, export or share ReShade settings for this game. Close the game before making changes.')" "${items[@]}" back "$(i18n back)")" || return
+        choice="$(menu_select "$title — ${rom##*/}" "$(community_txt 'Importer ou exporter localement les réglages ReShade de ce jeu. Fermez le jeu avant toute modification.' 'Import or export ReShade settings locally for this game. Close the game before making changes.')" "${items[@]}" back "$(i18n back)")" || return
         case "$choice" in
             import-ini)
                 source="$(resh_preset_file import "$rom")" || continue
                 resh_import_ini "$rom" "$source" ;;
             import-pack) resh_pack_menu "$rom" ;;
-            pack-presets)
-                source="$(resh_pack_source)" || continue
-                if ! output="$(resh_cmd presets-pack "$rom" "$source" 2>&1)"; then msgbox "$title" "$output"; fi ;;
             export-ini) resh_export_game_preset "$rom" ;;
-            export-pack) community_export_reshade_pack_menu "$title" "$rom" ;;
-            share-ini) community_share reshade "$title" "$rom" ;;
-            import-package) community_import_package reshade "$title" "$rom" ;;
-            community) community_menu reshade "$rom" ;;
+            export-pack) community_export_reshade_pack "$title" "$rom" local ;;
             *) return ;;
         esac
     done
@@ -830,12 +820,13 @@ resh_game_menu() {
         if [ "$state" != missing ]; then
             if [ "$state" = disabled ]; then actions+=(enable "$(i18n resh_enable)")
             else actions+=(disable "$(i18n resh_disable)"); fi
-            actions+=(presets "$(community_txt 'Presets du jeu et détails' 'Game presets and details')" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)")
+            actions+=(import-export "Import / Export" presets "$(community_txt 'Presets du jeu et détails' 'Game presets and details')" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)")
         fi
         choice="$(menu_select "$(i18n resh_title) — $(basename "$rom")" "$prompt" \
-            "${actions[@]}" import-export "Import / Export" back "$(i18n back)")" || return
+            "${actions[@]}" community "$(community_txt 'Partage communautaire' 'Community sharing')" back "$(i18n back)")" || return
         case "$choice" in
             import-export) resh_import_export_menu "$rom" ;;
+            community) community_menu reshade "$rom" ;;
             install) resh_install_game "$rom" ;;
             presets) resh_presets_menu "$rom" ;;
             enable|disable)

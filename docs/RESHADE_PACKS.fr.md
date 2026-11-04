@@ -127,10 +127,10 @@ retour, puis repris au prochain lancement. Les raccourcis ReShade personnalisés
 déjà affectés restent prioritaires ; les touches Page haut/bas sont les valeurs
 par défaut lorsque ces commandes ne sont pas affectées.
 
-Les nouveaux imports de packs ajoutent toutes leurs variantes. Pour un pack
-installé avec le premier test, utiliser **Import / Export → Ajouter les variantes du pack installé (ZIP ou dossier)** et sélectionner la même source que lors de l’installation : les variantes
-sont ajoutées sans réinstaller les shaders ou l'add-on. Pour changer entre
-elles, il suffit ensuite de les activer dans la collection.
+Les imports de packs ajoutent automatiquement toutes leurs variantes. Elles
+sont accessibles dans **Presets du jeu et détails**. L’ancien ajout séparé des
+variantes, destiné aux premiers imports de test, n’est plus proposé dans les
+menus ; la commande de maintenance reste compatible.
 
 Une variante attachée à un pack reste listée après son retrait, mais ne peut
 être activée que lorsque ce même pack est installé. Les presets ordinaires
@@ -273,8 +273,7 @@ clones locaux simulés pour vérifier le chemin de téléchargement/fusion seul.
 
 ## Préparer un pack personnalisé pour partage (branche de test)
 
-Dans **ReShade → Presets communautaires → Exporter un pack ReShade (ZIP) →
-Préparer pour le partage**, choisir un jeu géré par la Toolbox ou un ZIP/dossier personnalisé.
+Dans **ReShade → Presets communautaires → Préparer un pack pour partage (ZIP)**, choisir un jeu géré par la Toolbox ou un ZIP/dossier personnalisé.
 Fermer le jeu avant d’exporter ses réglages. Le preset actif est seul coché par
 défaut ; s’il est incomplet, le premier preset valide est proposé. Les presets
 incomplets restent visibles et marqués, avec le nom du fichier manquant ou les
@@ -367,38 +366,20 @@ la texture conditionnelle de `FXShaders/NeoBloom.fx` : c’est une limitation
 distincte du résolveur de textures dynamiques, pas un échec du téléchargement
 FFT. Les trois variantes Henriko restent exportables.
 
-## Import / Export par jeu (depuis 0.11.1-dev5)
+## Menus du jeu : transferts locaux et communauté (0.11.1-dev7)
 
-Le menu principal d’un jeu géré propose désormais **Import / Export**. Les
-options de transfert y sont regroupées ; **Presets du jeu et détails** garde
-l’activation, le renommage, la consultation et la suppression.
+**Import / Export** contient uniquement les transferts locaux : preset INI,
+pack ZIP/dossier, export INI actif ou autre et export de
+pack ReShade ZIP. L’export de pack reprend directement le jeu sélectionné et
+crée le ZIP et sa somme SHA-256 dans `exports/reshade-packs/`, sans choix d’usage
+ni formulaire public.
 
-- **Importer un preset INI**, avec contrôle des effets manquants.
-- **Pack local : importer / gérer (ZIP ou dossier)** : installation, complément
-  des shaders des variantes et retrait/restauration du pack existant.
-- **Ajouter les variantes du pack installé (ZIP ou dossier)**.
-- **Exporter un preset INI (actif ou autre)** : choisir la variante sans
-  l’activer, puis choisir le fichier de destination.
-- **Exporter un pack ReShade (ZIP) → Usage personnel / transfert local** : le
-  jeu sélectionné est repris directement ; choisir les presets, les add-ons
-  requis et le nom du pack. Le ZIP réimportable et sa somme SHA-256 sont créés dans
-  `exports/reshade-packs/`. Aucun formulaire public ou envoi au catalogue.
-- **Partager un preset INI avec la communauté**, ou **Exporter un pack ReShade
-  (ZIP) → Préparer pour le partage** : parcours avec métadonnées et crédits.
-- **Importer un paquet communautaire ZIP (preset)** et **Rechercher un preset
-  dans la base communautaire**.
+**Partage communautaire**, accessible séparément dans le menu du jeu, regroupe
+recherche, téléchargement, import de paquets communautaires, partage de presets,
+préparation de packs pour partage manuel avec crédits et modération. Les packs
+préparés pour le partage restent dans `exports/community/reshade-packs/`.
+Le service en ligne actuel ne reçoit toujours que les presets INI.
 
-L’import ZIP d’un pack local et l’import d’un paquet communautaire contenant un
-preset INI restent deux formats distincts. Sans installation gérée, le sous-menu
-propose les parcours communautaires pouvant conduire à l’installation ; les
-exports de jeu et imports de packs apparaissent une fois ReShade installé.
-L’assistant d’installation initial garde ses choix directs de modèle, pack
-local et preset communautaire.
-
-Depuis `0.11.1-dev6`, une seule entrée **Exporter un pack ReShade (ZIP)** est
-présente, dans Import / Export comme dans le menu communautaire. Le choix
-suivant distingue **Usage personnel / transfert local** et **Préparer pour le
-partage**. Lorsque le jeu est déjà choisi, les deux parcours le reprennent sans
-redemander le jeu ou la source. Le choix de source ZIP/dossier reste disponible
-pour un export lancé sans contexte de jeu. Aucun de ces parcours n’envoie de
-pack au catalogue en ligne actuel.
+**Presets du jeu et détails** conserve activation, consultation, renommage et
+suppression. L’assistant d’installation initial conserve ses choix de modèle,
+pack local ou preset communautaire.
