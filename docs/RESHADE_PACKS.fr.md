@@ -273,7 +273,7 @@ clones locaux simulés pour vérifier le chemin de téléchargement/fusion seul.
 
 ## Préparer un pack personnalisé pour partage (branche de test)
 
-Dans **ReShade → Presets communautaires → Préparer un pack pour partage (ZIP)**, choisir un jeu géré par la Toolbox ou un ZIP/dossier personnalisé.
+Dans **ReShade → Presets communautaires → Partager un pack ReShade (ZIP)**, choisir un jeu géré par la Toolbox ou un ZIP/dossier personnalisé.
 Fermer le jeu avant d’exporter ses réglages. Le preset actif est seul coché par
 défaut ; s’il est incomplet, le premier preset valide est proposé. Les presets
 incomplets restent visibles et marqués, avec le nom du fichier manquant ou les
@@ -315,10 +315,14 @@ pas être déduits. Les crédits sont déclarés par l’auteur, pas vérifiés 
 Le ZIP et son fichier `.sha256` sont créés dans
 `exports/community/reshade-packs/`. Le ZIP se réimporte par **Pack ReShade local
 → Archive ZIP** après installation de la version et de l’API indiquées.
-L’export ne modifie pas les sources. Le service communautaire en ligne actuel
-accepte uniquement les petits profils texte : cette préparation n’envoie aucun
-pack au catalogue. Le partage manuel du ZIP est disponible ; la réception,
-le stockage et la modération des packs binaires restent à ajouter au service.
+L’export ne modifie pas les sources. Depuis la version de test 0.11.1-dev8,
+le ZIP peut être envoyé directement au service communautaire pour modération.
+La copie locale est conservée même si l’envoi échoue. Les packs approuvés sont
+recherchables et installables depuis le même menu communautaire. Cette voie
+nécessite la mise à jour du Worker, de sa table D1 et la liaison R2 privée PACKS.
+Les presets INI gardent leur catalogue Git existant. Les ZIP utilisent un
+catalogue D1 séparé et des objets R2 privés, accessibles uniquement après
+approbation via le Worker.
 
 ## Compléter les shaders de tous les presets à l’import
 
@@ -376,10 +380,42 @@ ni formulaire public.
 
 **Partage communautaire**, accessible séparément dans le menu du jeu, regroupe
 recherche, téléchargement, import de paquets communautaires, partage de presets,
-préparation de packs pour partage manuel avec crédits et modération. Les packs
+envoi direct de packs ZIP avec crédits et modération, recherche et installation de packs. Les packs
 préparés pour le partage restent dans `exports/community/reshade-packs/`.
-Le service en ligne actuel ne reçoit toujours que les presets INI.
+Le Worker doit être mis à jour pour activer les ZIP ; les anciens clients INI restent compatibles.
 
 **Presets du jeu et détails** conserve activation, consultation, renommage et
 suppression. L’assistant d’installation initial conserve ses choix de modèle,
 pack local ou preset communautaire.
+
+## Partage direct des packs (0.11.1-dev8)
+
+**Partage communautaire → Partager un pack ReShade (ZIP)** prépare et transmet
+les fichiers sélectionnés. **Rechercher / installer un pack communautaire**
+interroge le catalogue public du service, avec recherche jeu/titre/auteur,
+affiche crédits, version, architecture, presets et add-ons, vérifie le ZIP puis
+ouvre l’import existant. Sans ReShade géré, l’assistant de configuration est
+proposé ; choisir la version et l’API requises. Un pack existant doit être
+retiré explicitement avant remplacement. Les contrôles d’architecture et de
+version restent applicables. L’installation propose les shaders manquants de
+tous les presets, comme pour un import local.
+
+Les modérateurs réutilisent l’appairage existant : **Valider les partages →
+Examiner les packs ReShade ZIP**, puis lecture des crédits, sommes de contrôle,
+add-ons et liste des membres avant décision. Les fichiers sont inspectés sans
+exécuter de code. Une approbation n’atteste pas la compilation GPU ni le bon
+fonctionnement en jeu. Le retrait d’un pack publié bloque les téléchargements
+futurs sans supprimer les installations locales.
+
+Limites en ligne : ZIP 16 Mio, total décompressé 64 Mio, 4096 membres,
+32 Mio par membre et 200 presets. Les exports locaux conservent leurs limites
+existantes. Chaque fichier du manifeste et le ZIP complet sont vérifiés par
+SHA-256. Le Worker contrôle aussi chemins, doublons, liens, tailles réelles
+pendant décompression, CRC, types de fichiers et en-têtes PE des add-ons.
+Le ZIP ne distribue pas l’injecteur ReShade.
+
+Déploiement du service : voir
+[les instructions Cloudflare](https://github.com/Thomson67/ultimate-wine-toolbox-community/blob/main/service/INSTALLATION_FR.md).
+Les tests couvrent SQLite réel, stockage R2 simulé, refus avant validation,
+retrait et intégration des menus ; Cloudflare/Batocera restent à valider après
+activation du Worker.

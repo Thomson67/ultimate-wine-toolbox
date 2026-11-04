@@ -8,6 +8,16 @@ Created by **Thomsonito**.
 
 **Stable version: [v0.11.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.0).**
 
+## Test branch 0.11.1-dev8: community bundles
+
+ReShade ZIP bundles can be submitted directly, searched and installed after
+moderator approval. Exports retain only used shader dependencies and selected
+add-ons. Online limits: 16 MiB ZIP / 64 MiB expanded. The service requires an
+updated Worker, D1 schema and private R2 PACKS binding; until enabled, the
+Toolbox retains the ZIP and explains why submission is unavailable. Existing
+INI sharing remains compatible.
+
+
 ## Features
 
 - French / English interface

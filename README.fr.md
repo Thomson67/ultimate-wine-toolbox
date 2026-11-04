@@ -8,6 +8,17 @@ Créée par **Thomsonito**.
 
 **Version stable : [v0.11.0](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.0).**
 
+## Branche de test 0.11.1-dev8 : packs communautaires
+
+Le menu communautaire peut envoyer directement les packs ReShade ZIP,
+les rechercher et les installer après validation d’un modérateur. L’export
+reste limité aux effets utilisés et aux add-ons sélectionnés. Limites en ligne :
+16 Mio ZIP / 64 Mio décompressés. Le service nécessite la mise à jour du Worker,
+de la table D1 et une liaison de stockage R2 privée PACKS ; sans cette activation,
+la Toolbox conserve le ZIP et explique pourquoi l’envoi est indisponible.
+Les partages INI existants restent compatibles.
+
+
 ## Fonctionnalités
 
 - interface Français / Anglais

@@ -197,7 +197,8 @@ community_report() { :; }
 input_text() { printf 'Public value'; }
 yesno_default_no() { return 0; }
 msgbox() { :; }
-community_service_cmd() { echo 'unexpected submission' >&2; return 1; }
+community_service_cmd() { echo 'unexpected text submission' >&2; return 1; }
+community_packs_cmd() { [ "$1" = submit ] && [ "$2" = /userdata/export.zip ] || return 1; printf 'pack-id\npending\n'; }
 community_cmd() {
  case "$1" in
   reshade-pack-plan) printf '%s' "$PLAN" ;;

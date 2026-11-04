@@ -2,6 +2,7 @@
 # Shared implementation; each tool keeps its own menu and file type.
 community_txt() { if [ "${WT_LANGUAGE:-fr}" = fr ]; then printf '%s' "$1"; else printf '%s' "$2"; fi; }
 community_cmd() { python3 "$WT_ROOT/helpers/community_profiles.py" --home "$WT_HOME" --language "$WT_LANGUAGE" "$@"; }
+community_packs_cmd() { python3 "$WT_ROOT/helpers/community_packs.py" --home "$WT_HOME" "$@"; }
 community_service_cmd() { python3 "$WT_ROOT/helpers/community_service.py" --home "$WT_HOME" --language "$WT_LANGUAGE" "$@"; }
 community_report() {
   local title="$1" content="$2" report
@@ -467,7 +468,12 @@ community_send_package() {
   local -a filter=()
   [ -z "$kind" ] || filter=(--kind "$kind")
   while true; do
-    if output="$(community_service_cmd submit "$package" "${filter[@]}" 2>&1)"; then
+    if [ "$kind" = reshade-pack ]; then
+      output="$(community_packs_cmd submit "$package" 2>&1)"; local send_rc=$?
+    else
+      output="$(community_service_cmd submit "$package" "${filter[@]}" 2>&1)"; local send_rc=$?
+    fi
+    if [ "$send_rc" -eq 0 ]; then
       status="${output##*$'\n'}"
       case "$status" in
         rejected) output="$(community_txt 'Ce partage a été refusé. Vous pouvez le corriger et proposer un nouveau partage.' 'This submission was rejected. You can make changes and submit it again.')" ;;
@@ -551,11 +557,15 @@ community_validate() (
   wt_clear_tty
   [ "$result" -eq 0 ] || { msgbox "$title" "$output"; return 0; }
   trap 'community_service_cmd logout >/dev/null 2>&1 || true' EXIT
+  local -a pack_options=()
+  [ "$kind" != reshade ] || pack_options=(packs "$(community_txt 'Examiner les packs ReShade ZIP' 'Review ReShade ZIP bundles')" remove-packs "$(community_txt 'Retirer un pack ReShade publié' 'Remove a published ReShade bundle')")
   while true; do
     choice="$(menu_select "$title" "$(community_txt 'Gestion des partages communautaires' 'Manage community submissions')" \
       pending "$(community_txt 'Examiner les partages en attente' 'Review pending submissions')" \
-      published "$(community_txt 'Retirer un partage déjà publié' 'Remove a published submission')" back "$(i18n back)")" || return 0
+      published "$(community_txt 'Retirer un partage déjà publié' 'Remove a published submission')" "${pack_options[@]}" back "$(i18n back)")" || return 0
     case "$choice" in
+      packs) community_review_reshade_packs "$title" pending ;;
+      remove-packs) community_review_reshade_packs "$title" published ;;
       pending) community_review_pending "$kind" "$title" ;;
       published) community_remove_published "$kind" "$title" ;;
       *) return 0 ;;
@@ -592,7 +602,7 @@ community_export_reshade_pack() {
   if [ -n "$rom" ]; then
     choice=game
   else
-    choice="$(menu_select "$title" "$(community_txt 'Préparer un pack personnalisé pour partage manuel (ZIP)' 'Prepare a customized bundle for manual sharing (ZIP)')" \
+    choice="$(menu_select "$title" "$(community_txt 'Partager un pack ReShade avec la communauté' 'Share a ReShade bundle with the community')" \
       game "$(community_txt 'Depuis un jeu géré par la Toolbox' 'From a Toolbox-managed game')" \
       source "$(community_txt 'Depuis un ZIP ou dossier personnalisé' 'From a custom ZIP or directory')" back "$(i18n back)")" || return
   fi
@@ -644,7 +654,7 @@ community_export_reshade_pack() {
     author="$(input_text "$title" "$(community_txt 'Votre pseudo public' 'Your public nickname')" '')" || return
     description="$(input_text "$title" "$(community_txt 'Description et prérequis' 'Description and requirements')" '')" || return
     credits="$(input_text "$title" "$(community_txt 'Crédits, provenance et licences autorisant le partage des fichiers sélectionnés' 'Credits, sources and licenses permitting redistribution of the selected files')" '')" || return
-    yesno_default_no "$title" "$(community_txt 'Créer ce ZIP pour partage manuel ? Confirmez être autorisé à redistribuer les fichiers sélectionnés. Aucun envoi au catalogue ne sera effectué.' 'Create this ZIP for manual sharing? Confirm you may redistribute the selected files. Nothing will be sent to the catalogue.')" || return
+    yesno_default_no "$title" "$(community_txt 'Envoyer ce pack à la communauté pour validation ? Confirmez être autorisé à redistribuer les fichiers sélectionnés.' 'Submit this bundle to the community for review? Confirm you may redistribute the selected files.')" || return
   fi
   expected="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["sha256"])' "$plan")" || return
   if output="$(community_cmd reshade-pack-export "${origin[@]}" "${presets[@]}" "${addons[@]}" --expected "$expected" \
@@ -652,7 +662,7 @@ community_export_reshade_pack() {
     if [ "$destination" = local ]; then
       msgbox "$title" "$(community_txt 'Pack local exporté avec manifeste et somme SHA-256. Réimport : Import / Export → Pack local → Archive ZIP.' 'Local bundle exported with manifest and SHA-256 checksum. Reimport: Import / Export → Local bundle → ZIP archive.')\n$output"
     else
-    msgbox "$title" "$(community_txt 'Pack portable créé avec manifeste et somme SHA-256. Partagez le ZIP manuellement ; le service communautaire actuel accepte uniquement les presets INI. Réimport : ReShade → Pack local → ZIP.' 'Portable bundle created with manifest and SHA-256 checksum. Share the ZIP manually; the current community service only accepts INI presets. Reimport: ReShade → Local bundle → ZIP.')\n$output"
+      community_send_package "$title" "${output%%$'\n'*}" reshade-pack
     fi
   else msgbox "$title" "$output"; return 1; fi
 }
@@ -689,7 +699,7 @@ community_menu() {
   if [ "$kind" = antimicrox ]; then title="AntiMicroX — $(community_txt 'Profils communautaires' 'Community profiles')"; else title="ReShade — $(community_txt 'Presets communautaires' 'Community presets')"; fi
   if [ "$kind" = reshade ]; then
     share_label="$(community_txt 'Partager mon preset ReShade' 'Share my ReShade preset')"
-    import_options=(export-pack "$(community_txt 'Préparer un pack pour partage (ZIP)' 'Prepare a bundle for sharing (ZIP)')" import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')")
+    import_options=(browse-packs "$(community_txt 'Rechercher / installer un pack communautaire' 'Find / install a community bundle')" export-pack "$(community_txt 'Partager un pack ReShade (ZIP)' 'Share a ReShade bundle (ZIP)')" import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')")
     management_options=(validate "$(community_txt 'Valider les partages (modérateurs)' 'Review submissions (moderators)')"
       forget "$(community_txt 'Retirer l’accès modérateur de ce PC' 'Remove moderator access from this PC')")
     browse_label="$(community_txt 'Voir les presets disponibles' 'Browse available presets')"
@@ -722,6 +732,7 @@ $output"; fi
         if [ "$kind" = antimicrox ]; then community_share_menu "$title" "$rom";
         else community_share "$kind" "$title" "$rom"; fi
         continue ;;
+      browse-packs) community_browse_reshade_packs "$title" "$rom"; continue ;;
       export-pack) community_export_reshade_pack "$title" "$rom" community; continue ;;
       import) community_import_package "$kind" "$title" "$rom"; continue ;;
       validate) community_validate "$kind" "$title"; continue ;;
@@ -748,5 +759,63 @@ $output"; fi
     fi
     yesno "$title" "$details"$'\n\n'"$(community_txt 'Télécharger ce fichier ? Vous pourrez ensuite l’utiliser pour un jeu.' 'Download this file? You can then use it for a game.')" || continue
     if path="$(community_cmd fetch "$kind" "$selected" 2>&1)"; then community_import_actions "$kind" "$path" "$title" "$rom"; else msgbox "$title" "$path"; fi
+  done
+}
+
+
+community_choose_reshade_pack() {
+  local title="$1" query rows id label details output
+  local -a items=()
+  query="$(input_text "$title" "$(community_txt 'Rechercher un pack : jeu, nom ou auteur (vide = tous)' 'Find a bundle: game, title or author (empty = all)')" '')" || return 1
+  rows="$(community_packs_cmd list --query "$query" 2>&1)" || { msgbox "$title" "$rows"; return 1; }
+  [ -n "$rows" ] || { msgbox "$title" "$(community_txt 'Aucun pack publié pour cette recherche.' 'No published bundles match this search.')"; return 1; }
+  while IFS=$'\t' read -r id label; do items+=("$id" "$label"); done <<< "$rows"
+  id="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Packs ReShade communautaires' 'Community ReShade bundles')" "${items[@]}" back "$(i18n back)")" || return 1
+  [ "$id" != back ] || return 1
+  details="$(community_packs_cmd show "$id" 2>&1)" || { msgbox "$title" "$details"; return 1; }
+  community_report "$title" "$details"
+  yesno_default_no "$title" "$(community_txt 'Télécharger ce pack ? Les add-ons sélectionnés par son auteur sont des modules exécutables. Vérifiez les crédits et la version ReShade requise.' 'Download this bundle? Author-selected add-ons are executable modules. Check credits and the required ReShade version.')" || return 1
+  output="$(community_packs_cmd fetch "$id" 2>&1)" || { msgbox "$title" "$output"; return 1; }
+  printf '%s\n' "$output"
+}
+
+community_browse_reshade_packs() {
+  local title="$1" rom="${2:-}" path selected state
+  path="$(community_choose_reshade_pack "$title")" || return
+  if [ -z "$rom" ]; then
+    selected="$(community_pick_game "$title")" || return
+    rom="${selected%%$'\t'*}"
+  fi
+  state="$(resh_cmd status "$rom")" || return
+  if [ "$state" = missing ]; then
+    resh_install_game "$rom" "" "" "$path"
+  else
+    resh_pack_menu "$rom" apply "$path"
+  fi
+}
+
+community_review_reshade_packs() {
+  local title="$1" mode="$2" rows id label review checksum choice output
+  local -a items=()
+  while true; do
+    if [ "$mode" = pending ]; then rows="$(community_packs_cmd pending 2>&1)";
+    else rows="$(community_packs_cmd list 2>&1)"; fi
+    local result=$?
+    [ "$result" -eq 0 ] || { msgbox "$title" "$rows"; return; }
+    [ -n "$rows" ] || { msgbox "$title" "$(community_txt 'Aucun pack.' 'No bundles.')"; return; }
+    items=()
+    while IFS=$'\t' read -r id label; do items+=("$id" "$label"); done <<< "$rows"
+    id="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir le pack à examiner' 'Choose a bundle to review')" "${items[@]}" back "$(i18n back)")" || return
+    [ "$id" != back ] || return
+    review="$(community_packs_cmd review "$id" 2>&1)" || { msgbox "$title" "$review"; continue; }
+    checksum="${review%%$'\n'*}"
+    community_report "$title" "${review#*$'\n'}"
+    if [ "$mode" = pending ]; then
+      choice="$(menu_select "$title" "$(community_txt 'Décision pour ce pack ZIP (les add-ons ne sont pas exécutés pendant la vérification)' 'ZIP bundle decision (add-ons are not executed during inspection)')" approve "$(community_txt 'Accepter et publier' 'Approve and publish')" reject "$(community_txt 'Refuser' 'Reject')" back "$(i18n back)")" || continue
+    else choice=remove; fi
+    case "$choice" in approve|reject|remove) : ;; *) continue ;; esac
+    yesno_default_no "$title" "$(community_txt 'Confirmer cette décision pour le pack examiné ?' 'Confirm this decision for the reviewed bundle?')" || continue
+    output="$(community_packs_cmd "$choice" "$id" "$checksum" 2>&1)"
+    msgbox "$title" "$output"
   done
 }

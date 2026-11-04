@@ -144,7 +144,7 @@ resh_diagnostic() {
 }
 
 resh_resume_diagnostic() {
-    local rom exe detected candidates evidence result community_preset
+    local rom exe detected candidates evidence result community_preset community_pack
     rom="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["rom"])' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || return
     if [ "$(cat "$WT_HOME/state/launch-game.request" 2>/dev/null)" = "$rom" ]; then
         rm -f -- "$WT_HOME/state/launch-game.request"
@@ -155,12 +155,13 @@ resh_resume_diagnostic() {
     fi
     exe="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("installation_exe", ""))' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || exe=""
     community_preset="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("community_preset", ""))' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || community_preset=""
+    community_pack="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("community_pack", ""))' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || community_pack=""
     rm -f -- "$WT_HOME/state/reshade-diagnostic.json" "$WT_HOME/state/reshade-diagnostic.stop"
     detected="$(python3 "$WT_ROOT/helpers/reshade_diagnostic.py" --home "$WT_HOME" result "$rom")"
     candidates="${detected%%$'\t'*}"; evidence="${detected##*$'\t'}"
     result="$(cat "$WT_HOME/state/wsq-launch-result" 2>/dev/null)"
     msgbox "$(i18n resh_title)" "$(i18n resh_diag_result "${candidates:-?}" "${evidence:-?}" "${result:-?}")"
-    if [ -n "$exe" ] && resh_install_game "$rom" "$exe" "$community_preset"; then
+    if [ -n "$exe" ] && resh_install_game "$rom" "$exe" "$community_preset" "$community_pack"; then
         if [ -n "$community_preset" ] && [ -f "$community_preset" ]; then
             community_import_actions reshade "$community_preset" "ReShade — $(community_txt 'Presets communautaires' 'Community presets')" "$rom"
         fi
@@ -294,7 +295,7 @@ resh_install_game() {
         return 1
     fi
     local resume_exe="${2:-}" community_preset="${3:-}" resumed=0 index apply_community=0
-    local local_pack="" local_pack_preset="" pack_selection pack_error
+    local local_pack="${4:-}" local_pack_preset="" pack_selection pack_error
     local -a exes=() items=() shaders=()
     local listing
     listing="$(resh_cmd exes "$rom" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
@@ -322,12 +323,13 @@ resh_install_game() {
     fi
     dll="$(resh_api_select "$rom" "$exe")" || {
         if [ -f "$WT_HOME/state/reshade-diagnostic.json" ]; then
-            if [ -n "$community_preset" ]; then
-                python3 - "$WT_HOME/state/reshade-diagnostic.json" "$community_preset" <<'PY_PENDING'
+            if [ -n "$community_preset" ] || [ -n "$local_pack" ]; then
+                python3 - "$WT_HOME/state/reshade-diagnostic.json" "$community_preset" "$local_pack" <<'PY_PENDING'
 import json, os, sys, tempfile
 from pathlib import Path
 path = Path(sys.argv[1]); data = json.loads(path.read_text())
 data['community_preset'] = sys.argv[2]
+data['community_pack'] = sys.argv[3]
 fd, name = tempfile.mkstemp(dir=path.parent, prefix='.reshade-pending-')
 try:
     with os.fdopen(fd, 'w') as stream: json.dump(data, stream, ensure_ascii=False)
@@ -358,20 +360,32 @@ PY_PENDING
         *) return 1 ;;
     esac
     resh_backend_ready || return 1
-    if [ -n "$community_preset" ]; then
+    if [ -n "$local_pack" ]; then
+        pack_selection="$(resh_pack_menu "$rom" select "$local_pack")" || return 1
+        local_pack="${pack_selection%%$'\n'*}"
+        local_pack_preset="${pack_selection#*$'\n'}"
+        if ! pack_error="$(resh_cmd pack-check "$rom" "$local_pack" "$local_pack_preset" "$release_id" "$exe" 2>&1)"; then
+            msgbox "$(i18n resh_title)" "$pack_error"; return 1
+        fi
+        model=local-pack; defaults=none
+    elif [ -n "$community_preset" ]; then
         model=community-preset; defaults=""
     else
         items=(standard "$(i18n resh_model_standard)" retro "$(i18n resh_model_retro)" thomson "$(i18n resh_model_thomson)" manual "$(i18n resh_model_manual)")
         current="$(resh_cmd details "$rom")"
         [ -z "$current" ] || items+=(current "$(i18n resh_model_current)")
         items+=(community "$(community_txt 'Rechercher un preset dans la base communautaire' 'Find a preset in the community catalogue')")
+        items+=(community-pack "$(community_txt 'Rechercher un pack ZIP communautaire' 'Find a community ZIP bundle')")
         items+=(local-pack "$(community_txt 'Installer un pack ReShade local (ZIP ou dossier, add-ons et shaders)' 'Install a local ReShade bundle (ZIP or directory, add-ons and shaders)')")
         model="$(WT_MENU_LIST=1 menu_select "$(i18n resh_title)" "$(i18n resh_model_prompt)" "${items[@]}")" || return 1
         case "$model" in
             standard|retro|thomson|manual) defaults="$(resh_model_packs "$model")" ;;
             community) community_preset="$(community_choose_reshade_preset "$(i18n resh_title)")" || return 1; model=community-preset; defaults=""; apply_community=1 ;;
-            local-pack)
-                pack_selection="$(resh_pack_menu "$rom" select)" || return 1
+            local-pack|community-pack)
+                if [ "$model" = community-pack ]; then
+                    local_pack="$(community_choose_reshade_pack "$(i18n resh_title)")" || return 1
+                fi
+                pack_selection="$(resh_pack_menu "$rom" select "$local_pack")" || return 1
                 local_pack="${pack_selection%%$'\n'*}"
                 local_pack_preset="${pack_selection#*$'\n'}"
                 if ! pack_error="$(resh_cmd pack-check "$rom" "$local_pack" "$local_pack_preset" "$release_id" "$exe" 2>&1)"; then
@@ -553,6 +567,10 @@ resh_pack_menu() {
     local mode="${2:-apply}"
     info="$(resh_cmd pack-status "$rom" 2>>"${WT_SESSION_LOG:-/dev/null}")" || return 1
     if [ "$info" != '{}' ]; then
+        if [ -n "${3:-}" ]; then
+            msgbox "$(i18n resh_title)" "$(community_txt 'Un pack est déjà installé pour ce jeu. Retirez-le depuis Import / Export → Pack local avant d’en installer un autre. Le ZIP téléchargé est conservé.' 'A bundle is already installed for this game. Remove it through Import / Export → Local bundle before installing another. The downloaded ZIP is retained.')"
+            return 1
+        fi
         summary="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(d.get("selected", ""))' "$info")"
         choice="$(menu_select "$(i18n resh_title)" "$(community_txt 'Pack local installé' 'Installed local bundle'): $summary" \
             shaders "$(community_txt 'Vérifier / compléter les shaders de tous les presets' 'Check / complete shaders for all presets')" \
@@ -568,7 +586,8 @@ resh_pack_menu() {
         else msgbox "$(i18n resh_title)" "$output"; fi
         return
     fi
-    archive="$(resh_pack_source)" || return 1
+    archive="${3:-}"
+    [ -n "$archive" ] || archive="$(resh_pack_source)" || return 1
     if ! info="$(resh_cmd pack-info "$archive" 2>&1)"; then msgbox "$(i18n resh_title)" "$info"; return 1; fi
     summary="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("ReShade: "+(d["required_release"] or "full add-on support")); print("Add-ons: "+", ".join(n+" ("+str(a)+" bits)" for n,a in d["addons"].items())); print("Presets ("+str(len(d["presets"]))+"): "+", ".join(d["presets"])); print(str(d["files"])+" files / "+str(round(d["bytes"]/1048576,1))+" MiB")' "$info")" || return
     preset="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["preferred"])' "$info")" || return 1

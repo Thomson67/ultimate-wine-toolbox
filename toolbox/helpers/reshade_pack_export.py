@@ -1,4 +1,4 @@
-"""Prepare portable ReShade ZIPs; never submit binary packs to the text-only API."""
+"""Prepare portable ReShade ZIPs for local transfer or moderated community sharing."""
 import hashlib
 import json
 import os
@@ -235,7 +235,7 @@ def export(home, *, rom=None, local=None, selected=(), addons=(), expected='', g
     payload['uwt-pack.json'] = (json.dumps(public, ensure_ascii=False, indent=2) + '\n').encode()
     payload['README.txt'] = ('UWT ReShade pack / Pack ReShade\n' + title + '\n' + credits + '\n\n'
         'Import via ReShade > Pack local > ZIP. Install the specified ReShade version/API first.\n'
-        'Public community API upload is not supported yet; share this ZIP manually.\n'
+        'Community sharing: submit via ReShade > Community > Share a ReShade bundle.\n'
         'Add-ons were explicitly selected by the author; they are executable Windows modules.\n').encode()
     folder = home / ('exports/reshade-packs' if destination == 'local' else 'exports/community/reshade-packs')
     folder.mkdir(parents=True, exist_ok=True)

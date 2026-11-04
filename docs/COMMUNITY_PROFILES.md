@@ -242,3 +242,22 @@ controller and game behavior is not established by these tests alone. Native
 launcher/game switching and complete community transfer from `.wine` to
 `.wsquashfs` have been confirmed on the reported Batocera
 v44/labwc machine; other combinations remain to be checked.
+
+## Direct ReShade ZIP sharing (0.11.1-dev8 test)
+
+Community → Share a ReShade bundle (ZIP) exports selected presets, active
+shader dependencies and explicitly selected add-ons, then submits the ZIP.
+Find / install a community bundle searches the public pack catalogue and
+opens the existing version/architecture-checked bundle installer. Local
+Import / Export stays separate. ZIPs remain locally available on failed sends.
+
+The separate `/v1/packs` API uses a private R2 binding named PACKS and the D1
+pack_submissions table. Nothing binary enters the legacy INI/AntiMicroX Git
+catalogue. Uploads remain private until approved using the existing moderator
+session. Review downloads validate hashes and inspect members without executing
+add-ons. Moderators can reject submissions and remove published packs.
+
+Limits: 16 MiB compressed, 64 MiB expanded, 4096 members, 32 MiB per file,
+200 presets. Local pack limits remain unchanged. Enable this capability using
+the community repository's service/INSTALLATION_FR.md before trying uploads.
+`/health` advertises reshade-packs only when PACKS storage is bound.
