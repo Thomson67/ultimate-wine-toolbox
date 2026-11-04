@@ -49,7 +49,7 @@ resh_prepare_tools() {
 }
 
 resh_import_ini() {
-    local rom="$1" source="$2" report output hash packs unknown file options selected job log backend_packs
+    local rom="$1" source="$2" mode="${3:-preset}" report output hash packs unknown file options selected job log backend_packs prompt
     local -a choices=() selected_packs=()
     if ! report="$(resh_cmd dependency-check "$rom" "$source" 2>&1)"; then msgbox "$(i18n resh_title)" "$report"; return 1; fi
     hash="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["sha256"])' "$report")" || return 1
@@ -71,7 +71,12 @@ $unknown
 $(community_txt 'Continuer malgré ces dépendances non résolues ? Les effets concernés pourront rester désactivés ou en erreur.' 'Continue despite these unresolved dependencies? These effects may remain disabled or report errors.')" || return 1
     fi
     if [ -n "$packs" ]; then
-        yesno_default_no "$(i18n resh_title)" "$(community_txt 'Installer les packs de shaders manquants avant d’importer le preset ?' 'Install the missing shader packs before importing the preset?')
+        if [ "$mode" = pack ]; then
+            prompt="$(community_txt 'Ajouter les packs de shaders manquants pour tous les presets du pack local ?' 'Add missing shader packs for all presets in the local bundle?')"
+        else
+            prompt="$(community_txt 'Installer les packs de shaders manquants avant d’importer le preset ?' 'Install the missing shader packs before importing the preset?')"
+        fi
+        yesno_default_no "$(i18n resh_title)" "$prompt
 $packs
 
 $(community_txt 'Les packs complets et leurs dépendances seront téléchargés. La version ReShade et les presets existants seront conservés.' 'Complete packs and their dependencies will be downloaded. The ReShade version and existing presets will be retained.')" || return 1
@@ -96,7 +101,9 @@ $(community_txt 'Les packs complets et leurs dépendances seront téléchargés.
             msgbox "$(i18n resh_title)" "$output"; return 1
         fi
     fi
-    if ! output="$(resh_cmd preset "$rom" "$source" "$hash" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; return 1; fi
+    if [ "$mode" != pack ]; then
+        if ! output="$(resh_cmd preset "$rom" "$source" "$hash" 2>&1)"; then msgbox "$(i18n resh_title)" "$output"; return 1; fi
+    fi
 }
 
 resh_model_packs() {
@@ -452,6 +459,7 @@ PY_PENDING
             msgbox "$(i18n resh_title)" "$pack_error"
             return 1
         fi
+        resh_pack_complete_shaders "$rom" || return 1
     fi
     if ! resh_cmd enable "$rom" >> "$log" 2>&1; then
         msgbox "$(i18n resh_title)" "$(i18n resh_failed "$log")"
@@ -544,7 +552,12 @@ resh_pack_menu() {
     if [ "$info" != '{}' ]; then
         summary="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(d.get("selected", ""))' "$info")"
         choice="$(menu_select "$(i18n resh_title)" "$(community_txt 'Pack local installé' 'Installed local bundle'): $summary" \
+            shaders "$(community_txt 'Vérifier / compléter les shaders de tous les presets' 'Check / complete shaders for all presets')" \
             remove "$(community_txt 'Retirer le pack et restaurer les réglages précédents' 'Remove bundle and restore previous settings')" back "$(i18n back)")" || return
+        if [ "$choice" = shaders ]; then
+            resh_pack_complete_shaders "$rom" && msgbox "$(i18n resh_title)" "$(community_txt 'Vérification des shaders du pack terminée. Presets conservés.' 'Bundle shader check completed. Presets retained.')"
+            return
+        fi
         [ "$choice" = remove ] || return
         yesno_default_no "$(i18n resh_title)" "$(community_txt 'Retirer ce pack et restaurer le preset et la configuration précédents ?' 'Remove this bundle and restore the previous preset and configuration?')" || return
         if output="$(resh_cmd pack-remove "$rom" 2>&1)"; then
@@ -566,8 +579,20 @@ $(community_txt 'Installer pour ce jeu les add-ons exécutables et les shaders d
         return 0
     fi
     if output="$(resh_cmd pack-import "$rom" "$archive" "$preset" 2>&1)"; then
+        resh_pack_complete_shaders "$rom" || return 1
         resh_pack_setup_info
     else msgbox "$(i18n resh_title)" "$output"; return 1; fi
+}
+
+resh_pack_complete_shaders() {
+    local rom="$1" source
+    if ! source="$(resh_cmd pack-dependency-source "$rom" 2>&1)"; then
+        msgbox "$(i18n resh_title)" "$source"; return 1
+    fi
+    if ! resh_import_ini "$rom" "$source" pack; then
+        msgbox "$(i18n resh_title)" "$(community_txt 'Le pack reste installé, mais la vérification ou l’ajout des shaders de tous ses presets n’est pas terminé. Reprenez « Vérifier / compléter les shaders de tous les presets » dans Pack ReShade local. Le preset actif est conservé.' 'The bundle remains installed, but checking or adding shaders for all its presets is incomplete. Use “Check / complete shaders for all presets” in Local ReShade bundle to retry. The active preset is retained.')"
+        return 1
+    fi
 }
 
 resh_pack_setup_info() {

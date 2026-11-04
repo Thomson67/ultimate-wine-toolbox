@@ -587,7 +587,7 @@ $output"; fi
 }
 
 community_export_reshade_pack() {
-  local title="$1" rom="${2:-}" choice selected source plan output name author description credits game expected token label
+  local title="$1" rom="${2:-}" choice selected source plan output name author description credits game expected token label checked warnings
   local -a origin=() items=() presets=() addons=() preset_names=() addon_names=()
   choice="$(menu_select "$title" "$(community_txt 'Préparer un pack personnalisé pour partage manuel (ZIP)' 'Prepare a customized bundle for manual sharing (ZIP)')" \
     game "$(community_txt 'Depuis un jeu géré par la Toolbox' 'From a Toolbox-managed game')" \
@@ -603,9 +603,13 @@ community_export_reshade_pack() {
     *) return ;;
   esac
   plan="$(community_cmd reshade-pack-plan "${origin[@]}" 2>&1)" || { msgbox "$title" "$plan"; return 1; }
-  while IFS=$'\t' read -r token label; do
-    [ -n "$token" ] && { preset_names+=("$token"); items+=("${#preset_names[@]}" "$label" on); }
-  done < <(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("\n".join(k+"\t"+v for k,v in d["names"].items()))' "$plan")
+  warnings="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("\n".join(d["names"].get(k,k)+": "+v for k,v in d.get("issues",{}).items()))' "$plan")" || return
+  if [ -n "$warnings" ]; then
+    community_report "$title" "$(community_txt 'Certains presets sont incomplets et ne sont pas cochés par défaut. Vous pouvez exporter les autres presets :' 'Some presets are incomplete and are not selected by default. You can export the other presets:')\n\n$warnings"
+  fi
+  while IFS=$'\t' read -r token label checked; do
+    [ -n "$token" ] && { preset_names+=("$token"); items+=("${#preset_names[@]}" "$label" "$checked"); }
+  done < <(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); default=d.get("default",d.get("preferred","")); issues=d.get("issues",{}); print("\n".join(k+"\t"+v+(" — "+sys.argv[2] if k in issues else "")+"\t"+("on" if k==default and k not in issues else "off") for k,v in d["names"].items()))' "$plan" "$(community_txt 'incomplet' 'incomplete')")
   selected="$(checklist_select "$title" "$(community_txt 'Presets à partager : seuls leurs effets actifs et dépendances résolues seront exportés.' 'Presets to share: only their active effects and resolved dependencies will be exported.')" "${items[@]}")" || return
   while IFS= read -r token; do
     [ -n "$token" ] || continue

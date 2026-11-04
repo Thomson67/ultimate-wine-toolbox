@@ -93,3 +93,7 @@ retain their existing workflow.
 For a directory, select the root containing ReShade.ini and reshade-shaders/Shaders. Required files are copied; the source directory stays unchanged.
 
 Prepare a ReShade bundle for sharing (ZIP), under Community presets: select presets and only the required add-ons. Export includes active effects, their resolved includes/textures, settings, credits and requirements. Dynamic/ambiguous dependencies block export. The ZIP under exports/community/reshade-packs can be shared manually and reimported as a local bundle. No catalogue submission; the current service still only accepts INI presets.
+
+Bundle export: only the valid active preset is selected by default (otherwise, the first valid preset). Incomplete presets are flagged with their dependency and remain unchecked. They do not block exporting other presets; explicitly selecting one still blocks export without changing its effects.
+
+Bundle import: active effects from all imported presets are checked, then recognized missing shader packs are offered. Custom shaders retain priority and the active preset is unchanged. For an existing bundle: Local ReShade bundle > Check / complete shaders for all presets. Cancellation or download failure keeps the bundle installed and completion can be retried. Unknown effects require confirmation and cannot be downloaded automatically.

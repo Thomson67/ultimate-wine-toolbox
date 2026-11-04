@@ -152,7 +152,7 @@ class PresetDependencyUiTests(unittest.TestCase):
         (backend / 'shader_build.sh').write_text('buildGameShaderDir() { mkdir -p "$MAIN_PATH/game-shaders/$1/Merged/Shaders"; printf "technique CAS {}\\n" > "$MAIN_PATH/game-shaders/$1/Merged/Shaders/CAS.fx"; }\n')
         (backend / 'install.sh').write_text('touch "$WT_HOME/UNEXPECTED_RUNTIME_INSTALL"\n')
 
-    def run_import(self, source, consent='0', fail=False):
+    def run_import(self, source, consent='0', fail=False, mode='preset'):
         root = Path(__file__).resolve().parents[1]
         return subprocess.run(['bash', '-c', r'''
 source "$WT_ROOT/modules/community.sh"
@@ -162,10 +162,62 @@ msgbox() { printf '%s\n' "$2" >> "$WT_HOME/messages"; }
 yesno_default_no() { printf '%s\n' "$2" >> "$WT_HOME/confirmations"; return "$CONSENT"; }
 resh_backend_ready() { return 0; }
 resh_prepare_tools() { mkdir -p "$WT_HOME/reshade/bin"; }
-resh_import_ini "$ROM" "$SOURCE"
+if [ "$MODE" = pack ]; then resh_pack_complete_shaders "$ROM"; else resh_import_ini "$ROM" "$SOURCE"; fi
 '''], env=dict(os.environ, WT_ROOT=str(root / 'toolbox'), WT_HOME=str(self.home), WT_LANGUAGE='fr',
               WT_LOG_DIR=str(self.base / 'logs'), ROM=str(self.rom), SOURCE=str(source), CONSENT=consent,
-              FAIL_DOWNLOAD='1' if fail else '0'), text=True, capture_output=True, timeout=15)
+              FAIL_DOWNLOAD='1' if fail else '0', MODE=mode), text=True, capture_output=True, timeout=15)
+
+    def installed_pack_with_extra_variant(self, technique='CAS@CAS.fx'):
+        self.cfg.update(version='6.3.3', release_id='6.3.3-addons', variant='standard-addons')
+        m.save_json(self.config, self.cfg)
+        archive = pack_fixture.LocalReShadePackTests.bundle(self, {'Inactive variant.ini': ('Techniques=' + technique + '\n[CAS.fx]\nAmount=0.42\n').encode()})
+        pack.install(self.home, self.rom, archive, 'Ultra.ini')
+        return pack.dependency_source(self.home, self.rom)
+
+    def test_pack_checks_all_variants_and_downloads_without_switching_active_preset(self):
+        self.backend()
+        source = self.installed_pack_with_extra_variant()
+        self.assertIn('CAS@CAS.fx', source.read_text())
+        self.assertIn('Citra@Citra.fx', source.read_text())
+        active = p.index(self.home, self.rom)['active']
+        before = (self.profile / 'ReShadePreset.ini').read_bytes()
+        runtime = self.runtime.read_bytes()
+        result = self.run_import(source, mode='pack')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(p.index(self.home, self.rom)['active'], active)
+        self.assertEqual((self.profile / 'ReShadePreset.ini').read_bytes(), before)
+        self.assertEqual(self.runtime.read_bytes(), runtime)
+        cfg = m.read_json(self.config)
+        self.assertEqual(cfg['release_id'], '6.3.3-addons')
+        root = Path(cfg['preset_shaders']['root'])
+        self.assertTrue((root / 'Shaders/CAS.fx').is_file())
+        self.assertEqual((root / 'Shaders/Glamayre_Fast_Effects.fx').read_text(), 'custom shader')
+        self.assertEqual(d.analyze(self.home, self.rom, source)['missing'], [])
+        # A new game launch uses the augmented view, and removing the pack restores its predecessor.
+        m.event(self.home, self.rom, 'gameStart')
+        self.assertIn('Combined', (self.game / 'ReShade.ini').read_text())
+        pack.remove(self.home, self.rom)
+        self.assertNotIn('preset_shaders', m.read_json(self.config))
+
+    def test_pack_cancel_or_download_failure_keeps_import_and_active_settings_for_retry(self):
+        self.backend()
+        source = self.installed_pack_with_extra_variant()
+        cfg = self.config.read_bytes()
+        active = (self.profile / 'ReShadePreset.ini').read_bytes()
+        for consent, fail in [('1', False), ('0', True)]:
+            result = self.run_import(source, consent=consent, fail=fail, mode='pack')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(self.config.read_bytes(), cfg)
+            self.assertEqual((self.profile / 'ReShadePreset.ini').read_bytes(), active)
+            self.assertIn('Le pack reste installé', (self.home / 'messages').read_text())
+
+    def test_pack_unknown_effect_in_non_active_variant_requires_explicit_confirmation(self):
+        source = self.installed_pack_with_extra_variant('DoNothing@FastFourierTransform.fx')
+        result = self.run_import(source, consent='1', mode='pack')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('FastFourierTransform.fx', (self.home / 'confirmations').read_text())
+        self.assertTrue(m.read_json(self.config)['pack'])
+        self.assertNotIn('preset_shaders', m.read_json(self.config))
 
     def test_managed_ini_downloads_missing_effect_before_import_without_dll_install(self):
         self.backend()

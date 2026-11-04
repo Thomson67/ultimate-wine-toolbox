@@ -111,7 +111,16 @@ def source(home, rom=None, local=None):
 
 
 def plan(home, rom=None, local=None):
-    _, context = source(home, rom, local)
+    files, context = source(home, rom, local)
+    issues = {}
+    for name in context['names']:
+        try:
+            dependencies(files, [name])
+        except (ValueError, UnicodeError) as error:
+            issues[name] = str(error)
+    valid = [name for name in context['names'] if name not in issues]
+    context['issues'] = issues
+    context['default'] = context['preferred'] if context['preferred'] in valid else next(iter(valid), '')
     return context
 
 
@@ -136,8 +145,10 @@ def dependencies(files, selected):
             if len(matches) == 1:
                 return matches[0]
         matches = [n for n in files if n.startswith(base) and (n.casefold().endswith('/' + value.casefold()) or n.casefold() == (base + value).casefold())]
-        if len(matches) != 1:
-            raise ValueError('missing or ambiguous shader dependency: ' + value)
+        if not matches:
+            raise ValueError('missing shader dependency: ' + value)
+        if len(matches) > 1:
+            raise ValueError('ambiguous shader dependency: ' + value + ' (' + ', '.join(sorted(matches)) + ')')
         return matches[0]
 
     def visit(name):
@@ -161,18 +172,21 @@ def dependencies(files, selected):
             visit(resolve(match[1], texture=True))
 
     for name in selected:
-        parser = pack.ini(files[name], True)
-        for technique in parser['UWT_PRESET'].get('Techniques', '').split(','):
-            technique = technique.strip()
-            if not technique:
-                continue
-            if '@' in technique:
-                visit(resolve(technique.split('@', 1)[1]))
-            else:
-                matches = [n for n in effects if re.search(r'\btechnique\d*\s+' + re.escape(technique) + r'\b', files[n].decode('utf-8-sig'))]
-                if len(matches) != 1:
-                    raise ValueError('missing or ambiguous active technique: ' + technique)
-                visit(matches[0])
+        try:
+            parser = pack.ini(files[name], True)
+            for technique in parser['UWT_PRESET'].get('Techniques', '').split(','):
+                technique = technique.strip()
+                if not technique:
+                    continue
+                if '@' in technique:
+                    visit(resolve(technique.split('@', 1)[1]))
+                else:
+                    matches = [n for n in effects if re.search(r'\btechnique\d*\s+' + re.escape(technique) + r'\b', files[n].decode('utf-8-sig'))]
+                    if len(matches) != 1:
+                        raise ValueError('missing or ambiguous active technique: ' + technique)
+                    visit(matches[0])
+        except (ValueError, UnicodeError) as error:
+            raise ValueError('preset ' + name + ': ' + str(error)) from error
     if not any(n.lower().endswith('.fx') for n in result):
         raise ValueError('selected presets contain no active shader')
     return result

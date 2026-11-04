@@ -271,6 +271,34 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
     return meta
 
 
+def dependency_source(home, rom):
+    """Inspect every current variant of the installed pack without activating it."""
+    import reshade_presets as presets
+    from reshade_preset_dependencies import configuration, idle
+    cfg = configuration(home, rom)
+    if not cfg.get('pack'):
+        raise ValueError('no local ReShade pack installed')
+    idle(home, rom, cfg)
+    presets.sync(home, rom)
+    context = manifest(home, rom)['archive_sha256']
+    techniques, names = [], []
+    for identity, item in presets.index(home, rom)['items'].items():
+        if item.get('pack', '') != context:
+            continue
+        parser = ini(presets.path(home, rom, identity).read_bytes(), True)
+        names.append(item['name'])
+        for technique in parser['UWT_PRESET'].get('Techniques', '').split(','):
+            technique = technique.strip()
+            if technique and technique not in techniques:
+                techniques.append(technique)
+    if not names:
+        raise ValueError('no preset variants remain for this pack')
+    target = profile(home, rom) / 'pack/dependency-check.ini'
+    # This synthetic INI is only an input to dependency analysis, never a game preset.
+    m.atomic_bytes(target, ('Techniques=' + ','.join(techniques) + '\n').encode())
+    return target
+
+
 def remove(home, rom, runner='', bottles=Path('/userdata/system/wine-bottles/windows'), legacy=False):
     config_path = home / 'reshade/games' / (m.key(rom) + '.json')
     cfg = m.read_json(config_path)

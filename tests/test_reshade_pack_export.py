@@ -78,6 +78,32 @@ class PackExportTests(unittest.TestCase):
         self.assertNotIn('my.addon64', files)
         self.assertIn('reshade-shaders/Shaders/Citra.fx', files)
 
+    def test_unrelated_incomplete_preset_is_reported_but_does_not_block_valid_export(self):
+        source = self.source({'ReShadePreset.ini': b'Techniques=DoNothing@FastFourierTransform.fx\n'})
+        plan = export.plan(self.home, local=source)
+        self.assertEqual(plan['default'], 'My preset.ini')
+        self.assertNotIn('My preset.ini', plan['issues'])
+        self.assertIn('FastFourierTransform.fx', plan['issues']['ReShadePreset.ini'])
+        path = self.prepare(source)
+        self.assertNotIn('ReShadePreset.ini', pack.archive(path)[0])
+        with self.assertRaisesRegex(ValueError, r'preset ReShadePreset.ini: missing shader dependency: FastFourierTransform.fx'):
+            self.prepare(source, selected=['My preset.ini', 'ReShadePreset.ini'])
+        # A broken active/default preset is never preselected instead of a valid one.
+        self.source({'ReShade.ini': b'[GENERAL]\nPresetPath=ReShadePreset.ini\n',
+                     'ReShadePreset.ini': b'Techniques=DoNothing@FastFourierTransform.fx\n'})
+        self.assertEqual(export.plan(self.home, local=source)['default'], 'My preset.ini')
+
+    def test_ambiguous_dependency_lists_candidates_instead_of_claiming_missing(self):
+        source = self.source({'My preset.ini': b'Techniques=DoNothing@FastFourierTransform.fx\n',
+                             'reshade-shaders/Shaders/A/FastFourierTransform.fx': b'technique DoNothing {}',
+                             'reshade-shaders/Shaders/B/FastFourierTransform.fx': b'technique DoNothing { /* different */ }'})
+        issue = export.plan(self.home, local=source)['issues']['My preset.ini']
+        self.assertIn('ambiguous shader dependency:', issue)
+        self.assertIn('Shaders/A/FastFourierTransform.fx', issue)
+        self.assertIn('Shaders/B/FastFourierTransform.fx', issue)
+        with self.assertRaisesRegex(ValueError, 'ambiguous shader dependency:'):
+            self.prepare(source)
+
     def test_presets_union_and_explicit_no_addons(self):
         path = self.prepare(self.source(), selected=['My preset.ini', 'Other.ini'], addons=[])
         files, meta = pack.archive(path)
@@ -144,10 +170,6 @@ class PackExportTests(unittest.TestCase):
                              game='Game', title='Minimal', author='Player', credits='Own creation')
         self.assertNotIn('reshade-shaders/Shaders/Huge.fx', pack.archive(path)[0])
 
-
-if __name__ == '__main__':
-    unittest.main()
-
 class PackExportUiTests(unittest.TestCase):
     def test_checklists_preserve_spaces_and_never_send_to_text_service(self):
         import os
@@ -155,14 +177,16 @@ class PackExportUiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             args = Path(tmp) / 'args.json'
             plan = {'names': {'My preset.ini': 'My custom preset', 'Other.ini': 'Other'},
-                    'addons': {'my addon.addon64': 64, 'unused.addon64': 64}, 'sha256': 'abc'}
+                    'addons': {'my addon.addon64': 64, 'unused.addon64': 64}, 'sha256': 'abc',
+                    'default': 'My preset.ini', 'issues': {'Other.ini': 'preset Other.ini: missing shader dependency: FastFourierTransform.fx'}}
             script = r'''
 source "$ROOT/toolbox/modules/community.sh"
 community_txt() { printf '%s' "$1"; }
 i18n() { printf '%s' "$1"; }
 menu_select() { printf source; }
 resh_pack_source() { printf '/userdata/My custom folder'; }
-checklist_select() { printf '1\n'; }
+checklist_select() { printf '%s\n' "$@" >> "$CHECKLIST"; printf '1\n'; }
+community_report() { :; }
 input_text() { printf 'Public value'; }
 yesno_default_no() { return 0; }
 msgbox() { :; }
@@ -178,7 +202,7 @@ community_export_reshade_pack Title
 '''
             result = subprocess.run(['bash', '-c', script], text=True, capture_output=True,
                                     env=dict(os.environ, ROOT=str(Path(__file__).resolve().parents[1]),
-                                             PLAN=json.dumps(plan), ARGS=str(args)))
+                                             PLAN=json.dumps(plan), ARGS=str(args), CHECKLIST=str(Path(tmp)/'checklist')))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stderr, '')
             actual = json.loads(args.read_text())
@@ -186,3 +210,11 @@ community_export_reshade_pack Title
             self.assertEqual(actual[actual.index('--addon') + 1], 'my addon.addon64')
             self.assertNotIn('Other.ini', actual)
             self.assertNotIn('unused.addon64', actual)
+            choices = (Path(tmp)/'checklist').read_text()
+            self.assertIn('1\nMy custom preset\non', choices)
+            self.assertIn('2\nOther — incomplet\noff', choices)
+            self.assertIn('1\nmy addon.addon64 (64 bits)\noff', choices)
+
+
+if __name__ == '__main__':
+    unittest.main()

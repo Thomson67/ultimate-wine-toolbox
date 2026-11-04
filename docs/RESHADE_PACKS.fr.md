@@ -276,7 +276,12 @@ clones locaux simulés pour vérifier le chemin de téléchargement/fusion seul.
 
 Dans **ReShade → Presets communautaires → Préparer un pack ReShade pour partage
 (ZIP)**, choisir un jeu géré par la Toolbox ou un ZIP/dossier personnalisé.
-Fermer le jeu avant d’exporter ses réglages. Cocher les presets à partager, puis
+Fermer le jeu avant d’exporter ses réglages. Le preset actif est seul coché par
+défaut ; s’il est incomplet, le premier preset valide est proposé. Les presets
+incomplets restent visibles et marqués, avec le nom du fichier manquant ou les
+candidats ambigus. Ils ne bloquent pas l’export des autres presets. Un preset
+incomplet explicitement sélectionné provoque toujours un refus : ses effets
+ne sont pas supprimés silencieusement. Cocher les presets à partager, puis
 uniquement les add-ons indispensables : aucun add-on n’est coché par défaut,
 les modules désactivés sont exclus et l’utilisation d’un add-on ne peut pas être
 déduite d’un preset. Le couple Citra.fx/citra.addon connu est contrôlé.
@@ -316,3 +321,33 @@ L’export ne modifie pas les sources. Le service communautaire en ligne actuel
 accepte uniquement les petits profils texte : cette préparation n’envoie aucun
 pack au catalogue. Le partage manuel du ZIP est disponible ; la réception,
 le stockage et la modération des packs binaires restent à ajouter au service.
+
+## Compléter les shaders de tous les presets à l’import
+
+Après l’import d’un ZIP ou dossier, y compris depuis l’installation initiale,
+UWT contrôle les effets actifs de **toutes les variantes importées**, sans les
+activer successivement ni modifier le choix courant. Les packs de shaders
+manquants reconnus sont proposés au téléchargement. Les sources ambiguës
+nécessitent un choix ; les effets non reconnus restent signalés et une
+confirmation explicite est nécessaire pour continuer avec ces manques.
+
+Les ajouts utilisent le backend de shaders déjà vérifié, sans changer la DLL,
+la version de ReShade ou les paramètres des presets. La vue combinée conserve
+la priorité des shaders/includes/textures personnalisés du pack. Les copies
+supplémentaires sont propres au jeu. Le contrôle porte sur les fichiers FX des
+effets actifs ; il ne prouve pas leur compilation GPU ni le fonctionnement
+d’un add-on. Une dépendance privée ou absente du catalogue n’est pas téléchargée
+au hasard. L’export continue de vérifier ses dépendances statiques plus fines.
+
+Pour un pack déjà installé, choisir **Pack ReShade local → Vérifier / compléter
+les shaders de tous les presets**. Une annulation ou un échec laisse le pack
+installé, signale que le complément n’est pas terminé et permet de réessayer.
+Les réglages et le preset actif sont conservés ; les téléchargements achevés
+sont vérifiés avant publication de la nouvelle vue. Retirer le pack restaure
+le contexte de shaders antérieur.
+
+Dans l’archive Henriko utilisée pour les essais, `ReShadePreset.ini` référence
+notamment `FastFourierTransform.fx`, absent du ZIP et de notre index de packs.
+Les trois variantes Henriko N64, Ultra et Vibrant ont leurs dépendances dans le
+ZIP. L’import ne supprime pas les références du preset générique incomplet et
+ne présente pas son téléchargement comme résolu automatiquement.

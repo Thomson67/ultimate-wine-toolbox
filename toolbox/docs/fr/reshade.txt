@@ -93,3 +93,7 @@ existants ont priorité. Les injecteurs intégrés non gérés gardent leur parc
 Pour un dossier, sélectionner la racine contenant ReShade.ini et reshade-shaders/Shaders. Les fichiers utiles sont copiés ; le dossier source reste intact.
 
 Préparer un pack ReShade pour partage (ZIP), dans Presets communautaires : sélectionner les presets et les seuls add-ons requis. Seuls les effets actifs, leurs inclusions et textures résolues sont exportés, avec les réglages, crédits et prérequis. Les dépendances dynamiques/ambiguës bloquent l’export. Le ZIP créé dans exports/community/reshade-packs se partage manuellement et se réimporte comme pack local. Aucun envoi au catalogue, dont le service reste limité aux presets INI.
+
+Export de pack : seul le preset actif valide est coché par défaut (sinon, le premier valide). Les presets incomplets sont signalés avec leur dépendance et restent décochés. Ils ne bloquent pas l’export des autres presets ; les sélectionner bloque toujours l’export sans modifier leurs effets.
+
+Import de pack : les effets actifs de tous les presets sont vérifiés après import, puis les packs manquants reconnus sont proposés. Les shaders personnalisés gardent la priorité et le preset actif reste choisi. Pour un pack existant : Pack ReShade local > Vérifier / compléter les shaders de tous les presets. Si vous annulez ou si un téléchargement échoue, le pack reste installé et le complément peut être repris. Les effets inconnus nécessitent une confirmation ; ils ne peuvent pas être téléchargés automatiquement.
