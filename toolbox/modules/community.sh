@@ -16,7 +16,7 @@ community_report() {
     msgbox "$title" "$content"
   fi
   rm -f -- "$report"
-}
+} >&2
 
 community_import_actions() {
   local kind="$1" path="$2" title="$3" rom="${4:-}" choice output details selected launcher_notice old_profile
@@ -812,11 +812,23 @@ $output"; fi
 }
 
 
+# Selectors return a path on stdout; keep the terminal display separate.
+community_pack_progress() {
+  local title="$1" message="$2"
+  if have_dialog; then
+    dialog --no-shadow --title "$title" --infobox "$message" 8 76 >&2 || true
+  else
+    printf '%s\n' "$message" >&2
+  fi
+}
+
 community_fetch_reshade_pack() {
   local title="$1" id="$2" details output
+  community_pack_progress "$title" "$(community_txt 'Lecture de la fiche du pack…' 'Loading bundle details…')"
   details="$(community_packs_cmd show "$id" 2>&1)" || { msgbox "$title" "$details"; return 1; }
   community_report "$title" "$details"
   yesno_default_no "$title" "$(community_txt 'Télécharger ce pack ? Les add-ons sélectionnés par son auteur sont des modules exécutables. Vérifiez les crédits et la version ReShade requise.' 'Download this bundle? Author-selected add-ons are executable modules. Check credits and the required ReShade version.')" || return 1
+  community_pack_progress "$title" "$(community_txt 'Téléchargement et vérification du pack ReShade…' 'Downloading and verifying the ReShade bundle…')"
   output="$(community_packs_cmd fetch "$id" 2>&1)" || { msgbox "$title" "$output"; return 1; }
   printf '%s\n' "$output"
 }
@@ -827,7 +839,7 @@ community_apply_reshade_pack() {
     selected="$(community_pick_game "$title")" || return
     rom="${selected%%$'\t'*}"
   fi
-  state="$(resh_cmd status "$rom")" || return
+  state="$(resh_cmd status "$rom" 2>&1)" || { msgbox "$title" "$state"; return 1; }
   if [ "$state" = missing ]; then
     resh_install_game "$rom" "" "" "$path"
   else

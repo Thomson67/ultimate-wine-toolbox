@@ -83,7 +83,7 @@ class Packs(Service):
         try:
             if self.transport:
                 return self.transport(request)
-            with urllib.request.build_opener(NoRedirect()).open(request, timeout=180) as response:
+            with urllib.request.build_opener(NoRedirect()).open(request, timeout=45 if data is None else 180) as response:
                 raw = response.read((ZIP_LIMIT if data is None else 8192)+1)
             if len(raw) > (ZIP_LIMIT if data is None else 8192):
                 raise ValueError('Community pack response too large')
@@ -95,7 +95,9 @@ class Packs(Service):
             except (ValueError, AttributeError): message = ''
             message = ''.join(c for c in str(message) if ord(c) >= 32 and ord(c) != 127)[:300]
             raise ServiceError(f'Community pack HTTP {error.code}: {message}', error.code) from None
-        except (TimeoutError, urllib.error.URLError):
+        except TimeoutError:
+            raise ValueError('Community pack transfer timed out; retry the download or submission') from None
+        except urllib.error.URLError:
             raise ValueError('Community pack service unreachable; local ZIP preserved') from None
 
     def submit_pack(self, path):
@@ -123,7 +125,7 @@ class Packs(Service):
         return [r for r in rows if query.casefold() in ' '.join(str(r.get(k, '')) for k in ('game', 'title', 'author')).casefold()]
 
     def metadata(self, ident, review=False):
-        value = self.request('/v1/packs/'+identifier(ident), authenticated=review)
+        value = self.request('/v1/packs/'+identifier(ident), authenticated=review, timeout=20)
         metadata = value.get('metadata', {})
         if metadata.get('id') != ident or metadata.get('sha256') != ident[5:]:
             raise ValueError('Invalid community pack metadata')

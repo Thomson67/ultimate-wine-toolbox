@@ -69,3 +69,22 @@ community_catalog_rows reshade Community Zelda > "$WT_HOME/partial"
         self.assertIn('ini-id\tZelda — Preset Ultra\tZelda', files['list'])
         self.assertEqual(files['partial'].strip(), 'ini-id\tZelda — Preset Ultra\tZelda')
         self.assertIn('unavailable', files['messages'])
+
+    def test_pack_fetch_displays_progress_without_polluting_returned_path(self):
+        files = self.shell(r'''
+have_dialog() { return 0; }
+wt_clear_tty() { :; }
+dialog() { printf 'screen: %s\n' "$*"; }
+yesno_default_no() { return 0; }
+community_packs_cmd() {
+ case "$1" in
+  show) printf '%s\n' 'Zelda — Pack details' ;;
+  fetch) printf '%s\n' '/tmp/Zelda pack.zip' ;;
+  *) return 99 ;;
+ esac
+}
+community_fetch_reshade_pack Community pack-id > "$WT_HOME/path" 2> "$WT_HOME/screen"
+''')
+        self.assertEqual(files['path'].strip(), '/tmp/Zelda pack.zip')
+        self.assertIn('--textbox', files['screen'])
+        self.assertIn('Téléchargement et vérification', files['screen'])
