@@ -144,7 +144,7 @@ def merge(base, extra, destination):
     for part in ('Shaders', 'Textures'):
         (destination / part).mkdir(parents=True, exist_ok=True)
     seen, effects = set(), set()
-    for number, root in enumerate((base, extra)):
+    for root in (base, extra):
         groups = [sorted((root / part).rglob('*')) for part in ('Shaders', 'Textures')]
         groups.append(sorted(root.glob('*.fxh')))
         for sources in groups:
@@ -154,7 +154,7 @@ def merge(base, extra, destination):
                 rel = source.relative_to(root)
                 name = rel.as_posix().casefold()
                 effect = source.name.casefold() if source.suffix.lower() == '.fx' else ''
-                if name in seen or (number and effect and effect in effects):
+                if name in seen or (effect and effect in effects):
                     continue
                 target = destination / rel
                 target.parent.mkdir(parents=True, exist_ok=True)

@@ -130,7 +130,7 @@ class PresetDependencyTests(unittest.TestCase):
         original_view = dict(cfg['preset_shaders'])
         archive = pack_fixture.LocalReShadePackTests.bundle(self)
         pack.install(self.home, self.rom, archive, 'Ultra.ini')
-        self.assertNotIn('preset_shaders', m.read_json(self.config))
+        self.assertNotEqual(m.read_json(self.config)['preset_shaders'], original_view)
         pack.remove(self.home, self.rom)
         self.assertEqual(m.read_json(self.config)['preset_shaders'], original_view)
         self.assertEqual(d.analyze(self.home, self.rom, source)['missing'], [])
@@ -250,7 +250,7 @@ if [ "$MODE" = pack ]; then resh_pack_complete_shaders "$ROM"; else resh_import_
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('UnknownPrivate.fx', (self.home / 'confirmations').read_text())
         self.assertTrue(m.read_json(self.config)['pack'])
-        self.assertNotIn('preset_shaders', m.read_json(self.config))
+        self.assertIn('pack-shaders', m.read_json(self.config)['preset_shaders']['root'])
 
     def test_managed_ini_downloads_missing_effect_before_import_without_dll_install(self):
         self.backend()

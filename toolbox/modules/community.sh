@@ -166,15 +166,55 @@ Backups: $output
 Use the game’s ReShade menu to restore previous settings.")"
 }
 
-# Return a validated downloaded INI path for use by the standard installation wizard.
+# Merge both services for presentation; identifiers keep their original type.
+community_catalog_rows() {
+  local kind="$1" title="$2" query="${3:-}" mode="${4:-public}" left right left_rc=0 right_rc=0 id label game
+  if [ "$mode" = public ]; then
+    left="$(community_cmd list "$kind" --query "$query" --with-game 2>&1)" || left_rc=$?
+  else
+    left="$(community_service_cmd "$mode" "$kind" 2>&1)" || left_rc=$?
+  fi
+  if [ "$kind" = reshade ]; then
+    if [ "$mode" = pending ]; then right="$(community_packs_cmd pending 2>&1)" || right_rc=$?;
+    else right="$(community_packs_cmd list --query "$query" --with-game 2>&1)" || right_rc=$?; fi
+  else right=""; fi
+  if [ "$left_rc" -ne 0 ]; then msgbox "$title" "$(community_txt 'Catalogue des presets indisponible :' 'Preset catalogue unavailable:') $left" >&2; left=""; fi
+  if [ "$right_rc" -ne 0 ]; then msgbox "$title" "$(community_txt 'Catalogue des packs indisponible :' 'Bundle catalogue unavailable:') $right" >&2; right=""; fi
+  if [ "$left_rc" -ne 0 ] && { [ "$kind" != reshade ] || [ "$right_rc" -ne 0 ]; }; then return 1; fi
+  {
+    [ -z "$left" ] || printf '%s\n' "$left"
+    while IFS=$'\t' read -r id label game; do
+      [ -n "$id" ] || continue
+      if [ "$mode" = public ]; then printf 'zip:%s\t%s [Pack ZIP]\t%s\n' "$id" "$label" "$game";
+      else printf 'zip:%s\t%s [Pack ZIP]\n' "$id" "$label"; fi
+    done <<< "$right"
+  } | LC_ALL=C sort -t $'\t' -k2,2f
+}
+
+community_review_cmd() {
+  local action="$1" kind="$2" id="$3" checksum="${4:-}"
+  if [ "$kind" = reshade ] && [[ "$id" = zip:* ]]; then
+    id="${id#zip:}"
+    case "$action" in
+      review|published-review) community_packs_cmd review "$id" ;;
+      remove-published) community_packs_cmd remove "$id" "$checksum" ;;
+      approve|reject) community_packs_cmd "$action" "$id" "$checksum" ;;
+      *) return 1 ;;
+    esac
+  elif [ -n "$checksum" ]; then community_service_cmd "$action" "$kind" "$id" "$checksum";
+  else community_service_cmd "$action" "$kind" "$id"; fi
+}
+
+# Return a validated INI or ZIP for the installation wizard.
+
 community_choose_reshade_preset() {
-  local title="$1" query="" rows id label choice info path
+  local title="$1" query="" rows id label game choice info path
   local -a items=()
   while true; do
-    rows="$(community_cmd list reshade --query "$query" 2>&1)" || { msgbox "$title" "$rows"; return 1; }
+    rows="$(community_catalog_rows reshade "$title" "$query")" || return 1
     items=()
-    while IFS=$'\t' read -r id label; do [ -z "$id" ] || items+=("$id" "$label"); done <<< "$rows"
-    choice="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir un preset communautaire ReShade' 'Choose a community ReShade preset')" \
+    while IFS=$'\t' read -r id label game; do [ -z "$id" ] || items+=("$id" "$label"); done <<< "$rows"
+    choice="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir une configuration ReShade — [Pack ZIP] si inclus' 'Choose a ReShade configuration — [Pack ZIP] if bundled')" \
       search "$(community_txt 'Rechercher un jeu ou un auteur' 'Search for a game or author')" \
       refresh "$(community_txt 'Mettre à jour la liste' 'Refresh the list')" "${items[@]}" back "$(i18n back)")" || return 1
     case "$choice" in
@@ -182,6 +222,10 @@ community_choose_reshade_preset() {
       search) query="$(input_text "$title" "$(community_txt 'Jeu, nom du preset ou auteur' 'Game, preset title or author')" "$query")" || return 1; continue ;;
       refresh) info="$(community_cmd refresh --kind reshade 2>&1)" || msgbox "$title" "$info"; continue ;;
     esac
+    if [[ "$choice" = zip:* ]]; then
+      path="$(community_fetch_reshade_pack "$title" "${choice#zip:}")" || continue
+      printf '%s' "$path"; return 0
+    fi
     info="$(community_cmd show reshade "$choice" 2>&1)" || { msgbox "$title" "$info"; continue; }
     yesno "$title" "$info"$'\n\n'"$(community_txt 'Utiliser ce preset pour cette installation ? Les packs d’effets seront identifiés à partir du preset.' 'Use this preset for this installation? Shader packs will be identified from the preset.')" || continue
     path="$(community_cmd fetch reshade "$choice" 2>&1)" || { msgbox "$title" "$path"; continue; }
@@ -499,13 +543,13 @@ community_review_pending() {
   local kind="$1" title="$2" rows selected output review checksum choice
   local -a items=()
   while true; do
-    if ! rows="$(community_service_cmd pending "$kind" 2>&1)"; then msgbox "$title" "$rows"; return 0; fi
+    rows="$(community_catalog_rows "$kind" "$title" "" pending)" || return 0
     [ -n "$rows" ] || { msgbox "$title" "$(community_txt 'Aucune proposition en attente.' 'No pending contributions.')"; return 0; }
     items=()
     while IFS=$'\t' read -r selected output; do items+=("$selected" "$output"); done <<< "$rows"
     selected="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Propositions à valider — pseudo non vérifié' 'Contributions for review — unverified nickname')" "${items[@]}" back "$(i18n back)")" || return 0
     [ "$selected" != back ] || return 0
-    review="$(community_service_cmd review "$kind" "$selected" 2>&1)" || { msgbox "$title" "$review"; continue; }
+    review="$(community_review_cmd review "$kind" "$selected" 2>&1)" || { msgbox "$title" "$review"; continue; }
     checksum="${review%%$'\n'*}"
     community_report "$title" "${review#*$'\n'}"
     choice="$(menu_select "$title" "$(community_txt 'Décision pour cette contribution' 'Decision for this contribution')" \
@@ -515,7 +559,7 @@ community_review_pending() {
     if [ "$choice" = approve ]; then
       yesno "$title" "$(community_txt 'Publier ce partage dans la liste communautaire ? Il deviendra accessible à tous les joueurs.' 'Publish this submission in the community catalogue? It will become available to all players.')" || continue
     else yesno "$title" "$(community_txt 'Refuser ce partage ? Il ne sera pas publié.' 'Reject this submission? It will not be published.')" || continue; fi
-    if output="$(community_service_cmd "$choice" "$kind" "$selected" "$checksum" 2>&1)"; then
+    if output="$(community_review_cmd "$choice" "$kind" "$selected" "$checksum" 2>&1)"; then
       msgbox "$title" "$(community_txt "Décision enregistrée : $output" "Decision saved: $output")"
     else msgbox "$title" "$output"; fi
   done
@@ -525,20 +569,20 @@ community_remove_published() {
   local kind="$1" title="$2" rows selected label output review checksum
   local -a items=()
   while true; do
-    rows="$(community_service_cmd published "$kind" 2>&1)" || { msgbox "$title" "$rows"; return 0; }
+    rows="$(community_catalog_rows "$kind" "$title" "" published)" || return 0
     [ -n "$rows" ] || { msgbox "$title" "$(community_txt 'Aucun partage publié pour cet outil.' 'No published submissions for this tool.')"; return 0; }
     items=()
     while IFS=$'\t' read -r selected label; do items+=("$selected" "$label"); done <<< "$rows"
     selected="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir le partage à retirer de la liste communautaire' 'Choose a submission to remove from the community catalogue')" "${items[@]}" back "$(i18n back)")" || return 0
     case "$selected" in ''|back) return 0 ;; esac
-    review="$(community_service_cmd published-review "$kind" "$selected" 2>&1)" || { msgbox "$title" "$review"; continue; }
+    review="$(community_review_cmd published-review "$kind" "$selected" 2>&1)" || { msgbox "$title" "$review"; continue; }
     checksum="${review%%$'\n'*}"
     if ! yesno_default_no "$title" "${review#*$'\n'}"$'\n\n'"$(community_txt 'Retirer ce partage du catalogue ?
 
-Son fichier et sa fiche seront supprimés du dépôt communautaire. Les profils déjà installés chez les joueurs restent conservés.' 'Remove this submission from the catalogue?
+Il ne sera plus proposé aux autres joueurs. Les configurations déjà installées restent conservées.' 'Remove this submission from the catalogue?
 
-Its file and catalogue entry will be deleted from the community repository. Profiles already installed by players are retained.')"; then continue; fi
-    if output="$(community_service_cmd remove-published "$kind" "$selected" "$checksum" 2>&1)"; then
+It will no longer be offered to other players. Already installed configurations are retained.')"; then continue; fi
+    if output="$(community_review_cmd remove-published "$kind" "$selected" "$checksum" 2>&1)"; then
       # Refresh this machine immediately; other users see removal on their next refresh.
       if community_cmd refresh --kind "$kind" >/dev/null 2>&1; then
         msgbox "$title" "$(community_txt 'Partage retiré. La liste communautaire est à jour.' 'Submission removed. The community list is up to date.')"
@@ -557,15 +601,11 @@ community_validate() (
   wt_clear_tty
   [ "$result" -eq 0 ] || { msgbox "$title" "$output"; return 0; }
   trap 'community_service_cmd logout >/dev/null 2>&1 || true' EXIT
-  local -a pack_options=()
-  [ "$kind" != reshade ] || pack_options=(packs "$(community_txt 'Examiner les packs ReShade ZIP' 'Review ReShade ZIP bundles')" remove-packs "$(community_txt 'Retirer un pack ReShade publié' 'Remove a published ReShade bundle')")
   while true; do
     choice="$(menu_select "$title" "$(community_txt 'Gestion des partages communautaires' 'Manage community submissions')" \
       pending "$(community_txt 'Examiner les partages en attente' 'Review pending submissions')" \
-      published "$(community_txt 'Retirer un partage déjà publié' 'Remove a published submission')" "${pack_options[@]}" back "$(i18n back)")" || return 0
+      published "$(community_txt 'Retirer un partage déjà publié' 'Remove a published submission')" back "$(i18n back)")" || return 0
     case "$choice" in
-      packs) community_review_reshade_packs "$title" pending ;;
-      remove-packs) community_review_reshade_packs "$title" published ;;
       pending) community_review_pending "$kind" "$title" ;;
       published) community_remove_published "$kind" "$title" ;;
       *) return 0 ;;
@@ -698,14 +738,14 @@ community_menu() {
   local -a import_options=() management_options=()
   if [ "$kind" = antimicrox ]; then title="AntiMicroX — $(community_txt 'Profils communautaires' 'Community profiles')"; else title="ReShade — $(community_txt 'Presets communautaires' 'Community presets')"; fi
   if [ "$kind" = reshade ]; then
-    share_label="$(community_txt 'Partager mon preset ReShade' 'Share my ReShade preset')"
-    import_options=(browse-packs "$(community_txt 'Rechercher / installer un pack communautaire' 'Find / install a community bundle')" export-pack "$(community_txt 'Partager un pack ReShade (ZIP)' 'Share a ReShade bundle (ZIP)')" import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')")
+    share_label="$(community_txt 'Partager ma configuration ReShade' 'Share my ReShade configuration')"
+    import_options=(import "$(community_txt 'Importer un paquet ZIP' 'Import a ZIP package')")
     management_options=(validate "$(community_txt 'Valider les partages (modérateurs)' 'Review submissions (moderators)')"
       forget "$(community_txt 'Retirer l’accès modérateur de ce PC' 'Remove moderator access from this PC')")
-    browse_label="$(community_txt 'Voir les presets disponibles' 'Browse available presets')"
-    intro="$(community_txt 'Un preset contient les réglages visuels de ReShade. Téléchargez ceux d’autres joueurs ou partagez les vôtres. Un modérateur valide les partages avant publication.' 'A preset contains ReShade visual settings. Download presets from other players or share yours. A moderator reviews submissions before publication.')"
-    empty_label="$(community_txt 'Aucun preset ReShade trouvé. Actualisez le catalogue ou partagez votre preset.' 'No ReShade preset found. Refresh the catalogue or share your preset.')"
-    count_label="$(community_txt 'presets ReShade' 'ReShade presets')"
+    browse_label="$(community_txt 'Voir les configurations disponibles' 'Browse available configurations')"
+    intro="$(community_txt 'Téléchargez ou partagez des configurations ReShade. La mention [Pack ZIP] indique les partages incluant des shaders et éventuellement des add-ons. Un modérateur valide les partages avant publication.' 'Download or share ReShade configurations. [Pack ZIP] marks contributions including shaders and optionally add-ons. A moderator reviews submissions before publication.')"
+    empty_label="$(community_txt 'Aucune configuration ReShade trouvée. Actualisez le catalogue ou partagez la vôtre.' 'No ReShade configuration found. Refresh the catalogue or share yours.')"
+    count_label="$(community_txt 'configurations ReShade' 'ReShade configurations')"
     search_prompt="$(community_txt 'Jeu, nom du preset ReShade ou auteur' 'Game, ReShade preset title or author')"
   else
     share_label="$(community_txt 'Partager et transférer des profils' 'Share and transfer profiles')"
@@ -725,15 +765,19 @@ community_menu() {
       "${management_options[@]}" back "$(i18n back)")" || return 0
     case "$choice" in
       refresh)
-        if output="$(community_cmd refresh --kind "$kind" 2>&1)"; then msgbox "$title" "$(community_txt "Catalogue actualisé : $output $count_label." "Catalogue refreshed: $output $count_label.")"; else msgbox "$title" "$(community_txt 'Actualisation impossible ; le cache précédent reste disponible.' 'Refresh failed; the previous cache remains available.')
+        if output="$(community_cmd refresh --kind "$kind" 2>&1)"; then
+          if [ "$kind" = reshade ]; then
+            rows="$(community_catalog_rows "$kind" "$title" "")" || rows=""
+            output="$(printf '%s\n' "$rows" | awk 'NF {n++} END {print n+0}')"
+          fi
+          msgbox "$title" "$(community_txt "Catalogue actualisé : $output $count_label." "Catalogue refreshed: $output $count_label.")"
+        else msgbox "$title" "$(community_txt 'Actualisation impossible ; le cache précédent reste disponible.' 'Refresh failed; the previous cache remains available.')
 $output"; fi
         continue ;;
       share)
         if [ "$kind" = antimicrox ]; then community_share_menu "$title" "$rom";
-        else community_share "$kind" "$title" "$rom"; fi
+        else community_share_reshade "$title" "$rom"; fi
         continue ;;
-      browse-packs) community_browse_reshade_packs "$title" "$rom"; continue ;;
-      export-pack) community_export_reshade_pack "$title" "$rom" community; continue ;;
       import) community_import_package "$kind" "$title" "$rom"; continue ;;
       validate) community_validate "$kind" "$title"; continue ;;
       forget) community_forget_access "$title"; continue ;;
@@ -741,7 +785,7 @@ $output"; fi
       browse) query="" ;;
       *) return 0 ;;
     esac
-    if ! rows="$(community_cmd list "$kind" --query "$query" --with-game 2>&1)"; then msgbox "$title" "$rows"; continue; fi
+    rows="$(community_catalog_rows "$kind" "$title" "$query")" || continue
     if [ -z "$rows" ]; then msgbox "$title" "$empty_label"; continue; fi
     items=(); WT_MENU_GAME_LABELS=()
     while IFS=$'\t' read -r id label game_name; do
@@ -750,6 +794,11 @@ $output"; fi
     done <<< "$rows"
     selected="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir un profil ou un preset' 'Choose a profile or preset')" "${items[@]}" back "$(i18n back)")" || continue
     [ "$selected" != back ] || continue
+    if [ "$kind" = reshade ] && [[ "$selected" = zip:* ]]; then
+      path="$(community_fetch_reshade_pack "$title" "${selected#zip:}")" || continue
+      community_apply_reshade_pack "$title" "$rom" "$path"
+      continue
+    fi
     details="$(community_cmd show "$kind" "$selected" 2>&1)" || { msgbox "$title" "$details"; continue; }
     path="$(community_cmd local "$kind" "$selected" 2>/dev/null)" || path=""
     if [ -n "$path" ]; then
@@ -763,15 +812,8 @@ $output"; fi
 }
 
 
-community_choose_reshade_pack() {
-  local title="$1" query rows id label details output
-  local -a items=()
-  query="$(input_text "$title" "$(community_txt 'Rechercher un pack : jeu, nom ou auteur (vide = tous)' 'Find a bundle: game, title or author (empty = all)')" '')" || return 1
-  rows="$(community_packs_cmd list --query "$query" 2>&1)" || { msgbox "$title" "$rows"; return 1; }
-  [ -n "$rows" ] || { msgbox "$title" "$(community_txt 'Aucun pack publié pour cette recherche.' 'No published bundles match this search.')"; return 1; }
-  while IFS=$'\t' read -r id label; do items+=("$id" "$label"); done <<< "$rows"
-  id="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Packs ReShade communautaires' 'Community ReShade bundles')" "${items[@]}" back "$(i18n back)")" || return 1
-  [ "$id" != back ] || return 1
+community_fetch_reshade_pack() {
+  local title="$1" id="$2" details output
   details="$(community_packs_cmd show "$id" 2>&1)" || { msgbox "$title" "$details"; return 1; }
   community_report "$title" "$details"
   yesno_default_no "$title" "$(community_txt 'Télécharger ce pack ? Les add-ons sélectionnés par son auteur sont des modules exécutables. Vérifiez les crédits et la version ReShade requise.' 'Download this bundle? Author-selected add-ons are executable modules. Check credits and the required ReShade version.')" || return 1
@@ -779,9 +821,8 @@ community_choose_reshade_pack() {
   printf '%s\n' "$output"
 }
 
-community_browse_reshade_packs() {
-  local title="$1" rom="${2:-}" path selected state
-  path="$(community_choose_reshade_pack "$title")" || return
+community_apply_reshade_pack() {
+  local title="$1" rom="$2" path="$3" selected state
   if [ -z "$rom" ]; then
     selected="$(community_pick_game "$title")" || return
     rom="${selected%%$'\t'*}"
@@ -794,28 +835,13 @@ community_browse_reshade_packs() {
   fi
 }
 
-community_review_reshade_packs() {
-  local title="$1" mode="$2" rows id label review checksum choice output
-  local -a items=()
-  while true; do
-    if [ "$mode" = pending ]; then rows="$(community_packs_cmd pending 2>&1)";
-    else rows="$(community_packs_cmd list 2>&1)"; fi
-    local result=$?
-    [ "$result" -eq 0 ] || { msgbox "$title" "$rows"; return; }
-    [ -n "$rows" ] || { msgbox "$title" "$(community_txt 'Aucun pack.' 'No bundles.')"; return; }
-    items=()
-    while IFS=$'\t' read -r id label; do items+=("$id" "$label"); done <<< "$rows"
-    id="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir le pack à examiner' 'Choose a bundle to review')" "${items[@]}" back "$(i18n back)")" || return
-    [ "$id" != back ] || return
-    review="$(community_packs_cmd review "$id" 2>&1)" || { msgbox "$title" "$review"; continue; }
-    checksum="${review%%$'\n'*}"
-    community_report "$title" "${review#*$'\n'}"
-    if [ "$mode" = pending ]; then
-      choice="$(menu_select "$title" "$(community_txt 'Décision pour ce pack ZIP (les add-ons ne sont pas exécutés pendant la vérification)' 'ZIP bundle decision (add-ons are not executed during inspection)')" approve "$(community_txt 'Accepter et publier' 'Approve and publish')" reject "$(community_txt 'Refuser' 'Reject')" back "$(i18n back)")" || continue
-    else choice=remove; fi
-    case "$choice" in approve|reject|remove) : ;; *) continue ;; esac
-    yesno_default_no "$title" "$(community_txt 'Confirmer cette décision pour le pack examiné ?' 'Confirm this decision for the reviewed bundle?')" || continue
-    output="$(community_packs_cmd "$choice" "$id" "$checksum" 2>&1)"
-    msgbox "$title" "$output"
-  done
+community_share_reshade() {
+  local title="$1" rom="${2:-}" choice
+  choice="$(menu_select "$title" "$(community_txt 'Contenu à partager' 'Content to share')" \
+    preset "$(community_txt 'Preset seul — réglages INI' 'Preset only — INI settings')" \
+    pack "$(community_txt 'Configuration avec shaders et add-ons [Pack ZIP]' 'Configuration with shaders and add-ons [Pack ZIP]')" back "$(i18n back)")" || return
+  case "$choice" in
+    preset) community_share reshade "$title" "$rom" ;;
+    pack) community_export_reshade_pack "$title" "$rom" community ;;
+  esac
 }

@@ -41,6 +41,7 @@ WT_HOME="$TEST_HOME"; WT_LANGUAGE="$TEST_LANGUAGE"
 source "$ROOT/toolbox/lang/$TEST_LANGUAGE.sh"
 source "$ROOT/toolbox/modules/community.sh"
 source "$ROOT/toolbox/modules/reshade.sh"
+community_packs_cmd() { :; }
 msgbox() { printf '%s\n' "$@" >> "$WT_HOME/ui"; }
 yesno() { printf '%s\n' "$@" >> "$WT_HOME/ui"; return 0; }
 community_report() { printf '%s\n' "$@" >> "$WT_HOME/ui"; }
@@ -95,6 +96,7 @@ menu_select() {
  case "$3" in
   all) if [ -f "$WT_HOME/main-once" ]; then echo back; else touch "$WT_HOME/main-once"; echo community; fi;;
   browse) if [ -f "$WT_HOME/community-once" ]; then echo back; else touch "$WT_HOME/community-once"; echo share; fi;;
+  preset) echo preset;;
   game) echo game;;
   scan) echo 1;;
   *) return 1;;
@@ -243,7 +245,7 @@ community_choose_reshade_preset ReShade > "$WT_HOME/chosen"
 ''')
         self.assertEqual((self.home/'chosen').read_text(),str(self.preset))
         calls=(self.home/'calls').read_text().splitlines()
-        self.assertIn('list reshade --query Lighthouse',calls)
+        self.assertIn('list reshade --query Lighthouse --with-game',calls)
         self.assertIn('show reshade preset-id',calls);self.assertIn('fetch reshade preset-id',calls)
         self.assertIn('Required packs: SweetFX',ui);self.assertNotIn('AntiMicroX',ui)
 

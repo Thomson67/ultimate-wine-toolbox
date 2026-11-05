@@ -273,7 +273,7 @@ clones locaux simulés pour vérifier le chemin de téléchargement/fusion seul.
 
 ## Préparer un pack personnalisé pour partage (branche de test)
 
-Dans **ReShade → Presets communautaires → Partager un pack ReShade (ZIP)**, choisir un jeu géré par la Toolbox ou un ZIP/dossier personnalisé.
+Dans **ReShade → Presets communautaires → Partager ma configuration ReShade → Configuration avec shaders et add-ons [Pack ZIP]**, choisir un jeu géré par la Toolbox ou un ZIP/dossier personnalisé.
 Fermer le jeu avant d’exporter ses réglages. Le preset actif est seul coché par
 défaut ; s’il est incomplet, le premier preset valide est proposé. Les presets
 incomplets restent visibles et marqués, avec le nom du fichier manquant ou les
@@ -390,8 +390,8 @@ pack local ou preset communautaire.
 
 ## Partage direct des packs (0.11.1-dev8)
 
-**Partage communautaire → Partager un pack ReShade (ZIP)** prépare et transmet
-les fichiers sélectionnés. **Rechercher / installer un pack communautaire**
+**Partage communautaire → Partager ma configuration ReShade → Configuration avec shaders et add-ons [Pack ZIP]** prépare et transmet
+les fichiers sélectionnés. **Rechercher un jeu ou un auteur**
 interroge le catalogue public du service, avec recherche jeu/titre/auteur,
 affiche crédits, version, architecture, presets et add-ons, vérifie le ZIP puis
 ouvre l’import existant. Sans ReShade géré, l’assistant de configuration est
@@ -401,7 +401,7 @@ version restent applicables. L’installation propose les shaders manquants de
 tous les presets, comme pour un import local.
 
 Les modérateurs réutilisent l’appairage existant : **Valider les partages →
-Examiner les packs ReShade ZIP**, puis lecture des crédits, sommes de contrôle,
+Examiner les partages en attente**, puis lecture des crédits, sommes de contrôle,
 add-ons et liste des membres avant décision. Les fichiers sont inspectés sans
 exécuter de code. Une approbation n’atteste pas la compilation GPU ni le bon
 fonctionnement en jeu. Le retrait d’un pack publié bloque les téléchargements
@@ -419,3 +419,21 @@ Déploiement du service : voir
 Les tests couvrent SQLite réel, stockage R2 simulé, refus avant validation,
 retrait et intégration des menus ; Cloudflare/Batocera restent à valider après
 activation du Worker.
+
+## Catalogue commun et doublons de shaders (0.11.1-dev9)
+
+Presets et packs figurent dans la même liste et les mêmes résultats de
+recherche. Le badge **[Pack ZIP]** indique un pack. La modération affiche
+également les deux formats dans une liste commune.
+
+À l’import, les copies identiques d’un même shader sont regroupées. Si le
+pack et les shaders installés contiennent des versions différentes du même
+fichier `.fx`, choisir la version du pack ou la version installée. Ce choix
+s’applique au jeu sélectionné. Les fichiers communs aux autres jeux restent
+disponibles dans leurs bibliothèques d’origine. Si deux variantes différentes
+d’un même shader figurent dans une seule bibliothèque, l’import indique les
+chemins à vérifier avant de choisir.
+
+Pour un pack déjà installé, **Import / Export → Pack local → Vérifier /
+compléter les shaders de tous les presets** regroupe les copies identiques
+dans les shaders chargés par ReShade et conserve les réglages des presets.

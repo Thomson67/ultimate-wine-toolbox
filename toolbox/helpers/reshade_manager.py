@@ -771,7 +771,7 @@ def main():
     parser.add_argument('--runner', default='')
     parser.add_argument('--legacy', action='store_true')
     parser.add_argument('command', choices=['backend-packs', 'exes', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'external-scan', 'external-info', 'external-enable', 'external-disable', 'external-release', 'wiki-title', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
-                                           'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore', 'pack-info', 'pack-import', 'pack-remove', 'pack-status', 'pack-check', 'pack-dependency-source',
+                                           'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore', 'pack-info', 'pack-import', 'pack-remove', 'pack-status', 'pack-check', 'pack-dependency-source', 'pack-conflicts',
                                            'presets-list', 'presets-info', 'presets-select', 'presets-rename', 'presets-delete', 'presets-pack',
                                            'presets-catalog', 'presets-global-items', 'presets-global-info', 'presets-global-rename',
                                            'presets-global-copy', 'presets-global-export', 'presets-global-delete', 'presets-global-forget',
@@ -851,6 +851,11 @@ def main():
             import reshade_pack
             if args.command == 'pack-info':
                 print(json.dumps(reshade_pack.archive(rom)[1], ensure_ascii=False))
+            elif args.command == 'pack-conflicts':
+                from reshade_shader_conflicts import plan
+                files, _ = reshade_pack.archive(Path(args.args[0]))
+                cfg = read_json(home / 'reshade/games' / (key(rom) + '.json'))
+                print(json.dumps(plan(home, rom, files, cfg), ensure_ascii=False))
             elif args.command == 'pack-dependency-source':
                 print(reshade_pack.dependency_source(home, rom))
             elif args.command == 'pack-status':
@@ -864,7 +869,9 @@ def main():
                 reshade_pack.preset_bytes(files[args.args[1]], metadata)
             elif args.command == 'pack-import':
                 print(json.dumps(reshade_pack.install(home, rom, Path(args.args[0]), args.args[1],
-                                                     args.runner, args.bottles, args.legacy), ensure_ascii=False))
+                                                     args.runner, args.bottles, args.legacy,
+                                                     args.args[2] if len(args.args) > 2 else 'pack',
+                                                     args.args[3] if len(args.args) > 3 else ''), ensure_ascii=False))
             else:
                 reshade_pack.remove(home, rom, args.runner, args.bottles, args.legacy)
         elif args.command == 'status-list':

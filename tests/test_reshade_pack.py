@@ -35,6 +35,69 @@ class LocalReShadePackTests(unittest.TestCase):
             z.extractall(target)
         return target
 
+    def test_duplicate_bloom_loads_once_with_each_shader_priority(self):
+        from reshade_preset_dependencies import shader_root
+        from reshade_shader_conflicts import plan
+
+        self.configure()
+        standard = self.shaders / 'Merged/Shaders/Standard/PD80_02_Bloom.fx'
+        standard.parent.mkdir()
+        standard.write_bytes(b'technique StandardBloom {}')
+        custom = b'technique HenrikoBloom {}'
+        source = self.bundle({
+            'reshade-shaders/Shaders/PD80_02_Bloom.fx': custom,
+            'reshade-shaders/Shaders/PD80/PD80_02_Bloom.fx': custom,
+        })
+        for policy, expected in [('pack', custom), ('installed', standard.read_bytes())]:
+            with self.subTest(policy=policy):
+                cfg = m.read_json(self.config)
+                report = plan(self.home, self.rom, p.archive(source)[0], cfg)
+                self.assertEqual(len(report['duplicates']), 1)
+                self.assertEqual(report['conflicts'][0]['name'], 'PD80_02_Bloom.fx')
+                meta = p.install(self.home, self.rom, source, 'Ultra.ini', shader_policy=policy,
+                                 expected=report['expected'])
+                view = shader_root(self.home, self.rom, m.read_json(self.config))
+                copies = list(view.rglob('PD80_02_Bloom.fx'))
+                self.assertEqual(len(copies), 1)
+                self.assertEqual(copies[0].read_bytes(), expected)
+                self.assertEqual(standard.read_bytes(), b'technique StandardBloom {}')
+                if policy == 'installed':
+                    self.assertNotIn('reshade-shaders/Shaders/PD80_02_Bloom.fx', meta['hashes'])
+                p.remove(self.home, self.rom)
+                self.assertFalse(view.exists())
+
+    def test_shader_review_is_invalidated_if_installed_source_changes(self):
+        from reshade_shader_conflicts import plan
+        self.configure()
+        source = self.bundle()
+        report = plan(self.home, self.rom, p.archive(source)[0], m.read_json(self.config))
+        (self.shaders / 'Merged/Shaders/Changed.fx').write_text('technique Changed {}')
+        with self.assertRaisesRegex(ValueError, 'shader sources changed'):
+            p.install(self.home, self.rom, source, 'Ultra.ini', expected=report['expected'])
+        self.assertFalse((self.profile / 'pack').exists())
+
+    def test_check_existing_pack_removes_duplicate_from_view_without_reimport(self):
+        from reshade_preset_dependencies import shader_root
+        from reshade_shader_conflicts import remove_view
+        from reshade_presets import index
+        self.configure()
+        source = self.bundle()
+        meta = p.install(self.home, self.rom, source, 'Ultra.ini')
+        cfg = m.read_json(self.config)
+        cfg.pop('preset_shaders')
+        m.save_json(self.config, cfg)
+        remove_view(self.home, self.rom, meta.pop('shader_view'))
+        m.save_json(self.profile / 'pack/manifest.json', meta)
+        duplicate = self.profile / 'pack/assets/reshade-shaders/Shaders/Old/Citra.fx'
+        duplicate.parent.mkdir()
+        duplicate.write_bytes(b'technique Citra {}')
+        before = index(self.home, self.rom)['active']
+        p.dependency_source(self.home, self.rom)
+        view = shader_root(self.home, self.rom, m.read_json(self.config))
+        self.assertEqual(len(list(view.rglob('Citra.fx'))), 1)
+        self.assertEqual(index(self.home, self.rom)['active'], before)
+        self.assertTrue(duplicate.is_file())
+
     def test_directory_import_keeps_all_presets_and_survives_source_removal(self):
         import shutil
         import reshade_presets as presets
@@ -108,7 +171,7 @@ class LocalReShadePackTests(unittest.TestCase):
         before = (self.game / 'ReShadePreset.ini').read_bytes()
         p.install(self.home, self.rom, self.bundle(), 'Ultra.ini')
         config = (self.game / 'ReShade.ini').read_text()
-        self.assertIn('UWT-ReShadePack', config)
+        self.assertIn('pack-shaders', config)
         self.assertNotIn('Merged', config)
         self.assertIn('KeyOverlay=36,0,0,0', config)
         self.assertIn('FontSize=22', config)
@@ -301,6 +364,7 @@ resh_cmd() {
   backend-packs) printf '%s' "$2";;
   status) echo enabled;;
   prepare) printf '%s\n' "$*" >> "$RESULT"; echo "$WT_HOME/workspace";;
+  pack-conflicts) printf '%s' '{"conflicts":[],"duplicates":[],"expected":""}';;
   pack-import) printf '%s\n' "$*" >> "$RESULT"; [ "$MODE" != import-fails ];;
   *) printf '%s\n' "$*" >> "$RESULT";;
  esac
@@ -318,7 +382,7 @@ resh_install_game '/games/An emulator.wine'
                 else:
                     calls = (base / 'result').read_text().splitlines()
                     self.assertIn('prepare /games/An emulator.wine Game.exe vulkan 6.3.3 none 6.3.3-addons', calls)
-                    imported = 'pack-import /games/An emulator.wine /userdata/My bundle.zip Ultra.ini'
+                    imported = 'pack-import /games/An emulator.wine /userdata/My bundle.zip Ultra.ini pack '
                     self.assertIn(imported, calls)
                     enabled = 'enable /games/An emulator.wine'
                     if mode == 'install':
@@ -378,6 +442,7 @@ resh_cmd() {
  case "$1" in
   pack-status) printf '{}';;
   pack-info) printf '%s' "$META";;
+  pack-conflicts) printf '%s' '{"conflicts":[],"duplicates":[],"expected":""}';;
   pack-import) printf '%s\n' "$@" > "$RESULT";;
  esac
 }
@@ -392,7 +457,7 @@ resh_pack_menu '/userdata/roms/windows/An emulator.wine' "$MODE"
                 if confirm == '0' and mode == 'apply':
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual((base / 'result').read_text().splitlines(),
-                                     ['pack-import', '/userdata/roms/windows/An emulator.wine', ('/userdata/My bundle.zip' if kind == 'zip' else '/userdata/My bundle'), 'Ultra.ini'])
+                                     ['pack-import', '/userdata/roms/windows/An emulator.wine', ('/userdata/My bundle.zip' if kind == 'zip' else '/userdata/My bundle'), 'Ultra.ini', 'pack', ''])
                 else:
                     self.assertFalse((base / 'result').exists())
                     if confirm == '0':

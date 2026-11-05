@@ -245,9 +245,9 @@ v44/labwc machine; other combinations remain to be checked.
 
 ## Direct ReShade ZIP sharing (0.11.1-dev8 test)
 
-Community → Share a ReShade bundle (ZIP) exports selected presets, active
+Community → Share my ReShade configuration → Configuration with shaders and add-ons [Pack ZIP] exports selected presets, active
 shader dependencies and explicitly selected add-ons, then submits the ZIP.
-Find / install a community bundle searches the public pack catalogue and
+Search for a game or author searches the public pack catalogue and
 opens the existing version/architecture-checked bundle installer. Local
 Import / Export stays separate. ZIPs remain locally available on failed sends.
 

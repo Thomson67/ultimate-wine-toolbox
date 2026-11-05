@@ -374,17 +374,13 @@ PY_PENDING
         items=(standard "$(i18n resh_model_standard)" retro "$(i18n resh_model_retro)" thomson "$(i18n resh_model_thomson)" manual "$(i18n resh_model_manual)")
         current="$(resh_cmd details "$rom")"
         [ -z "$current" ] || items+=(current "$(i18n resh_model_current)")
-        items+=(community "$(community_txt 'Rechercher un preset dans la base communautaire' 'Find a preset in the community catalogue')")
-        items+=(community-pack "$(community_txt 'Rechercher un pack ZIP communautaire' 'Find a community ZIP bundle')")
+        items+=(community "$(community_txt 'Rechercher une configuration communautaire' 'Find a community configuration')")
         items+=(local-pack "$(community_txt 'Installer un pack ReShade local (ZIP ou dossier, add-ons et shaders)' 'Install a local ReShade bundle (ZIP or directory, add-ons and shaders)')")
         model="$(WT_MENU_LIST=1 menu_select "$(i18n resh_title)" "$(i18n resh_model_prompt)" "${items[@]}")" || return 1
         case "$model" in
             standard|retro|thomson|manual) defaults="$(resh_model_packs "$model")" ;;
             community) community_preset="$(community_choose_reshade_preset "$(i18n resh_title)")" || return 1; model=community-preset; defaults=""; apply_community=1 ;;
-            local-pack|community-pack)
-                if [ "$model" = community-pack ]; then
-                    local_pack="$(community_choose_reshade_pack "$(i18n resh_title)")" || return 1
-                fi
+            local-pack)
                 pack_selection="$(resh_pack_menu "$rom" select "$local_pack")" || return 1
                 local_pack="${pack_selection%%$'\n'*}"
                 local_pack_preset="${pack_selection#*$'\n'}"
@@ -396,6 +392,15 @@ PY_PENDING
             current) defaults="${current##*$'\t'}" ;;
             *) return 1 ;;
         esac
+    fi
+    if [ "$model" = community-preset ] && [[ "$community_preset" = *.zip ]]; then
+        local_pack="$community_preset"; community_preset=""; apply_community=0
+        pack_selection="$(resh_pack_menu "$rom" select "$local_pack")" || return 1
+        local_pack_preset="${pack_selection#*$'\n'}"
+        if ! pack_error="$(resh_cmd pack-check "$rom" "$local_pack" "$local_pack_preset" "$release_id" "$exe" 2>&1)"; then
+            msgbox "$(i18n resh_title)" "$pack_error"; return 1
+        fi
+        model=local-pack; defaults=none
     fi
     if [ "$model" = community-preset ]; then
         local analysis review
@@ -471,11 +476,7 @@ PY_PENDING
         return 1
     }
     if [ -n "$local_pack" ]; then
-        if ! pack_error="$(resh_cmd pack-import "$rom" "$local_pack" "$local_pack_preset" 2>&1)"; then
-            printf '%s\n' "$pack_error" >> "$log"
-            msgbox "$(i18n resh_title)" "$pack_error"
-            return 1
-        fi
+        resh_import_pack "$rom" "$local_pack" "$local_pack_preset" || return 1
         resh_pack_complete_shaders "$rom" || return 1
     fi
     if ! resh_cmd enable "$rom" >> "$log" 2>&1; then
@@ -600,10 +601,9 @@ $(community_txt 'Installer pour ce jeu les add-ons exécutables et les shaders d
         printf '%s\n%s\n' "$archive" "$preset"
         return 0
     fi
-    if output="$(resh_cmd pack-import "$rom" "$archive" "$preset" 2>&1)"; then
-        resh_pack_complete_shaders "$rom" || return 1
-        resh_pack_setup_info
-    else msgbox "$(i18n resh_title)" "$output"; return 1; fi
+    resh_import_pack "$rom" "$archive" "$preset" || return 1
+    resh_pack_complete_shaders "$rom" || return 1
+    resh_pack_setup_info
 }
 
 resh_pack_complete_shaders() {
@@ -945,4 +945,28 @@ resh_menu() {
             *) return ;;
         esac
     done
+}
+
+
+resh_import_pack() {
+    local rom="$1" archive="$2" preset="$3" plan policy=pack expected clashes duplicates output
+    plan="$(resh_cmd pack-conflicts "$rom" "$archive" 2>&1)" || { msgbox "$(i18n resh_title)" "$plan"; return 1; }
+    clashes="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("\n".join(r["name"] for r in d["conflicts"] if not r["identical"]))' "$plan")" || return 1
+    duplicates="$(python3 -c 'import json,sys; print(len(json.loads(sys.argv[1])["duplicates"]))' "$plan")" || return 1
+    expected="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["expected"])' "$plan")" || return 1
+    if [ -n "$clashes" ]; then
+        policy="$(menu_select "$(i18n resh_title)" "$(community_txt 'Ces shaders existent déjà avec un contenu différent :' 'These shaders already exist with different contents:')
+$clashes
+
+$(community_txt 'Choisir la version utilisée pour ce jeu. Une seule copie sera chargée ; les bibliothèques partagées restent intactes.' 'Choose the version used for this game. Only one copy will load; shared libraries stay intact.')" \
+          pack "$(community_txt 'Utiliser les versions du pack à la place des versions installées' 'Use bundle versions instead of installed versions')" \
+          installed "$(community_txt 'Conserver les versions installées et ignorer celles du pack' 'Keep installed versions and skip bundle copies')" back "$(i18n back)")" || return 1
+        case "$policy" in pack|installed) : ;; *) return 1 ;; esac
+    fi
+    if [ "$duplicates" -gt 0 ]; then
+        msgbox "$(i18n resh_title)" "$(community_txt 'Copies identiques présentes dans le pack : une seule copie de chaque shader sera chargée.' 'Identical copies found inside the bundle: only one copy of each shader will load.')" >&2
+    fi
+    if ! output="$(resh_cmd pack-import "$rom" "$archive" "$preset" "$policy" "$expected" 2>&1)"; then
+        msgbox "$(i18n resh_title)" "$output"; return 1
+    fi
 }

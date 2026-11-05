@@ -29,11 +29,10 @@ community_send_package Community '/tmp/My bundle.zip' reshade-pack
         for status, expected in [('enabled', 'pack'), ('missing', 'install')]:
             with self.subTest(status=status):
                 files = self.shell('''
-community_choose_reshade_pack() { printf '/tmp/My bundle.zip\\n'; }
 resh_cmd() { echo STATUS; }
 resh_pack_menu() { printf '%s\\n' pack "$1" "$2" "$3" > "$WT_HOME/apply"; }
 resh_install_game() { printf '%s\\n' install "$1" "$2" "$3" "$4" > "$WT_HOME/apply"; }
-community_browse_reshade_packs Community '/roms/My game.wine'
+community_apply_reshade_pack Community '/roms/My game.wine' '/tmp/My bundle.zip'
 '''.replace('STATUS', status))
                 lines = files['apply'].splitlines()
                 self.assertEqual(lines[0], expected)
@@ -49,10 +48,24 @@ community_packs_cmd() {
  approve) touch "$WT_HOME/done"; echo approved;; *) return 99;; esac
 }
 community_report() { printf '%s\\n' "$2" > "$WT_HOME/review"; }
-menu_select() { if [ "$3" = approve ]; then echo approve; else echo pack-id; fi; }
-yesno_default_no() { echo yes > "$WT_HOME/confirmed"; }
-community_review_reshade_packs Community pending
+menu_select() { if [ "$3" = approve ]; then echo approve; else echo zip:pack-id; fi; }
+yesno() { echo yes > "$WT_HOME/confirmed"; }
+community_service_cmd() { [ "$1" = pending ] || return 99; }
+community_review_pending reshade Community
 ''')
         self.assertIn('approve pack-id expected-hash', files['calls'])
         self.assertIn('member list', files['review'])
         self.assertIn('confirmed', files)
+
+    def test_catalogue_marks_packs_and_keeps_ini_available_on_pack_failure(self):
+        files = self.shell(r'''
+community_cmd() { printf 'ini-id\tZelda — Preset Ultra\tZelda\n'; }
+community_packs_cmd() { printf 'pack-id\tZelda — Full Ultra\tZelda\n'; }
+community_catalog_rows reshade Community Zelda > "$WT_HOME/list"
+community_packs_cmd() { echo unavailable; return 1; }
+community_catalog_rows reshade Community Zelda > "$WT_HOME/partial"
+''')
+        self.assertIn('zip:pack-id\tZelda — Full Ultra [Pack ZIP]\tZelda', files['list'])
+        self.assertIn('ini-id\tZelda — Preset Ultra\tZelda', files['list'])
+        self.assertEqual(files['partial'].strip(), 'ini-id\tZelda — Preset Ultra\tZelda')
+        self.assertIn('unavailable', files['messages'])

@@ -91,7 +91,7 @@ retain their existing workflow.
 
 For a directory, select the root containing ReShade.ini and reshade-shaders/Shaders. Required files are copied; the source directory stays unchanged.
 
-Share a ReShade bundle (ZIP), under Community: select presets and only required add-ons. Export includes active effects, resolved includes/textures, settings, credits and requirements. The ZIP is submitted for moderation, then becomes searchable and installable through Find / install a community bundle. A local copy remains under exports/community/reshade-packs/. Community limits: 16 MiB ZIP, 64 MiB expanded. The Worker needs private R2 PACKS storage and the pack_submissions table. Until updated, the ZIP is retained and submission explains the missing configuration.
+Share my ReShade configuration → Configuration with shaders and add-ons [Pack ZIP], under Community: select presets and only required add-ons. Export includes active effects, resolved includes/textures, settings, credits and requirements. The ZIP is submitted for moderation, then becomes searchable and installable through Search for a game or author. A local copy remains under exports/community/reshade-packs/. Community limits: 16 MiB ZIP, 64 MiB expanded. The Worker needs private R2 PACKS storage and the pack_submissions table. Until updated, the ZIP is retained and submission explains the missing configuration.
 
 Bundle export: only the valid active preset is selected by default (otherwise, the first valid preset). Incomplete presets are flagged with their dependency and remain unchecked. They do not block exporting other presets; explicitly selecting one still blocks export without changing its effects.
 

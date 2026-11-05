@@ -168,7 +168,7 @@ def main():
     sub = parser.add_subparsers(dest='command', required=True)
     p = sub.add_parser('submit'); p.add_argument('path', type=Path)
     for action in ('list', 'pending'):
-        p = sub.add_parser(action); p.add_argument('--query', default='')
+        p = sub.add_parser(action); p.add_argument('--query', default=''); p.add_argument('--with-game', action='store_true')
     for action in ('show', 'fetch', 'review'):
         p = sub.add_parser(action); p.add_argument('id')
     for action in ('approve', 'reject', 'remove'):
@@ -178,7 +178,7 @@ def main():
         value = service.submit_pack(args.path); print(value['id']); print(value['status'])
     elif args.command in ('list', 'pending'):
         for row in service.listing(args.command == 'pending', args.query):
-            print(row['id']+'\t'+entry_label(row))
+            print(row['id']+'\t'+entry_label(row)+('\t'+row['game'] if args.with_game else ''))
     elif args.command == 'show': print(summary(service.metadata(args.id)))
     elif args.command == 'fetch': print(service.fetch_pack(args.id))
     elif args.command == 'review':

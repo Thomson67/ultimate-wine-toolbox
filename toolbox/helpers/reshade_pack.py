@@ -206,7 +206,7 @@ def manifest(home, rom):
     return m.read_json(profile(home, rom) / 'pack/manifest.json')
 
 
-def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system/wine-bottles/windows'), legacy=False):
+def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system/wine-bottles/windows'), legacy=False, shader_policy='pack', expected=''):
     files, meta = archive(source)
     config_path = home / 'reshade/games' / (m.key(rom) + '.json')
     cfg = m.read_json(config_path)
@@ -219,6 +219,17 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
     p = profile(home, rom)
     if cfg.get('pack') or (p / 'pack').exists():
         raise ValueError('remove the current pack before importing another one')
+    import reshade_shader_conflicts as conflicts
+    report = conflicts.plan(home, rom, files, cfg)
+    if expected and report['expected'] != expected:
+        raise ValueError('shader sources changed during review; retry pack import')
+    if shader_policy not in ('pack', 'installed'):
+        raise ValueError('choose pack or installed shader priority')
+    origin_hash = source_digest(source, files)
+    files, _ = conflicts.unique(files)
+    if shader_policy == 'installed':
+        for row in report['conflicts']:
+            files.pop('reshade-shaders/' + row['pack'], None)
     # Validate all output before touching the game, profile or enabled state.
     chosen = preset_bytes(files[preset], meta)
     # Validate every variant before modifying an existing installation.
@@ -226,7 +237,8 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
         preset_bytes(files[name], meta)
     merged = merge_config((p / 'ReShade.ini').read_bytes(), files['ReShade.ini'])
     payload = {n: data for n, data in files.items() if n.startswith('reshade-shaders/') or n in meta['addons']}
-    meta.update(selected=preset, archive_sha256=source_digest(source, files),
+    meta.update(selected=preset, archive_sha256=origin_hash,
+                shader_policy=shader_policy, shader_conflicts=report['conflicts'], shader_duplicates=report['duplicates'],
                 hashes={n: hashlib.sha256(d).hexdigest() for n, d in payload.items()})
     if cfg.get('preset_shaders'):
         meta['previous_preset_shaders'] = cfg['preset_shaders']
@@ -237,6 +249,7 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
     m.set_enabled(home, rom, False)
     merged = merge_config((p / 'ReShade.ini').read_bytes(), files['ReShade.ini'])
     old = {n: (p / n).read_bytes() for n in ('ReShade.ini', 'ReShadePreset.ini')}
+    shader_view = None
     try:
         with tempfile.TemporaryDirectory(prefix='.pack-', dir=p) as temp:
             stage = Path(temp)
@@ -249,7 +262,11 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
         m.atomic_bytes(p / 'ReShade.ini', merged)
         m.atomic_bytes(p / 'ReShadePreset.ini', chosen)
         cfg.update(pack=True, enabled=False)
-        cfg.pop('preset_shaders', None)
+        shader_view = conflicts.build(home, rom, previous_cfg, p / 'pack/assets/reshade-shaders', shader_policy)
+        meta['shader_view'] = str(shader_view)
+        m.save_json(p / 'pack/manifest.json', meta)
+        cfg['preset_shaders'] = {'root': str(shader_view), 'context': meta['archive_sha256'], 'base': cfg['shaders'],
+                                 'packs': previous_cfg.get('preset_shaders', {}).get('packs', [])}
         m.save_json(config_path, cfg)
         m.set_enabled(home, rom, was_enabled)
         if was_enabled:
@@ -264,6 +281,8 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
         cfg['enabled'] = False
         m.save_json(config_path, cfg)
         shutil.rmtree(p / 'pack', ignore_errors=True)
+        if shader_view is not None:
+            conflicts.remove_view(home, rom, shader_view)
         m.set_enabled(home, rom, was_enabled)
         if was_enabled:
             m.event(home, rom, 'gameStart', runner, bottles, legacy)
@@ -274,13 +293,31 @@ def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system
 def dependency_source(home, rom):
     """Inspect every current variant of the installed pack without activating it."""
     import reshade_presets as presets
-    from reshade_preset_dependencies import configuration, idle
+    from reshade_preset_dependencies import config_path, configuration, idle, shader_root
     cfg = configuration(home, rom)
     if not cfg.get('pack'):
         raise ValueError('no local ReShade pack installed')
     idle(home, rom, cfg)
     presets.sync(home, rom)
-    context = manifest(home, rom)['archive_sha256']
+    metadata = manifest(home, rom)
+    context = metadata['archive_sha256']
+    # Older packs can already contain duplicate FX files. Point the game to
+    # one copy without reimporting its presets or rewriting the pack assets.
+    from reshade_shader_conflicts import library, make_view, remove_view, unique
+    shaders, duplicates = unique(library(home, shader_root(home, rom, cfg)))
+    if duplicates:
+        view = make_view(home, rom, shaders)
+        manifest_path = profile(home, rom) / 'pack/manifest.json'
+        new_metadata = dict(metadata, shader_view=str(view), shader_duplicates=duplicates)
+        cfg['preset_shaders'] = {'root': str(view), 'context': context, 'base': cfg['shaders'],
+                                 'packs': cfg.get('preset_shaders', {}).get('packs', [])}
+        try:
+            m.save_json(manifest_path, new_metadata)
+            m.save_json(config_path(home, rom), cfg)
+        except Exception:
+            m.save_json(manifest_path, metadata)
+            remove_view(home, rom, view)
+            raise
     techniques, names = [], []
     for identity, item in presets.index(home, rom)['items'].items():
         if item.get('pack', '') != context:
@@ -306,6 +343,7 @@ def remove(home, rom, runner='', bottles=Path('/userdata/system/wine-bottles/win
     if not cfg.get('pack'):
         raise ValueError('no local ReShade pack installed')
     p = profile(home, rom)
+    shader_view = manifest(home, rom).get('shader_view')
     old = {n: (p / 'pack/before' / n).read_bytes() for n in ('ReShade.ini', 'ReShadePreset.ini')}
     was_enabled = cfg.get('enabled', False)
     m.set_enabled(home, rom, False)
@@ -333,6 +371,9 @@ def remove(home, rom, runner='', bottles=Path('/userdata/system/wine-bottles/win
         m.save_json(config_path, cfg)
         raise
     shutil.rmtree(p / 'pack')
+    if shader_view:
+        from reshade_shader_conflicts import remove_view
+        remove_view(home, rom, shader_view)
     from reshade_presets import capture
     capture(home, rom, adopt=True)
 

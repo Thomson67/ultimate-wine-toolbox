@@ -95,6 +95,8 @@ def source(home, rom=None, local=None):
         files, context = game_source(home, rom)
     else:
         files, metadata = pack.archive(Path(local))
+        from reshade_shader_conflicts import unique
+        files, _ = unique(files, require_unique=False)
         context = {'names': {n: n for n in metadata['presets']}, 'preferred': metadata['preferred'],
                    'release': metadata['required_release'], 'arch': next(iter(metadata['addons'].values()), None), 'api': ''}
     digest = hashlib.sha256()
