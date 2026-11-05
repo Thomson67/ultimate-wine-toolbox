@@ -126,8 +126,45 @@ def plan(home, rom=None, local=None):
     return context
 
 
+def texture_filename(expression, code, definitions):
+    """Resolve literal paths and simple object-like macros in shader sources."""
+    literal = re.fullmatch(r'"([^"\n]+)"', expression.strip())
+    if literal:
+        return literal[1]
+    macro = expression.strip()
+    if not re.fullmatch(r'[A-Za-z_]\w*', macro):
+        return None
+    define = r'^[ \t]*#[ \t]*define[ \t]+' + macro + r'\b([^\r\n]*)'
+    values = re.findall(define, code, re.M)
+    if len(values) > 1 or re.search(r'^[ \t]*#[ \t]*undef[ \t]+' + macro + r'\b', code, re.M):
+        return None
+    if macro in definitions:
+        # A guarded default can safely be replaced by the runtime definition.
+        guarded = (r'^[ \t]*#[ \t]*ifndef[ \t]+' + macro + r'[ \t]*\r?\n'
+                   + define + r'\r?\n[ \t]*#[ \t]*endif\b')
+        if values and not re.search(guarded, code, re.M):
+            return None
+        value = definitions[macro]
+    else:
+        value = values[0].strip() if values else ''
+    literal = re.fullmatch(r'"([^"\n]+)"', value)
+    return literal[1] if literal else None
+
+
+def texture_definitions(config, preset, effect):
+    # ReShade uses the first definition: per-effect, preset-wide, then global.
+    definitions = {}
+    for parser, section in ((preset, PurePosixPath(effect).name),
+                            (preset, 'UWT_PRESET'), (config, 'GENERAL')):
+        for item in parser.get(section, 'PreprocessorDefinitions', fallback='').split(','):
+            name, _, value = item.partition('=')
+            definitions.setdefault(name.strip(), value.strip())
+    return definitions
+
+
 def dependencies(files, selected):
-    """Resolve active effects and literal include/texture references only."""
+    """Resolve dependencies of active effects, including simple texture macros."""
+    config = pack.ini(files['ReShade.ini'])
     effects = [n for n in files if n.startswith('reshade-shaders/Shaders/') and n.lower().endswith('.fx')]
     result = set()
 
@@ -153,9 +190,10 @@ def dependencies(files, selected):
             raise ValueError('ambiguous shader dependency: ' + value + ' (' + ', '.join(sorted(matches)) + ')')
         return matches[0]
 
-    def visit(name):
-        if name in result:
+    def visit(name, definitions, visited):
+        if name in visited:
             return
+        visited.add(name)
         result.add(name)
         if PurePosixPath(name).suffix.lower() not in ('.fx', '.fxh', '.h', '.hlsl'):
             return
@@ -165,13 +203,13 @@ def dependencies(files, selected):
             match = re.fullmatch(r'["<]([^">]+)[">]\s*', include.strip())
             if not match:
                 raise ValueError('dynamic include needs manual resolution in ' + name + ': ' + include.strip())
-            visit(resolve(match[1], name))
+            visit(resolve(match[1], name), definitions, visited)
         annotations = re.findall(r'\btexture(?:1D|2D|3D|Cube)?\s+\w+\s*<([^>]*)>', code, re.S)
         for texture in re.findall(r'\bsource\s*=\s*([^;]+);', '\n'.join(annotations)):
-            match = re.fullmatch(r'"([^"\n]+)"', texture.strip())
-            if not match:
+            filename = texture_filename(texture, code, definitions)
+            if not filename:
                 raise ValueError('dynamic texture needs manual resolution in ' + name)
-            visit(resolve(match[1], texture=True))
+            visit(resolve(filename, texture=True), definitions, visited)
 
     for name in selected:
         try:
@@ -181,12 +219,13 @@ def dependencies(files, selected):
                 if not technique:
                     continue
                 if '@' in technique:
-                    visit(resolve(technique.split('@', 1)[1]))
+                    effect = resolve(technique.split('@', 1)[1])
                 else:
                     matches = [n for n in effects if re.search(r'\btechnique\d*\s+' + re.escape(technique) + r'\b', files[n].decode('utf-8-sig'))]
                     if len(matches) != 1:
                         raise ValueError('missing or ambiguous active technique: ' + technique)
-                    visit(matches[0])
+                    effect = matches[0]
+                visit(effect, texture_definitions(config, parser, effect), set())
         except (ValueError, UnicodeError) as error:
             raise ValueError('preset ' + name + ': ' + str(error)) from error
     if not any(n.lower().endswith('.fx') for n in result):

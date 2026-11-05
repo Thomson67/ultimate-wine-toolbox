@@ -659,7 +659,7 @@ community_export_reshade_pack() {
   plan="$(community_cmd reshade-pack-plan "${origin[@]}" 2>&1)" || { msgbox "$title" "$plan"; return 1; }
   warnings="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("\n".join(d["names"].get(k,k)+": "+v for k,v in d.get("issues",{}).items()))' "$plan")" || return
   if [ -n "$warnings" ]; then
-    community_report "$title" "$(community_txt 'Certains presets sont incomplets et ne sont pas cochés par défaut. Vous pouvez exporter les autres presets :' 'Some presets are incomplete and are not selected by default. You can export the other presets:')\n\n$warnings"
+    community_report "$title" "$(community_txt 'Certains presets sont incomplets et ne sont pas cochés par défaut. Vous pouvez exporter les autres presets :' 'Some presets are incomplete and are not selected by default. You can export the other presets:')"$'\n\n'"$warnings"
   fi
   while IFS=$'\t' read -r token label checked; do
     [ -n "$token" ] && { preset_names+=("$token"); items+=("${#preset_names[@]}" "$label" "$checked"); }

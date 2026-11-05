@@ -132,6 +132,23 @@ class PackExportTests(unittest.TestCase):
                 self.prepare(self.source(updates))
         self.assertFalse((self.home / 'exports/community/reshade-packs').exists())
 
+    def test_guarded_texture_macro_resolves_for_each_selected_preset(self):
+        source = self.source({
+            'ReShade.ini': b'[GENERAL]\nPresetPath=My preset.ini\n[DEPTH]\nUseAspectRatioHeuristics=0\n',
+            'reshade-shaders/Shaders/Used.fx': (
+                b'#ifndef LUT_NAME\n#define LUT_NAME "lut.png"\n#endif\n'
+                b'texture LUT < source = LUT_NAME; >; technique Used {}'
+            ),
+            'Other.ini': b'Techniques=Used@Used.fx\n[Used.fx]\nPreprocessorDefinitions=LUT_NAME="custom.png"\n',
+            'reshade-shaders/Textures/custom.png': b'custom texture',
+        })
+        path = self.prepare(source, selected=['My preset.ini', 'Other.ini'])
+        files, _ = pack.archive(path)
+        self.assertIn('reshade-shaders/Textures/lut.png', files)
+        self.assertIn('reshade-shaders/Textures/custom.png', files)
+        self.assertNotIn('reshade-shaders/Textures/unused.png', files)
+        self.assertEqual(pack.ini(files['ReShade.ini']).get('DEPTH', 'UseAspectRatioHeuristics'), '0')
+
     def test_disabled_addons_and_changed_source_are_rejected(self):
         source = self.source({'ReShade.ini': b'[GENERAL]\nPresetPath=My preset.ini\n[ADDON]\nDisabledAddons=my\n'})
         self.assertNotIn('my.addon64', export.plan(self.home, local=source)['addons'])
@@ -193,7 +210,7 @@ i18n() { printf '%s' "$1"; }
 menu_select() { if [ "$2" = 'Exporter un pack ReShade (ZIP)' ]; then printf community; else printf source; fi; }
 resh_pack_source() { printf '/userdata/My custom folder'; }
 checklist_select() { printf '%s\n' "$@" >> "$CHECKLIST"; printf '1\n'; }
-community_report() { :; }
+community_report() { printf '%s\n' "$2" >> "$ARGS.report"; }
 input_text() { printf 'Public value'; }
 yesno_default_no() { return 0; }
 msgbox() { :; }
@@ -222,6 +239,7 @@ community_export_reshade_pack Title
             self.assertIn('1\nMy custom preset\non', choices)
             self.assertIn('2\nOther — incomplet\noff', choices)
             self.assertIn('1\nmy addon.addon64 (64 bits)\noff', choices)
+            self.assertIn('\n\nOther: preset Other.ini:', args.with_suffix('.json.report').read_text())
 
     def test_local_game_pack_export_keeps_context_without_public_submission_form(self):
         import os
