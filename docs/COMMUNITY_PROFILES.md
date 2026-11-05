@@ -243,7 +243,7 @@ launcher/game switching and complete community transfer from `.wine` to
 `.wsquashfs` have been confirmed on the reported Batocera
 v44/labwc machine; other combinations remain to be checked.
 
-## Direct ReShade ZIP sharing (0.11.1-dev8 test)
+## Direct ReShade ZIP sharing (0.11.1)
 
 Community → Share my ReShade configuration → Configuration with shaders and add-ons [Pack ZIP] exports selected presets, active
 shader dependencies and explicitly selected add-ons, then submits the ZIP.

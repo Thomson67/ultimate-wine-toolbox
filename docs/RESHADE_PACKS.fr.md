@@ -315,7 +315,7 @@ pas être déduits. Les crédits sont déclarés par l’auteur, pas vérifiés 
 Le ZIP et son fichier `.sha256` sont créés dans
 `exports/community/reshade-packs/`. Le ZIP se réimporte par **Pack ReShade local
 → Archive ZIP** après installation de la version et de l’API indiquées.
-L’export ne modifie pas les sources. Depuis la version de test 0.11.1-dev8,
+L’export ne modifie pas les sources. Depuis la version 0.11.1,
 le ZIP peut être envoyé directement au service communautaire pour modération.
 La copie locale est conservée même si l’envoi échoue. Les packs approuvés sont
 recherchables et installables depuis le même menu communautaire. Cette voie
@@ -349,7 +349,7 @@ sont vérifiés avant publication de la nouvelle vue. Retirer le pack restaure
 le contexte de shaders antérieur.
 
 Dans l’archive Henriko utilisée pour les essais, `ReShadePreset.ini` référence
-notamment `FastFourierTransform.fx`, absent du ZIP. Depuis `0.11.1-dev4`,
+notamment `FastFourierTransform.fx`, absent du ZIP. Depuis `0.11.1`,
 il est reconnu via le complément `uwt-insane-dev` : source originale de Lord Of
 Lunacy, branche `DevAndOldShaders`, commit
 `71ac8cd50824413a695155b44e39d2888135731d`, fichier téléchargé avec contrôle
@@ -370,7 +370,7 @@ la texture conditionnelle de `FXShaders/NeoBloom.fx` : c’est une limitation
 distincte du résolveur de textures dynamiques, pas un échec du téléchargement
 FFT. Les trois variantes Henriko restent exportables.
 
-## Menus du jeu : transferts locaux et communauté (0.11.1-dev7)
+## Menus du jeu : transferts locaux et communauté (0.11.1)
 
 **Import / Export** contient uniquement les transferts locaux : preset INI,
 pack ZIP/dossier, export INI actif ou autre et export de
@@ -388,7 +388,7 @@ Le Worker doit être mis à jour pour activer les ZIP ; les anciens clients INI 
 suppression. L’assistant d’installation initial conserve ses choix de modèle,
 pack local ou preset communautaire.
 
-## Partage direct des packs (0.11.1-dev8)
+## Partage direct des packs (0.11.1)
 
 **Partage communautaire → Partager ma configuration ReShade → Configuration avec shaders et add-ons [Pack ZIP]** prépare et transmet
 les fichiers sélectionnés. **Rechercher un jeu ou un auteur**
@@ -420,7 +420,7 @@ Les tests couvrent SQLite réel, stockage R2 simulé, refus avant validation,
 retrait et intégration des menus ; Cloudflare/Batocera restent à valider après
 activation du Worker.
 
-## Catalogue commun et doublons de shaders (0.11.1-dev9)
+## Catalogue commun et doublons de shaders (0.11.1)
 
 Presets et packs figurent dans la même liste et les mêmes résultats de
 recherche. Le badge **[Pack ZIP]** indique un pack. La modération affiche
