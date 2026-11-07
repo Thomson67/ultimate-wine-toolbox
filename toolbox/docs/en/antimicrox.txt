@@ -21,7 +21,11 @@ Rules can match title, class or executable, exactly or partially. Title changes 
 Test the selected windows now relaunches using automatic rules without the editor. On return, retest, change rules or record again. Wine Xorg/XWayland windows are supported; native Wine Wayland windows are not. An [L] filename tag enables nothing automatically. Disable Windows AntiMicroX started by a start.bat to avoid two simultaneous mappers.
 
 USE AN EXISTING PROFILE
-Choose the profile or Browse .amgp files, then the game. Similar names appear first; other games remain available. The profile loads on the next ES launch. Assigning an imported launcher configuration also restores its rules and second profile for the selected game.
+Choose the profile or Browse .amgp files, then the game. Similar names appear first, and other games remain available.
+
+Use the shared profile assigns the same file to the game. Edits to that file apply to every game using it. Create an editable copy for this game creates a separate .amgp file in the profiles folder. The game name is suggested and can be edited. If the name is taken, a number is appended.
+
+The selected profile loads on the next ES launch. When an imported launcher configuration is assigned from the catalogue, its rules and second profile are also restored.
 
 EDIT A CONFIGURED GAME
 My games and their profiles lists assignments even when the ROM or profile is missing. Launcher games open their specific menu. Edit launcher profile controls and Edit game profile controls each offer Edit the profile in game or Edit the profile without starting the game. During live editing, the selected role stays loaded. The primary assignment, other profile and rules are preserved.

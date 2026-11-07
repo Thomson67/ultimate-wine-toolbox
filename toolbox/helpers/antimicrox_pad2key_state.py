@@ -1,11 +1,12 @@
 """Reversible per-game Pad2Key suspension for converted AntiMicroX profiles."""
 import base64
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import stat
 import uuid
 
@@ -127,9 +128,36 @@ class Pad2KeyStore:
         if len(entries) != count:
             atomic(self.state, json.dumps(entries, ensure_ascii=False, indent=2).encode())
 
+    def copy_path(self, name):
+        name = name.strip()
+        if name.lower().endswith('.amgp'):
+            name = name[:-5]
+        name = ''.join(c if c.isprintable() and c not in '<>:"/\\|?*' else '_' for c in name)
+        name = name.strip(' .')[:60].rstrip(' .')
+        if not name:
+            raise ValueError('Enter a name for the profile copy')
+        directory = (self.home/'config/antimicrox-profiles').resolve()
+        if not directory.is_relative_to(self.userdata):
+            raise ValueError('Profile directory must be under /userdata')
+        directory.mkdir(parents=True, exist_ok=True)
+        destination, suffix = directory/(name+'.amgp'), 2
+        while destination.exists() or destination.is_symlink():
+            destination = directory/f'{name} ({suffix}).amgp'
+            suffix += 1
+        return destination
+
     def assign(self, rom, profile):
+        return self._assign_profile(rom, profile)[1]
+
+    def copy_and_assign(self, rom, profile, name):
+        return self._assign_profile(rom, profile, name)
+
+    def _assign_profile(self, rom, profile, copy_name=None):
         if any(c in rom+profile for c in '\t\r\n'):
             raise ValueError('Paths cannot contain tabs or line breaks')
+        if copy_name is not None and not profile:
+            raise ValueError('Select a profile to copy')
+        selected = None
         if profile:
             selected = Path(profile).resolve()
             if not selected.is_file() or selected.suffix.lower() != '.amgp' or not selected.is_relative_to(self.userdata):
@@ -137,15 +165,15 @@ class Pad2KeyStore:
         with self.locked():
             registry = self.read(self.registry)
             suspended = self.read(self.state)
-            converted = bool(profile) and str(Path(profile).resolve()) in registry
-            managed = converted or self.is_community(profile)
+            metadata = registry.get(str(selected), {})
+            converted = 'source' in metadata
+            managed = str(selected) in registry or self.is_community(profile)
             extra = [self.keys_path(rom)] if managed or rom in suspended else []
             adoption = None
             if converted and rom in suspended:
                 path = self.keys_path(rom)
                 current = path.read_bytes() if path.exists() else None
                 expected = base64.b64decode(suspended[rom]['disabled'], validate=True)
-                metadata = registry[str(Path(profile).resolve())]
                 if (current is not None and current != expected and not path.is_symlink()
                         and Path(metadata['source']).resolve() == path.resolve()
                         and hashlib.sha256(current).hexdigest() == metadata.get('sha256')):
@@ -158,7 +186,6 @@ class Pad2KeyStore:
                     extra.append(archive)
                     adoption = (path, current, stat.S_IMODE(path.stat().st_mode), archive)
             if converted and rom not in suspended:
-                metadata = registry[str(Path(profile).resolve())]
                 source = Path(metadata['source'])
                 if source.exists():
                     content = source.read_bytes()
@@ -168,7 +195,19 @@ class Pad2KeyStore:
                             break
                     if hashlib.sha256(content).hexdigest() != metadata.get('sha256'):
                         raise ValueError('Pad2Key changed after conversion. Convert the updated file before activating it.')
-            with self.transaction([rom], extra):
+            destination = self.copy_path(copy_name) if copy_name is not None else None
+            with ExitStack() as cleanup, self.transaction([rom], extra):
+                if destination is not None:
+                    with selected.open('rb') as source, destination.open('xb') as target:
+                        cleanup.callback(destination.unlink, missing_ok=True)
+                        shutil.copyfileobj(source, target)
+                        target.flush()
+                        os.fsync(target.fileno())
+                    profile = str(destination)
+                    if managed:
+                        # Keep Pad2Key behavior without linking a copy to the community catalogue.
+                        registry[profile] = metadata or {'suspend_pad2key': True}
+                        atomic(self.registry, json.dumps(registry, ensure_ascii=False, indent=2).encode())
                 if adoption:
                     path, content, mode, archive = adoption
                     if path.read_bytes() != content:
@@ -183,7 +222,8 @@ class Pad2KeyStore:
                                       'disabled': base64.b64encode(content).decode(), 'mode': mode}
                     atomic(self.state, json.dumps(suspended, ensure_ascii=False, indent=2).encode())
                 self._assign(rom, profile, managed, suspended, registry)
-            return adoption[3] if adoption else None
+                cleanup.pop_all()
+            return destination, adoption[3] if adoption else None
 
     def _assign(self, rom, profile, converted, suspended, registry):
         if not profile:

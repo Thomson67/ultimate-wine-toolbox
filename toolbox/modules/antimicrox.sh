@@ -144,15 +144,17 @@ amx_game_for_profile() {
   local profile="$1" preferred selected
   preferred="$(community_cmd suggest-game antimicrox "$profile" 2>/dev/null)" || preferred=""
   selected="$(community_pick_game AntiMicroX "$preferred")" || return 1
-  printf '%s\n' "${selected%%$'\t'*}"
+  if [ "${2:-}" = with-title ]; then printf '%s\n' "$selected"
+  else printf '%s\n' "${selected%%$'\t'*}"; fi
 }
 amx_assign_existing() {
-  local profile rom
+  local profile selected title=""
   amx_ensure_installed || return 1
   profile="$(amx_profile_file)" || return 1
   profile="$(amx_validate_profile "$profile")" || return 1
-  rom="$(amx_game_for_profile "$profile")" || return 1
-  amx_assign_profile_for "$rom" "$profile"
+  selected="$(amx_game_for_profile "$profile" with-title)" || return 1
+  [[ "$selected" != *$'\t'* ]] || title="${selected#*$'\t'}"
+  amx_assign_profile_for "${selected%%$'\t'*}" "$profile" "$title"
 }
 amx_profiles_cmd() { python3 "$WT_ROOT/helpers/antimicrox_profiles.py" --home "$WT_HOME" --language "$WT_LANGUAGE" "$@"; }
 amx_pad2key_cmd() { python3 "$WT_ROOT/helpers/antimicrox_pad2key.py" --home "$WT_HOME" --language "$WT_LANGUAGE" "$@"; }
@@ -396,7 +398,7 @@ amx_current_profile() {
   awk -F '\t' -v p="$1" '$1==p {v=$2} END{print v}' "$AMX_OVERRIDES" 2>/dev/null
 }
 amx_assign_profile_for() {
-  local rom="$1" current new_profile="${2:-}"
+  local rom="$1" current new_profile="${2:-}" title="${3:-}" choice name output
   amx_ensure_installed || return 1
   if amx_running; then
     msgbox AntiMicroX "$(amx_txt 'Fermez le jeu ou AntiMicroX avant de changer son profil.' 'Close the game or AntiMicroX before changing its profile.')"
@@ -405,8 +407,23 @@ amx_assign_profile_for() {
   current="$(amx_current_profile "$rom")"
   [ -n "$new_profile" ] || new_profile="$(amx_profile_file "$current")" || return 1
   new_profile="$(amx_validate_profile "$new_profile")" || return 1
-  amx_set_profile "$rom" "$new_profile" || return 1
-  msgbox AntiMicroX "$(amx_txt 'Profil associé au jeu.' 'Profile assigned to game.')"
+  choice="$(menu_select AntiMicroX "$(amx_txt 'Comment utiliser ce profil pour le jeu ?' 'How should this game use the profile?')" \
+    shared "$(amx_txt 'Utiliser le profil partagé (les modifications affectent les jeux associés)' 'Use the shared profile (edits affect the games using it)')" \
+    copy "$(amx_txt 'Créer une copie modifiable pour ce jeu' 'Create an editable copy for this game')" back "$(i18n back)")" || return 1
+  case "$choice" in
+    shared)
+      amx_set_profile "$rom" "$new_profile" || return 1
+      msgbox AntiMicroX "$(amx_txt 'Profil associé au jeu.' 'Profile assigned to game.')" ;;
+    copy)
+      [ -n "$title" ] || { title="${rom##*/}"; title="${title%.*}"; }
+      name="$(input_text AntiMicroX "$(amx_txt 'Nom du fichier profil à créer' 'Name of the profile file to create')" "$title")" || return 1
+      if ! output="$(amx_pad2key_cmd assign --copy-name="$name" "$rom" "$new_profile" 2>&1)"; then
+        msgbox AntiMicroX "$(amx_txt 'Impossible de créer et d’associer la copie :' 'Could not create and assign the copy:')\n$output"
+        return 1
+      fi
+      msgbox AntiMicroX "$(amx_txt 'Copie associée au jeu :' 'Copy assigned to game:')\n$output" ;;
+    *) return 1 ;;
+  esac
 }
 amx_associations() {
   [ -f "$AMX_OVERRIDES" ] || return 0

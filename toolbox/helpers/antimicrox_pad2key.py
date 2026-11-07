@@ -284,6 +284,7 @@ def main():
         if name == 'convert': command.add_argument('--expected')
     sub.add_parser('hotkeys').add_argument('source')
     assign = sub.add_parser('assign'); assign.add_argument('rom'); assign.add_argument('profile')
+    assign.add_argument('--copy-name')
     sub.add_parser('restore-all')
     args = parser.parse_args()
     if args.action == 'hotkeys':
@@ -304,7 +305,11 @@ def main():
         if args.profile and (str(Path(args.profile).resolve()) in store.read(store.registry) or store.is_community(args.profile)):
             if not os.access(Path(args.home)/'tools/antimicrox/antimicrox', os.X_OK) or not os.access('/dev/uinput', os.W_OK):
                 raise ValueError('Install AntiMicroX and check /dev/uinput before enabling the converted profile')
-        recovery = store.assign(args.rom, args.profile)
+        if args.copy_name is None:
+            recovery = store.assign(args.rom, args.profile)
+        else:
+            destination, recovery = store.copy_and_assign(args.rom, args.profile, args.copy_name)
+            print(destination)
         if recovery:
             print(('Le Pad2Key modifié a été reconnu comme source du nouveau profil et adopté.\n'
                    'Vos dernières modifications seront restaurées au retrait de l’association.\n'

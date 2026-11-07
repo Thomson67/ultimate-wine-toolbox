@@ -125,6 +125,64 @@ class Pad2KeyTests(unittest.TestCase):
             self.assertEqual(store.cfg.read_bytes(), cfg)
             self.assertIn(str(rom), store.read(store.state))
 
+    def test_copy_assigns_a_separate_file_and_keeps_conversion_behavior(self):
+        with tempfile.TemporaryDirectory() as folder:
+            _, _, rom, keys, original, profile, store = self.setup_game(folder)
+            other_rom = rom.with_name('Another game.wsquashfs')
+            other_rom.touch()
+            store.assign(str(other_rom), str(profile))
+            existing = profile.with_name('Max Payne.amgp')
+            existing.write_bytes(b'existing profile')
+
+            duplicate, recovery = store.copy_and_assign(str(rom), str(profile), 'Max Payne.amgp')
+
+            self.assertIsNone(recovery)
+            self.assertEqual(duplicate.name, 'Max Payne (2).amgp')
+            self.assertEqual(duplicate.read_bytes(), profile.read_bytes())
+            self.assertEqual(existing.read_bytes(), b'existing profile')
+            self.assertEqual(store.cfg.read_text(), f'{other_rom}\t{profile}\n{rom}\t{duplicate}\n')
+            self.assertEqual(store.read(store.registry)[str(duplicate)], store.read(store.registry)[str(profile)])
+            self.assertTrue(all(action['target'] == [] for action in json.loads(keys.read_text())['actions_player1']))
+            store.assign(str(rom), '')
+            self.assertEqual(keys.read_bytes(), original)
+
+    def test_copy_failure_rolls_back_file_and_metadata(self):
+        with tempfile.TemporaryDirectory() as folder:
+            _, _, rom, keys, original, profile, store = self.setup_game(folder)
+            previous = store.registry.read_bytes()
+            assign = store._assign
+
+            def fail_after_assignment(*args):
+                assign(*args)
+                raise OSError('assignment failed')
+
+            with patch.object(store, '_assign', side_effect=fail_after_assignment):
+                with self.assertRaisesRegex(OSError, 'assignment failed'):
+                    store.copy_and_assign(str(rom), str(profile), 'Max Payne')
+            self.assertEqual(list(profile.parent.glob('*.amgp')), [profile])
+            self.assertEqual(store.registry.read_bytes(), previous)
+            self.assertEqual(keys.read_bytes(), original)
+            self.assertFalse(store.cfg.exists())
+
+    def test_copy_of_community_profile_still_suspends_pad2key_on_reassignment(self):
+        with tempfile.TemporaryDirectory() as folder:
+            _, home, rom, keys, original, profile, store = self.setup_game(folder)
+            source = profile.with_name('community-profile.amgp')
+            source.write_bytes(profile.read_bytes())
+            imports = home/'state/community/imports.json'
+            imports.parent.mkdir()
+            imports.write_text(json.dumps({str(source): {'kind': 'antimicrox', 'id': 'community-profile'}}))
+
+            duplicate, _ = store.copy_and_assign(str(rom), str(source), 'Max Payne')
+            self.assertNotEqual(keys.read_bytes(), original)
+            self.assertFalse(store.is_community(str(duplicate)))
+            store.assign(str(rom), '')
+            self.assertEqual(keys.read_bytes(), original)
+            store.assign(str(rom), str(duplicate))
+            self.assertNotEqual(keys.read_bytes(), original)
+            store.assign(str(rom), '')
+            self.assertEqual(keys.read_bytes(), original)
+
     def test_reconverted_current_pad2key_is_adopted_and_previous_backup_is_archived(self):
         import base64
         with tempfile.TemporaryDirectory() as folder:

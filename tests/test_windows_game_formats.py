@@ -83,7 +83,7 @@ community_cmd() { python3 "$SHIM" --home "$WT_HOME" "$@"; }
 amx_ensure_installed() { :; }
 amx_profile_file() { echo /userdata/Existing.amgp; }
 amx_validate_profile() { echo "$1"; }
-amx_assign_profile_for() { printf '%s\\n' "$@" > "$WT_HOME/assigned"; }
+amx_assign_profile_for() { printf '%s\\n' "$1" "$2" > "$WT_HOME/assigned"; }
 msgbox() { return 1; }; i18n() { echo Back; }
 menu_select() {
  shift 2

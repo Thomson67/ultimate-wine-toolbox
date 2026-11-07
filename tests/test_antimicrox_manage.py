@@ -38,7 +38,8 @@ amx_assign_existing
 ''')
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual((home/'order').read_text().splitlines(), ['ensure', 'profile', 'game'])
-            self.assertEqual((home/'assigned').read_text().splitlines(), ['/games/Max Payne 2.wine', '/userdata/Max Payne.amgp'])
+            self.assertEqual((home/'assigned').read_text().splitlines(),
+                             ['/games/Max Payne 2.wine', '/userdata/Max Payne.amgp', 'Max Payne 2'])
 
     def test_cancel_profile_or_game_selection_never_changes_assignments(self):
         for stage in ('profile', 'game'):
@@ -170,12 +171,38 @@ amx_binary() { echo /fake/antimicrox; }
 amx_running() { return 1; }
 amx_profile_file() { echo "$REPLACEMENT"; }
 amx_validate_profile() { printf '%s\\n' "$1"; }
+i18n() { echo Retour; }
+menu_select() { echo shared; }
 msgbox() { return 0; }
 amx_assign_profile_for "$GAME"
 ''', GAME=str(first), REPLACEMENT=str(replacement))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(dict(line.split('\t') for line in cfg.read_text().splitlines()),
                              {str(first): str(replacement), str(missing): str(profile)})
+
+    def test_copy_suggests_game_title_and_only_assigns_after_confirming_name(self):
+        for outcome in ('copy', 'cancel-name', 'back'):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as folder:
+                home = Path(folder)
+                result = self.bash(home, r'''
+amx_ensure_installed() { :; }
+amx_running() { return 1; }
+amx_validate_profile() { printf '%s\n' "$1"; }
+i18n() { echo Retour; }
+menu_select() { if [ "$OUTCOME" = back ]; then echo back; else echo copy; fi; }
+input_text() { printf '%s\n' "$3" > "$WT_HOME/suggestion"; [ "$OUTCOME" != cancel-name ] && echo 'Mon profil'; }
+amx_pad2key_cmd() { printf '%s\n' "$@" > "$WT_HOME/assigned"; }
+msgbox() { :; }
+amx_assign_profile_for '/userdata/Max Payne 2[UMU].wine' '/userdata/Max Payne.amgp' 'Max Payne 2'
+''', OUTCOME=outcome)
+                self.assertEqual(result.returncode == 0, outcome == 'copy', result.stderr)
+                if outcome != 'back':
+                    self.assertEqual((home/'suggestion').read_text().strip(), 'Max Payne 2')
+                if outcome == 'copy':
+                    self.assertEqual((home/'assigned').read_text().splitlines(),
+                                     ['assign', '--copy-name=Mon profil', '/userdata/Max Payne 2[UMU].wine', '/userdata/Max Payne.amgp'])
+                else:
+                    self.assertFalse((home/'assigned').exists())
 
     def test_missing_game_can_be_removed_but_not_launched(self):
         with tempfile.TemporaryDirectory() as folder:

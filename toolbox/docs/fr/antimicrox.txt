@@ -21,7 +21,11 @@ Une règle peut utiliser le titre, la classe ou l’exécutable, avec correspond
 Tester maintenant les fenêtres choisies relance le jeu avec la bascule automatique, sans éditeur. Au retour, retester, modifier les règles ou refaire le relevé. Les fenêtres Wine Xorg/XWayland sont prises en charge ; les fenêtres Wine Wayland natives ne le sont pas. Une balise [L] n’active rien automatiquement. Désactiver un AntiMicroX Windows lancé par un start.bat évite deux mappers simultanés.
 
 UTILISER UN PROFIL EXISTANT
-Choisir le profil ou Parcourir les fichiers .amgp, puis le jeu. Les noms proches sont proposés en priorité ; les autres jeux restent accessibles. Le profil sera chargé au prochain lancement depuis ES. Une configuration launcher importée rétablit aussi ses règles et son second profil lors de l’association au jeu cible.
+Choisir le profil ou Parcourir les fichiers .amgp, puis le jeu. Les noms proches sont proposés en priorité et les autres jeux restent accessibles.
+
+Utiliser le profil partagé associe le même fichier au jeu. Les modifications apportées à ce fichier s’appliquent à tous les jeux qui l’utilisent. Créer une copie modifiable pour ce jeu crée un fichier .amgp distinct dans le dossier des profils. Le nom du jeu est proposé et peut être modifié. Si le nom est déjà pris, un numéro est ajouté.
+
+Le profil choisi sera chargé au prochain lancement depuis ES. Depuis le catalogue, l’association d’une configuration launcher importée rétablit aussi ses règles et son second profil.
 
 MODIFIER UN JEU CONFIGURÉ
 Mes jeux et leurs profils liste les associations, même si le jeu ou le profil a disparu. Un jeu avec launcher ouvre son menu spécifique. Modifier les commandes du profil launcher et Modifier les commandes du profil jeu proposent chacun Modifier le profil en jeu ou Modifier le profil sans lancer le jeu. Pendant l’édition en jeu, le rôle choisi reste chargé. L’association principale, l’autre profil et les règles sont conservés.
