@@ -111,9 +111,34 @@ fi
 case "$event" in
     gameStart)
         [ -n "$rom" ] || exit 0
+        for test in "$ROOT/state"/wsq-dxvk-test.*; do
+            [ -f "$test" ] || continue
+            test_pid="${test##*.}"
+            [[ "$test_pid" =~ ^[1-9][0-9]*$ ]] || continue
+            if ! kill -0 "$test_pid" 2>/dev/null; then
+                rm -f -- "$test"
+                continue
+            fi
+            {
+                IFS= read -r test_rom && IFS= read -r test_bundle
+            } < "$test" || continue
+            [ "$test_rom" = "$rom" ] || continue
+            if [ "$test_bundle" = __GLOBAL__ ]; then
+                log "gameStart selected=test-global:$global_state"
+                apply_state "$global_state"
+            elif [[ -n "$test_bundle" && "$test_bundle" != */* ]] &&
+                 [ -d "$BUNDLE_DIR/$test_bundle/x32" ] && [ -d "$BUNDLE_DIR/$test_bundle/x64" ]; then
+                log "gameStart selected=test:$test_bundle"
+                apply_state "$test_bundle"
+            else
+                log "gameStart test_bundle_invalid=$test_bundle selected=global:$global_state"
+                apply_state "$global_state"
+            fi
+            exit 0
+        done
         override=""
         if [ -s "$GAME_FILE" ]; then
-            override="$(awk -F '\t' -v p="$rom" '$2==p {v=$1} END{print v}' "$GAME_FILE")"
+            override="$(DXVK_ROM="$rom" awk -F '\t' '$2==ENVIRON["DXVK_ROM"] {v=$1} END{print v}' "$GAME_FILE")"
         fi
 
         log "gameStart override=$override global=$global_state"

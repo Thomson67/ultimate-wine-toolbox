@@ -573,7 +573,7 @@ wsq_resume_update() {
     # prefix/game_name/snapshot/exe_rel/runner are local to wsq_resume_build.
     local game_name="$game_name"
     local metadata phase save_rel save_kind test_save archive staged backup log original_name prepared_save final_mode="" new_archive=0
-    local ready_review ready_kind skip_save_prepare=0
+    local ready_review ready_kind skip_save_prepare=0 dxvk_archive_bundle dxvk_test_bundle
     local -a commit_args=()
     metadata="$(wsq_state_value metadata)"; phase="$(wsq_state_value phase)"; log="$(wsq_state_value update_log)"
     ready_review="$(wsq_state_value save_review_ready)"; ready_kind="$(wsq_state_value save_ready_kind)"
@@ -666,6 +666,12 @@ wsq_resume_update() {
             return 13
         }
     fi
+    dxvk_archive_bundle="$(wsq_state_value dxvk_archive_bundle)" || return 1
+    dxvk_test_bundle="$(wsq_state_value dxvk_test_bundle)" || return 1
+    if [ -z "$dxvk_archive_bundle" ] && [ -n "$dxvk_test_bundle" ]; then
+        dxvk_archive_bundle="$(wsq_confirm_archive_dxvk_bundle "$dxvk_test_bundle" "$archive")"
+        wsq_update_state dxvk_archive_bundle "$dxvk_archive_bundle" || return 1
+    fi
     [ "$final_mode" != replace ] || commit_args+=(--replace)
     # Also cover older pending operations already marked ready. Never compress
     # links to a current or previous test-save tree, even if integrity is skipped.
@@ -691,6 +697,7 @@ wsq_resume_update() {
         --backup-dir "$WSQ_STATE_DIR/config-backups" >> "$log" 2>&1 || {
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_runner_finalize_failed "$archive")"; return
     }
+    wsq_apply_archive_dxvk_bundle "$archive" "$(wsq_state_value dxvk_archive_bundle)" || return 1
     python3 "$WSQ_UPDATE_HELPER" cleanup-test "$metadata" >> "$log" 2>&1 || {
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
     }

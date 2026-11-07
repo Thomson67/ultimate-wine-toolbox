@@ -64,6 +64,86 @@ wsq_post_build_menu
         self.assertNotIn('update', options)
         self.assertEqual((self.home/'action').read_text().strip(), 'create')
 
+    def test_dxvk_test_selection_inherits_then_overrides_without_persisting_until_confirmation(self):
+        self.shell(r'''
+source "$WT_ROOT/modules/dxvk-manager.sh"
+prefix="$TEST_PREFIX"
+archive="$WT_HOME/Game.wsquashfs"
+final="$WT_HOME/Game renamed.wsquashfs"
+mkdir -p "$DXVK_BUNDLE_DIR/Bundle-2/x32" "$DXVK_BUNDLE_DIR/Bundle-2/x64"
+dxvk_set_game_bundle "$archive" Bundle-1
+dxvk_set_game_bundle "$prefix" Prefix-bundle
+wsq_update_state mode update archive "$archive"
+[[ "$(wsq_dxvk_test_override)" = Bundle-1 ]] || exit 1
+menu_select() { printf '%s\n' "$@" > "$WT_HOME/dxvk-menu"; echo 2; }
+wsq_retry_pending() { touch "$WT_HOME/dxvk-retry"; }
+wsq_change_test_dxvk_bundle || exit 2
+[[ "$(wsq_dxvk_test_override)" = Bundle-2 && -f "$WT_HOME/dxvk-retry" ]] || exit 3
+[[ "$(dxvk_game_bundle "$archive")" = Bundle-1 && "$(dxvk_game_bundle "$prefix")" = Prefix-bundle ]] || exit 4
+yesno_default_no() { return 1; }
+wsq_apply_archive_dxvk_bundle "$archive" "$(wsq_confirm_archive_dxvk_bundle Bundle-2 "$archive")" || exit 5
+[[ "$(dxvk_game_bundle "$archive")" = Bundle-1 ]] || exit 6
+yesno_default_no() { return 0; }
+wsq_apply_archive_dxvk_bundle "$final" "$(wsq_confirm_archive_dxvk_bundle Bundle-2 "$final")" || exit 7
+[[ "$(dxvk_game_bundle "$final")" = Bundle-2 ]] || exit 8
+wsq_apply_archive_dxvk_bundle "$final" __GLOBAL__ || exit 9
+[[ -z "$(dxvk_game_bundle "$final")" && "$(dxvk_game_bundle "$archive")" = Bundle-1 ]]
+''')
+        self.assertIn("Bundle-1", (self.home/'dxvk-menu').read_text())
+
+    def test_dxvk_test_bundle_survives_a_runner_change_during_creation(self):
+        self.shell(r'''
+wsq_update_state mode create dxvk_test_bundle __GLOBAL__
+wsq_save_state "$TEST_PREFIX" Game "$TEST_SNAPSHOT" drive_c/game/Game.exe custom-runner || exit 1
+[[ "$(wsq_dxvk_test_override)" = __GLOBAL__ ]]
+''')
+
+    def test_dxvk_test_handoff_applies_only_to_the_launched_prefix(self):
+        port = (ROOT/'toolbox/ports/Ultimate Wine Toolbox.sh').read_text()
+        monitor = port.split('monitor_wsq_launch() {',1)[1].split('\nresume_wsq_unavailable()',1)[0]
+        hook = (ROOT/'toolbox/hooks/dxvk-game-event.sh').read_text()
+        hook = hook.replace('ROOT="/userdata/system/ultimate-wine-toolbox"', 'ROOT="$WT_HOME"')
+        hook = hook.replace('DXVK_PATH="/userdata/system/wine/dxvk"', 'DXVK_PATH="$WT_HOME/active-dxvk"')
+        hook = hook.replace('LOG_DIR="/userdata/system/logs/ultimate-wine-toolbox"', 'LOG_DIR="$WT_HOME/logs"')
+        (self.home/'dxvk-hook.sh').write_text(hook)
+        self.shell('monitor_wsq_launch() {'+monitor+r'''
+source "$WT_ROOT/modules/dxvk-manager.sh"
+export WT_HOME
+STATE_DIR="$WSQ_STATE_DIR"
+BOOT_LOG="$WT_HOME/port.log"; RESULT_FILE="$STATE_DIR/wsq-launch-result"
+mkdir -p "$DXVK_CONFIG_DIR"
+for bundle in Global Test Individual; do
+    mkdir -p "$DXVK_BUNDLE_DIR/$bundle/x32" "$DXVK_BUNDLE_DIR/$bundle/x64"
+done
+printf '%s\n' Global > "$DXVK_GLOBAL_FILE"
+dxvk_set_game_bundle "$TEST_PREFIX" Individual || exit 1
+wsq_update_state dxvk_test_bundle Test || exit 2
+wsq_request_game_launch "$TEST_PREFIX" || exit 3
+{
+    IFS= read -r launch_rom
+    IFS= read -r launch_dxvk_bundle
+} < "$STATE_DIR/launch-game.request"
+[[ "$launch_rom" = "$TEST_PREFIX" && "$launch_dxvk_bundle" = Test ]] || exit 4
+launch_game_via_es() {
+    bash "$WT_HOME/dxvk-hook.sh" gameStart windows '' '' "$WT_HOME/Other.wine"
+    [[ "$(readlink "$WT_HOME/active-dxvk")" = "$DXVK_BUNDLE_DIR/Global" ]] || exit 5
+    bash "$WT_HOME/dxvk-hook.sh" gameStart windows '' '' "$1"
+    [[ "$(readlink "$WT_HOME/active-dxvk")" = "$DXVK_BUNDLE_DIR/$EXPECTED" ]] || exit 6
+}
+wait_for_game_start() { GAME_STARTED_AT=$SECONDS; }
+wait_for_game_stop() { bash "$WT_HOME/dxvk-hook.sh" gameStop windows '' '' "$launch_rom"; }
+resume_wsquashfs_toolbox() { :; }
+EXPECTED=Test
+monitor_wsq_launch
+[[ "$(readlink "$WT_HOME/active-dxvk")" = "$DXVK_BUNDLE_DIR/Global" ]] || exit 7
+! compgen -G "$STATE_DIR/wsq-dxvk-test.*" >/dev/null || exit 8
+bash "$WT_HOME/dxvk-hook.sh" gameStart windows '' '' "$launch_rom"
+[[ "$(readlink "$WT_HOME/active-dxvk")" = "$DXVK_BUNDLE_DIR/Individual" ]] || exit 9
+launch_dxvk_bundle=__GLOBAL__; EXPECTED=Global
+monitor_wsq_launch
+[[ "$(dxvk_game_bundle "$launch_rom")" = Individual ]]
+''')
+
     def test_extraction_report_captures_stdout_stderr_and_failure_with_or_without_dialog(self):
         for graphical in (0, 1):
             with self.subTest(dialog=graphical):

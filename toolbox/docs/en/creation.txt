@@ -16,6 +16,7 @@ The system default runner is offered first. Custom runners follow, with UMU runn
 3. TEST AND CREATE A SAVE
 The game launches for testing. Play long enough to create a real save, then close the game.
 The Toolbox reopens and asks you to confirm the launch. If there is a problem, retry, change the runner or adjust the available options.
+In creation and update tests, open the game options and choose “Change the DXVK / VKD3D bundle and relaunch”. Select an installed bundle or follow the global setting. The first update test uses the archive’s per-game bundle if one is assigned. When finalizing, choose whether to assign the tested setting to the final WSquashFS, including after a rename. A runner that ships its own DXVK may give it priority.
 For controller problems, test game options one at a time: HIDRAW, then if needed HIDRAW-to-XInput conversion for PlayStation controllers with a compatible Proton runner (PROTON_SONY_HIDRAW_XINPUT). This is not a universal fix. DXVK/VKD3D/NVAPI, FPS limit, large address awareness and virtual desktop remain available. Review / change the game executable corrects the launch; Install additional Winetricks adds components before retesting.
 
 4. SELECT THE SAVE LOCATION

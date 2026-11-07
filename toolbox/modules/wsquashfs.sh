@@ -509,7 +509,7 @@ data = {}
 try:
     with open(path, encoding="utf-8") as f:
         old = json.load(f)
-    if old.get("prefix") == prefix and old.get("mode") == "update":
+    if old.get("prefix") == prefix and (old.get("mode") == "update" or old.get("snapshot") == snapshot):
         data = old
 except (OSError, ValueError):
     pass
@@ -557,12 +557,17 @@ wsq_restart_emulationstation_deferred() {
 }
 
 wsq_request_game_launch() {
-    local rom="$1"
+    local rom="$1" bundle request
     python3 "$WSQ_UPDATE_HELPER" profiles "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || return 1
-    mkdir -p "$WSQ_STATE_DIR"
+    bundle="$(wsq_dxvk_test_override)" || return 1
+    mkdir -p "$WSQ_STATE_DIR" || return 1
+    request="$(mktemp "$WSQ_STATE_DIR/.wsq-launch.XXXXXX")" || return 1
     rm -f -- "$WSQ_STATE_DIR/wsq-launch-result"
-    printf '%s\n' "$rom" > "$WSQ_STATE_DIR/launch-game.request"
-    return 0
+    if ! { printf '%s\n' "$rom" && { [ -z "$bundle" ] || printf '%s\n' "$bundle"; }; } > "$request" ||
+       ! mv -f -- "$request" "$WSQ_STATE_DIR/launch-game.request"; then
+        rm -f -- "$request"
+        return 1
+    fi
 }
 
 wsq_create_new() {
@@ -661,7 +666,7 @@ wsq_create_new() {
         return
     fi
 
-    wsq_save_state "$target" "$game_name" "$snapshot" "$exe_rel" "$runner"
+    wsq_save_state "$target" "$game_name" "$snapshot" "$exe_rel" "$runner" || return
 
     msgbox "$(i18n wsq_create_title)" \
         "$(i18n wsq_test_ready "$target" "$rom_name")"
@@ -1332,6 +1337,49 @@ wsq_game_option() {
         "$(basename "$prefix")" "$2" "${@:3}"
 }
 
+wsq_dxvk_test_override() {
+    local bundle archive
+    bundle="$(wsq_state_value dxvk_test_bundle)" || return 1
+    if [ -n "$bundle" ]; then
+        printf '%s\n' "$bundle"
+    elif [ -s "${DXVK_GAME_FILE:-}" ]; then
+        archive="$(wsq_state_value archive)" || return 1
+        [ -z "$archive" ] || dxvk_game_bundle "$archive"
+    fi
+}
+
+wsq_change_test_dxvk_bundle() {
+    local current bundle
+    current="$(wsq_dxvk_test_override)" || return 1
+    [ -n "$current" ] || current="$(dxvk_game_bundle "$prefix")" || return 1
+    bundle="$(dxvk_choose_bundle_value test "$current")" || return 1
+    wsq_update_state dxvk_test_bundle "$bundle" dxvk_archive_bundle "" || return 1
+    wsq_retry_pending
+}
+
+wsq_confirm_archive_dxvk_bundle() {
+    local bundle="$1" archive="$2" label="$1"
+    [ -n "$bundle" ] || return 0
+    [ "$bundle" != __GLOBAL__ ] || label="$(i18n wsq_dxvk_follow_global)"
+    if yesno_default_no "$(i18n dxvk_per_game)" "$(i18n wsq_dxvk_keep "$(basename "$archive")" "$label")"; then
+        printf '%s' "$bundle"
+    else
+        printf '%s' __UNCHANGED__
+    fi
+}
+
+wsq_apply_archive_dxvk_bundle() {
+    local archive="$1" bundle="$2"
+    case "$bundle" in
+        ''|__UNCHANGED__) return 0 ;;
+        __GLOBAL__) bundle="" ;;
+    esac
+    dxvk_set_game_bundle "$archive" "$bundle" || {
+        msgbox "$(i18n wsq_dxvk_test)" "$(i18n wsq_dxvk_save_failed "$archive")"
+        return 1
+    }
+}
+
 wsq_game_options_menu() {
     local key value label choice
     local -a items=()
@@ -1346,6 +1394,7 @@ wsq_game_options_menu() {
             esac
             items+=("$key" "$(i18n "wsq_option_$key") : $label")
         done
+        items+=("dxvk_bundle" "$(i18n wsq_dxvk_test)")
         value="$(python3 "$WT_ROOT/helpers/autorun_env.py" get "$prefix/autorun.cmd")" || return 1
         if [ "$value" = 1 ]; then label="$(i18n enabled)"; else label="$(i18n disabled)"; fi
         items+=("umu_direct_game" "$(i18n wsq_umu_direct_title) : $label")
@@ -1357,8 +1406,9 @@ wsq_game_options_menu() {
         esac
         items+=("sony_xinput" "$(i18n wsq_sony_xinput_title) : $label")
         items+=("relaunch" "$(i18n wsq_options_relaunch)" "back" "$(i18n back)")
-        choice="$(menu_select "$(i18n wsq_options_title)" "$(i18n wsq_options_prompt)" "${items[@]}")" || return 1
+        choice="$(menu_select "$(i18n wsq_options_title)" "$(i18n wsq_test_options_prompt)" "${items[@]}")" || return 1
         case "$choice" in
+            dxvk_bundle) wsq_change_test_dxvk_bundle ;;
             umu_direct_game)
                 value="$(menu_select "$(i18n wsq_umu_direct_title)" "$(i18n wsq_umu_direct_body)" "1" "$(i18n enabled)" "0" "$(i18n disabled)")" || continue
                 case "$value" in 0|1) ;; *) continue ;; esac
@@ -1697,6 +1747,8 @@ wsq_resume_build() {
     if [ -n "${WSQ_LAST_SAVE_BACKUP:-}" ]; then
         msgbox "$(i18n wsq_save_title)" "$(i18n wsq_save_backup_done "$WSQ_LAST_SAVE_BACKUP")"
     fi
+    local dxvk_test_bundle dxvk_archive_bundle
+    dxvk_test_bundle="$(wsq_state_value dxvk_test_bundle)" || return 1
     WSQ_LAST_SAVE_BACKUP=""
     WSQ_ALLOW_KEEP_EXISTING=0
     rm -f -- "$snapshot" "$WSQ_STATE_FILE"
@@ -1764,11 +1816,13 @@ wsq_resume_build() {
             return
         fi
 
+        dxvk_archive_bundle="$(wsq_confirm_archive_dxvk_bundle "$dxvk_test_bundle" "$archive")"
         if maintenance_squash_wine "$prefix" "$archive" ask-quick; then
             wsq_finalize_runner_config "$final_game_name" "$runner" "$prefix" || {
                 msgbox "$(i18n wsq_create_title)" "$(i18n wsq_runner_finalize_failed "$archive")"
                 return
             }
+            wsq_apply_archive_dxvk_bundle "$archive" "$dxvk_archive_bundle" || return 1
 
             if [ -n "${WSQ_LAST_ARCHIVE_BACKUP:-}" ]; then
                 msgbox "$(i18n wsq_archive_conflict_title)" \

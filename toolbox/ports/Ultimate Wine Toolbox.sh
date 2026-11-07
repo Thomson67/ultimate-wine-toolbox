@@ -245,13 +245,21 @@ finish_amx_live() {
 }
 
 monitor_wsq_launch() {
-    local result diagnostic_pid=""
+    local result="" diagnostic_pid="" dxvk_test=""
+    if [ -n "${launch_dxvk_bundle:-}" ]; then
+        dxvk_test="$STATE_DIR/wsq-dxvk-test.$BASHPID"
+        if ! printf '%s\n' "$launch_rom" "$launch_dxvk_bundle" > "$dxvk_test.tmp" ||
+           ! mv -f -- "$dxvk_test.tmp" "$dxvk_test"; then
+            echo 'ERROR: failed to prepare the WSquashFS test bundle.' >> "$BOOT_LOG"
+            result=launch_failed
+        fi
+    fi
     if [ ! -f "$AMX_REQUEST" ] && [ -f "$DIAG_REQUEST" ]; then
         python3 /userdata/system/ultimate-wine-toolbox/toolbox/helpers/reshade_diagnostic.py \
             --home /userdata/system/ultimate-wine-toolbox observe "$launch_rom" >> "$BOOT_LOG" 2>&1 &
         diagnostic_pid=$!
     fi
-    if ! launch_game_via_es "$launch_rom"; then
+    if [ -n "$result" ] || ! launch_game_via_es "$launch_rom"; then
         result="launch_failed"
     elif ! wait_for_game_start; then
         result="start_unconfirmed"
@@ -262,6 +270,9 @@ monitor_wsq_launch() {
         else
             result="normal"
         fi
+    fi
+    if [ -n "$dxvk_test" ]; then
+        rm -f -- "$dxvk_test" "$dxvk_test.tmp"
     fi
     if [ -n "$diagnostic_pid" ]; then
         : > "$STATE_DIR/reshade-diagnostic.stop"
@@ -314,8 +325,12 @@ resume_wsquashfs_toolbox() {
 }
 
 launch_rom=""
+launch_dxvk_bundle=""
 if [ -f "$LAUNCH_REQUEST" ]; then
-    IFS= read -r launch_rom < "$LAUNCH_REQUEST" || true
+    {
+        IFS= read -r launch_rom || true
+        IFS= read -r launch_dxvk_bundle || true
+    } < "$LAUNCH_REQUEST"
     rm -f -- "$LAUNCH_REQUEST"
     echo "es_launch_requested=1" >>"$BOOT_LOG"
 fi

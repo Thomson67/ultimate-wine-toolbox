@@ -16,6 +16,7 @@ Le runner par défaut du système est proposé en premier. Les runners personnal
 3. TESTER ET CRÉER UNE SAUVEGARDE
 Le jeu est lancé pour un test. Jouez suffisamment pour créer une véritable sauvegarde, puis fermez le jeu.
 La Toolbox se relance et vous demande de valider le lancement. En cas de problème, vous pouvez relancer, changer de runner ou ajuster les options proposées.
+En création comme en mise à jour, ouvrez les options du jeu pour choisir « Changer le bundle DXVK / VKD3D et relancer ». Sélectionnez un bundle installé ou suivez le réglage global. Le premier test d’une mise à jour reprend le bundle individuel de l’archive s’il existe. À la finalisation, choisissez si le réglage testé doit être associé au WSquashFS, y compris si son nom a changé. Un runner qui embarque son propre DXVK peut lui donner la priorité.
 En cas de problème de manette, tester les options par jeu une à une : HIDRAW, puis si nécessaire la conversion HIDRAW en XInput pour les manettes PlayStation avec un runner Proton compatible (PROTON_SONY_HIDRAW_XINPUT). Ce n’est pas un correctif universel. Les options DXVK/VKD3D/NVAPI, limiteur de FPS, adresses larges et bureau virtuel restent disponibles. Vérifier / modifier le choix de l’exécutable du jeu corrige le lancement ; Installer des Winetricks supplémentaires permet d’ajouter des composants avant de retester.
 
 4. CHOISIR L'EMPLACEMENT DES SAUVEGARDES

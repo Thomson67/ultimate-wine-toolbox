@@ -444,21 +444,25 @@ dxvk_use_batocera_default() {
 dxvk_game_bundle() {
     local path="$1"
     [ -s "$DXVK_GAME_FILE" ] || return 0
-    awk -F '\t' -v p="$path" '$2==p {v=$1} END{print v}' "$DXVK_GAME_FILE"
+    DXVK_ROM="$path" awk -F '\t' '$2==ENVIRON["DXVK_ROM"] {v=$1} END{print v}' "$DXVK_GAME_FILE"
 }
 
-dxvk_set_game_bundle() {
+dxvk_set_game_bundle() (
     local path="$1" bundle="$2" tmp
-    mkdir -p "$DXVK_CONFIG_DIR"
-    tmp="$(mktemp /tmp/wt-dxvk-games.XXXXXX)" || return 1
+    case "$path$bundle" in *$'\t'*|*$'\n'*|*$'\r'*) return 1 ;; esac
+    mkdir -p "$DXVK_CONFIG_DIR" || return 1
+    exec 8>"$DXVK_CONFIG_DIR/dxvk-games.lock" || return 1
+    flock -x 8 || return 1
+    tmp="$(mktemp "$DXVK_CONFIG_DIR/.dxvk-games.XXXXXX")" || return 1
+    trap 'rm -f -- "$tmp"' EXIT
 
     if [ -s "$DXVK_GAME_FILE" ]; then
-        awk -F '\t' -v p="$path" '$2!=p' "$DXVK_GAME_FILE" > "$tmp"
+        DXVK_ROM="$path" awk -F '\t' '$2!=ENVIRON["DXVK_ROM"]' "$DXVK_GAME_FILE" > "$tmp" || return 1
     fi
 
-    [ -n "$bundle" ] && printf '%s\t%s\n' "$bundle" "$path" >> "$tmp"
-    mv -f "$tmp" "$DXVK_GAME_FILE"
-}
+    [ -z "$bundle" ] || printf '%s\t%s\n' "$bundle" "$path" >> "$tmp" || return 1
+    mv -f -- "$tmp" "$DXVK_GAME_FILE"
+)
 
 dxvk_list_games() {
     [ -d "/userdata/roms/windows" ] || return 0
@@ -470,21 +474,40 @@ dxvk_list_games() {
 }
 
 dxvk_choose_bundle_value() {
-    local rows="" name idx=1 choice
-    local -a items=()
+    local mode="${1:-}" current="${2:-}" name choice label prompt global_bundle global_label
+    local -a items=() bundles=()
+
+    if [ "$mode" = test ]; then
+        global_bundle="$(head -n 1 "$DXVK_GLOBAL_FILE" 2>/dev/null)" || global_bundle=""
+        case "$global_bundle" in
+            batocera) global_bundle="$(i18n dxvk_batocera_default)" ;;
+            '') global_bundle="$(dxvk_status)" ;;
+        esac
+        global_label="$(i18n wsq_dxvk_follow_global) — $global_bundle"
+        bundles=(__GLOBAL__)
+        items=(1 "$global_label")
+        case "$current" in ''|__GLOBAL__) current="$global_label" ;; esac
+        prompt="$(i18n wsq_dxvk_choose "$current")"
+    else
+        prompt="$(i18n dxvk_choose_bundle_for_games)"
+    fi
 
     while IFS= read -r name; do
         [ -n "$name" ] || continue
-        items+=("$idx" "$name")
-        rows+="$name"$'\n'
-        idx=$((idx+1))
+        label="$name"
+        if [ "$mode" = test ]; then
+            [ -d "$DXVK_BUNDLE_DIR/$name/x64" ] && [ -d "$DXVK_BUNDLE_DIR/$name/x32" ] || continue
+            [ "$name" != "$current" ] || label+=" — $(i18n wsq_dxvk_current)"
+        fi
+        bundles+=("$name")
+        items+=("${#bundles[@]}" "$label")
     done < <(dxvk_list_bundles)
 
     [ "${#items[@]}" -gt 0 ] || return 1
 
-    choice="$(WT_MENU_LIST=1 menu_select "$(i18n dxvk_per_game)" "$(i18n dxvk_choose_bundle_for_games)" "${items[@]}" "0" "$(i18n back)")" || return 1
-    [ "$choice" != "0" ] && [ -n "$choice" ] || return 1
-    sed -n "${choice}p" <<< "$rows"
+    choice="$(WT_MENU_LIST=1 menu_select "$(i18n dxvk_per_game)" "$prompt" "${items[@]}" "0" "$(i18n back)")" || return 1
+    [[ "$choice" =~ ^[1-9][0-9]*$ ]] && [ "$choice" -le "${#bundles[@]}" ] || return 1
+    printf '%s\n' "${bundles[$((choice-1))]}"
 }
 
 dxvk_assign_games_menu() {
