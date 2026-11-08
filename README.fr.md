@@ -6,7 +6,14 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.11.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.1).**
+**Version stable : [v0.11.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.2).**
+
+## Nouveautés de la v0.11.2
+
+- Création et mise à jour des WSquashFS. Changez de bundle DXVK / VKD3D depuis les options du jeu testé, puis choisissez si le réglage doit suivre l’archive finale.
+- AntiMicroX. Dupliquez un profil existant pour un jeu et modifiez sa copie indépendamment du profil partagé.
+
+[Notes de version v0.11.2](release-notes/v0.11.2.md)
 
 ## Nouveautés de la v0.11.1 : packs communautaires
 

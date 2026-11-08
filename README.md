@@ -6,7 +6,14 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.11.1](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.1).**
+**Stable version: [v0.11.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.2).**
+
+## New in v0.11.2
+
+- WSquashFS creation and updates. Switch DXVK / VKD3D bundles from the test game's options and choose whether to save the setting for the final archive.
+- AntiMicroX. Duplicate an existing profile for a game and edit its copy independently of the shared profile.
+
+[v0.11.2 release notes](release-notes/v0.11.2.md)
 
 ## New in v0.11.1: community bundles
 
