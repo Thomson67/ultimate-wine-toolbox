@@ -1,0 +1,45 @@
+name: Publish AntiMicroX Pad2Key test prerelease
+on:
+  push:
+    branches: ["release-test/v0.11.3-dev1"]
+    paths:
+      - .github/workflows/pad2key-test-release.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      TAG: v0.11.3-dev1
+      SOURCE: 38e45171d53561f6b4e572cf794bfab982782701
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 38e45171d53561f6b4e572cf794bfab982782701
+      - name: Verify and package the prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE"
+          test "$(cat VERSION)" = "${TAG#v}"
+          find toolbox -name '*.sh' -type f -print0 | xargs -0 -n 1 bash -n
+          bash -n package-install.sh
+          root="Ultimate-Wine-Toolbox-$TAG"
+          mkdir dist
+          git archive --format=zip --prefix="$root/" --output="dist/$root.zip" "$SOURCE" \
+            VERSION package-install.sh uninstall.sh README.md README.fr.md RELEASING.md release-notes docs community-catalog toolbox
+          cd dist
+          sha256sum "$root.zip" > "$root.zip.sha256"
+          sha256sum -c "$root.zip.sha256"
+      - name: Publish the GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset="dist/Ultimate-Wine-Toolbox-$TAG.zip"
+          gh release create "$TAG" "$asset" "$asset.sha256" --target "$SOURCE" \
+            --title "Ultimate Wine Toolbox $TAG" --notes-file "release-notes/$TAG.md" \
+            --prerelease --latest=false
