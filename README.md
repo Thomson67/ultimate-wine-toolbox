@@ -6,7 +6,13 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.11.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.2).**
+**Stable version: [v0.11.3](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.3).**
+
+## New in v0.11.3
+
+- AntiMicroX. Remove a game assignment or delete a profile after manually deleting its suspended Pad2Key file. The original mapping is kept in the recovery directory.
+
+[v0.11.3 release notes](release-notes/v0.11.3.md)
 
 ## New in v0.11.2
 

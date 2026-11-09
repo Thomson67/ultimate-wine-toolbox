@@ -6,7 +6,13 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.11.2](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.2).**
+**Version stable : [v0.11.3](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.3).**
+
+## Nouveautés de la v0.11.3
+
+- AntiMicroX. Retirez l’association à un jeu ou supprimez un profil après avoir supprimé manuellement son fichier Pad2Key suspendu. Le mapping d’origine est archivé dans le dossier de récupération.
+
+[Notes de version v0.11.3](release-notes/v0.11.3.md)
 
 ## Nouveautés de la v0.11.2
 
