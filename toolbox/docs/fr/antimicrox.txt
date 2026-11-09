@@ -44,7 +44,7 @@ Pour un jeu classique : désactiver son association en gardant le profil, ou sup
 CONVERTIR UN PAD2KEY
 Convertir un Pad2Key (.keys) en profil permet de choisir le jeu ou un fichier .keys. Le bilan indique les commandes convertibles et les limites. Les combinaisons Hotkey identifiables sont prises en charge ; Hotkey+Start n’est pas ajouté sans définition explicite dans le fichier source.
 
-La conversion conserve l’original. À l’activation, le Pad2Key du joueur 1 est sauvegardé et suspendu pour éviter le double mapping. Retirer l’association restaure l’original. Si le .keys a changé, suivre le message de reconversion pour préserver ses modifications. Les autres joueurs ne reçoivent pas automatiquement des profils AntiMicroX distincts.
+La conversion conserve l’original. À l’activation, le Pad2Key du joueur 1 est sauvegardé et suspendu pour éviter le double mapping. Retirer l’association restaure l’original. Si le .keys suspendu a été supprimé manuellement, le retrait respecte sa suppression et archive l’original dans state/antimicrox-pad2key-recoveries. Si le fichier a été modifié, suivre le message de reconversion pour préserver les modifications. Les autres joueurs ne reçoivent pas automatiquement des profils AntiMicroX distincts.
 
 PARTAGER ET TRANSFÉRER
 Télécharger ou partager des profils donne accès au catalogue. Téléchargé repère une copie locale disponible ; modifié indique une copie retouchée. Vérifier les commandes et la Hotkey avant association. Une copie locale peut être réutilisée sans téléchargement.

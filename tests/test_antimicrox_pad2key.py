@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 from pathlib import Path
@@ -125,6 +126,40 @@ class Pad2KeyTests(unittest.TestCase):
             self.assertEqual(store.cfg.read_bytes(), cfg)
             self.assertIn(str(rom), store.read(store.state))
 
+    def test_manually_deleted_pad2key_stays_absent_when_removing_assigned_profile(self):
+        for delete_profile in (False, True):
+            with self.subTest(delete_profile=delete_profile), tempfile.TemporaryDirectory() as folder:
+                userdata, home, rom, keys, original, profile, store = self.setup_game(folder)
+                store.assign(str(rom), str(profile))
+                keys.unlink()
+                if delete_profile:
+                    profiles = Profiles(home, userdata, active=lambda: False)
+                    token = profiles.plan(str(profile))[-1]
+                    profiles.delete(str(profile), token)
+                else:
+                    store.assign(str(rom), '')
+                self.assertFalse(keys.exists())
+                self.assertEqual(profile.exists(), not delete_profile)
+                self.assertEqual(store.cfg.read_text(), '')
+                self.assertEqual(store.read(store.state), {})
+                archive, = store.recoveries.glob('*.json')
+                record = json.loads(archive.read_text())
+                self.assertEqual(record['rom'], str(rom))
+                self.assertEqual(base64.b64decode(record['previous_backup']['original']), original)
+                self.assertEqual(record['previous_backup']['mode'], 0o640)
+
+    def test_failed_archive_write_keeps_the_backup_and_assignment(self):
+        with tempfile.TemporaryDirectory() as folder:
+            _, _, rom, keys, _, profile, store = self.setup_game(folder)
+            store.assign(str(rom), str(profile))
+            keys.unlink()
+            with patch('antimicrox_pad2key_state.atomic', side_effect=OSError('no space')):
+                with self.assertRaisesRegex(OSError, 'no space'):
+                    store.assign(str(rom), '')
+            self.assertFalse(keys.exists())
+            self.assertEqual(store.cfg.read_text(), f'{rom}\t{profile}\n')
+            self.assertIn(str(rom), store.read(store.state))
+
     def test_copy_assigns_a_separate_file_and_keeps_conversion_behavior(self):
         with tempfile.TemporaryDirectory() as folder:
             _, _, rom, keys, original, profile, store = self.setup_game(folder)
@@ -184,7 +219,6 @@ class Pad2KeyTests(unittest.TestCase):
             self.assertEqual(keys.read_bytes(), original)
 
     def test_reconverted_current_pad2key_is_adopted_and_previous_backup_is_archived(self):
-        import base64
         with tempfile.TemporaryDirectory() as folder:
             userdata, home, rom, keys, original, profile, store = self.setup_game(folder)
             store.assign(str(rom), str(profile))

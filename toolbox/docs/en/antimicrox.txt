@@ -44,7 +44,7 @@ For a classic game: disable its assignment while keeping the profile, or explici
 CONVERT PAD2KEY
 Convert a Pad2Key (.keys) file to a profile selects a game or .keys file. The report lists supported mappings and limits. Identifiable Hotkey combinations are supported; Hotkey+Start is not added unless explicitly defined in the source.
 
-Conversion preserves the original. Activation backs up and suspends player-one Pad2Key to avoid duplicate mappings. Removing the assignment restores it. If the .keys file changed, follow the reconversion message to keep those changes. Other players do not automatically get separate AntiMicroX profiles.
+Conversion preserves the original. Activation backs up and suspends player-one Pad2Key to avoid duplicate mappings. Removing the assignment restores it. If the suspended .keys file was manually deleted, removing the assignment keeps the file absent and archives the original in state/antimicrox-pad2key-recoveries. If the file was edited, follow the reconversion message to keep those changes. Other players do not automatically get separate AntiMicroX profiles.
 
 SHARE AND TRANSFER
 Download or share profiles opens the catalogue. Downloaded marks an available local copy; modified marks an edited copy. Check controls and Hotkey before assignment. Local copies can be reused without another download.

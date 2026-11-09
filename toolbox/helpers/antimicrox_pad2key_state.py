@@ -19,6 +19,7 @@ class Pad2KeyStore:
         self.cfg = self.home/'config/antimicrox-games.tsv'
         self.state = self.home/'state/antimicrox-pad2key-backups.json'
         self.registry = self.home/'state/antimicrox-pad2key-conversions.json'
+        self.recoveries = self.home/'state/antimicrox-pad2key-recoveries'
 
     def read(self, path):
         value = json.loads(path.read_text()) if path.exists() else {}
@@ -105,7 +106,7 @@ class Pad2KeyStore:
         atomic(self.state, json.dumps(entries, ensure_ascii=False, indent=2).encode())
         atomic(path, disabled, entries[rom]['mode'])
 
-    def restore(self, roms):
+    def restore(self, roms, *, keep_deleted=True):
         entries = self.read(self.state)
         count = len(entries)
         for rom in roms:
@@ -118,9 +119,16 @@ class Pad2KeyStore:
             original = base64.b64decode(entry['original'], validate=True) if entry['original'] is not None else None
             disabled = base64.b64decode(entry['disabled'], validate=True)
             current = path.read_bytes() if path.exists() else None
-            if current not in (disabled, original):
+            if current is None and original is not None and keep_deleted:
+                # Respect a manual deletion. Save the previous mapping before
+                # retiring the active backup, using the same path on a retry.
+                record = {'rom': rom, 'previous_backup': entry, 'reason': 'keys_deleted'}
+                data = json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True).encode()
+                archive = self.recoveries/(hashlib.sha256(data).hexdigest()+'.json')
+                atomic(archive, data)
+            elif current not in (disabled, original):
                 raise ValueError(f'Pad2Key modified externally: {path}. Backup retained; no overwrite.')
-            if original is None:
+            elif original is None:
                 path.unlink(missing_ok=True)
             elif current != original:
                 atomic(path, original, entry['mode'])
@@ -182,7 +190,7 @@ class Pad2KeyStore:
                         raise ValueError('Finish the live editing session before adopting a modified Pad2Key')
                     if suspended[rom].get('path') != str(path):
                         raise ValueError('Invalid Pad2Key backup path; backup retained')
-                    archive = self.home/'state/antimicrox-pad2key-recoveries'/(uuid.uuid4().hex+'.json')
+                    archive = self.recoveries/(uuid.uuid4().hex+'.json')
                     extra.append(archive)
                     adoption = (path, current, stat.S_IMODE(path.stat().st_mode), archive)
             if converted and rom not in suspended:
@@ -243,4 +251,5 @@ class Pad2KeyStore:
         with self.locked():
             roms = list(self.read(self.state))
             with self.transaction(roms):
-                self.restore(roms)
+                # The uninstaller removes the recovery directory afterwards.
+                self.restore(roms, keep_deleted=False)
