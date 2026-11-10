@@ -505,10 +505,15 @@ wsq_update_review_save() {
     savefiles="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" savefiles)" || return 1
     legacy="$(python3 "$WSQ_UPDATE_HELPER" legacy-summary "$metadata")" || return 1
     preserve_links="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" preserve_save_links)" || return 1
-    if [ "$preserve_links" = True ]; then
+    if [ "$preserve_links" = True ] && [ -n "$legacy$savedir$savefiles" ]; then
+        local live_locations="$legacy"
+        if [ -n "$savedir" ]; then
+            live_locations="$live_locations"$'\n'"SAVEDIR=$savedir"
+            if [ -n "$savefiles" ]; then live_locations="$live_locations  SAVEFILES=$savefiles"; fi
+        fi
         while true; do
             choice="$(menu_select "$(i18n wsq_update_save_title)" \
-                "$(i18n wsq_update_links_live "$(wsq_display_path "$legacy")")" \
+                "$(i18n wsq_update_links_live "$(wsq_display_path "$live_locations")")" \
                 keep "$(i18n wsq_update_links_keep)" \
                 inspect-existing "$(i18n wsq_inspect_existing_save)" \
                 retry "$(i18n wsq_no_save_retry)" \
@@ -629,7 +634,7 @@ wsq_resume_update() {
     # prefix/game_name/snapshot/exe_rel/runner are local to wsq_resume_build.
     local game_name="$game_name"
     local metadata phase save_rel save_kind test_save archive staged backup log original_name prepared_save final_mode="" new_archive=0
-    local ready_review ready_kind skip_save_prepare=0 dxvk_archive_bundle dxvk_test_bundle preserve_links
+    local ready_review ready_kind skip_save_prepare=0 dxvk_archive_bundle dxvk_test_bundle preserve_links managed_saves
     local -a commit_args=()
     metadata="$(wsq_state_value metadata)"; phase="$(wsq_state_value phase)"; log="$(wsq_state_value update_log)"
     ready_review="$(wsq_state_value save_review_ready)"; ready_kind="$(wsq_state_value save_ready_kind)"
@@ -639,6 +644,7 @@ wsq_resume_update() {
     if [ ! -e "$archive" ] && [ ! -L "$archive" ]; then new_archive=1; fi
     test_save="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" test_save)" || return
     preserve_links="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" preserve_save_links)" || return
+    managed_saves="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" managed_saves)" || return
     original_name="$game_name"
     game_name="$(basename "$prefix" .wine).validated"
     prepared_save="$WSQ_SAVE_ROOT/$game_name"
@@ -734,6 +740,10 @@ wsq_resume_update() {
         wsq_update_state dxvk_archive_bundle "$dxvk_archive_bundle" || return 1
     fi
     [ "$final_mode" != replace ] || commit_args+=(--replace)
+    if [ "$preserve_links" = True ]; then
+        python3 "$WSQ_UPDATE_HELPER" restore-save-rules "$metadata" >> "$log" 2>&1 || return
+        python3 "$WSQ_UPDATE_HELPER" detach-native-saves "$metadata" >> "$log" 2>&1 || return
+    fi
     # Also cover older pending operations already marked ready. Never compress
     # links to a current or previous test-save tree, even if integrity is skipped.
     if ! python3 "$WSQ_UPDATE_HELPER" validate-save-links "$metadata" >> "$log" 2>&1; then
@@ -741,10 +751,20 @@ wsq_resume_update() {
         return 1
     fi
     staged="$archive.update-tmp-$$"
-    if ! maintenance_squash_wine "$prefix" "$staged" ask-full "$log"; then
+    local squash_rc=0
+    maintenance_squash_wine "$prefix" "$staged" ask-full "$log" || squash_rc=$?
+    if [ "$preserve_links" = True ]; then
+        python3 "$WSQ_UPDATE_HELPER" restore-native-saves "$metadata" >> "$log" 2>&1 || {
+            msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"
+            return 1
+        }
+    fi
+    if [ "$squash_rc" -ne 0 ]; then
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
     fi
-    [ "$preserve_links" = True ] || [ ! -d "$prepared_save" ] || commit_args+=(--prepared-save "$prepared_save")
+    if { [ "$preserve_links" != True ] || [ "$managed_saves" = False ]; } && [ -d "$prepared_save" ]; then
+        commit_args+=(--prepared-save "$prepared_save")
+    fi
     if ! wsq_update_run "$(i18n wsq_update_title)" "$(i18n wsq_update_finalizing)" "$log" \
         python3 "$WSQ_UPDATE_HELPER" commit "$metadata" "$staged" "${commit_args[@]}"; then
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return

@@ -821,7 +821,7 @@ declare -gA I18N=(
   [wsq_executable_apply_failed]="Could not save the selected executable: %s"
   [wsq_update_exe_missing]="The existing launch command no longer matches an available file in the updated game. Select a new executable."
   [wsq_update_links_prompt]="Save links from the original prefix:\\n%s\\n\\nKeep these links by default. A root link may let the game or start.bat create its own subdirectory. Check loading and a new save before confirming."
-  [wsq_update_links_live]="Preserved save links:\\n%s\\n\\nThe test uses the original destinations. After updating, you can keep or delete the safety backups."
+  [wsq_update_links_live]="Preserved save locations:\\n%s\\n\\nThe test uses the original destinations. After updating, you can keep or delete the safety backups."
   [wsq_update_links_keep]="Keep the existing save links (default)"
 
   [wsq_update_root_prompt]="A link points to the Windows save root. The folder created by the game may be unknown before launch. Explicitly identifiable folders are copied for testing, but the entire save root is never copied. If your progress is in another folder, select it here to copy it before testing."

@@ -68,7 +68,7 @@ class TemporarySaveLinkTests(unittest.TestCase):
 
     def test_old_manifest_cannot_stage_or_erase_previous_staging(self):
         test, _ = self.polluted_manifest()
-        stage = test / '.legacy-publish'; stage.mkdir()
+        stage = test / '.legacy-publish'; stage.mkdir(parents=True)
         marker = stage / 'retained'; marker.write_text('keep')
         with self.assertRaisesRegex(ValueError, 'Temporary save links'):
             update.stage_legacy(self.manifest)
@@ -76,6 +76,9 @@ class TemporarySaveLinkTests(unittest.TestCase):
 
     def test_final_guard_rejects_current_named_test_and_old_hidden_test(self):
         test = self.prepare()
+        data = json.loads(self.manifest.read_text())
+        data.pop('preserve_save_links', None)
+        update.save_json(self.manifest, data)
         link = self.link('drive_c/users/Public/save', test)
         for target in (test, self.stale(exists=False), test / 'missing'):
             link.unlink(); link.symlink_to(target)

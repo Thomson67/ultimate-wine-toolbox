@@ -821,7 +821,7 @@ declare -gA I18N=(
   [wsq_executable_apply_failed]="Impossible d’enregistrer l’exécutable sélectionné : %s"
   [wsq_update_exe_missing]="Le lancement existant ne correspond plus à un fichier disponible dans la nouvelle version. Choisissez un nouvel exécutable."
   [wsq_update_links_prompt]="Liens de sauvegarde du préfixe original :\\n%s\\n\\nCes liens seront conservés par défaut. Un lien vers la racine peut laisser le jeu ou start.bat créer son propre sous-dossier. Vérifiez le chargement et une nouvelle sauvegarde avant confirmation."
-  [wsq_update_links_live]="Liens de sauvegarde conservés :\\n%s\\n\\nLe test utilise les destinations d’origine. Après la mise à jour, vous pourrez garder ou supprimer les copies de sécurité."
+  [wsq_update_links_live]="Emplacements de sauvegarde conservés :\\n%s\\n\\nLe test utilise les destinations d’origine. Après la mise à jour, vous pourrez garder ou supprimer les copies de sécurité."
   [wsq_update_links_keep]="Conserver les liens de sauvegarde existants (par défaut)"
 
   [wsq_update_root_prompt]="Un lien pointe vers la racine des sauvegardes Windows. Le nom créé par le jeu peut être inconnu avant lancement. Les dossiers explicitement identifiables sont copiés pour le test, mais la racine entière ne sera pas copiée. Si votre progression se trouve dans un autre dossier, choisissez-le ici pour en copier le contenu avant le test."
