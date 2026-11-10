@@ -551,7 +551,8 @@ run_update() {{
 }}
 run_update
 '''
-        subprocess.run(['bash', '-c', script], check=True, capture_output=True, text=True)
+        result = subprocess.run(['bash', '-c', script], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
         self.assertEqual(json.loads(state.read_text())['phase'], 'ready')
         self.assertEqual(os.readlink(link), raw_target)
         self.assertEqual((link / 'slot').read_text(), 'played')

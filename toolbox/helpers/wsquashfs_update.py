@@ -470,7 +470,9 @@ def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False,
         raise ValueError('original save directory must be a real directory')
     if savedir is not None and not links:
         location = root / savedir
-        if location.is_symlink() and not location.resolve().is_relative_to(original_save.resolve()):
+        if (location.is_symlink()
+                and not location.resolve().is_relative_to(original_save.resolve())
+                and not (values.get('SAVEFILES') and location.resolve().is_relative_to(root))):
             raise ValueError('existing save link does not point to this game save directory')
     old_game = game.with_name(game.name + '.bak')
     embedded = root / '.uwt-update-embedded-save'
@@ -667,8 +669,11 @@ def prepare_live_save_rules(manifest):
     if destination.is_symlink() or (location != root and not location.parent.resolve().is_relative_to(root)):
         raise ValueError('invalid live save destination')
     keep_rule = False
-    if location.is_symlink():
-        keep_rule = not data.get('savefiles')
+    native_link = location.is_symlink() and not (
+        data.get('savefiles') and location.resolve().is_relative_to(root))
+    runtime_destination = base / Path(data['prefix']).stem
+    if native_link:
+        keep_rule = not data.get('savefiles') and location.resolve() == runtime_destination.resolve()
     else:
         location = location.resolve()
         if data.get('savefiles'):
@@ -692,7 +697,7 @@ def prepare_live_save_rules(manifest):
                 pairs = []
             else:
                 pairs = [(location, destination)]
-                keep_rule = True
+                keep_rule = destination.resolve() == runtime_destination.resolve()
         for source, target in pairs:
             if not source.parent.resolve().is_relative_to(root):
                 raise ValueError('save file parent escapes the working prefix')
@@ -732,20 +737,25 @@ def prepare_live_save_rules(manifest):
     # Batocera rewrites SAVEFILES links and replaces a real SAVEDIR directory.
     # Suppress only rules that would change the links during the test launch.
     if not keep_rule:
-        directives(root)  # Reject an autorun.cmd symlink before reading it.
-        text = (root / 'autorun.cmd').read_bytes().decode('utf-8', errors='surrogateescape')
-        rules = []
-        lines = []
-        for index, line in enumerate(text.splitlines(keepends=True)):
-            if line.split('=', 1)[0].strip().upper() in ('SAVEDIR', 'SAVEFILES'):
-                rules.append([index, line])
-            else:
-                lines.append(line)
-        if rules:
-            with defer_cancellation():
-                data['live_rules_suspended'] = rules
-                save_json(manifest, data)
-                write_save_config(root, ''.join(lines))
+        suspend_live_save_rules(manifest, data)
+
+
+def suspend_live_save_rules(manifest, data):
+    root = Path(data['prefix'])
+    directives(root)  # Reject an autorun.cmd symlink before reading it.
+    text = (root / 'autorun.cmd').read_bytes().decode('utf-8', errors='surrogateescape')
+    rules = []
+    lines = []
+    for index, line in enumerate(text.splitlines(keepends=True)):
+        if line.split('=', 1)[0].strip().upper() in ('SAVEDIR', 'SAVEFILES'):
+            rules.append([index, line])
+        else:
+            lines.append(line)
+    if rules:
+        with defer_cancellation():
+            data['live_rules_suspended'] = rules
+            save_json(manifest, data)
+            write_save_config(root, ''.join(lines))
 
 
 def detach_generated_native_saves(manifest):
@@ -827,6 +837,44 @@ def existing_save_locations(manifest):
     return sorted(locations, key=lambda path: str(path).casefold())
 
 
+def prepare_unmanaged_retest(manifest, data, prepared):
+    from v41_savedir import check_tree, seed
+
+    root = Path(data['prefix']).resolve()
+    _, rules = directives(root)
+    if not rules.get('SAVEDIR'):
+        return
+    location = root / relative_path(rules['SAVEDIR'])
+    if (not location.resolve().is_relative_to(root)
+            or (location.is_symlink() and not rules.get('SAVEFILES'))
+            or (location.resolve() == root and not rules.get('SAVEFILES'))):
+        raise ValueError('new save location must stay inside the working prefix')
+    location = location.resolve()
+    if prepared is not None:
+        base = Path(data['save_root']).resolve()
+        if (prepared.is_symlink() or prepared.parent.resolve() != base
+                or prepared.name != Path(data['prefix']).stem + '.validated'):
+            raise ValueError('invalid prepared save copy')
+        if prepared.is_dir():
+            if rules.get('SAVEFILES'):
+                paths = set()
+                for pattern in rules['SAVEFILES'].split(';'):
+                    if pattern.strip():
+                        pattern_path = relative_path(pattern)
+                        paths.update(path.relative_to(prepared)
+                                     for path in prepared.glob(str(pattern_path)) if path.is_file())
+                pairs = [(prepared / path, location / path) for path in sorted(paths)]
+            else:
+                pairs = [(prepared, location)]
+            # Validate all entries first, then seed only missing local data.
+            for source, target in pairs:
+                check_tree(source, target, root)
+            for source, target in pairs:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                seed(source, target, root)
+    suspend_live_save_rules(manifest, data)
+
+
 def prepare_retest(manifest, prepared=None):
     """Rebind a prepared prefix to test saves before another game launch."""
     from wsquashfs_builder import safe_save_dir
@@ -837,7 +885,10 @@ def prepare_retest(manifest, prepared=None):
         if data.get('committed'):
             raise ValueError('cannot relaunch a committed update')
         restore_legacy(root, manifest)
-        prepare_live_save_rules(manifest)
+        if data.get('savedir') or data.get('save_links'):
+            prepare_live_save_rules(manifest)
+        else:
+            prepare_unmanaged_retest(manifest, data, prepared)
         return
     test = Path(data['test_save'])
     expected = '.uwt-test-' + manifest.stem if data.get('same_rom_name') else Path(data['prefix']).stem

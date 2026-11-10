@@ -630,6 +630,29 @@ wsq_update_manage_save_backups() {
     fi
 }
 
+wsq_update_squash() (
+    local metadata="$1" prefix="$2" staged="$3" log="$4" preserve_links="$5" operation_rc=0
+    if [ "$preserve_links" = True ]; then
+        # Keep cleanup scoped to this compression. Terminal closure must restore
+        # the working prefix even when the archive guard or compression fails.
+        trap '
+            operation_rc=$?
+            trap - EXIT
+            trap "" HUP INT TERM
+            python3 "$WSQ_UPDATE_HELPER" restore-native-saves "$metadata" >> "$log" 2>&1 || exit 1
+            exit "$operation_rc"
+        ' EXIT
+        trap 'exit 129' HUP
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        python3 "$WSQ_UPDATE_HELPER" restore-save-rules "$metadata" >> "$log" 2>&1 || exit 1
+        python3 "$WSQ_UPDATE_HELPER" detach-native-saves "$metadata" >> "$log" 2>&1 || exit 1
+    fi
+    # Cover older pending operations too, including when integrity is skipped.
+    python3 "$WSQ_UPDATE_HELPER" validate-save-links "$metadata" >> "$log" 2>&1 || exit 1
+    maintenance_squash_wine "$prefix" "$staged" ask-full "$log"
+)
+
 wsq_resume_update() {
     # prefix/game_name/snapshot/exe_rel/runner are local to wsq_resume_build.
     local game_name="$game_name"
@@ -740,27 +763,10 @@ wsq_resume_update() {
         wsq_update_state dxvk_archive_bundle "$dxvk_archive_bundle" || return 1
     fi
     [ "$final_mode" != replace ] || commit_args+=(--replace)
-    if [ "$preserve_links" = True ]; then
-        python3 "$WSQ_UPDATE_HELPER" restore-save-rules "$metadata" >> "$log" 2>&1 || return
-        python3 "$WSQ_UPDATE_HELPER" detach-native-saves "$metadata" >> "$log" 2>&1 || return
-    fi
-    # Also cover older pending operations already marked ready. Never compress
-    # links to a current or previous test-save tree, even if integrity is skipped.
-    if ! python3 "$WSQ_UPDATE_HELPER" validate-save-links "$metadata" >> "$log" 2>&1; then
+    staged="$archive.update-tmp-$$"
+    if ! wsq_update_squash "$metadata" "$prefix" "$staged" "$log" "$preserve_links"; then
         msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"
         return 1
-    fi
-    staged="$archive.update-tmp-$$"
-    local squash_rc=0
-    maintenance_squash_wine "$prefix" "$staged" ask-full "$log" || squash_rc=$?
-    if [ "$preserve_links" = True ]; then
-        python3 "$WSQ_UPDATE_HELPER" restore-native-saves "$metadata" >> "$log" 2>&1 || {
-            msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"
-            return 1
-        }
-    fi
-    if [ "$squash_rc" -ne 0 ]; then
-        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"; return
     fi
     if { [ "$preserve_links" != True ] || [ "$managed_saves" = False ]; } && [ -d "$prepared_save" ]; then
         commit_args+=(--prepared-save "$prepared_save")
