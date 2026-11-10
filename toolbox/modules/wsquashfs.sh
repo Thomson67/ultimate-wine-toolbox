@@ -717,7 +717,7 @@ wsq_cancel_pending() {
 }
 
 wsq_retry_pending() {
-    local metadata log prepared preserve_links
+    local metadata="" log="" prepared="" preserve_links=""
     if [ "$(wsq_state_value mode)" = update ]; then
         metadata="$(wsq_state_value metadata)"; log="$(wsq_state_value update_log)"
         preserve_links="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" preserve_save_links 2>> "$log")" || return 1

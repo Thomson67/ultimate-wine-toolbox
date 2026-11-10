@@ -40,6 +40,41 @@ have_dialog() { return 1; }
         self.assertEqual(result.returncode,0,result.stderr)
         return result
 
+    def test_retry_initializes_update_state_for_creation_and_older_sessions(self):
+        for mode in ('', 'create', 'update'):
+            for launch_ok in (False, True):
+                with self.subTest(mode=mode, launch_ok=launch_ok):
+                    state = json.loads(self.state.read_text())
+                    state.pop('mode', None)
+                    if mode:
+                        state['mode'] = mode
+                    if mode == 'update':
+                        metadata = self.home/'state/update.json'
+                        metadata.write_text(json.dumps({'preserve_save_links': False}))
+                        state.update(metadata=str(metadata), update_log=str(self.home/'update.log'),
+                                     phase='testing')
+                    self.state.write_text(json.dumps(state))
+                    for name in ('retry-launch', 'retry-restart'):
+                        (self.home/name).unlink(missing_ok=True)
+                    self.shell(r"""
+set -euo pipefail
+unset metadata log prepared preserve_links
+prefix="$TEST_PREFIX"
+wsq_request_game_launch() {
+    printf '%s\n%s\n' "$1" "$2" > "$WT_HOME/retry-launch"
+    return LAUNCH_STATUS
+}
+wsq_restart_emulationstation_deferred() { touch "$WT_HOME/retry-restart"; }
+if wsq_retry_pending; then
+    exit 91
+else
+    [ "$?" -eq 1 ]
+fi
+""".replace('LAUNCH_STATUS', '0' if launch_ok else '1'))
+                    fields=(self.home/'retry-launch').read_text().splitlines()
+                    self.assertEqual(fields, [str(self.prefix), 'False' if mode == 'update' else ''])
+                    self.assertEqual((self.home/'retry-restart').exists(), launch_ok)
+
     def test_update_completion_offers_another_update_and_dispatches_it(self):
         self.shell(r"""
 menu_select() { printf '%s\n' "$@" > "$WT_HOME/options"; echo update; }
