@@ -796,6 +796,7 @@ declare -gA I18N=(
   [wsq_update_confirm]="Archive :\\n%s\\n\\nNouvelle version :\\n%s\\n\\nPréfixe de test :\\n%s\\n\\nL’archive originale reste intacte. Le dossier source sera déplacé dans le préfixe de test : il ne restera plus à son emplacement actuel. L’ancien dossier du jeu sera conservé en .bak jusqu’à validation du lancement. Les liens de sauvegarde seront repris. Prévoyez l’espace pour l’extraction et la recompression. Continuer ?"
   [wsq_update_extract]="Extraction du préfixe de test. L’archive originale est conservée."
   [wsq_update_copy]="Déplacement de la nouvelle version et préparation des sauvegardes de test. Cette opération peut prendre plusieurs minutes."
+  [wsq_update_copy_safety]="Déplacement de la nouvelle version et préparation de la copie de sécurité des sauvegardes. Cette opération peut prendre plusieurs minutes."
   [wsq_update_finalizing]="Finalisation de la mise à jour : sauvegarde de l’ancienne archive si demandée, puis remplacement. Une copie de sauvegarde peut prendre du temps. Gardez la Toolbox ouverte jusqu’au message de fin."
   [wsq_update_validate]="Contrôle complet de la nouvelle archive avant remplacement. Les données sont lues sans extraction supplémentaire.\n\nGardez la Toolbox ouverte jusqu’au message de fin. Fermer la fenêtre interrompt le travail ; les données de reprise sont conservées."
   [wsq_update_elapsed]="Opération en cours — %s secondes écoulées."
@@ -820,11 +821,15 @@ declare -gA I18N=(
   [wsq_executable_apply_failed]="Impossible d’enregistrer l’exécutable sélectionné : %s"
   [wsq_update_exe_missing]="Le lancement existant ne correspond plus à un fichier disponible dans la nouvelle version. Choisissez un nouvel exécutable."
   [wsq_update_links_prompt]="Liens de sauvegarde du préfixe original :\\n%s\\n\\nCes liens seront conservés par défaut. Un lien vers la racine peut laisser le jeu ou start.bat créer son propre sous-dossier. Vérifiez le chargement et une nouvelle sauvegarde avant confirmation."
+  [wsq_update_links_live]="Liens de sauvegarde conservés :\\n%s\\n\\nLe test utilise les destinations d’origine. Après la mise à jour, vous pourrez garder ou supprimer les copies de sécurité."
   [wsq_update_links_keep]="Conserver les liens de sauvegarde existants (par défaut)"
 
   [wsq_update_root_prompt]="Un lien pointe vers la racine des sauvegardes Windows. Le nom créé par le jeu peut être inconnu avant lancement. Les dossiers explicitement identifiables sont copiés pour le test, mais la racine entière ne sera pas copiée. Si votre progression se trouve dans un autre dossier, choisissez-le ici pour en copier le contenu avant le test."
+  [wsq_update_shared_backup_prompt]="Un lien pointe vers la racine des sauvegardes Windows. Sélectionnez le ou les dossiers utilisés par ce jeu pour en faire une copie de sécurité avant le test. Le jeu continuera à utiliser ses chemins habituels."
   [wsq_update_root_continue]="Continuer avec les sauvegardes de test préparées"
+  [wsq_update_shared_backup_continue]="Continuer vers le test"
   [wsq_update_root_copy]="Copier un dossier de progression existant pour le test"
+  [wsq_update_shared_backup_progress]="Copie de sécurité du dossier sélectionné…"
 
   [wsq_update_done_new]="Mise à jour terminée, nouveau WSquashFS créé :\\n%s\\n\\nPréfixe de travail :\\n%s"
   [wsq_update_reuse_label]="réutiliser ce préfixe, sans extraction"
@@ -878,6 +883,7 @@ I18N[wsq_update_save_cleanup_progress]="Suppression des copies de sécurité de 
 I18N[wsq_update_save_cleanup_failed]="Certaines copies de sauvegardes n’ont pas pu être vérifiées ou supprimées. Les copies restantes sont conservées pour vérification manuelle. La MAJ a réussi et les sauvegardes actives sont conservées. Journal :\n%s"
 
 I18N[wsq_update_replace_source_links]="La nouvelle version contient des liens aux emplacements de sauvegarde connus :\n\n%s\n\nRemplacer ces liens par ceux de la configuration existante ? Les essais utiliseront les copies de test prévues par le workflow (sauf lien vers la racine partagée).\n\nSeuls les liens seront remplacés : leurs anciens dossiers cibles, y compris les sauvegardes d’un essai précédent, restent intacts. Leur contenu ne sera pas importé. Non interrompt la préparation avant le déplacement du dossier source."
+I18N[wsq_update_restore_source_links]="La nouvelle version contient des liens aux emplacements de sauvegarde connus :\n\n%s\n\nRemplacer ces liens par ceux de la configuration existante ? Les essais utiliseront les destinations de sauvegarde d’origine.\n\nSeuls les liens seront remplacés : leurs anciens dossiers cibles, y compris les sauvegardes d’un essai précédent, restent intacts. Leur contenu ne sera pas importé. Non interrompt la préparation avant le déplacement du dossier source."
 
 I18N[osk_title]="Clavier virtuel à la manette"
 I18N[osk_intro]="Afficher / masquer : Hotkey + Select, selon votre configuration EmulationStation. Désactivé par défaut. Valable pour les prochains lancements Windows. Les réglages par jeu sont prioritaires. Les raccourcis Batocera existants restent inchangés."

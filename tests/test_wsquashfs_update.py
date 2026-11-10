@@ -89,20 +89,22 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(link.resolve(),self.saves)
         self.assertEqual((self.original_save/'slot').read_text(),'original')
 
-    def test_retest_of_dedicated_legacy_link_uses_test_copy(self):
+    def test_retest_of_dedicated_link_keeps_permanent_target(self):
         update.rewrite_save_rules(self.prefix,'','')
         shared=self.saves/'Shared';shared.mkdir();(shared/'slot').write_text('original shared')
         link=self.prefix/'drive_c/users/root/Custom'
         link.parent.mkdir(parents=True,exist_ok=True);link.symlink_to(shared,target_is_directory=True)
+        raw_target = os.path.relpath(shared, link.parent)
+        link.unlink(); link.symlink_to(raw_target)
         test=self.prepare()
-        (test/'.legacy-shared/Shared/slot').write_text('tested shared')
-        update.stage_legacy(self.manifest)
-        update.restore_legacy(self.prefix,self.manifest)
-        self.assertEqual(link.resolve(),shared)
+        self.assertFalse(test.exists())
+        self.assertEqual(os.readlink(link), raw_target)
+        (link/'slot').write_text('tested shared')
         update.prepare_retest(self.manifest)
-        self.assertEqual(link.resolve(),test/'.legacy-shared/Shared')
-        self.assertEqual((link/'slot').read_text(),'tested shared')
-        self.assertEqual((shared/'slot').read_text(),'original shared')
+        self.assertEqual(os.readlink(link), raw_target)
+        self.assertEqual((shared/'slot').read_text(),'tested shared')
+        self.assertEqual(next(self.saves.glob('Shared.backup-*')).joinpath('slot').read_text(),
+                         'original shared')
 
     def test_retest_refuses_redirected_prepared_save_copy(self):
         self.prepare()
@@ -146,14 +148,16 @@ class UpdateTests(unittest.TestCase):
                 update.ensure_root_alias(self.prefix)
                 self.assertEqual((root / 'profile').read_text(), 'kept')
 
-    def test_reversed_profile_alias_allows_update_with_save_isolation(self):
+    def test_reversed_profile_alias_keeps_save_link_and_profile_path(self):
         root = self.prefix / 'drive_c/users/root'; root.mkdir(parents=True)
         (root / 'Saved').symlink_to(self.original_save)
         (root.parent / 'steamuser').symlink_to('root')
         test_save = self.prepare()
-        self.assertEqual((root / 'Saved').resolve(), test_save)
+        self.assertFalse(test_save.exists())
+        self.assertEqual(os.readlink(root.parent / 'steamuser'), 'root')
+        self.assertEqual(os.readlink(root / 'Saved'), str(self.original_save))
         (root / 'Saved/slot').write_text('tested')
-        self.assertEqual((self.original_save / 'slot').read_text(), 'original')
+        self.assertEqual((self.original_save / 'slot').read_text(), 'tested')
         self.assertTrue((self.game / 'new.exe').is_file())
 
     def test_invalid_steamuser_alias_is_rejected_without_changes(self):
@@ -172,13 +176,14 @@ class UpdateTests(unittest.TestCase):
             update.ensure_root_alias(self.prefix)
         self.assertTrue((users / 'root').is_symlink())
 
-    def test_save_isolation_and_launch_arguments(self):
+    def test_save_link_and_launch_arguments_survive_prepare_and_retest(self):
         save_link = self.prefix / 'drive_c/users/root/Saved'
         save_link.parent.mkdir(parents=True); save_link.symlink_to(self.original_save)
         test_save = self.prepare()
-        self.assertEqual(save_link.resolve(), test_save)
+        self.assertFalse(test_save.exists())
+        self.assertEqual(os.readlink(save_link), str(self.original_save))
         (save_link / 'slot').write_text('tested')
-        self.assertEqual((self.original_save / 'slot').read_text(), 'original')
+        self.assertEqual((self.original_save / 'slot').read_text(), 'tested')
         self.assertFalse(self.source.exists())
         self.assertEqual((self.game / 'new.exe').read_bytes(), b'new')
         self.assertFalse((self.game / 'old.exe').exists())
@@ -186,9 +191,9 @@ class UpdateTests(unittest.TestCase):
         autorun = (self.prefix / 'autorun.cmd').read_text()
         for line in ('ENV=FOO=bar', 'LANG=fr_FR', 'CMD="new.exe" --launch'):
             self.assertIn(line, autorun)
-        update.detach_saves(self.prefix, test_save)
-        self.assertFalse(save_link.is_symlink()); self.assertEqual(list(save_link.iterdir()), [])
-        self.assertEqual((test_save / 'slot').read_text(), 'tested')
+        update.prepare_retest(self.manifest)
+        self.assertEqual(os.readlink(save_link), str(self.original_save))
+        self.assertEqual((save_link / 'slot').read_text(), 'tested')
 
     def test_update_log_detail_shows_recent_failure_reason(self):
         root = Path(__file__).resolve().parents[1]
@@ -279,14 +284,20 @@ wsq_apply_executable_selection drive_c/game/new.exe
         self.prepare()
         self.assertEqual((self.game / 'Saved/slot').read_text(), 'embedded')
 
-    def test_registry_links_become_portable_files(self):
+    def test_existing_registry_link_is_kept_across_retest_and_rule_restore(self):
         (self.original_save / 'user.reg').write_text('registry')
-        (self.prefix / 'autorun.cmd').write_text('SAVEDIR=.\nSAVEFILES=user.reg\n')
+        (self.prefix / 'autorun.cmd').write_bytes(b'ENV=FOO=bar\r\nSAVEDIR=.\r\nLANG=fr_FR\r\nSAVEFILES=user.reg')
         (self.prefix / 'user.reg').symlink_to(self.original_save / 'user.reg')
         test_save = self.prepare()
-        update.detach_saves(self.prefix, test_save)
-        self.assertFalse((self.prefix / 'user.reg').is_symlink())
+        original_rules = (self.prefix / 'autorun.cmd').read_bytes()
+        update.prepare_retest(self.manifest)
+        data = json.loads(self.manifest.read_text())
+        self.assertFalse(update.directives(self.prefix)[1].get('SAVEFILES'))
+        update.restore_live_save_rules(self.manifest, data)
+        self.assertEqual((self.prefix / 'autorun.cmd').read_bytes(), original_rules)
+        self.assertEqual(os.readlink(self.prefix / 'user.reg'), str(self.original_save / 'user.reg'))
         self.assertEqual((self.prefix / 'user.reg').read_text(), 'registry')
+        self.assertFalse(test_save.exists())
 
     def test_unsafe_sources_are_refused(self):
         (self.source / 'outside').symlink_to(self.original_save)
@@ -320,17 +331,18 @@ wsq_apply_executable_selection drive_c/game/new.exe
         self.assertTrue((self.game / 'old.exe').is_file())
         self.assertFalse(self.manifest.exists())
 
-    def test_replace_source_save_links_isolates_test_and_keeps_previous_progress(self):
+    def test_replace_source_save_links_reuses_original_target_and_keeps_previous_progress(self):
         stale, _ = self.source_link_fixture()
         update.prepare(self.prefix, self.source, self.archive, self.saves, self.manifest,
                        replace_source_save_links=True)
         data = json.loads(self.manifest.read_text())
         link = self.game / 'ph/work/out'
-        self.assertEqual(link.resolve(), Path(data['test_save']) / '.legacy-shared/Game')
+        self.assertEqual(os.readlink(link), str(self.original_save))
+        self.assertFalse(Path(data['test_save']).exists())
         self.assertEqual((link / 'slot').read_text(), 'original')
         (link / 'slot').write_text('new test')
         self.assertEqual((stale / 'slot').read_text(), 'previous test progress')
-        self.assertEqual((self.original_save / 'slot').read_text(), 'original')
+        self.assertEqual((self.original_save / 'slot').read_text(), 'new test')
         self.assertEqual(data['replaced_source_save_links'][0]['original'], str(stale))
         update.restore_legacy(self.prefix, self.manifest)
         self.assertEqual(link.resolve(), self.original_save)
@@ -492,6 +504,44 @@ wsq_resume_build
                              ['review', 'final', 'final', 'review', 'final'])
             self.assertEqual(list(self.saves.glob('*.validated.backup-*')), [])
 
+    def test_shell_linked_update_preserves_live_save_on_compression_failure(self):
+        link = self.game / 'Save'
+        raw_target = os.path.relpath(self.original_save, link.parent)
+        link.symlink_to(raw_target)
+        self.prepare()
+        (link / 'slot').write_text('played')
+        root = Path(__file__).resolve().parents[1]
+        state = self.base / 'pending.json'
+        log = self.base / 'update.log'
+        state.write_text(json.dumps(dict(phase='testing', metadata=str(self.manifest),
+                                              update_log=str(log))))
+        q = shlex.quote
+        script = f'''
+WT_ROOT={q(str(root / 'toolbox'))}
+WT_HOME={q(str(self.base))}
+source "$WT_ROOT/modules/wsquashfs.sh"
+WSQ_STATE_FILE={q(str(state))}
+WSQ_SAVE_ROOT={q(str(self.saves))}
+WSQ_CONF={q(str(self.base / 'batocera.conf'))}
+i18n() {{ printf '%s' "$1"; }}
+msgbox() {{ :; }}
+menu_select() {{ printf keep; }}
+wsq_update_final_choice() {{ printf replace; }}
+maintenance_squash_wine() {{ return 1; }}
+run_update() {{
+    local prefix={q(str(self.prefix))} game_name=Game
+    wsq_resume_update
+}}
+run_update
+'''
+        subprocess.run(['bash', '-c', script], check=True, capture_output=True, text=True)
+        self.assertEqual(json.loads(state.read_text())['phase'], 'ready')
+        self.assertEqual(os.readlink(link), raw_target)
+        self.assertEqual((link / 'slot').read_text(), 'played')
+        self.assertEqual(next(self.saves.glob('Game.backup-*')).joinpath('slot').read_text(),
+                         'original')
+        self.assertEqual(self.archive.read_bytes(), b'old archive')
+
     def test_replace_and_delete_source_finishes_only_after_cleanup(self):
         self.test_shell_compression_failure_can_resume_without_touching_original_saves(
             final_mode='replace', delete_source=True)
@@ -635,9 +685,10 @@ wsq_resume_build
         (custom / 'slot').write_text('custom original')
         link = self.game / 'saves'; link.symlink_to(custom)
         test_save = self.prepare()
-        self.assertEqual(link.resolve(), test_save / '.legacy-shared/NameFromStartBat')
+        self.assertFalse(test_save.exists())
+        self.assertEqual(os.readlink(link), str(custom))
         (link / 'slot').write_text('custom tested')
-        self.assertEqual((custom / 'slot').read_text(), 'custom original')
+        self.assertEqual((custom / 'slot').read_text(), 'custom tested')
         update.stage_legacy(self.manifest)
         update.restore_legacy(self.prefix, self.manifest)
         self.assertEqual(os.readlink(link), str(custom))
@@ -645,7 +696,13 @@ wsq_resume_build
         update.commit(self.manifest, staged)
         self.assertEqual((custom / 'slot').read_text(), 'custom tested')
         self.assertEqual((self.original_save / 'slot').read_text(), 'original')
-        self.assertTrue(list(self.saves.glob('NameFromStartBat.backup-*')))
+        backups = update.manage_save_backups(self.manifest)
+        custom_backup = next(path for path in backups if path.name.startswith('NameFromStartBat.backup-'))
+        self.assertEqual((custom_backup / 'slot').read_text(), 'custom original')
+        update.manage_save_backups(self.manifest, remove=True)
+        self.assertFalse(custom_backup.exists())
+        self.assertEqual(os.readlink(link), str(custom))
+        self.assertEqual((custom / 'slot').read_text(), 'custom tested')
 
     def test_root_link_and_batch_paths_are_preserved(self):
         (self.prefix / 'autorun.cmd').write_text('DIR=drive_c/game\nCMD="start.bat"\n')
@@ -663,7 +720,12 @@ wsq_resume_build
         self.assertTrue((shared / 'UnrelatedGame').exists())
         self.assertFalse((test_save / '.legacy-shared').exists())
         self.assertIn(str(shared), (self.game / 'start.bat').read_text())
+        subprocess.run([sys.executable, update.__file__, 'backup-shared-save', str(self.manifest),
+                        str(custom)], check=True, capture_output=True, text=True)
+        backup = next(shared.glob('GameCreatedName.backup-*'))
+        self.assertFalse(list(shared.glob('UnrelatedGame.backup-*')))
         (shared / 'GameCreatedName/slot').write_text('new progress')
+        self.assertEqual((backup / 'slot').read_text(), 'old progress')
         (shared / 'EngineCreatedName').mkdir()
         (shared / 'EngineCreatedName/new').write_text('saved by game')
         update.stage_legacy(self.manifest); update.restore_legacy(self.prefix, self.manifest)
@@ -674,6 +736,9 @@ wsq_resume_build
         self.assertEqual((custom / 'slot').read_text(), 'new progress')
         self.assertEqual((self.saves / 'EngineCreatedName/new').read_text(), 'saved by game')
         self.assertEqual((unrelated / 'huge').read_text(), 'unrelated')
+        update.manage_save_backups(self.manifest, remove=True)
+        self.assertFalse(backup.exists())
+        self.assertEqual((custom / 'slot').read_text(), 'new progress')
 
     def test_mixed_savedir_and_custom_links_keep_their_separate_rules(self):
         standard = self.prefix / 'drive_c/users/root/Saved'
@@ -684,7 +749,7 @@ wsq_resume_build
         update.stage_legacy(self.manifest)
         update.detach_saves(self.prefix, test_save)
         update.restore_legacy(self.prefix, self.manifest, 'custom')
-        self.assertFalse(standard.is_symlink())
+        self.assertEqual(os.readlink(standard), str(self.original_save))
         self.assertEqual(os.readlink(extra), str(custom))
 
     def test_existing_executable_resolution(self):
@@ -711,7 +776,8 @@ wsq_resume_build
         self.assertEqual(update.game_directory(self.prefix), game)
         self.assertEqual(update.launch_executable(self.prefix), f'drive_c/{name}/start.bat')
         self.assertTrue((game / 'SMB1R.exe').exists())
-        self.assertIn(str(test_save).replace('/', '\\'), (game / 'start.bat').read_text())
+        self.assertFalse(test_save.exists())
+        self.assertEqual((game / 'start.bat').read_text(), batch)
         update.stage_legacy(self.manifest); update.restore_legacy(self.prefix, self.manifest)
         self.assertEqual((game / 'start.bat').read_text(), batch)
         self.assertEqual(os.readlink(link), str(save))

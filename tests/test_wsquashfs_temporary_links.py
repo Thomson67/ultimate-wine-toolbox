@@ -54,6 +54,7 @@ class TemporarySaveLinkTests(unittest.TestCase):
         stale = self.stale()
         link = self.link('drive_c/users/Public/save', test)
         data = json.loads(self.manifest.read_text())
+        data.pop('preserve_save_links', None)
         data['save_links'] = [dict(path=link.relative_to(self.prefix).as_posix(),
                                   original=str(stale), target=str(stale), directory=True)]
         update.save_json(self.manifest, data)
