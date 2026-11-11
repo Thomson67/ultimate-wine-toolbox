@@ -10,11 +10,11 @@ In WSquashFS Management, choose Update a WSquashFS. Select the archive and the f
 The first test keeps the archive’s executable and arguments. Check launch, controllers, loading progress and saving again. On return, Review / change the game executable lets you correct the launch command. Original start.bat files are preserved. The old game folder remains in .bak until launch is validated.
 
 3. CONFIRM SAVES
-Keep existing save rules or select another location. Tests normally use a separate copy of the saves. Exception: a link to the root /userdata/saves/windows keeps its target and directly uses shared saves.
+Existing links and SAVEDIR/SAVEFILES rules use their original destinations during tests and relaunches. A separate safety copy is made before the first test. On return, keep these locations or inspect their files. For an archive without save configuration, select a location through detection or the browser.
 
-“Inspect existing saves” shows the path, filenames, sizes and dates in the existing Batocera save folder without modifying it. The test prefix contents remain separately accessible. Back from the final archive choice returns to save review before preparation. Resuming after a compression failure also allows save review; retaining the same existing rules reuses the prepared copy without repeating its transfer.
+“Inspect existing saves” shows the path, filenames, sizes and dates in the existing Batocera save folder without modifying it. The test prefix contents remain separately accessible. Back from the final archive choice returns to save review before preparation. Resuming after a compression failure also allows save review; retaining existing rules reuses their permanent destinations and active progression.
 
-Inspection is also available for legacy save links. When a link targets the shared saves/windows root, select the game's subfolder to inspect. Back from save selection returns to game settings; the operation remains resumable if left at this step. Relaunching restores test-save links before starting the game, while preserving the special case of legacy links targeting the shared root.
+Inspection is also available for legacy save links. When a link targets the shared saves/windows root, select the game's subfolder to inspect. Back from save selection returns to game settings; the operation remains resumable if left at this step. Relaunching reuses permanent destinations. After choosing a new location, prepared progression is restored inside the prefix for the next test.
 
 4. COMPRESS AND FINALIZE
 Choose to back up the old archive before replacement or replace it directly. After compression, run the proposed full check or skip it. Cancel at this stage does not replace the archive. Skipped checks can be run later from WSquashFS Management.
@@ -34,16 +34,19 @@ If the ES API skips the Ports group, return uses an owned technical launcher in 
 With mergerfs, free space is checked per disk and a suitable physical archive location is offered before compression. Total free space does not guarantee one archive fits on a disk. Keep the Toolbox open during compression, verification and finalization: closing it interrupts workers and retains recovery state.
 
 SAVE-DATA BACKUP COPIES
-Keeping links or save rules preserves locations, but tested progression may replace active save files during publication. The previous folder is renamed <name>.backup-<date>. This permanent copy differs from temporary test saves, which are cleaned after success.
+The <name>.backup-<date> copy contains saves from before the first test. The game then uses its active saves at their permanent locations. On failure or abandonment, the safety copy remains available. For a link to the shared saves/windows root, select the game folders to copy before testing.
 
 At the end of a successful update, choose whether to delete save-data backup copies created by that operation. No keeps them; Yes removes only the listed verified copies. Active saves and any old WSquashFS archive backup are kept. The choice persists if finalization is resumed. Changed or undeletable backups are kept with a warning; optional cleanup does not undo the successful update.
 
 Earlier updates’ backups and copies explicitly created for a destination conflict are not removed by this choice. Old pending operations lacking a full backup record retain their copies. No global deletion of .backup-* folders occurs.
 
 LINKS ALREADY PRESENT IN THE NEW VERSION
-If the source directory contains links at save locations already known by the existing configuration, the Toolbox displays their current targets and the configuration targets, then offers to replace them. Links are restored in the working prefix with the usual test redirections. Declining stops preparation before the source directory is moved. Old target folders remain untouched and their progress is not imported automatically. External links without a known matching save location remain rejected.
+If the source directory contains links at save locations already known by the existing configuration, the Toolbox displays their current targets and the configuration targets, then offers to replace them. Links are restored in the working prefix using the exact destinations from the existing configuration. Declining stops preparation before the source directory is moved. Old target folders remain untouched and their progress is not imported automatically. External links without a known matching save location remain rejected.
 
 STALE TEMPORARY LINKS
 If the existing configuration retains links to an old .uwt-test-… directory, preparation is refused before game files are moved. Compare the save copies and repair their permanent destinations before retrying; no progression is selected automatically. A precompression check also blocks temporary links in pending operations, even when archive integrity verification is skipped. Save copies remain available for recovery.
 
 The return launcher is reused without reloading the collection when it is unchanged and already indexed in ES. Missing or changed entries still require a refresh. No duplicate request is sent while the launcher is already starting. Timings and HTTP responses are recorded in port-launch.log.
+
+RECOVERING AN OLDER OPERATION
+Close the game and Toolbox. The command wsquashfs_update.py recover-original-saves <manifest> uses the operation journal to restore recorded destinations. The manifest path is stored in the metadata field of state/wsquashfs-builder.json. Progress created in the old temporary folder remains separately available.
