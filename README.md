@@ -6,7 +6,14 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.11.3](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.3).**
+**Stable version: [v0.11.4](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.4).**
+
+## New in v0.11.4
+
+- Updates use original save destinations and create a safety copy before testing.
+- Compression interruptions restore native links. Relaunches retain prepared progression and also work during creation.
+
+[v0.11.4 release notes](release-notes/v0.11.4.md)
 
 ## New in v0.11.3
 
@@ -243,15 +250,15 @@ Compression, integrity checks and pending-operation resume are part of the workf
 
 In WSquashFS Management, Update follows Create. Select a Wine-prefix archive, or an existing `.wine` containing `system.reg` and `autorun.cmd`, then a directory containing the updated game files directly. A `.wine` is reused in place; an archive is extracted into a separate test prefix. The source directory is moved into the existing game directory identified from `autorun.cmd` (often `drive_c/game`) of the working prefix. `.pc` archives without a Wine prefix are not supported.
 
-The first test keeps the archive's existing launch command; executable selection is no longer a mandatory step before this test. Check launch, controller input, loading progress and saving again. On return, **Review / change the game executable** lets you correct it and retest. The original runner and game options are copied; testing uses a separate save copy except for shared-root links described below. Then confirm previous save rules or select another location through detection or the graphical browser.
+The first test keeps the archive's existing launch command; executable selection is no longer a mandatory step before this test. Check launch, controller input, loading progress and saving again. On return, **Review / change the game executable** lets you correct it and retest. The original runner and game options are copied. Existing links and SAVEDIR/SAVEFILES rules use permanent destinations, with a separate safety copy created before the first test. On return, keep these locations or inspect their files. For an archive without save configuration, select a location through detection or the graphical browser.
 
-After compression, choose to run or skip the full integrity check before replacement. Checking is offered first; Cancel preserves the working prefix and the original archive. At completion, choose backup and replacement of the old archive or direct replacement. Previous saves are retained as `.backup-…` copies during publication. After success, choose whether to keep or delete the copies created by this operation; active saves and any archive backup remain in place. Older backups are not globally deleted. Changes to `batocera.conf` remain backed up. Compression failure leaves original saves in place. Resume pending updates from the menu. Temporary test saves are removed automatically after successful completion and retained on failure or while pending; deleting the working prefix is optional at completion.
+After compression, choose to run or skip the full integrity check before replacement. Checking is offered first; Cancel preserves the working prefix and the original archive. At completion, choose backup and replacement of the old archive or direct replacement. The `.backup-…` safety copies made before testing remain available during publication. After success, choose whether to keep or delete the copies created by this operation; active saves and any archive backup remain in place. Older backups are not globally deleted. Changes to `batocera.conf` remain backed up. Compression failure leaves original saves in place. Resume pending updates from the menu. A temporary copy from an older interrupted operation remains available for recovery. Deleting the working prefix is optional at completion.
 
 After successful replacement, bottles associated with the archive are cleaned so the next launch uses the updated files and settings. This prevents stale configurations such as an older MangoHud setup from surviving the update.
 
-Allow space for extraction, test saves and the new archive. Native `SAVEDIR=` support requires Batocera v42 or newer. For v41 only, WSquashFS Management offers an experimental boot service with launcher backup and restoration. Enable or disable it from the Toolbox; v40 and .pc launches are not covered.
+Allow space for extraction, safety copies and the new archive. Native `SAVEDIR=` support requires Batocera v42 or newer. For v41 only, WSquashFS Management offers an experimental boot service with launcher backup and restoration. Enable or disable it from the Toolbox; v40 and .pc launches are not covered.
 
-Updates retain the launch command from `autorun.cmd`, restoring original `start.bat` scripts at the same relative locations in the replacement folder. Another executable can be selected after the test. Without `SAVEDIR=`, existing links to `/userdata/saves/windows` or its subdirectories are detected, restored in the updated game and offered by default. A link to the shared save root keeps its exact original target throughout testing and in the final archive, without an extra prompt or batch changes; this case uses existing saves directly. On return, keep the links or choose another location.
+Updates retain the launch command from `autorun.cmd`, restoring original `start.bat` scripts at the same relative locations. Existing save links retain their exact destinations during tests, relaunches and in the final archive. A link to the shared `/userdata/saves/windows` root allows choosing the game folder to back up before testing. Batch paths are preserved. Native links created for testing are restored in the prefix after interrupted or rejected compression. The working prefix remains available for manual use.
 
 Before the move, the old game directory is renamed `<name>.bak`. The updated directory retains the original name; the source directory disappears from its former location. The `.bak` remains until the game launch is validated, then is removed before recompression. Save links inside the old game directory are restored at the same locations. The move never falls back to an implicit copy. On mergerfs after EXDEV, the Toolbox can move each source part within its physical branch; steps are recorded and failures attempt rollback. Keeping existing save rules no longer requires an additional confirmation.
 

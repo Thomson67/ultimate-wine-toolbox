@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare an isolated game update; preserve launch directives and commit safely."""
+"""Prepare a game update; preserve launch directives and commit safely."""
 import argparse
 import errno
 import fnmatch
@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -192,21 +193,6 @@ def source_save_links(prefix, source, save_root):
     return result
 
 
-def redirect_saves(prefix, old, new, excluded=None):
-    """Never let the test prefix retain a link to the original game's saves."""
-    old = old.resolve()
-    for root, dirs, files in os.walk(prefix, followlinks=False):
-        dirs[:] = [name for name in dirs if Path(root) / name != excluded]
-        for name in dirs + files:
-            path = Path(root) / name
-            if path.is_symlink():
-                target = path.resolve()
-                if target.is_relative_to(old):
-                    replacement = new / target.relative_to(old)
-                    path.unlink()
-                    path.symlink_to(replacement, target_is_directory=replacement.is_dir())
-
-
 def launch_executable(prefix):
     """Resolve the existing CMD without evaluating shell/batch commands."""
     _, values = directives(prefix)
@@ -298,7 +284,14 @@ def validate_archive_save_links(manifest):
             if path.is_symlink():
                 links.append(dict(path=path.relative_to(prefix).as_posix(),
                                   original=os.readlink(path), target=str(path.resolve())))
-    reject_temporary_save_links(links, prefix, data['save_root'], data['test_save'])
+    reject_temporary_save_links(links, prefix, data['save_root'],
+                                None if data.get('preserve_save_links') else data['test_save'])
+    if data.get('preserve_save_links'):
+        for link in data['save_links']:
+            path = prefix / relative_path(link['path'])
+            if (not path.parent.resolve().is_relative_to(prefix.resolve())
+                    or not path.is_symlink() or os.readlink(path) != link['original']):
+                raise ValueError(f"original save link is missing or changed: {link['path']}")
 
 
 def custom_links(data):
@@ -323,18 +316,26 @@ def custom_links(data):
     return result
 
 
-def restore_legacy(prefix, manifest, restore_links=True):
+def restore_legacy(prefix, manifest, restore_links=True, links_override=None):
     data = json.loads(manifest.read_text())
-    links = custom_links(data) if restore_links == 'custom' else data.get('save_links', [])
+    links = links_override if links_override is not None else (
+        custom_links(data) if restore_links == 'custom' else data.get('save_links', []))
     if restore_links:
-        reject_temporary_save_links(links, prefix, data['save_root'], data['test_save'])
+        reject_temporary_save_links(links, prefix, data['save_root'],
+                                    None if data.get('preserve_save_links') else data['test_save'])
     for link in links if restore_links else []:
         path = prefix / link['path']
         if not path.parent.resolve().is_relative_to(prefix.resolve()):
             raise ValueError('save link parent escapes the working prefix')
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.is_symlink():
-            path.unlink()
+            if os.readlink(path) == link['original']:
+                continue
+            with tempfile.TemporaryDirectory(prefix='.uwt-save-link-', dir=path.parent) as tmp:
+                replacement = Path(tmp) / 'link'
+                replacement.symlink_to(link['original'])
+                os.replace(replacement, path)
+            continue
         elif path.is_dir():
             path.rmdir()  # Only remove an empty placeholder, never game data.
         elif path.exists():
@@ -352,6 +353,8 @@ def restore_legacy(prefix, manifest, restore_links=True):
 def stage_legacy(manifest):
     """Merge only save locations used by this test, never copy the whole root."""
     data = json.loads(manifest.read_text())
+    if data.get('preserve_save_links'):
+        return
     reject_temporary_save_links(data.get('save_links', []), data['prefix'],
                                 data['save_root'], data['test_save'])
     shared = Path(data['test_save']) / '.legacy-shared'
@@ -419,6 +422,8 @@ def cleanup_test_saves(manifest):
     data = json.loads(manifest.read_text())
     if not data.get('committed'):
         raise ValueError('test saves must be retained until the update is committed')
+    if data.get('preserve_save_links'):
+        return
     base = Path(data['save_root']).resolve()
     test = Path(data['test_save'])
     expected = '.uwt-test-' + manifest.stem if data.get('same_rom_name') else Path(data['prefix']).stem
@@ -441,7 +446,12 @@ def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False,
     if reuse_prefix and (prefix.suffix.casefold() != '.wine' or not (root / 'system.reg').is_file()
                          or not (root / 'autorun.cmd').is_file()):
         raise ValueError('reusing a prefix requires a .wine directory with system.reg and autorun.cmd')
-    ensure_root_alias(root)
+    # A physical root profile may have save links of its own. Normalizing it
+    # could move those links or discard them when steamuser already exists.
+    root_profile = Path('drive_c/users/root')
+    if not any(Path(link['path']).is_relative_to(root_profile)
+               for link in save_links(root, save_root)):
+        ensure_root_alias(root)
     game = game_directory(root)
     if (root / 'drive_c').is_symlink() or not game.is_dir() or game.is_symlink():
         raise ValueError('archive must contain an internal game directory')
@@ -456,13 +466,13 @@ def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False,
     original_save = save_root / archive.stem
     same_rom_name = prefix.stem == archive.stem
     test_save = save_root / ('.uwt-test-' + manifest.stem) if same_rom_name else save_root / prefix.stem
-    if test_save.exists() or test_save.is_symlink():
-        raise ValueError('test-save destination already exists')
-    if original_save.is_symlink():
-        raise ValueError('original save directory must not be a symlink')
-    if savedir is not None:
+    if original_save.is_symlink() or (original_save.exists() and not original_save.is_dir()):
+        raise ValueError('original save directory must be a real directory')
+    if savedir is not None and not links:
         location = root / savedir
-        if location.is_symlink() and not location.resolve().is_relative_to(original_save.resolve()):
+        if (location.is_symlink()
+                and not location.resolve().is_relative_to(original_save.resolve())
+                and not (values.get('SAVEFILES') and location.resolve().is_relative_to(root))):
             raise ValueError('existing save link does not point to this game save directory')
     old_game = game.with_name(game.name + '.bak')
     embedded = root / '.uwt-update-embedded-save'
@@ -472,6 +482,18 @@ def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False,
         raise ValueError('unfinished preparation artifacts already present: ' + paths)
     if source.stat().st_dev != game.parent.stat().st_dev:
         raise ValueError('game source and prefix must be on the same filesystem for a move without copying')
+    game_relative = game.relative_to(root)
+    for link in links:
+        relative = Path(link['path'])
+        if not relative.is_relative_to(game_relative):
+            continue
+        replacement = source / relative.relative_to(game_relative)
+        if not replacement.parent.resolve().is_relative_to(source):
+            raise ValueError(f'replacement game redirects the save-link parent: {replacement}')
+        if replacement.is_symlink() or not replacement.exists():
+            continue
+        if not replacement.is_dir() or any(replacement.iterdir()):
+            raise ValueError(f'replacement contains data at old save-link location: {replacement}')
     existing_launch = launch_executable(root)
     data = {'archive': str(archive), 'archive_signature': None if new_archive else signature(archive),
             'reuse_prefix': reuse_prefix, 'replaced_source_save_links': replacements,
@@ -479,36 +501,45 @@ def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False,
             'original_save': str(original_save), 'test_save': str(test_save),
             'autorun': text, 'savedir': values.get('SAVEDIR', ''),
             'savefiles': values.get('SAVEFILES', ''), 'save_root': str(save_root),
-            'save_links': links, 'test_scripts': [], 'same_rom_name': same_rom_name}
+            'save_links': links, 'test_scripts': [], 'same_rom_name': same_rom_name,
+            'preserve_save_links': True, 'managed_saves': bool(links or savedir)}
     save_json(manifest, data)
-    if original_save.is_dir():
-        shutil.copytree(original_save, test_save, symlinks=False)
-    else:
-        test_save.mkdir(parents=True)
+    targets = {original_save.resolve()}
+    base = save_root.resolve()
+    for link in links:
+        target = Path(link['target'])
+        if target != base:
+            targets.add(base / target.relative_to(base).parts[0])
+    for target in sorted(targets):
+        copy_save_backup(manifest, target)
+    data = json.loads(manifest.read_text())
     if savedir is not None and savedir != Path('.'):
         location = root / savedir
         if location.is_relative_to(game) and location != game and location.is_dir() and not location.is_symlink():
             shutil.copytree(location, embedded, symlinks=True)
-    game.rename(old_game)
-    try:
+    with defer_cancellation():
+        game.rename(old_game)
         try:
-            source.rename(game)
-        except OSError as exc:
-            if exc.errno != errno.EXDEV:
-                raise
-            print('Direct rename returned EXDEV; checking mergerfs physical branches (no copy).', flush=True)
-            def record_moves(plan):
-                data['physical_moves'] = plan
-                save_json(manifest, data)
             try:
-                rename_in_branches(source, game, record_moves)
-            except (OSError, ValueError) as physical_error:
-                raise OSError(errno.EXDEV, f'Cannot move without copying: {physical_error}') from exc
-    except MoveRecoveryRequired:
-        raise  # Partial new game must not be mixed with the old .bak.
-    except Exception:
-        old_game.rename(game)
-        raise
+                source.rename(game)
+            except OSError as exc:
+                if exc.errno != errno.EXDEV:
+                    raise
+                print('Direct rename returned EXDEV; checking mergerfs physical branches (no copy).', flush=True)
+                def record_moves(plan):
+                    data['physical_moves'] = plan
+                    save_json(manifest, data)
+                try:
+                    rename_in_branches(source, game, record_moves)
+                except (OSError, ValueError) as physical_error:
+                    raise OSError(errno.EXDEV, f'Cannot move without copying: {physical_error}') from exc
+        except MoveRecoveryRequired:
+            raise  # Partial new game must not be mixed with the old .bak.
+        except Exception:
+            old_game.rename(game)
+            raise
+        if links:
+            restore_legacy(root, manifest)
     # Original start.bat scripts take precedence, even if the new game supplies
     # another start.bat. Keep each one at its original relative location.
     launchers = []
@@ -536,114 +567,258 @@ def prepare(prefix, source, archive, save_root, manifest, reuse_prefix=False,
         location = root / savedir
         if location.is_symlink() or not location.parent.resolve().is_relative_to(root):
             raise ValueError('replacement game redirects the savedir outside the prefix')
-        shutil.copytree(embedded, location, symlinks=True, dirs_exist_ok=True)
-    # Restore custom save links that replacing drive_c/game would otherwise lose.
-    # SAVEDIR links use Batocera's per-ROM test copy; custom links use a separate
-    # root view, including links that point at the shared saves/windows root.
-    shared = test_save / '.legacy-shared'
-    for link in links:
-        target = Path(link['target'])
-        path = root / link['path']
-        if target == save_root.resolve():
-            replacement = Path(link['original'])
-        elif savedir is not None and target.is_relative_to(original_save.resolve()):
-            replacement = test_save / target.relative_to(original_save.resolve())
-        else:
-            relative = target.relative_to(save_root.resolve())
-            replacement = shared / relative
-            if relative != Path('.') and target.exists() and not replacement.exists():
-                replacement.parent.mkdir(parents=True, exist_ok=True)
-                if target.is_dir():
-                    shutil.copytree(target, replacement, symlinks=False)
-                else:
-                    shutil.copy2(target, replacement)
-            else:
-                shared.mkdir(parents=True, exist_ok=True)
-        if not path.parent.resolve().is_relative_to(root):
-            raise ValueError('replacement game redirects the save-link parent')
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if path.is_symlink():
-            path.unlink()
-        elif path.is_dir():
-            path.rmdir()  # Restore the old link only over an empty placeholder.
-        elif path.exists():
-            raise ValueError(f'replacement contains data at old save-link location: {path}')
-        path.symlink_to(replacement, target_is_directory=link['directory'])
-    # Literal save-root references in batch launchers must use the same test view.
-    # No command is executed or arbitrary batch expression evaluated here.
-    if links and savedir is None and not any(Path(link['target']) == save_root.resolve() for link in links):
-        shared.mkdir(parents=True, exist_ok=True)
-        replacements = [(str(save_root), str(shared)),
-                        (str(save_root).replace('/', '\\'), str(shared).replace('/', '\\'))]
-        candidates = {archive.stem}
-        for path in game.rglob('*'):
-            if path.suffix.casefold() not in ('.bat', '.cmd') or path.is_symlink() or not path.is_file():
-                continue
-            content = path.read_text(encoding='utf-8', errors='surrogateescape')
-            for base in (str(save_root), str(save_root).replace('/', '\\')):
-                for match in re.finditer(re.escape(base) + r'[/\\]([^"\r\n]+)', content):
-                    candidate = re.split(r'[/\\]', match.group(1))[0].strip()
-                    if candidate and candidate not in ('.', '..') and not any(c in candidate for c in '%!><|&'):
-                        candidates.add(candidate)
-        for name in candidates:
-            target = save_root / name
-            destination = shared / name
-            if target.is_dir() and not target.is_symlink() and not destination.exists():
-                shutil.copytree(target, destination, symlinks=False)
-        data['script_replacements'] = replacements
-        for path in game.rglob('*'):
-            if path.suffix.casefold() not in ('.bat', '.cmd') or path.is_symlink() or not path.is_file():
-                continue
-            content = path.read_text(encoding='utf-8', errors='surrogateescape')
-            updated = content
-            for original, replacement in replacements:
-                updated = updated.replace(original, replacement)
-            if updated != content:
-                data['test_scripts'].append(path.relative_to(root).as_posix())
-                path.write_text(updated, encoding='utf-8', errors='surrogateescape')
-        save_json(manifest, data)
-    redirect_saves(root, original_save, test_save, old_game)
-    if same_rom_name and savedir is not None:
-        # A stable .wine name shares Batocera's save basename with the archive.
-        # Disable its automatic save redirect for this test only, and install
-        # explicit links to the isolated copy (including SAVEFILES registries).
-        location = root / savedir
-        if not location.parent.resolve().is_relative_to(root) and savedir != Path('.'):
-            raise ValueError('test save parent escapes the prefix')
-        if values.get('SAVEFILES'):
-            location.mkdir(parents=True, exist_ok=True)
-            for pattern in values['SAVEFILES'].split(';'):
-                if not pattern.strip(): continue
-                relative_path(pattern)
-                for entry in location.glob(pattern):
-                    if not entry.is_file(): continue
-                    relative = entry.relative_to(location)
-                    target = test_save / relative
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    if not target.exists(): shutil.copy2(entry, target)
-                    if entry.resolve() != target.resolve():
-                        entry.unlink(); entry.symlink_to(target)
-        else:
-            if location == root or game.is_relative_to(location):
-                raise ValueError('SAVEDIR cannot redirect the whole prefix or game for this test')
-            if location.is_symlink():
-                location.unlink()
-            elif location.exists():
-                shutil.copytree(location, test_save, symlinks=False, dirs_exist_ok=True)
-                shutil.rmtree(location)
-            location.parent.mkdir(parents=True, exist_ok=True)
-            location.symlink_to(test_save, target_is_directory=True)
-        rewrite_save_rules(root, '', '')
+        def skip_restored_links(directory, names):
+            target_dir = location / Path(directory).relative_to(embedded)
+            return [name for name in names
+                    if (Path(directory) / name).is_symlink() and (target_dir / name).is_symlink()
+                    and os.readlink(Path(directory) / name) == os.readlink(target_dir / name)]
+        shutil.copytree(embedded, location, symlinks=True, dirs_exist_ok=True,
+                        ignore=skip_restored_links)
     if embedded.exists():
         shutil.rmtree(embedded)
+    prepare_live_save_rules(manifest)
+    restore_live_save_rules(manifest, json.loads(manifest.read_text()))
+
+
+def recover_original_saves(manifest):
+    """Restore journaled permanent paths and retain interrupted test copies."""
+    data = json.loads(manifest.read_text())
+    root = Path(data['prefix'])
+    base = Path(data['save_root']).resolve(strict=True)
+    original = Path(data['original_save'])
+    test = Path(data['test_save'])
+    expected = '.uwt-test-' + manifest.stem if data.get('same_rom_name') else root.stem
+    if (data.get('committed') or root.is_symlink() or not root.is_dir()
+            or original.parent.resolve() != base or original.name != Path(data['archive']).stem
+            or original.is_symlink()
+            or test.parent.resolve() != base or test.name != expected or test.is_symlink()
+            or test.resolve() == original.resolve()):
+        raise ValueError('invalid interrupted update; automatic link recovery refused')
+    root = root.resolve()
+    desired = list(data.get('save_links', []))
+    native_records = list(data.get('native_test_links', []))
+
+    def identity(path):
+        return path.parent.resolve() / path.name
+
+    known = {identity(root / link['path']) for link in desired}
+    if data.get('savedir'):
+        location = root / relative_path(data['savedir'])
+        if data.get('savefiles'):
+            paths = []
+            for pattern in data['savefiles'].split(';'):
+                if pattern.strip():
+                    paths.extend(location.glob(str(relative_path(pattern))))
+        else:
+            paths = [location]
+        for path in paths:
+            if (path.is_symlink() and path.resolve().is_relative_to(test)
+                    and identity(path) not in known):
+                target = original / path.relative_to(location) if data.get('savefiles') else original
+                desired.append(dict(path=path.relative_to(root).as_posix(), original=str(target),
+                                    target=str(target.resolve()), directory=not data.get('savefiles')))
+                known.add(identity(path))
+                record = dict(path=path.relative_to(root).as_posix(), target=str(target),
+                              directory=not data.get('savefiles'))
+                if not any(item['path'] == record['path'] for item in native_records):
+                    native_records.append(record)
+    reject_temporary_save_links(desired, root, base, test)
+    for link in save_links(root, base):
+        target = Path(link['target'])
+        temporary = target.is_relative_to(test) or any(
+            part.startswith('.uwt-test-') or part in ('.legacy-shared', '.legacy-publish')
+            for part in target.relative_to(base).parts)
+        if temporary and identity(root / link['path']) not in known:
+            raise ValueError(f"no original destination recorded for {link['path']}; keep all copies")
+    for link in desired:
+        path = root / relative_path(link['path'])
+        if not path.parent.resolve().is_relative_to(root):
+            raise ValueError('original save-link parent escapes the prefix')
+        if path.exists() and not path.is_symlink() and (
+                not path.is_dir() or any(path.iterdir())):
+            raise ValueError(f'save location contains local data; automatic recovery refused: {path}')
+    data.update(preserve_save_links=True, managed_saves=bool(desired or data.get('savedir')),
+                native_test_links=native_records, legacy_publish=[], recovered_test_save=str(test))
+    save_json(manifest, data)
+    targets = {original.resolve()}
+    for link in desired:
+        target = Path(link['target'])
+        if target != base:
+            targets.add(base / target.relative_to(base).parts[0])
+    for target in sorted(targets):
+        copy_save_backup(manifest, target)
+    restore_legacy(root, manifest, links_override=desired)
+    rewrite_save_rules(root, data.get('savedir', ''), data.get('savefiles', ''))
+    prepare_live_save_rules(manifest)
+    restore_live_save_rules(manifest, json.loads(manifest.read_text()))
+    validate_archive_save_links(manifest)
+    print(f'Original save destinations restored. Interrupted test copy retained at {test}', flush=True)
+
+
+def prepare_live_save_rules(manifest):
+    # Use permanent targets for native save rules during a linked-prefix test.
+    from v41_savedir import check_tree, seed
+
+    data = json.loads(manifest.read_text())
+    if data.get('committed') or not data.get('savedir'):
+        return
+    root = Path(data['prefix']).resolve()
+    base = Path(data['save_root']).resolve()
+    destination = base / Path(data['original_save']).name
+    location = root / relative_path(data['savedir'])
+    if destination.is_symlink() or (location != root and not location.parent.resolve().is_relative_to(root)):
+        raise ValueError('invalid live save destination')
+    keep_rule = False
+    native_link = location.is_symlink() and not (
+        data.get('savefiles') and location.resolve().is_relative_to(root))
+    runtime_destination = base / Path(data['prefix']).stem
+    if native_link:
+        keep_rule = not data.get('savefiles') and location.resolve() == runtime_destination.resolve()
+    else:
+        location = location.resolve()
+        if data.get('savefiles'):
+            paths = set()
+            for pattern in data['savefiles'].split(';'):
+                if not pattern.strip():
+                    continue
+                relative = relative_path(pattern)
+                if any(char in pattern for char in '*?['):
+                    paths.update(path.relative_to(location) for path in location.glob(str(relative)))
+                    paths.update(path.relative_to(destination) for path in destination.glob(str(relative)))
+                else:
+                    paths.add(relative)
+            pairs = [(location / path, destination / path) for path in sorted(paths)]
+        else:
+            if location == root or (root / data['game_dir']).resolve().is_relative_to(location):
+                raise ValueError('SAVEDIR cannot redirect the whole prefix or game')
+            # Native SAVEDIR would otherwise replace this directory and all the
+            # existing save links below it. Keep its mixed layout instead.
+            if any((root / link['path']).is_relative_to(location) for link in data['save_links']):
+                pairs = []
+            else:
+                pairs = [(location, destination)]
+                keep_rule = destination.resolve() == runtime_destination.resolve()
+        for source, target in pairs:
+            if not source.parent.resolve().is_relative_to(root):
+                raise ValueError('save file parent escapes the working prefix')
+            if source.is_symlink():
+                continue
+            if target.is_symlink() or not target.resolve().is_relative_to(base):
+                raise ValueError('live save target escapes the save root')
+            if data.get('savefiles') and any(path.exists() and not path.is_file() for path in (source, target)):
+                raise ValueError(f'SAVEFILES requires a regular file: {source}')
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if source.exists():
+                # Validate before copying or replacing anything at this location.
+                check_tree(source, target, base)
+                seed(source, target, base)
+            elif not data.get('savefiles'):
+                target.mkdir(parents=True, exist_ok=True)
+            source.parent.mkdir(parents=True, exist_ok=True)
+            records = data.setdefault('native_test_links', [])
+            relative = source.relative_to(root).as_posix()
+            if not any(record['path'] == relative for record in records):
+                records.append(dict(path=relative, target=str(target),
+                                    directory=not data.get('savefiles')))
+                save_json(manifest, data)
+            with tempfile.TemporaryDirectory(prefix='.uwt-save-link-', dir=source.parent) as tmp:
+                replacement = Path(tmp) / 'link'
+                replacement.symlink_to(target, target_is_directory=not data.get('savefiles'))
+                with defer_cancellation():
+                    previous = Path(tmp) / 'previous'
+                    if source.is_dir():
+                        source.rename(previous)
+                    try:
+                        os.replace(replacement, source)
+                    except OSError:
+                        if previous.exists():
+                            previous.rename(source)
+                        raise
+    # Batocera rewrites SAVEFILES links and replaces a real SAVEDIR directory.
+    # Suppress only rules that would change the links during the test launch.
+    if not keep_rule:
+        suspend_live_save_rules(manifest, data)
+
+
+def suspend_live_save_rules(manifest, data):
+    root = Path(data['prefix'])
+    directives(root)  # Reject an autorun.cmd symlink before reading it.
+    text = (root / 'autorun.cmd').read_bytes().decode('utf-8', errors='surrogateescape')
+    rules = []
+    lines = []
+    for index, line in enumerate(text.splitlines(keepends=True)):
+        if line.split('=', 1)[0].strip().upper() in ('SAVEDIR', 'SAVEFILES'):
+            rules.append([index, line])
+        else:
+            lines.append(line)
+    if rules:
+        with defer_cancellation():
+            data['live_rules_suspended'] = rules
+            save_json(manifest, data)
+            write_save_config(root, ''.join(lines))
+
+
+def detach_generated_native_saves(manifest):
+    """Restore portable native paths while retaining all original save links."""
+    data = json.loads(manifest.read_text())
+    if not data.get('preserve_save_links'):
+        return
+    root = Path(data['prefix']).resolve()
+    original = {(root / link['path']).parent.resolve() / Path(link['path']).name
+                for link in data['save_links']}
+    for record in data.get('native_test_links', []):
+        path = root / relative_path(record['path'])
+        identity = path.parent.resolve() / path.name
+        if identity in original or not path.is_symlink():
+            continue
+        if not path.parent.resolve().is_relative_to(root) or os.readlink(path) != record['target']:
+            raise ValueError(f'native save link changed; keep it for inspection: {path}')
+        with tempfile.TemporaryDirectory(prefix='.uwt-native-archive-', dir=path.parent) as tmp:
+            replacement = Path(tmp) / 'save'
+            if record['directory']:
+                replacement.mkdir()
+                with defer_cancellation():
+                    path.unlink()
+                    try:
+                        replacement.rename(path)
+                    except OSError:
+                        path.symlink_to(record['target'], target_is_directory=True)
+                        raise
+            else:
+                shutil.copy2(path, replacement)
+                os.replace(replacement, path)
+
+
+def restore_live_save_rules(manifest, data):
+    rules = data.get('live_rules_suspended', [])
+    if not rules:
+        return
+    root = Path(data['prefix'])
+    _, current = directives(root)
+    text = (root / 'autorun.cmd').read_bytes().decode('utf-8', errors='surrogateescape')
+    lines = text.splitlines(keepends=True)
+    missing = [(index, rule) for index, rule in rules
+               if rule.split('=', 1)[0].strip().upper() not in current]
+    for index, rule in missing:
+        position = min(index, len(lines))
+        if position and not lines[position - 1].endswith(('\n', '\r')):
+            lines[position - 1] += '\n'
+        if position < len(lines) and not rule.endswith(('\n', '\r')):
+            rule += '\n'
+        lines.insert(position, rule)
+    if missing:
+        write_save_config(root, ''.join(lines))
+    data.pop('live_rules_suspended')
+    save_json(manifest, data)
 
 
 def existing_save_locations(manifest):
     """Read-only locations; a shared-root link requires choosing a child folder."""
     data = json.loads(manifest.read_text())
     base = Path(data['save_root']).resolve()
-    excluded = {Path(data['test_save']).resolve(),
-                base / (Path(data['prefix']).stem + '.validated')}
+    excluded = {base / (Path(data['prefix']).stem + '.validated')}
+    if not data.get('preserve_save_links'):
+        excluded.add(Path(data['test_save']).resolve())
     candidates = [Path(data['original_save'])]
     for link in data.get('save_links', []):
         target = Path(link['target'])
@@ -656,9 +831,48 @@ def existing_save_locations(manifest):
         real = path.resolve()
         if (not path.is_symlink() and path.is_dir() and real != base
                 and real.is_relative_to(base) and real not in excluded
-                and not path.name.startswith('.uwt-')):
+                and not path.name.startswith('.uwt-')
+                and not re.search(r'\.backup-[0-9]{8}-[0-9]{6}-[0-9]{6}$', path.name)):
             locations.add(real)
     return sorted(locations, key=lambda path: str(path).casefold())
+
+
+def prepare_unmanaged_retest(manifest, data, prepared):
+    from v41_savedir import check_tree, seed
+
+    root = Path(data['prefix']).resolve()
+    _, rules = directives(root)
+    if not rules.get('SAVEDIR'):
+        return
+    location = root / relative_path(rules['SAVEDIR'])
+    if (not location.resolve().is_relative_to(root)
+            or (location.is_symlink() and not rules.get('SAVEFILES'))
+            or (location.resolve() == root and not rules.get('SAVEFILES'))):
+        raise ValueError('new save location must stay inside the working prefix')
+    location = location.resolve()
+    if prepared is not None:
+        base = Path(data['save_root']).resolve()
+        if (prepared.is_symlink() or prepared.parent.resolve() != base
+                or prepared.name != Path(data['prefix']).stem + '.validated'):
+            raise ValueError('invalid prepared save copy')
+        if prepared.is_dir():
+            if rules.get('SAVEFILES'):
+                paths = set()
+                for pattern in rules['SAVEFILES'].split(';'):
+                    if pattern.strip():
+                        pattern_path = relative_path(pattern)
+                        paths.update(path.relative_to(prepared)
+                                     for path in prepared.glob(str(pattern_path)) if path.is_file())
+                pairs = [(prepared / path, location / path) for path in sorted(paths)]
+            else:
+                pairs = [(prepared, location)]
+            # Validate all entries first, then seed only missing local data.
+            for source, target in pairs:
+                check_tree(source, target, root)
+            for source, target in pairs:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                seed(source, target, root)
+    suspend_live_save_rules(manifest, data)
 
 
 def prepare_retest(manifest, prepared=None):
@@ -667,6 +881,15 @@ def prepare_retest(manifest, prepared=None):
     data = json.loads(manifest.read_text())
     root = Path(data['prefix']).resolve()
     base = Path(data['save_root']).resolve()
+    if data.get('preserve_save_links'):
+        if data.get('committed'):
+            raise ValueError('cannot relaunch a committed update')
+        restore_legacy(root, manifest)
+        if data.get('savedir') or data.get('save_links'):
+            prepare_live_save_rules(manifest)
+        else:
+            prepare_unmanaged_retest(manifest, data, prepared)
+        return
     test = Path(data['test_save'])
     expected = '.uwt-test-' + manifest.stem if data.get('same_rom_name') else Path(data['prefix']).stem
     if (data.get('committed') or test.is_symlink() or test.parent.resolve() != base
@@ -755,9 +978,17 @@ def rewrite_save_rules(prefix, savedir, savefiles):
     lines = [line for line in text.splitlines() if line.split('=', 1)[0].strip().upper() not in ('SAVEDIR', 'SAVEFILES')]
     if savedir: lines.append('SAVEDIR=' + savedir)
     if savefiles: lines.append('SAVEFILES=' + savefiles)
-    tmp = prefix / 'autorun.cmd.uwt-saves'
-    tmp.write_text('\n'.join(lines) + '\n', encoding='utf-8', errors='surrogateescape')
-    os.replace(tmp, prefix / 'autorun.cmd')
+    write_save_config(prefix, '\n'.join(lines) + '\n')
+
+
+def write_save_config(prefix, text):
+    with tempfile.TemporaryDirectory(prefix='.uwt-save-rules-', dir=prefix) as tmp:
+        path = Path(tmp) / 'autorun.cmd'
+        current = prefix / 'autorun.cmd'
+        path.write_text(text, encoding='utf-8', errors='surrogateescape')
+        if current.exists():
+            shutil.copymode(current, path)
+        os.replace(path, current)
 
 
 def write_autorun(prefix, exe, savedir=None, savefiles=None):
@@ -850,12 +1081,47 @@ def backup_tree_signature(path):
     return hashlib.sha256(json.dumps(rows, ensure_ascii=True).encode()).hexdigest()
 
 
+def copy_save_backup(manifest, target):
+    data = json.loads(manifest.read_text())
+    base = Path(data['save_root']).resolve()
+    if (not data.get('preserve_save_links') or data.get('committed')
+            or target.parent != base or target.is_symlink()):
+        raise ValueError('invalid save backup source')
+    backups = data.setdefault('save_backups', [])
+    if any(record['target'] == str(target) for record in backups) or not target.exists():
+        return
+    active = target.stat()
+    backup = target.with_name(target.name + '.backup-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
+    with tempfile.TemporaryDirectory(prefix='.uwt-save-copy-', dir=base) as tmp:
+        copy = Path(tmp) / 'save'
+        if target.is_dir():
+            shutil.copytree(target, copy, symlinks=True)
+        elif target.is_file():
+            shutil.copy2(target, copy)
+        else:
+            raise ValueError('unsupported save backup source')
+        with defer_cancellation():
+            copy.rename(backup)
+            backups.append(dict(path=str(backup), target=str(target),
+                                target_identity=[active.st_dev, active.st_ino],
+                                signature=backup_tree_signature(backup)))
+            save_json(manifest, data)
+    print(backup, flush=True)
+
+
 def save_backup_records(data):
     if not data.get('committed'):
         raise ValueError('Save backups must be retained until the update is committed')
     base = Path(data['save_root']).resolve()
     allowed = {str(Path(data['original_save']))}
     allowed.update(change['target'] for change in data.get('legacy_publish', []))
+    if data.get('preserve_save_links'):
+        allowed.add(str(Path(data['original_save']).resolve()))
+        for link in data.get('save_links', []):
+            target = Path(link['target'])
+            if target != base and target.is_relative_to(base):
+                allowed.add(str(base / target.relative_to(base).parts[0]))
+        allowed.update(data.get('shared_backup_targets', []))
     found, seen = [], set()
     records = data.get('save_backups', [])
     if not isinstance(records, list):
@@ -935,12 +1201,15 @@ def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
                 raise
     original_save = Path(data['original_save'])
     changes = list(data.get('legacy_publish', []))
+    if (data.get('preserve_save_links') and (data.get('save_links') or data.get('savedir'))
+            and (changes or prepared_save is not None)):
+        raise ValueError('cannot replace live linked saves with a staged copy')
     if prepared_save is not None:
         if prepared_save.is_symlink() or not prepared_save.is_dir() or prepared_save.parent.resolve() != original_save.parent.resolve() or prepared_save == original_save:
             raise ValueError('prepared saves must be a distinct adjacent directory')
         changes.append(dict(target=str(original_save), prepared=str(prepared_save)))
     swapped = []
-    save_backups = []
+    save_backups = list(data.get('save_backups', []))
     save_backup = None
     print(f'update_phase=publication time={datetime.now().isoformat(timespec="seconds")}', file=sys.stderr, flush=True)
     with defer_cancellation():
@@ -960,6 +1229,11 @@ def commit(manifest, staged, prepared_save=None, keep_archive_backup=True):
                 save_backup = backup_path or save_backup
                 if backup_path is not None:
                     active = target.stat()
+                    previous = backup_path.stat()
+                    for record in save_backups:
+                        if (record['target'] == str(target) and
+                                record['target_identity'] == [previous.st_dev, previous.st_ino]):
+                            record['target_identity'] = [active.st_dev, active.st_ino]
                     save_backups.append(dict(path=str(backup_path), target=str(target),
                         target_identity=[active.st_dev, active.st_ino],
                         signature=backup_tree_signature(backup_path)))
@@ -1014,12 +1288,12 @@ def main():
     a.add_argument('manifest', type=Path); a.add_argument('staged', type=Path); a.add_argument('--prepared-save', type=Path); a.add_argument('--replace', action='store_true')
     a = sp.add_parser('cleanup-bottles')
     a.add_argument('root', type=Path); a.add_argument('archive_name')
-    for action in ('validate-save-links', 'save-backups', 'cleanup-save-backups', 'keep-save-backups', 'cleanup-test', 'profiles', 'restore-save-rules', 'finish-game', 'restore-legacy', 'restore-custom', 'restore-scripts', 'stage-legacy', 'legacy-summary', 'exe', 'game-dir'):
+    for action in ('restore-native-saves', 'detach-native-saves', 'recover-original-saves', 'validate-save-links', 'save-backups', 'cleanup-save-backups', 'keep-save-backups', 'cleanup-test', 'profiles', 'restore-save-rules', 'finish-game', 'restore-legacy', 'restore-custom', 'restore-scripts', 'stage-legacy', 'legacy-summary', 'exe', 'game-dir'):
         a = sp.add_parser(action)
         a.add_argument('prefix' if action in ('exe', 'game-dir', 'profiles') else 'manifest', type=Path)
     a = sp.add_parser('root-link')
     a.add_argument('manifest', type=Path)
-    a = sp.add_parser('seed-legacy')
+    a = sp.add_parser('backup-shared-save')
     a.add_argument('manifest', type=Path); a.add_argument('source', type=Path)
     a = sp.add_parser('copy-test')
     a.add_argument('manifest', type=Path); a.add_argument('destination', type=Path)
@@ -1043,6 +1317,11 @@ def main():
             for path in manage_save_backups(a.manifest,
                     remove=a.action == 'cleanup-save-backups', keep=a.action == 'keep-save-backups'):
                 print(path)
+        elif a.action == 'restore-native-saves':
+            prepare_live_save_rules(a.manifest)
+            restore_live_save_rules(a.manifest, json.loads(a.manifest.read_text()))
+        elif a.action == 'detach-native-saves': detach_generated_native_saves(a.manifest)
+        elif a.action == 'recover-original-saves': recover_original_saves(a.manifest)
         elif a.action == 'cleanup-test': cleanup_test_saves(a.manifest)
         elif a.action == 'cleanup-bottles':
             removed = cleanup_runtime_bottles(a.root, a.archive_name)
@@ -1056,14 +1335,20 @@ def main():
         elif a.action == 'root-link':
             data = json.loads(a.manifest.read_text())
             print(any(Path(link['target']) == Path(data['save_root']).resolve() for link in data.get('save_links', [])))
-        elif a.action == 'seed-legacy':
+        elif a.action == 'backup-shared-save':
             data = json.loads(a.manifest.read_text())
             base = Path(data['save_root']).resolve()
             source = a.source.resolve(strict=True)
-            if not source.is_dir() or source.parent != base or a.source.is_symlink():
+            if (source.parent != base or a.source.is_symlink() or not source.is_dir()
+                    or source not in existing_save_locations(a.manifest)):
                 raise ValueError('choose this game folder directly inside the saves/windows root')
-            destination = Path(data['test_save']) / '.legacy-shared' / source.name
-            shutil.copytree(source, destination, symlinks=False, dirs_exist_ok=True)
+            if not any(Path(link['target']) == base for link in data['save_links']):
+                raise ValueError('no shared save-root link in this update')
+            targets = data.setdefault('shared_backup_targets', [])
+            if str(source) not in targets:
+                targets.append(str(source))
+                save_json(a.manifest, data)
+            copy_save_backup(a.manifest, source)
         elif a.action == 'copy-test':
             data = json.loads(a.manifest.read_text())
             for child in Path(data['test_save']).iterdir():
@@ -1073,6 +1358,9 @@ def main():
                 else: shutil.copy2(child, target)
         elif a.action == 'restore-save-rules':
             data = json.loads(a.manifest.read_text())
+            if data.get('preserve_save_links'):
+                restore_live_save_rules(a.manifest, data)
+                return
             if data.get('same_rom_name'):
                 root = Path(data['prefix'])
                 location = root / relative_path(data.get('savedir', '.'))

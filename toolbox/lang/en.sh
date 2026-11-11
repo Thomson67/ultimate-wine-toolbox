@@ -796,6 +796,7 @@ declare -gA I18N=(
   [wsq_update_confirm]="Archive:\\n%s\\n\\nNew game version:\\n%s\\n\\nTest prefix:\\n%s\\n\\nThe original archive stays intact. The source directory will be moved into the test prefix and will no longer remain at its current location. The old game directory is kept as .bak until launch validation. Existing save links are restored. Allow space for extraction and recompression. Continue?"
   [wsq_update_extract]="Extracting the test prefix. The original archive is retained."
   [wsq_update_copy]="Moving the new game version and preparing isolated test saves. This may take several minutes."
+  [wsq_update_copy_safety]="Moving the new game version and preparing a safety backup of the saves. This may take several minutes."
   [wsq_update_finalizing]="Finalizing the update: backing up the old archive if requested, then replacing it. A backup copy can take time. Keep the Toolbox open until the completion message."
   [wsq_update_validate]="Fully checking the new archive before replacement. Data is read without another extraction.\n\nKeep the Toolbox open until the completion message. Closing the window interrupts the operation; recovery data is retained."
   [wsq_update_elapsed]="Operation in progress — %s seconds elapsed."
@@ -820,11 +821,15 @@ declare -gA I18N=(
   [wsq_executable_apply_failed]="Could not save the selected executable: %s"
   [wsq_update_exe_missing]="The existing launch command no longer matches an available file in the updated game. Select a new executable."
   [wsq_update_links_prompt]="Save links from the original prefix:\\n%s\\n\\nKeep these links by default. A root link may let the game or start.bat create its own subdirectory. Check loading and a new save before confirming."
+  [wsq_update_links_live]="Preserved save locations:\\n%s\\n\\nThe test uses the original destinations. After updating, you can keep or delete the safety backups."
   [wsq_update_links_keep]="Keep the existing save links (default)"
 
   [wsq_update_root_prompt]="A link points to the Windows save root. The folder created by the game may be unknown before launch. Explicitly identifiable folders are copied for testing, but the entire save root is never copied. If your progress is in another folder, select it here to copy it before testing."
+  [wsq_update_shared_backup_prompt]="A link points to the Windows save root. Select the folders used by this game to back them up before testing. The game continues to use its original paths."
   [wsq_update_root_continue]="Continue with the prepared test saves"
+  [wsq_update_shared_backup_continue]="Continue to the test"
   [wsq_update_root_copy]="Copy an existing progress folder for testing"
+  [wsq_update_shared_backup_progress]="Backing up the selected save folder…"
 
   [wsq_update_done_new]="Update completed, new WSquashFS created:\\n%s\\n\\nWorking prefix:\\n%s"
   [wsq_update_reuse_label]="reuse this prefix without extraction"
@@ -878,6 +883,7 @@ I18N[wsq_update_save_cleanup_progress]="Removing this update’s save-data backu
 I18N[wsq_update_save_cleanup_failed]="Some save backups could not be verified or deleted. Remaining copies are kept for manual review. The update succeeded and active saves are kept. Log:\n%s"
 
 I18N[wsq_update_replace_source_links]="The new version contains links at known save locations:\n\n%s\n\nReplace these links using the existing configuration? Tests will use the workflow’s test copies (except links to the shared root).\n\nOnly the links will be replaced: their old target folders, including saves from a previous test, remain untouched. Their contents will not be imported. No stops preparation before the source directory is moved."
+I18N[wsq_update_restore_source_links]="The new version contains links at known save locations:\n\n%s\n\nReplace these links using the existing configuration? Tests will use the original save destinations.\n\nOnly the links will be replaced: their old target folders, including saves from a previous test, remain untouched. Their contents will not be imported. No stops preparation before the source directory is moved."
 
 I18N[osk_title]="Controller virtual keyboard"
 I18N[osk_intro]="Show / hide: Hotkey + Select, as configured in EmulationStation. Off by default. Applies to upcoming Windows launches. Per-game settings take priority. Existing Batocera shortcuts are preserved."

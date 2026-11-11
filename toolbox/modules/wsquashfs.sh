@@ -557,8 +557,10 @@ wsq_restart_emulationstation_deferred() {
 }
 
 wsq_request_game_launch() {
-    local rom="$1" bundle request
-    python3 "$WSQ_UPDATE_HELPER" profiles "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || return 1
+    local rom="$1" preserve_links="${2:-}" bundle request
+    if [ "$preserve_links" != True ]; then
+        python3 "$WSQ_UPDATE_HELPER" profiles "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || return 1
+    fi
     bundle="$(wsq_dxvk_test_override)" || return 1
     mkdir -p "$WSQ_STATE_DIR" || return 1
     request="$(mktemp "$WSQ_STATE_DIR/.wsq-launch.XXXXXX")" || return 1
@@ -687,8 +689,21 @@ wsq_recover_invalid_pending() {
         "$WSQ_STATE_DIR/restart-es.request"
 }
 
+wsq_restore_linked_save_rules() {
+    [ "$(wsq_state_value mode)" = update ] || return 0
+    local metadata log
+    metadata="$(wsq_state_value metadata)"; log="$(wsq_state_value update_log)"
+    [ -s "$metadata" ] || return 0
+    [ "$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" preserve_save_links)" = True ] || return 0
+    python3 "$WSQ_UPDATE_HELPER" restore-save-rules "$metadata" >> "$log" 2>&1 || {
+        msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"
+        return 1
+    }
+}
+
 wsq_abandon_pending() {
     local prefix="$1"
+    wsq_restore_linked_save_rules || return 1
     rm -f -- "$WSQ_STATE_FILE" "$WSQ_STATE_DIR/wsq-launch-result" \
         "$WSQ_STATE_DIR/launch-game.request" "$WSQ_STATE_DIR/resume-wsq.request" \
         "$WSQ_STATE_DIR/restart-es.request"
@@ -696,15 +711,20 @@ wsq_abandon_pending() {
 }
 
 wsq_cancel_pending() {
+    wsq_restore_linked_save_rules || return 1
     rm -f -- "$snapshot" "$WSQ_STATE_FILE" "$WSQ_STATE_DIR/wsq-launch-result"
     msgbox "$(i18n wsq_resume_title)" "$(i18n wsq_prefix_kept "$prefix")"
 }
 
 wsq_retry_pending() {
-    if [ "$(wsq_state_value mode)" = update ] &&
-       { [ "$(wsq_state_value save_review_ready)" = 1 ] || [ "$(wsq_state_value phase)" = ready ]; }; then
-        local metadata log prepared
+    local metadata="" log="" prepared="" preserve_links=""
+    if [ "$(wsq_state_value mode)" = update ]; then
         metadata="$(wsq_state_value metadata)"; log="$(wsq_state_value update_log)"
+        preserve_links="$(python3 "$WSQ_UPDATE_HELPER" value "$metadata" preserve_save_links 2>> "$log")" || return 1
+    fi
+    if [ -n "$metadata" ] &&
+       { [ "$preserve_links" = True ] || [ "$(wsq_state_value save_review_ready)" = 1 ] ||
+         [ "$(wsq_state_value phase)" = ready ]; }; then
         prepared="$WSQ_SAVE_ROOT/$(basename "$prefix" .wine).validated"
         python3 "$WSQ_UPDATE_HELPER" retest "$metadata" --prepared-save "$prepared" >> "$log" 2>&1 || {
             msgbox "$(i18n wsq_update_title)" "$(i18n wsq_update_failed "$prefix" "$log" "$(wsq_update_log_detail "$log")")"
@@ -712,8 +732,10 @@ wsq_retry_pending() {
         }
         wsq_update_state phase testing save_review_ready 0 save_ready_kind "" || return 1
     fi
-    wsq_request_game_launch "$prefix" || return 1
-    wsq_restart_emulationstation_deferred || return 1
+    if ! wsq_request_game_launch "$prefix" "$preserve_links" || ! wsq_restart_emulationstation_deferred; then
+        wsq_restore_linked_save_rules
+        return 1
+    fi
     exit 0
 }
 
@@ -1675,6 +1697,7 @@ wsq_resume_build() {
     }
 
     if [ "$(wsq_state_value mode)" = update ]; then
+        wsq_restore_linked_save_rules || return 1
         local review_update_launch=0
         while true; do
             if [ "$(wsq_state_value phase)" = testing ] || [ "$review_update_launch" -eq 1 ]; then

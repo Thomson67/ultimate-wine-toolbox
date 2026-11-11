@@ -14,9 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 class SaveBackupTests(unittest.TestCase):
     setUp = fixtures.UpdateTests.setUp
     prepare = fixtures.UpdateTests.prepare
+    legacy_prepare = fixtures.UpdateTests.legacy_prepare
 
     def publish(self, extra=False):
-        self.prepare()
+        self.legacy_prepare()
         if extra:
             target = self.saves/'Other save'; target.mkdir(); (target/'slot').write_text('old extra')
             prepared = self.saves/'extra-prepared'; prepared.mkdir(); (prepared/'slot').write_text('new extra')
@@ -54,7 +55,7 @@ class SaveBackupTests(unittest.TestCase):
         self.assertEqual(json.loads(self.manifest.read_text())['save_backup_choice'], 'keep')
 
     def test_uncommitted_state_cannot_delete_backups(self):
-        self.prepare()
+        self.legacy_prepare()
         with self.assertRaisesRegex(ValueError, 'committed'):
             update.manage_save_backups(self.manifest, remove=True)
         self.assertEqual((self.original_save/'slot').read_text(), 'original')
@@ -73,7 +74,7 @@ class SaveBackupTests(unittest.TestCase):
         self.assertTrue(backups[0].exists())
 
     def test_edits_inside_a_nested_backup_directory_block_cleanup(self):
-        self.prepare()
+        self.legacy_prepare()
         nested=self.original_save/'nested'; nested.mkdir(); (nested/'save').write_text('old')
         staged=self.base/'new.wsquashfs'; staged.write_bytes(b'new')
         prepared=self.saves/'validated'; prepared.mkdir()
@@ -107,7 +108,7 @@ class SaveBackupTests(unittest.TestCase):
         self.assertTrue(all(p.exists() for p in backups))
 
     def test_link_inside_backup_is_unlinked_without_deleting_its_target(self):
-        self.prepare(); outside=self.base/'external'; outside.mkdir(); (outside/'save').write_text('external')
+        self.legacy_prepare(); outside=self.base/'external'; outside.mkdir(); (outside/'save').write_text('external')
         (self.original_save/'link').symlink_to(outside,target_is_directory=True)
         prepared=self.saves/'validated'; prepared.mkdir()
         staged=self.base/'new.wsquashfs'; staged.write_bytes(b'new')
@@ -142,7 +143,7 @@ wsq_update_manage_save_backups "$MANIFEST" "$WT_HOME/cleanup.log"
         self.assertEqual(json.loads(self.manifest.read_text())['save_backup_choice'],'keep')
 
     def test_legacy_single_file_backup_is_removed_without_touching_active_file(self):
-        self.prepare(); target=self.saves/'settings.ini'; target.write_text('old')
+        self.legacy_prepare(); target=self.saves/'settings.ini'; target.write_text('old')
         prepared=self.saves/'prepared.ini'; prepared.write_text('new')
         data=json.loads(self.manifest.read_text()); data['legacy_publish']=[{'target':str(target),'prepared':str(prepared)}]
         update.save_json(self.manifest,data)
