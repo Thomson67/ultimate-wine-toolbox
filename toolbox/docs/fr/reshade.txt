@@ -31,6 +31,8 @@ MODÈLES
 Installer les packs ne signifie pas activer tous leurs effets. Le rendu des nouveaux filtres rétro reste à valider selon le jeu.
 
 EN JEU
+Choisir « Lancer le jeu pour préparer un preset » à la fin de l’installation ou depuis le menu ReShade du jeu. La Toolbox lance le jeu via EmulationStation avec son runner habituel et revient à son menu ReShade après la fermeture.
+
 Home ouvre ReShade. Pour les nouveaux profils, Fin active/désactive les effets ; les raccourcis personnalisés existants sont conservés. Activer les effets souhaités ou importer un preset .ini depuis la Toolbox. Ses shaders doivent être présents dans les packs installés.
 
 Les réglages et presets sont conservés par jeu et récupérés à sa fermeture. Un export de preset ne contient pas les packs de shaders. Fermer le jeu avant de modifier, désactiver ou désinstaller ReShade.

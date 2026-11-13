@@ -215,23 +215,35 @@ PY
 }
 
 wsq_update_select_executable() {
-    local prefix="$1" existing choice
-    existing="$(python3 "$WSQ_UPDATE_HELPER" exe "$prefix")" || return 1
+    local prefix="$1" existing choice game_dir selected browse_dir prompt=wsq_update_exe_missing
+    local -a actions=()
+    existing="$(python3 "$WSQ_UPDATE_HELPER" exe "$prefix" 2>> "${WT_SESSION_LOG:-/dev/null}")" || existing=""
+    game_dir="$(python3 "$WSQ_UPDATE_HELPER" game-dir "$prefix" 2>> "${WT_SESSION_LOG:-/dev/null}")" || game_dir=drive_c
+    browse_dir="$game_dir"
     if [ -n "$existing" ]; then
+        prompt=wsq_update_exe_prompt
+        browse_dir="$(dirname -- "$existing")"
+        actions+=(current "$(i18n wsq_update_exe_show)")
+    fi
+    actions+=(other "$(i18n wsq_update_exe_other)")
+    if command -v yad >/dev/null 2>&1; then actions+=(browse "$(i18n wsq_executable_browse)"); fi
+    while true; do
         choice="$(menu_select "$(i18n wsq_executable_title)" \
-            "$(i18n wsq_update_exe_prompt "$(wsq_display_path "$existing")")" \
-            keep "$(i18n wsq_update_exe_keep)" other "$(i18n wsq_update_exe_other)")" || return 1
+            "$(i18n "$prompt")" \
+            "${actions[@]}" back "$(i18n back)")" || return 1
         case "$choice" in
-            keep) printf '%s\n' "$existing"; return 0 ;;
-            other) ;;
+            current)
+                msgbox "$(i18n wsq_executable_title)" "$(i18n wsq_update_exe_current "$(wsq_display_path "$existing")")"
+                continue ;;
+            other) selected="$(wsq_select_executable "$prefix" "$game_dir" list)" || continue ;;
+            browse)
+                selected="$(wsq_browse_executable "$prefix" "$browse_dir")" || continue ;;
             *) return 1 ;;
         esac
-    else
-        msgbox "$(i18n wsq_executable_title)" "$(i18n wsq_update_exe_missing)"
-    fi
-    local game_dir
-    game_dir="$(python3 "$WSQ_UPDATE_HELPER" game-dir "$prefix")" || return 1
-    wsq_select_executable "$prefix" "$game_dir"
+        [ "$selected" != "$existing" ] || continue
+        printf '%s\n' "$selected"
+        return 0
+    done
 }
 
 wsq_update_select_source() {

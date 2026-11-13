@@ -45,6 +45,10 @@ class VulkanInstallerTests(unittest.TestCase):
                 embedded, current = catalog(content), catalog((ROOT/path).read_text())
                 self.assertTrue(embedded)
                 for key, value in embedded.items():
+                    if key in {'wsq_update_exe_keep', 'wsq_update_exe_missing',
+                               'wsq_update_exe_other', 'wsq_update_exe_prompt'}:
+                        # The historical installer retains the previous WSquashFS menu.
+                        continue
                     # Stable 0.9.1 deliberately improves this unrelated
                     # prefix-preparation diagnostic after the scoped installer.
                     if key == 'wsq_prepare_failed':

@@ -88,7 +88,7 @@ fi
 resume_requested=0
 if [ -f "$RESUME_REQUEST" ]; then
     case "$(cat "$RESUME_REQUEST")" in
-        reshade) RESUME_ENV=WT_AUTO_RESUME_RESH ;;
+        reshade|reshade-preset) RESUME_ENV=WT_AUTO_RESUME_RESH ;;
         antimicrox) RESUME_ENV=WT_AUTO_RESUME_AMX ;;
     esac
     rm -f -- "$RESUME_REQUEST"
@@ -326,13 +326,25 @@ resume_wsquashfs_toolbox() {
 
 launch_rom=""
 launch_dxvk_bundle=""
+launch_workflow=""
 if [ -f "$LAUNCH_REQUEST" ]; then
     {
         IFS= read -r launch_rom || true
         IFS= read -r launch_dxvk_bundle || true
+        IFS= read -r launch_workflow || true
     } < "$LAUNCH_REQUEST"
     rm -f -- "$LAUNCH_REQUEST"
     echo "es_launch_requested=1" >>"$BOOT_LOG"
+fi
+
+# Preset editing needs the Ports session to release ES before launching the game.
+if [ -n "$launch_rom" ] && [ "$launch_workflow" = reshade-preset ]; then
+    if ! python3 /userdata/system/ultimate-wine-toolbox/toolbox/helpers/toolbox_return.py \
+        spawn --parent-pid "$$" --reshade-rom "$launch_rom" >>"$BOOT_LOG" 2>&1; then
+        printf '%s\n' "$launch_rom" launch_failed > "$STATE_DIR/reshade-preset.result"
+        echo 'ERROR: failed to detach ReShade launch; reopen Toolbox to retry.' >>"$BOOT_LOG"
+    fi
+    exit "$rc"
 fi
 
 # A Ports process must exit before ES can honor another /launch request.

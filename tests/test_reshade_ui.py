@@ -42,6 +42,62 @@ resh_game_menu /games/Game.wine
                 self.assertEqual('presets' in actions, state != 'missing')
                 self.assertEqual('enable' in actions, state == 'disabled')
                 self.assertEqual('disable' in actions, state == 'enabled')
+                self.assertEqual('launch' in actions, state == 'enabled')
+
+    def test_installation_offers_launch_only_after_enable_and_preserves_game_path(self):
+        for mode in ('launch', 'later', 'failed', 'pending'):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                base = Path(folder)
+                state = base/'home/state'
+                state.mkdir(parents=True)
+                request = state/'launch-game.request'
+                if mode == 'pending':
+                    request.write_text('/games/Other.wine\n')
+                script = r'''
+WT_HOME="$TEST_HOME"
+WT_LOG_DIR="$WT_HOME/logs"
+source "$WT_ROOT/modules/reshade.sh"
+RESH_BACKEND=/dev/null
+i18n() { printf '%s' "$1"; }
+community_txt() { printf '%s' "$1"; }
+msgbox() { printf '%s\n' "$2" >> "$SUMMARY"; }
+yesno_default_no() { :; }
+resh_api_select() { printf dxgi; }
+resh_version_select() { printf 6.3.3-addons; }
+resh_backend_ready() { mkdir -p "$WT_HOME/reshade"; }
+resh_prepare_tools() { :; }
+menu_select() {
+    if [ "$2" = resh_model_prompt ]; then
+        printf standard
+    else
+        printf '%s\n' "$@" > "$CHECKLIST"
+        if [ "$MODE" = later ]; then printf later; else printf launch; fi
+    fi
+}
+resh_cmd() {
+    case "$1" in
+        exes) printf 'Game.exe\n';;
+        backend-packs) printf '%s' "$2";;
+        status) printf missing;;
+        prepare) printf '%s/workspace' "$WT_HOME";;
+        enable) [ "$MODE" != failed ];;
+    esac
+}
+resh_install_game '/games/My Game.wsquashfs'
+'''
+                result = subprocess.run(['bash', '-uc', script],
+                                        env=dict(self.environment(base), MODE=mode),
+                                        capture_output=True, text=True)
+                self.assertEqual(result.stderr, '')
+                self.assertEqual(result.returncode, int(mode == 'failed'))
+                self.assertEqual((base/'checklist').exists(), mode != 'failed')
+                if mode == 'launch':
+                    self.assertEqual(request.read_text(), '/games/My Game.wsquashfs\n\nreshade-preset\n')
+                elif mode == 'pending':
+                    self.assertEqual(request.read_text(), '/games/Other.wine\n')
+                    self.assertIn('resh_launch_pending', (base/'summary').read_text())
+                else:
+                    self.assertFalse(request.exists())
 
     def test_import_export_routes_actions_with_the_selected_game_context(self):
         expected = {
