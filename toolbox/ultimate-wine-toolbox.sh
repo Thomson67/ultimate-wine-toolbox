@@ -85,4 +85,6 @@ if [ "${WT_AUTO_RESUME_RESH:-0}" = "1" ] || [ -f "$WT_HOME/state/reshade-diagnos
     resh_resume_diagnostic
 fi
 
+resh_resume_preset
+
 main_menu
