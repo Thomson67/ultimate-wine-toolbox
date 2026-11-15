@@ -436,7 +436,7 @@ class LifecycleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             home=Path(directory)
             helpers=home/'toolbox/helpers';helpers.mkdir(parents=True)
-            for name in ('virtual_keyboard.py','virtual_keyboard_antimicrox.py'):
+            for name in ('virtual_keyboard.py', 'virtual_keyboard_antimicrox.py', 'es_options.py'):
                 shutil.copy2(ROOT/'toolbox/helpers'/name,helpers/name)
             (helpers/'antimicrox_live.py').write_text('from pathlib import Path\ndef atomic(path,data):\n Path(path).parent.mkdir(parents=True,exist_ok=True)\n Path(path).write_bytes(data)\n')
             (helpers/'virtual_keyboard_runtime.py').write_text('''
