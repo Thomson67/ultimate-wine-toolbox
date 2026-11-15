@@ -65,6 +65,28 @@ class PolicyTests(unittest.TestCase):
         keys.write_text('{"actions_player1":[{"trigger":["hotkey","select"],"target":"existing-command"}]}')
         self.assertIn('padto.keys',self.conflict())
 
+    def test_windows_mouse_accepts_only_the_stock_next_disk_binding(self):
+        global_keys, system_keys = self.home/'global.keys', self.home/'system.keys'
+        game_keys = self.rom/'padto.keys'
+        stock = {'trigger': ['hotkey', 'l3'], 'type': 'key', 'target': ['KEY_VIDEO_NEXT']}
+        def write(path, *actions):
+            path.write_text(json.dumps({'actions_player1': actions}))
+        def mouse_conflict():
+            return policy.conflict(self.home, self.rom, global_keys, system_keys, button='l3')
+
+        write(system_keys, stock)
+        self.assertFalse(mouse_conflict())
+        for path in (global_keys, game_keys):
+            write(path, stock)
+            self.assertIn(str(path), mouse_conflict())
+            path.unlink()
+        write(system_keys, stock, dict(stock, target=['KEY_F4']))
+        self.assertIn(str(system_keys), mouse_conflict())
+        write(system_keys, dict(stock, mode='any'))
+        self.assertIn(str(system_keys), mouse_conflict())
+        write(system_keys, dict(stock, target=['KEY_VIDEO_NEXT', 'KEY_F4']))
+        self.assertIn(str(system_keys), mouse_conflict())
+
     def test_anti_microx_profiles_and_launcher_alternate_sets(self):
         profile = self.home/'profile.amgp'
         profile.write_text('<gamecontroller><sets><set index="2"><button index="5"><slots><slot><code>0x45</code></slot></slots></button></set></sets></gamecontroller>')
@@ -414,7 +436,7 @@ class LifecycleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             home=Path(directory)
             helpers=home/'toolbox/helpers';helpers.mkdir(parents=True)
-            for name in ('virtual_keyboard.py','virtual_keyboard_antimicrox.py'):
+            for name in ('virtual_keyboard.py', 'virtual_keyboard_antimicrox.py', 'es_options.py'):
                 shutil.copy2(ROOT/'toolbox/helpers'/name,helpers/name)
             (helpers/'antimicrox_live.py').write_text('from pathlib import Path\ndef atomic(path,data):\n Path(path).parent.mkdir(parents=True,exist_ok=True)\n Path(path).write_bytes(data)\n')
             (helpers/'virtual_keyboard_runtime.py').write_text('''
@@ -457,14 +479,14 @@ def run(home,rom):
 
 
 class RuntimeIntegrationTests(unittest.TestCase):
-    def exercise(self, grab_failure=False, managed_amx=False):
+    def exercise(self, grab_failure=False, managed_amx=False, mouse_only=False, display_missing=False):
         import antimicrox_focus
         with tempfile.TemporaryDirectory() as directory:
             home=Path(directory);rom=str(home/'Game.wine')
-            policy.Settings(home).set('on',rom)
+            policy.Settings(home, 'mouse' if mouse_only else 'keyboard').set('on',rom)
             state=home/'state/virtual-keyboard';state.mkdir(parents=True)
             (state/'session.json').write_text(json.dumps({'rom':rom,'pid':os.getpid(),'token':'test-token'}))
-            clock=[0.];timers=[];typed=[];shown=[];errors=[]
+            clock=[0.];timers=[];typed=[];shown=[];errors=[];clicked=[]
             device=FakeDevice()
             if grab_failure:
                 def fail(): raise OSError('already grabbed')
@@ -473,14 +495,18 @@ class RuntimeIntegrationTests(unittest.TestCase):
                      'b':('button',304,1),'a':('button',305,1)}
             controller=runtime.Controller(device,mapping,types.SimpleNamespace(EV_KEY=1,EV_ABS=3,EV_SYN=0,SYN_DROPPED=3,SYN_REPORT=0))
             controller.amx_hotkey = 'guide'
+            if mouse_only:
+                mapping['l3'] = ('button',317,1)
+                controller.shortcuts = {'l3': 'mouse-toggle'}
             class Gtk:
                 quit=False
                 @classmethod
                 def main_quit(cls):cls.quit=True
                 @classmethod
                 def main(cls):
-                    steps={0:[(316,1),(314,1)],1:[(314,0),(316,0)],
-                           4:[(304,1)],5:[(304,0)],6:[(316,1),(314,1)],7:[(314,0),(316,0)]}
+                    shortcut = 317 if mouse_only else 314
+                    steps={0:[(316,1),(shortcut,1)],1:[(shortcut,0),(316,0)],
+                           4:[(304,1)],5:[(304,0)],6:[(316,1),(shortcut,1)],7:[(shortcut,0),(316,0)]}
                     for index in range(25):
                         clock[0]=index*.2
                         for code,value in steps.get(index,[]):device.event(code,value)
@@ -490,6 +516,8 @@ class RuntimeIntegrationTests(unittest.TestCase):
                     self.assertTrue(cls.quit,'watcher must stop after the game exits')
             class GLib:
                 PRIORITY_DEFAULT=0
+                @staticmethod
+                def MainLoop(): return types.SimpleNamespace(run=Gtk.main, quit=Gtk.main_quit)
                 @staticmethod
                 def timeout_add(delay,callback):timers.append(callback)
                 @staticmethod
@@ -507,25 +535,85 @@ class RuntimeIntegrationTests(unittest.TestCase):
                 def send(self,key):typed.append(key)
                 def close(self):pass
             windows=types.SimpleNamespace(current=lambda _:('game',1),close=lambda:None)
-            with patch.object(runtime,'gtk_dependencies',return_value=(Gtk,None,GLib,None)), \
+            with patch.object(runtime,'gtk_dependencies',return_value=(Gtk,None,GLib,None),
+                              side_effect=RuntimeError('GTK unavailable') if display_missing else None), \
+                 patch.dict(sys.modules,{'gi.repository':types.SimpleNamespace(GLib=GLib)}), \
+                 patch('virtual_mouse.Mouse') as mouse, \
+                 patch.object(runtime,'MouseIndicator') as indicator, \
                  patch.object(runtime,'controllers',return_value=[controller]), \
-                 patch.object(runtime,'KeySender',return_value=Sender()), \
+                 patch.object(runtime,'KeySender',return_value=Sender()) as keyboard, \
                  patch.object(runtime,'Overlay',Overlay), \
                  patch.object(runtime,'process_identity',return_value='test-token'), \
-                 patch.object(runtime,'conflict',return_value=''), \
                  patch.object(policy,'conflict',return_value='') as preflight, \
                  patch.object(runtime.time,'monotonic',side_effect=lambda:clock[0]), \
                  patch.object(runtime,'running_game',side_effect=lambda:rom if clock[0]<3 else ''), \
                  patch('virtual_keyboard_antimicrox.evdev_session',return_value=managed_amx), \
                  patch('virtual_keyboard_antimicrox.subprocess.run') as profile_ipc, \
                  patch.object(antimicrox_focus,'XWindows',return_value=windows):
+                mouse.return_value.button.side_effect = lambda key, pressed, _: clicked.append((key, pressed))
                 runtime.run(home,rom)
-                preflight.assert_called_once_with(home,rom,modifiers=[6])
+                if mouse_only:
+                    keyboard.assert_not_called()
+                    if display_missing:
+                        indicator.assert_not_called()
+                    else:
+                        self.assertEqual([entry[0] for entry in indicator.return_value.method_calls],
+                                         ['show', 'hide', 'close'])
+                    preflight.assert_called_once_with(home,rom,modifiers=[6],button='l3')
+                    self.assertEqual(clicked,[('b',True),('b',False)])
+                    self.assertEqual(shown,[])
+                    mouse.return_value.close.assert_called_once()
+                else:
+                    preflight.assert_called_once_with(home,rom,modifiers=[6])
                 if managed_amx: profile_ipc.assert_not_called()
             self.assertFalse(device.grabbed)
             self.assertTrue(device.closed)
             self.assertFalse((state/'session.json').exists())
             return typed,shown
+
+    def test_mouse_only_shows_indicator_without_opening_keyboard(self):
+        self.exercise(mouse_only=True)
+
+    def test_mouse_still_toggles_and_clicks_without_display_overlay(self):
+        self.exercise(mouse_only=True, display_missing=True)
+
+    def test_settings_and_l3_conflicts_are_independent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            rom = home/'Game.wine'
+            policy.Settings(home, 'mouse').set('on', rom)
+            self.assertTrue(policy.Settings(home, 'mouse').enabled(rom))
+            self.assertFalse(policy.Settings(home).enabled(rom))
+            keys = home/'hotkeys.keys'
+            keys.write_text(json.dumps({'actions_player1': [
+                {'trigger': ['hotkey', 'l3'], 'target': 'BTN_RIGHT'}]}))
+            self.assertIn('L3', policy.conflict(home, rom, keys, button='l3'))
+            self.assertEqual(policy.conflict(home, rom, keys), '')
+
+    def test_mouse_emits_relative_events_and_releases_held_buttons(self):
+        from unittest.mock import Mock
+        from virtual_mouse import Mouse
+        codes = types.SimpleNamespace(EV_KEY=1, EV_REL=2, BTN_LEFT=272, BTN_RIGHT=273,
+                                      KEY_ESC=1, REL_X=0, REL_Y=1, REL_WHEEL=8)
+        pointer, keyboard = Mock(), Mock()
+        evdev = types.SimpleNamespace(ecodes=codes, UInput=Mock(side_effect=[pointer, keyboard]))
+        with patch.dict(sys.modules, {'evdev': evdev}):
+            mouse = Mouse()
+        mouse.button('b', True, 0)
+        mouse.button('a', True, 0)
+        mouse.button('up', True, 0)
+        mouse.button('y', True, 0)
+        controller = types.SimpleNamespace(logical=lambda **_: set(),
+                                           stick=lambda name: (1, 0) if name == 'joystick1' else (0, 0))
+        mouse.update(controller, .025)
+        mouse.close()
+        pointer.write.assert_any_call(codes.EV_REL, codes.REL_X, 31)
+        pointer.write.assert_any_call(codes.EV_REL, codes.REL_WHEEL, 1)
+        for code in (codes.BTN_LEFT, codes.BTN_RIGHT):
+            pointer.write.assert_any_call(codes.EV_KEY, code, 1)
+            pointer.write.assert_any_call(codes.EV_KEY, code, 0)
+        keyboard.write.assert_any_call(codes.EV_KEY, codes.KEY_ESC, 1)
+        keyboard.write.assert_any_call(codes.EV_KEY, codes.KEY_ESC, 0)
 
     def test_real_runtime_opens_after_release_types_and_hides_before_game_end(self):
         typed,shown=self.exercise()

@@ -65,6 +65,37 @@ class ToolboxReturnTests(unittest.TestCase):
         self.assertFalse(self.request.exists())
         self.assertEqual(api.launches, 1)
 
+    def test_reshade_game_launch_waits_for_ports_and_returns_after_game_stop(self):
+        self.request.unlink()
+        rom = '/userdata/roms/windows/My Game.wsquashfs'
+        states = iter([(201, '')] * 4 + [(200, rom), (200, rom), (201, '')])
+        api = Api(self.request)
+        def running():
+            self.assertGreaterEqual(self.time.now, .5)
+            return next(states)
+        api.running = running
+        api.launch = api.targets.append
+        with patch.object(helper, 'resume', return_value=True) as resume:
+            self.assertTrue(helper.run_reshade_preset(
+                self.home, 123, rom, api, self.time.clock, self.time.sleep,
+                lambda pid: self.time.now < .5))
+        self.assertEqual(api.targets, [rom])
+        self.assertEqual(self.request.read_text(), 'reshade-preset\n')
+        self.assertEqual((self.home/'state/reshade-preset.result').read_text(), f'{rom}\nok\n')
+        resume.assert_called_once()
+
+    def test_reshade_missing_game_returns_with_error_without_launching(self):
+        self.request.unlink()
+        rom = '/userdata/roms/windows/Missing.wine'
+        api = Api(self.request, indexed=False)
+        with patch.object(helper, 'resume', return_value=True) as resume:
+            self.assertTrue(helper.run_reshade_preset(
+                self.home, 123, rom, api, self.time.clock, self.time.sleep,
+                lambda pid: False))
+        self.assertEqual(api.targets, [])
+        self.assertEqual((self.home/'state/reshade-preset.result').read_text(), f'{rom}\nlaunch_failed\n')
+        resume.assert_called_once()
+
     def test_busy_parent_retains_request_without_touching_es(self):
         api = Api(self.request)
         self.assertFalse(self.run_return(api, lambda pid: True))

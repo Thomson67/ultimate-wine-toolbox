@@ -56,6 +56,32 @@ class ExternalTests(unittest.TestCase):
         self.assertEqual(self.binary.read_bytes(),before)
         self.assertEqual(self.autorun.read_text(),self.original)
 
+    def test_es_disables_embedded_reshade_for_each_session_without_changing_toolbox_settings(self):
+        before, preset = self.binary.read_bytes(), self.preset.read_bytes()
+        with patch('es_options.Overrides') as overrides:
+            overrides.return_value.get.return_value = 'off'
+            for _ in range(2):
+                r.event(self.home, self.rom, 'gameStart', es=True)
+                self.assertFalse(self.binary.exists())
+                self.assertEqual(self.preset.read_bytes(), preset)
+                self.assertEqual(self.autorun.read_text(), self.original)
+                self.assertFalse(r.read_json(e.config_path(self.home, self.rom))['controlled'])
+                r.event(self.home, self.rom, 'gameStop', es=True)
+                self.assertEqual(self.binary.read_bytes(), before)
+            overrides.return_value.get.return_value = 'on'
+            r.event(self.home, self.rom, 'gameStart', es=True)
+            self.assertEqual(self.binary.read_bytes(), before)
+
+    def test_reenabling_in_es_recovers_a_mask_left_by_an_interrupted_session(self):
+        before = self.binary.read_bytes()
+        with patch('es_options.Overrides') as overrides:
+            overrides.return_value.get.return_value = 'off'
+            r.event(self.home, self.rom, 'gameStart', es=True)
+            self.assertFalse(self.binary.exists())
+            overrides.return_value.get.return_value = None
+            r.event(self.home, self.rom, 'gameStart', es=True)
+        self.assertEqual(self.binary.read_bytes(), before)
+
     def test_changed_dll_is_not_overwritten_on_restore(self):
         e.toggle(self.home,self.rom,False)
         self.binary.write_bytes(b'new DLL installed by user')
@@ -140,6 +166,38 @@ class ExternalTests(unittest.TestCase):
         with patch.object(e,'locations',return_value=(upper,upper)),patch.object(Path,'read_text',return_value='mount -t overlay upperdir='),patch.object(e.os,'mknod',side_effect=PermissionError()):
             with self.assertRaises(ValueError): e.apply(self.home,archive,desired=cfg)
         self.assertEqual(target.read_bytes(),dll())
+
+    def test_es_masks_the_archived_injector_in_the_bottle_only(self):
+        archive = self.base/'Packed.wsquashfs'
+        original = b'unchanged SquashFS archive'
+        archive.write_bytes(original)
+        upper = self.base/'runner-bottle.wine'
+        upper.mkdir()
+        target = upper/'drive_c/game/dxgi.dll'
+        r.save_json(e.config_path(self.home, archive), {
+            'rom': str(archive), 'signature': e.signature(archive), 'controlled': False,
+            'enabled': True, 'files': [{'path': 'drive_c/game/dxgi.dll', 'controllable': True}],
+        })
+        read = Path.read_text
+        file_id = e.file_id
+        with patch('es_options.Overrides') as options, \
+                patch.object(e, 'locations', return_value=(upper, upper)), \
+                patch.object(Path, 'read_text', lambda path, *a, **kw:
+                             'mount -t overlay upperdir=' if str(path) == '/usr/bin/batocera-wine'
+                             else read(path, *a, **kw)), \
+                patch.object(e.os, 'mknod', lambda path, *_: Path(path).touch()), \
+                patch.object(e, 'file_id', lambda path:
+                             {'whiteout': True} if path == target and path.exists() else file_id(path)):
+            options.return_value.get.return_value = 'off'
+            r.event(self.home, archive, 'gameStart', es=True)
+            self.assertTrue(target.exists())
+            self.assertEqual(archive.read_bytes(), original)
+            r.event(self.home, archive, 'gameStop', es=True)
+            self.assertFalse(target.exists())
+            options.return_value.get.return_value = 'on'
+            r.event(self.home, archive, 'gameStart', es=True)
+            self.assertFalse(target.exists())
+        self.assertEqual(archive.read_bytes(), original)
 
     def test_wiki_matching_removes_runner_and_keeps_game_edition(self):
         self.assertEqual(a.game_title('Denshattack[Wine-11.5].wsquashfs'),'Denshattack')

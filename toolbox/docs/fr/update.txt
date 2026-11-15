@@ -9,6 +9,8 @@ Dans Gestion des WSquashFS, choisir Mettre à jour un WSquashFS. Sélectionner l
 2. TESTER LE JEU
 Le premier essai reprend l’exécutable et les arguments de l’archive. Vérifier le démarrage, les manettes, le chargement de la progression et une nouvelle sauvegarde. Au retour, Vérifier / modifier le choix de l’exécutable du jeu permet de corriger le lancement. Les anciens start.bat sont conservés. L’ancien dossier du jeu reste en .bak jusqu’à validation du lancement.
 
+Dans ce menu, « Afficher l’exécutable choisi » montre le chemin actuel. Choisissez un autre fichier dans la liste détectée ou ouvrez Yad pour sélectionner un .exe, .bat ou .cmd dans le préfixe de travail.
+
 3. CONFIRMER LES SAUVEGARDES
 Les liens existants et les règles SAVEDIR/SAVEFILES utilisent les destinations d’origine pendant les essais et les relances. Une copie de sécurité séparée est créée avant le premier essai. Au retour, conserver ces emplacements ou inspecter leurs fichiers. Pour une archive sans configuration de sauvegarde, choisir un emplacement avec la détection ou l’explorateur.
 

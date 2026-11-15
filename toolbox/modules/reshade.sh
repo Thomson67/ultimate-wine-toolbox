@@ -143,6 +143,48 @@ resh_diagnostic() {
     return 0
 }
 
+resh_launch_preset() {
+    local rom="$1" state="$WT_HOME/state" request
+    if [ -e "$state/launch-game.request" ] || [ -e "$state/restart-es.request" ] ||
+       [ -e "$state/reshade-diagnostic.json" ] || [ -e "$state/antimicrox-live.json" ]; then
+        msgbox "$(i18n resh_title)" "$(i18n resh_launch_pending)"
+        return 1
+    fi
+    if ! mkdir -p "$state" || ! request="$(mktemp "$state/.reshade-launch.XXXXXX")"; then
+        msgbox "$(i18n resh_title)" "$(i18n resh_launch_error)"
+        return 1
+    fi
+    if ! printf '%s\n\nreshade-preset\n' "$rom" > "$request" ||
+       ! mv -nT -- "$request" "$state/launch-game.request" || [ -e "$request" ]; then
+        rm -f -- "$request"
+        msgbox "$(i18n resh_title)" "$(i18n resh_launch_error)"
+        return 1
+    fi
+    exit 0
+}
+
+resh_offer_preset_launch() {
+    local rom="$1" message="$2" choice
+    choice="$(menu_select "$(i18n resh_title)" "$message" \
+        later "$(i18n resh_launch_later)" launch "$(i18n resh_launch_preset)")" || return 0
+    if [ "$choice" = launch ]; then resh_launch_preset "$rom" || true; fi
+}
+
+resh_resume_preset() {
+    local file="$WT_HOME/state/reshade-preset.result" rom="" result=""
+    [ -f "$file" ] || return 0
+    {
+        IFS= read -r rom
+        IFS= read -r result
+    } < "$file"
+    rm -f -- "$file"
+    if [ "$result" != ok ]; then
+        msgbox "$(i18n resh_title)" "$(i18n resh_launch_failed "${WT_LOG_DIR:-/userdata/system/logs/ultimate-wine-toolbox}/port-launch.log")"
+    fi
+    [ -e "$rom" ] || return 0
+    resh_game_menu "$rom"
+}
+
 resh_resume_diagnostic() {
     local rom exe detected candidates evidence result community_preset community_pack
     rom="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["rom"])' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || return
@@ -163,7 +205,7 @@ resh_resume_diagnostic() {
     msgbox "$(i18n resh_title)" "$(i18n resh_diag_result "${candidates:-?}" "${evidence:-?}" "${result:-?}")"
     if [ -n "$exe" ] && resh_install_game "$rom" "$exe" "$community_preset" "$community_pack"; then
         if [ -n "$community_preset" ] && [ -f "$community_preset" ]; then
-            community_import_actions reshade "$community_preset" "ReShade — $(community_txt 'Presets communautaires' 'Community presets')" "$rom"
+            community_import_actions reshade "$community_preset" "ReShade — $(community_txt 'Presets communautaires' 'Community presets')" "$rom" 1
         fi
     fi
     resh_game_menu "$rom"
@@ -483,10 +525,14 @@ PY_PENDING
         msgbox "$(i18n resh_title)" "$(i18n resh_failed "$log")"
         return 1
     fi
-    msgbox "$(i18n resh_title)" "$(i18n resh_installed "$log")"
     if [ -n "$local_pack" ]; then resh_pack_setup_info; fi
-    if [ "$apply_community" -eq 1 ]; then
-        community_import_actions reshade "$community_preset" "$(i18n resh_title)" "$rom"
+    if [ -n "$community_preset" ]; then
+        msgbox "$(i18n resh_title)" "$(i18n resh_install_complete "$log")"
+        if [ "$apply_community" -eq 1 ]; then
+            community_import_actions reshade "$community_preset" "$(i18n resh_title)" "$rom" 1
+        fi
+    else
+        resh_offer_preset_launch "$rom" "$(i18n resh_install_complete "$log")\n\n$(i18n resh_launch_help)"
     fi
 }
 
@@ -838,7 +884,7 @@ resh_game_menu() {
         local -a actions=(install "$(i18n resh_install)")
         if [ "$state" != missing ]; then
             if [ "$state" = disabled ]; then actions+=(enable "$(i18n resh_enable)")
-            else actions+=(disable "$(i18n resh_disable)"); fi
+            else actions+=(launch "$(i18n resh_launch_preset)" disable "$(i18n resh_disable)"); fi
             actions+=(import-export "Import / Export" presets "$(community_txt 'Presets du jeu et détails' 'Game presets and details')" profile "$(i18n resh_profile)" uninstall "$(i18n resh_uninstall)")
         fi
         choice="$(menu_select "$(i18n resh_title) — $(basename "$rom")" "$prompt" \
@@ -847,6 +893,8 @@ resh_game_menu() {
             import-export) resh_import_export_menu "$rom" ;;
             community) community_menu reshade "$rom" ;;
             install) resh_install_game "$rom" ;;
+            launch)
+                yesno_default_no "$(i18n resh_title)" "$(i18n resh_launch_help)" && resh_launch_preset "$rom" ;;
             presets) resh_presets_menu "$rom" ;;
             enable|disable)
                 resh_cmd "$choice" "$rom" >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || {

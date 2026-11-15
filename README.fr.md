@@ -6,7 +6,15 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.11.4](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.4).**
+**Version stable : [v0.11.5](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.5).**
+
+## Nouveautés de la v0.11.5
+
+- Choisissez les réglages de la Toolbox à afficher dans EmulationStation, dont les bundles DXVK / VKD3D installés, MangoHud, AntiMicroX, ReShade et les entrées virtuelles.
+- Affichez le launcher d’un jeu compatible à chaque démarrage ou utilisez la manette comme souris avec Hotkey + L3.
+- Lancez un jeu après l’installation de ReShade pour préparer un preset. Affichez ou choisissez manuellement son exécutable lors de la création ou de la mise à jour d’un WSquashFS.
+
+[Notes de version v0.11.5](release-notes/v0.11.5.md)
 
 ## Nouveautés de la v0.11.4
 

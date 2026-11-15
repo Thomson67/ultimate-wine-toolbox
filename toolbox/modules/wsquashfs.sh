@@ -339,23 +339,52 @@ wsq_prepare_prefix() {
 }
 
 wsq_select_executable() {
-    local prefix="$1" game_dir="${2:-drive_c}"
-    local -a items=()
-    local rows="" line score rel idx=1 choice
+    local prefix="$1" game_dir="${2:-drive_c}" mode="${3:-all}"
+    local -a items=() paths=()
+    local score rel idx=1 choice selected
     while IFS=$'\t' read -r score rel; do
         [ -n "$rel" ] || continue
         items+=("$idx" "[$score] $rel")
-        rows+="$rel"$'\n'
+        paths+=("$rel")
         idx=$((idx+1))
     done < <(python3 "$WSQ_HELPER" exes "$prefix" --game-dir "$game_dir")
 
+    if [ "$mode" = all ] && command -v yad >/dev/null 2>&1; then
+        items+=(browse "$(i18n wsq_executable_browse)")
+    fi
     if [ "${#items[@]}" -eq 0 ]; then
         msgbox "$(i18n wsq_create_title)" "$(i18n wsq_no_executable "$game_dir")"
         return 1
     fi
 
-    choice="$(WT_MENU_LIST=1 menu_select "$(i18n wsq_executable_title)" "$(i18n wsq_executable_prompt)" "${items[@]}")" || return 1
-    sed -n "${choice}p" <<< "$rows"
+    while true; do
+        choice="$(WT_MENU_LIST=1 menu_select "$(i18n wsq_executable_title)" "$(i18n wsq_executable_prompt)" "${items[@]}" back "$(i18n back)")" || return 1
+        case "$choice" in
+            browse) selected="$(wsq_browse_executable "$prefix" "$game_dir")" || continue ;;
+            ''|*[!0-9]*) return 1 ;;
+            *) [ "$choice" -ge 1 ] && [ "$choice" -lt "$idx" ] || return 1
+               selected="${paths[$((10#$choice-1))]}" ;;
+        esac
+        printf '%s\n' "$selected"
+        return 0
+    done
+}
+
+wsq_browse_executable() {
+    local prefix="$1" directory="$2" selected relative
+    local title
+    title="$(i18n wsq_executable_browse)"
+    [ -d "$prefix/$directory" ] || directory=drive_c
+    [ -d "$prefix/$directory" ] || directory=.
+    selected="$(DISPLAY="${DISPLAY:-:0}" LANGUAGE="$WT_LANGUAGE" yad --file \
+        --title="$title" --filename="$prefix/$directory/" \
+        --file-filter='EXE / BAT / CMD | *.[eE][xX][eE] *.[bB][aA][tT] *.[cC][mM][dD]' \
+        --width=1000 --height=700)" || return 1
+    relative="$(python3 "$WSQ_UPDATE_HELPER" validate-executable "$prefix" "$selected" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
+        msgbox "$title" "$(i18n wsq_executable_invalid "$selected")"
+        return 1
+    }
+    printf '%s\n' "$relative"
 }
 
 wsq_write_autorun() {

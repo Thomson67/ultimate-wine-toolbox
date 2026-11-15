@@ -336,6 +336,7 @@ graphics_menu() {
             "4" "AntiMicroX" \
             "5" "$(i18n winetricks_tools_title)" \
             "6" "$(i18n osk_title)" \
+            "7" "$(i18n mouse_title)" \
             "0" "$(i18n back)")" || return
 
         case "$choice" in
@@ -345,6 +346,7 @@ graphics_menu() {
             4) antimicrox_menu ;;
             5) winetricks_game_menu ;;
             6) virtual_keyboard_menu ;;
+            7) virtual_keyboard_menu mouse ;;
             0|"") return ;;
         esac
     done

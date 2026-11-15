@@ -5,6 +5,7 @@ CONFIG_DIR="$ROOT/config"
 BUNDLE_DIR="$ROOT/dxvk/bundles"
 GLOBAL_FILE="$CONFIG_DIR/dxvk-global"
 GAME_FILE="$CONFIG_DIR/dxvk-games.tsv"
+ES_OPTIONS_FILE="/userdata/system/configs/emulationstation/es_features_ultimate_wine_toolbox.cfg"
 DXVK_PATH="/userdata/system/wine/dxvk"
 LOG_DIR="/userdata/system/logs/ultimate-wine-toolbox"
 LOG_FILE="$LOG_DIR/dxvk-game-event.log"
@@ -48,6 +49,11 @@ managed_target() {
         "$BUNDLE_DIR"/*) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+valid_bundle() {
+    case "$1" in ''|.|..|*/*) return 1 ;; esac
+    [ -d "$BUNDLE_DIR/$1/x32" ] && [ -d "$BUNDLE_DIR/$1/x64" ]
 }
 
 apply_state() {
@@ -141,8 +147,28 @@ case "$event" in
             override="$(DXVK_ROM="$rom" awk -F '\t' '$2==ENVIRON["DXVK_ROM"] {v=$1} END{print v}' "$GAME_FILE")"
         fi
 
+        if [ -s "$ES_OPTIONS_FILE" ]; then
+            selected="$(python3 "$ROOT/toolbox/helpers/es_options.py" get dxvk "$rom" \
+                --toolbox-game "$override" 2>> "$LOG_FILE")"
+            if [ "$selected" = batocera ] || valid_bundle "$selected"; then
+                # Save the inferred baseline before changing the link, so
+                # gameStop restores it even on previously unconfigured systems.
+                if [ ! -s "$GLOBAL_FILE" ]; then
+                    mkdir -p "$CONFIG_DIR" || exit 0
+                    tmp="$(mktemp "$CONFIG_DIR/.dxvk-global.XXXXXX")" || exit 0
+                    if ! { printf '%s\n' "$global_state" > "$tmp" && mv -f "$tmp" "$GLOBAL_FILE"; }; then
+                        rm -f "$tmp"
+                        exit 0
+                    fi
+                fi
+                log "gameStart selected=es:$selected"
+                apply_state "$selected"
+                exit 0
+            fi
+        fi
+
         log "gameStart override=$override global=$global_state"
-        if [ -n "$override" ] && [ -d "$BUNDLE_DIR/$override" ]; then
+        if [ "$override" = batocera ] || valid_bundle "$override"; then
             log "gameStart selected=override:$override"
             apply_state "$override"
         else

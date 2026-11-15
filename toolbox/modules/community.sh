@@ -20,6 +20,7 @@ community_report() {
 
 community_import_actions() {
   local kind="$1" path="$2" title="$3" rom="${4:-}" choice output details selected launcher_notice old_profile
+  local reshade_installed="${5:-0}"
   while true; do
     if [ "$kind" = antimicrox ]; then
       launcher_notice="$(community_cmd launcher-info "$path" 2>/dev/null)" || launcher_notice=""
@@ -104,6 +105,7 @@ Install/configure ReShade and the required packs now, then apply the downloaded 
         resh_install_game "$rom" "" "$path" || continue
         details="$(resh_cmd status "$rom")" || continue
         case "$details" in enabled|disabled) : ;; *) msgbox "$title" "$(community_txt 'Configuration ReShade non terminée. Le preset téléchargé est conservé.' 'ReShade configuration is incomplete. The downloaded preset is retained.')"; continue ;; esac
+        reshade_installed=1
       fi
       yesno "$title" "$(community_txt "Appliquer à $(basename "$rom") et activer ReShade ?
 Le preset actuel sera exporté dans les sauvegardes communautaires avant remplacement. Les effets seront vérifiés et les packs manquants reconnus seront proposés." "Apply to $(basename "$rom") and enable ReShade?
@@ -122,9 +124,16 @@ $output" "Preset imported but ReShade could not be enabled.
 Backup: $backup
 $output")"; return 1
         fi
-        msgbox "$title" "$(community_txt "Preset appliqué.
+        local applied
+        applied="$(community_txt "Preset appliqué.
 Sauvegarde : $backup" "Preset applied.
-Backup: $backup")"; return 0
+Backup: $backup")"
+        if [ "$reshade_installed" = 1 ]; then
+          resh_offer_preset_launch "$rom" "$applied\n\n$(i18n resh_launch_help)"
+        else
+          msgbox "$title" "$applied"
+        fi
+        return 0
       else
         msgbox "$title" "$(community_txt "Échec de l’application. Sauvegarde conservée :
 $backup

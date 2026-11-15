@@ -9,6 +9,8 @@ In WSquashFS Management, choose Update a WSquashFS. Select the archive and the f
 2. TEST THE GAME
 The first test keeps the archive’s executable and arguments. Check launch, controllers, loading progress and saving again. On return, Review / change the game executable lets you correct the launch command. Original start.bat files are preserved. The old game folder remains in .bak until launch is validated.
 
+In this menu, “Show the selected executable” displays the current path. Choose another file from the detected list or open Yad to select an .exe, .bat or .cmd file in the working prefix.
+
 3. CONFIRM SAVES
 Existing links and SAVEDIR/SAVEFILES rules use their original destinations during tests and relaunches. A separate safety copy is made before the first test. On return, keep these locations or inspect their files. For an archive without save configuration, select a location through detection or the browser.
 

@@ -8,7 +8,8 @@ import sys
 import time
 
 from antimicrox_handoff import EsApi, TOOLBOX, LOG_DIR
-from es_return_proxy import ensure_proxy
+from es_return_proxy import ensure_proxy, proxy_launcher
+from reshade_manager import atomic_bytes
 
 HOME = Path('/userdata/system/ultimate-wine-toolbox')
 
@@ -148,23 +149,87 @@ def _resume(home, parent_pid, api, clock, sleep, alive, timeout, refresh_timeout
     return False
 
 
+def run_reshade_preset(home, parent_pid, rom, api=None, clock=time.monotonic,
+                       sleep=time.sleep, alive=parent_alive):
+    api = api or EsApi()
+    state = home / 'state'
+    result = 'launch_failed'
+    try:
+        deadline = clock() + 30
+        while alive(parent_pid):
+            if clock() >= deadline:
+                raise RuntimeError('Previous Ports launcher did not exit')
+            sleep(.25)
+        idle = 0
+        while idle < 3:
+            if clock() >= deadline:
+                raise RuntimeError('EmulationStation did not become idle')
+            code, path = api.running()
+            idle = idle + 1 if code in (201, 404) else 0
+            if code == 200 and path and path not in (TOOLBOX, str(proxy_launcher(home))):
+                raise RuntimeError(f'Another game is running: {path}')
+            sleep(.25)
+        if not api.indexed(rom):
+            raise RuntimeError(f'Game is absent from the EmulationStation list: {rom}')
+        if api.running()[0] not in (201, 404):
+            raise RuntimeError('EmulationStation became busy before launch')
+        print(f'ReShade preset: launching {rom}', flush=True)
+        api.launch(rom)
+        deadline = clock() + 300
+        while clock() < deadline:
+            code, path = api.running()
+            if code == 200 and path:
+                if os.path.normpath(path) == os.path.normpath(rom):
+                    break
+                raise RuntimeError(f'A different game started: {path}')
+            sleep(.25)
+        else:
+            raise RuntimeError('Game launch was not confirmed within 300 seconds')
+        while True:
+            code, path = api.running()
+            if code in (201, 404) or (code == 200 and path and os.path.normpath(path) != os.path.normpath(rom)):
+                break
+            sleep(.5)
+        result = 'ok'
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f'ReShade preset: {exc}', flush=True)
+
+    atomic_bytes(state / 'reshade-preset.result', f'{rom}\n{result}\n'.encode())
+    request = state / 'resume-wsq.request'
+    try:
+        with request.open('x') as stream:
+            stream.write('reshade-preset\n')
+    except FileExistsError:
+        print('ReShade preset: another Toolbox return is pending', flush=True)
+        return False
+    return resume(home, parent_pid, api=api, clock=clock, sleep=sleep, alive=alive)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('command', choices=('spawn', 'run'))
     parser.add_argument('--parent-pid', type=int, required=True)
     parser.add_argument('--home', type=Path, default=HOME)
+    parser.add_argument('--reshade-rom')
     args = parser.parse_args()
     if args.command == 'spawn':
         LOG_DIR.mkdir(parents=True, exist_ok=True)
+        command = [sys.executable, str(Path(__file__).resolve()), 'run',
+                   '--parent-pid', str(args.parent_pid), '--home', str(args.home)]
+        if args.reshade_rom:
+            command.extend(['--reshade-rom', args.reshade_rom])
         with (LOG_DIR / 'port-launch.log').open('ab', buffering=0) as log:
             process = subprocess.Popen(
-                [sys.executable, str(Path(__file__).resolve()), 'run',
-                 '--parent-pid', str(args.parent_pid), '--home', str(args.home)],
+                command,
                 stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
                 start_new_session=True, close_fds=True)
         print(f'Toolbox return detached pid={process.pid}', flush=True)
         return
-    if not resume(args.home, args.parent_pid):
+    if args.reshade_rom:
+        confirmed = run_reshade_preset(args.home, args.parent_pid, args.reshade_rom)
+    else:
+        confirmed = resume(args.home, args.parent_pid)
+    if not confirmed:
         raise SystemExit(1)
 
 

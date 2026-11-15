@@ -218,6 +218,22 @@ def launch_executable(prefix):
     return ''
 
 
+def validate_executable_selection(prefix, selection):
+    prefix = prefix.absolute()
+    if not selection.is_absolute():
+        raise ValueError('select a file inside the working prefix')
+    relative = selection.relative_to(prefix)
+    executable = relative.as_posix()
+    if (selection.suffix.casefold() not in ('.exe', '.bat', '.cmd')
+            or selection.name.casefold() == 'autorun.cmd'
+            or '"' in executable
+            or relative_path(executable) != relative
+            or not selection.is_file()
+            or not selection.resolve().is_relative_to(prefix.resolve())):
+        raise ValueError('select an executable or launch script inside the working prefix')
+    return executable
+
+
 def game_directory(prefix):
     """Keep the archive's existing layout rather than forcing drive_c/game."""
     _, values = directives(prefix)
@@ -1275,6 +1291,8 @@ def main():
     a = sp.add_parser('autorun')
     a.add_argument('prefix', type=Path); a.add_argument('exe')
     a.add_argument('--savedir'); a.add_argument('--savefiles')
+    a = sp.add_parser('validate-executable')
+    a.add_argument('prefix', type=Path); a.add_argument('selection', type=Path)
     a = sp.add_parser('detach')
     a.add_argument('prefix', type=Path); a.add_argument('save', type=Path)
     a = sp.add_parser('retest')
@@ -1309,6 +1327,7 @@ def main():
             for link in source_save_links(a.prefix, a.source, a.save_root):
                 print(link['path'] + '\n  ' + link['original'] + '\n  -> ' + link['target'])
         elif a.action == 'autorun': write_autorun(a.prefix, a.exe, a.savedir, a.savefiles)
+        elif a.action == 'validate-executable': print(validate_executable_selection(a.prefix, a.selection))
         elif a.action == 'detach': detach_saves(a.prefix, a.save)
         elif a.action == 'config': print(copy_config(a.conf, a.source, a.dest, a.backup_dir, a.preserve_existing))
         elif a.action == 'commit': print(commit(a.manifest, a.staged, a.prepared_save, not a.replace))

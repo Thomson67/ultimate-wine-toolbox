@@ -134,6 +134,12 @@ if [ "$event" = "gameStop" ]; then
     # later WSquashFS build cannot embed MangoHud runtime settings.
     desired=0
 else
+    if [ -s /userdata/system/configs/emulationstation/es_features_ultimate_wine_toolbox.cfg ]; then
+        es_args=()
+        case "$override" in on|off) es_args=(--toolbox-game "$override") ;; esac
+        es_override="$(python3 "$ROOT/toolbox/helpers/es_options.py" get mangohud "$rom" "${es_args[@]}" 2>> "$HOOK_LOG")"
+        case "$es_override" in on|off) override="$es_override" ;; esac
+    fi
     case "$override" in
         on) desired=1 ;;
         off) desired=0 ;;
@@ -194,7 +200,11 @@ profile_configs = {
     "detailed": "fps,cpu_stats,gpu_stats,cpu_temp,gpu_temp,ram,vram,frametime,frame_timing",
 }
 try:
-    control_settings = settings(sys.argv[9], sys.argv[10])
+    if enabled and Path('/userdata/system/configs/emulationstation/es_features_ultimate_wine_toolbox.cfg').is_file():
+        from es_options import mangohud_settings
+        control_settings = mangohud_settings(sys.argv[9], sys.argv[10])
+    else:
+        control_settings = settings(sys.argv[9], sys.argv[10])
 except (OSError, ValueError) as error:
     print("MangoHud settings: " + str(error), file=sys.stderr)
     control_settings = {"display": sys.argv[7]}

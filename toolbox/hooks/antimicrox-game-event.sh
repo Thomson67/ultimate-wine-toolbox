@@ -67,6 +67,10 @@ if [ -f "$ROOT/state/antimicrox-live.json" ] && [ -f "$LIVE_HELPER" ]; then
   fi
 fi
 if [ "$live" -eq 0 ]; then
+  if [ -s /userdata/system/configs/emulationstation/es_features_ultimate_wine_toolbox.cfg ]; then
+    es_override="$(python3 "$ROOT/toolbox/helpers/es_options.py" get antimicrox "$rom" 2>> "$LOG")"
+    [ "$es_override" != off ] || { log "ES disabled the assigned mapping for $rom"; exit 0; }
+  fi
   [ -f "$CFG" ] || exit 0
   profile="$(awk -F '\t' -v p="$rom" '$1==p {v=$2} END {print v}' "$CFG")"
 fi

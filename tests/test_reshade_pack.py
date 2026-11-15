@@ -350,7 +350,10 @@ resh_api_select() { printf vulkan; }
 resh_version_select() { printf 6.3.3-addons; }
 resh_backend_ready() { mkdir -p "$WT_HOME/reshade/runtime"; }
 resh_prepare_tools() { mkdir -p "$WT_HOME/reshade/bin"; }
-menu_select() { printf '%s\n' "$@" > "$OPTIONS"; printf local-pack; }
+menu_select() {
+ if [ "$3" = later ]; then printf later; return; fi
+ printf '%s\n' "$@" > "$OPTIONS"; printf local-pack;
+}
 resh_pack_complete_shaders() { return 0; }
 resh_pack_menu() { [ "$MODE" != cancel ] || return 1; printf '/userdata/My bundle.zip\nUltra.ini'; }
 yesno_default_no() { return 0; }

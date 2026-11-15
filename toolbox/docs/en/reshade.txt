@@ -31,6 +31,8 @@ MODELS
 Installing packs does not activate every effect. The visual output of new retro filters still needs checking for each game.
 
 IN GAME
+Choose “Launch game to set up a preset” at the end of installation or from the game’s ReShade menu. The Toolbox starts the game through EmulationStation with its usual runner and returns to the game’s ReShade menu when it closes.
+
 Home opens ReShade. New profiles use End to toggle effects; existing custom shortcuts are preserved. Enable the desired effects or import an .ini preset from the Toolbox. Its shaders must be available in the installed packs.
 
 Settings and presets are kept per game and retrieved when the game closes. Exporting a preset does not include shader packs. Close the game before modifying, disabling or uninstalling ReShade.

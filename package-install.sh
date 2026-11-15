@@ -17,6 +17,7 @@ DXVK_HOOK="$SCRIPTS/ultimate-wine-toolbox-dxvk.sh"
 RESHADE_HOOK="$SCRIPTS/ultimate-wine-toolbox-reshade.sh"
 ANTIMICROX_HOOK="$SCRIPTS/ultimate-wine-toolbox-antimicrox.sh"
 KEYBOARD_HOOK="$SCRIPTS/ultimate-wine-toolbox-virtual-keyboard.sh"
+ES_LAUNCHER_HOOK="$SCRIPTS/ultimate-wine-toolbox-es-launcher.sh"
 OLD_MANGOHUD_HOOK="$SCRIPTS/thomsonito-wine-toolbox-mangohud.sh"
 OLD_DXVK_HOOK="$SCRIPTS/thomsonito-wine-toolbox-dxvk.sh"
 
@@ -150,6 +151,11 @@ fi
 if [ -s "$DEST/toolbox/hooks/antimicrox-game-event.sh" ]; then
     cp -f "$DEST/toolbox/hooks/antimicrox-game-event.sh" "$ANTIMICROX_HOOK"
     chmod +x "$ANTIMICROX_HOOK"
+fi
+install -m 0755 "$DEST/toolbox/hooks/es-launcher-game-event.sh" "$ES_LAUNCHER_HOOK"
+if ! python3 "$DEST/toolbox/helpers/es_options.py" refresh; then
+    say "Rechargez les rubriques ES depuis les paramètres de la Toolbox." \
+        "Republish the ES sections from the Toolbox settings."
 fi
 
 if [ -n "$OLD_DXVK_BUNDLE" ] && [ -d "$DEST/dxvk/bundles/$OLD_DXVK_BUNDLE" ]; then
