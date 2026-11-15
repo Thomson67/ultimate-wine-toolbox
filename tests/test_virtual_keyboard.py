@@ -65,6 +65,28 @@ class PolicyTests(unittest.TestCase):
         keys.write_text('{"actions_player1":[{"trigger":["hotkey","select"],"target":"existing-command"}]}')
         self.assertIn('padto.keys',self.conflict())
 
+    def test_windows_mouse_accepts_only_the_stock_next_disk_binding(self):
+        global_keys, system_keys = self.home/'global.keys', self.home/'system.keys'
+        game_keys = self.rom/'padto.keys'
+        stock = {'trigger': ['hotkey', 'l3'], 'type': 'key', 'target': ['KEY_VIDEO_NEXT']}
+        def write(path, *actions):
+            path.write_text(json.dumps({'actions_player1': actions}))
+        def mouse_conflict():
+            return policy.conflict(self.home, self.rom, global_keys, system_keys, button='l3')
+
+        write(system_keys, stock)
+        self.assertFalse(mouse_conflict())
+        for path in (global_keys, game_keys):
+            write(path, stock)
+            self.assertIn(str(path), mouse_conflict())
+            path.unlink()
+        write(system_keys, stock, dict(stock, target=['KEY_F4']))
+        self.assertIn(str(system_keys), mouse_conflict())
+        write(system_keys, dict(stock, mode='any'))
+        self.assertIn(str(system_keys), mouse_conflict())
+        write(system_keys, dict(stock, target=['KEY_VIDEO_NEXT', 'KEY_F4']))
+        self.assertIn(str(system_keys), mouse_conflict())
+
     def test_anti_microx_profiles_and_launcher_alternate_sets(self):
         profile = self.home/'profile.amgp'
         profile.write_text('<gamecontroller><sets><set index="2"><button index="5"><slots><slot><code>0x45</code></slot></slots></button></set></sets></gamecontroller>')

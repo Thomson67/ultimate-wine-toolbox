@@ -82,7 +82,7 @@ class Settings:
             atomic(self.path, (json.dumps(data, ensure_ascii=False, indent=2)+'\n').encode())
 
 
-def chord_conflicts(actions, button='select'):
+def chord_conflicts(actions, button='select', batocera_defaults=False):
     """A single-button mapping can also fire with the modifier held."""
     if not isinstance(actions, list):
         raise ValueError('Invalid Pad2Key actions')
@@ -93,7 +93,15 @@ def chord_conflicts(actions, button='select'):
         trigger = [trigger] if isinstance(trigger, str) else trigger
         if not isinstance(trigger, list):
             raise ValueError('Invalid Pad2Key trigger')
-        if not action.get('target'):
+        target = action.get('target')
+        if not target:
+            continue
+        # Wine has no next_disk action. Only exempt Batocera's stock
+        # Hotkey + L3 event, never an override or another action in that file.
+        if (batocera_defaults and button == 'l3' and len(trigger) == 2
+                and 'hotkey' in trigger and 'l3' in trigger
+                and action.get('type') == 'key' and action.get('mode', 'all') == 'all'
+                and target in ('KEY_VIDEO_NEXT', ['KEY_VIDEO_NEXT'])):
             continue
         if button == 'select':
             if ('select' in trigger or trigger == ['hotkey']
@@ -114,7 +122,8 @@ def conflict(home, rom, global_keys=None, system_keys=Path('/usr/share/evmapy/ho
     paths = [global_path, rom/'padto.keys' if rom.is_dir() else Path(str(rom)+'.keys')]
     for path in paths:
         if path.exists():
-            if chord_conflicts(json.loads(path.read_text()).get('actions_player1', []), button):
+            actions = json.loads(path.read_text()).get('actions_player1', [])
+            if chord_conflicts(actions, button, batocera_defaults=path == system_keys):
                 return f'Hotkey + {button.upper()} conflicts with Pad2Key in {path}'
     # Check the assigned AMX profile, including alternate sets. Global enable
     # must not grab a controller while the same chord runs a mapped action.
