@@ -441,6 +441,79 @@ class Overlay:
     def close(self): self.window.destroy()
 
 
+class MouseIndicator:
+    """A small click-through reminder while the controller drives the mouse."""
+
+    def __init__(self, dependencies, french):
+        Gtk, Gdk, _, layer = dependencies
+        self.window = window = Gtk.Window(type=Gtk.WindowType.TOPLEVEL if layer else Gtk.WindowType.POPUP)
+        window.set_title('UWT Virtual Mouse')
+        window.set_decorated(False)
+        window.set_resizable(False)
+        window.set_accept_focus(False)
+        window.set_focus_on_map(False)
+        window.set_skip_taskbar_hint(True)
+        window.set_skip_pager_hint(True)
+        display = Gdk.Display.get_default()
+        self.monitor = display.get_primary_monitor() or display.get_monitor(0)
+        self.layer = layer
+        if layer:
+            layer.init_for_window(window)
+            layer.set_namespace(window, 'uwt-virtual-mouse')
+            layer.set_layer(window, layer.Layer.OVERLAY)
+            layer.set_keyboard_mode(window, layer.KeyboardMode.NONE)
+            layer.set_exclusive_zone(window, 0)
+            for edge in (layer.Edge.TOP, layer.Edge.RIGHT):
+                layer.set_anchor(window, edge, True)
+                layer.set_margin(window, edge, 16)
+            if self.monitor:
+                layer.set_monitor(window, self.monitor)
+        else:
+            window.set_type_hint(Gdk.WindowTypeHint.NOTIFICATION)
+            window.set_keep_above(True)
+
+        title, controls = (
+            ('Souris virtuelle active · Hotkey + L3 pour désactiver',
+             'Sticks : déplacer / ajuster · ↑/↓ : molette\n'
+             'A/Croix : clic gauche · X/Carré : clic droit · B/Rond : Échap')
+            if french else
+            ('Virtual mouse active · Hotkey + L3 to turn off',
+             'Sticks: move / fine control · ↑/↓: wheel\n'
+             'A/Cross: left click · X/Square: right click · B/Circle: Esc')
+        )
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        for side in ('top', 'bottom', 'start', 'end'):
+            getattr(box, 'set_margin_'+side)(8 if side in ('top', 'bottom') else 12)
+        window.add(box)
+        heading = Gtk.Label()
+        heading.set_markup(f'<b>{title}</b>')
+        for label in (heading, Gtk.Label(label=controls)):
+            label.set_xalign(0)
+            box.pack_start(label, False, False, 0)
+        css = Gtk.CssProvider()
+        css.load_from_data(b'window { background-color: #17232d; } label { color: #edf4ff; font-size: 10pt; }')
+        for widget in (window, *box.get_children()):
+            widget.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        box.show_all()
+        try:
+            window.realize()
+            window.get_window().set_pass_through(True)
+        except (AttributeError, RuntimeError):
+            window.destroy()
+            raise
+
+    def show(self):
+        if not self.layer and self.monitor:
+            bounds = self.monitor.get_geometry()
+            _, size = self.window.get_preferred_size()
+            self.window.move(max(bounds.x, bounds.x+bounds.width-size.width-16), bounds.y+16)
+        self.window.show()
+
+    def hide(self): self.window.hide()
+
+    def close(self): self.window.destroy()
+
+
 def language(home):
     try: return (Path(home)/'config/language').read_text().strip() == 'fr'
     except OSError: return os.environ.get('LANG', '').startswith('fr')
@@ -506,22 +579,27 @@ def run(home, rom):
         mouse_enabled = Settings(home, 'mouse').enabled(rom)
         if not (keyboard_enabled or mouse_enabled): return
         display_environment()
-        devices, sender, overlay, windows, mouse = [], None, None, None, None
+        devices, sender, overlay, windows, mouse, indicator = [], None, None, None, None, None
+        deps = None
         try:
             devices = (controllers(keyboard=keyboard_enabled, mouse=True) if mouse_enabled else controllers())
             if not devices: raise RuntimeError('No configured controller with a distinct shortcut and Linux codes')
             modifiers = sorted({INDICES[d.amx_hotkey] for d in devices
                                 if getattr(d, 'amx_hotkey', None) in INDICES})
-            if keyboard_enabled:
+            try:
+                deps = gtk_dependencies()
+                Gtk, _, GLib, _ = deps
+                main, quit_loop = Gtk.main, Gtk.main_quit
+            except (OSError, ImportError, ValueError, RuntimeError) as exc:
+                if not mouse_enabled: raise
+                print(f'virtual_input_display_unavailable={exc}', flush=True)
+            if keyboard_enabled and deps is not None:
                 try:
-                    deps = gtk_dependencies()
-                    Gtk, _, GLib, _ = deps
-                    main, quit_loop = Gtk.main, Gtk.main_quit
                     sender = KeySender()
                 except (OSError, ImportError, ValueError, RuntimeError) as exc:
                     if not mouse_enabled: raise
                     print(f'virtual_keyboard_refused={exc}', flush=True)
-            if sender is None:
+            if deps is None:
                 from gi.repository import GLib
                 loop = GLib.MainLoop()
                 main, quit_loop = loop.run, loop.quit
@@ -531,6 +609,11 @@ def run(home, rom):
                 except (OSError, ImportError, RuntimeError) as exc:
                     if sender is None: raise
                     print(f'virtual_mouse_refused={exc}', flush=True)
+            if mouse is not None and deps is not None:
+                try:
+                    indicator = MouseIndicator(deps, language(home))
+                except (OSError, ImportError, AttributeError, ValueError, RuntimeError) as exc:
+                    print(f'virtual_mouse_indicator_unavailable={exc}', flush=True)
             from antimicrox_focus import XWindows
             windows = XWindows()
             def safe_foreground(): return windows.current(0)[0] == 'game'
@@ -540,13 +623,17 @@ def run(home, rom):
             quiet_since = None
             def keyboard_visible(): return overlay is not None and overlay.visible()
             def active(): return mouse_owner is not None or keyboard_visible()
-            def hide():
+            def hide_mouse():
                 nonlocal mouse_owner
-                if mouse_owner is not None:
-                    mouse_owner = None
-                    try: mouse.release()
-                    except OSError as exc: print(f'virtual_mouse_release_error={exc}', flush=True)
-                    print('virtual_mouse_disabled', flush=True)
+                if mouse_owner is None: return
+                mouse_owner.mouse_mode = False
+                mouse_owner = None
+                if indicator is not None: indicator.hide()
+                try: mouse.release()
+                except OSError as exc: print(f'virtual_mouse_release_error={exc}', flush=True)
+                print('virtual_mouse_disabled', flush=True)
+            def hide():
+                hide_mouse()
                 if overlay is not None: overlay.hide()
                 for device in devices: device.ungrab()
                 try: priority(home, rom, False)
@@ -628,10 +715,7 @@ def run(home, rom):
                                 if pending == 'hide': hide()
                                 elif current_rom == rom and safe_foreground():
                                     if pending == 'keyboard':
-                                        if mouse_owner is not None:
-                                            mouse.release()
-                                            mouse_owner.mouse_mode = False
-                                        mouse_owner = None
+                                        hide_mouse()
                                         for device in devices: device.grab()
                                         overlay.show()
                                         print('virtual_keyboard_shown', flush=True)
@@ -643,6 +727,7 @@ def run(home, rom):
                                             if device is not pending_owner: device.ungrab()
                                         pending_owner.mouse_mode = True
                                         mouse_owner = pending_owner
+                                        if indicator is not None: indicator.show()
                                         print('virtual_mouse_enabled', flush=True)
                                 else:
                                     hide()
@@ -658,6 +743,7 @@ def run(home, rom):
                 GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, lambda: (quit_loop(), False)[1])
             main()
         finally:
+            if indicator is not None: indicator.close()
             if mouse:
                 try: mouse.close()
                 except OSError as exc: print(f'virtual_mouse_release_error={exc}', flush=True)

@@ -479,7 +479,7 @@ def run(home,rom):
 
 
 class RuntimeIntegrationTests(unittest.TestCase):
-    def exercise(self, grab_failure=False, managed_amx=False, mouse_only=False):
+    def exercise(self, grab_failure=False, managed_amx=False, mouse_only=False, display_missing=False):
         import antimicrox_focus
         with tempfile.TemporaryDirectory() as directory:
             home=Path(directory);rom=str(home/'Game.wine')
@@ -535,11 +535,13 @@ class RuntimeIntegrationTests(unittest.TestCase):
                 def send(self,key):typed.append(key)
                 def close(self):pass
             windows=types.SimpleNamespace(current=lambda _:('game',1),close=lambda:None)
-            with patch.object(runtime,'gtk_dependencies',return_value=(Gtk,None,GLib,None)) as gtk, \
+            with patch.object(runtime,'gtk_dependencies',return_value=(Gtk,None,GLib,None),
+                              side_effect=RuntimeError('GTK unavailable') if display_missing else None), \
                  patch.dict(sys.modules,{'gi.repository':types.SimpleNamespace(GLib=GLib)}), \
                  patch('virtual_mouse.Mouse') as mouse, \
+                 patch.object(runtime,'MouseIndicator') as indicator, \
                  patch.object(runtime,'controllers',return_value=[controller]), \
-                 patch.object(runtime,'KeySender',return_value=Sender()), \
+                 patch.object(runtime,'KeySender',return_value=Sender()) as keyboard, \
                  patch.object(runtime,'Overlay',Overlay), \
                  patch.object(runtime,'process_identity',return_value='test-token'), \
                  patch.object(policy,'conflict',return_value='') as preflight, \
@@ -551,7 +553,12 @@ class RuntimeIntegrationTests(unittest.TestCase):
                 mouse.return_value.button.side_effect = lambda key, pressed, _: clicked.append((key, pressed))
                 runtime.run(home,rom)
                 if mouse_only:
-                    gtk.assert_not_called()
+                    keyboard.assert_not_called()
+                    if display_missing:
+                        indicator.assert_not_called()
+                    else:
+                        self.assertEqual([entry[0] for entry in indicator.return_value.method_calls],
+                                         ['show', 'hide', 'close'])
                     preflight.assert_called_once_with(home,rom,modifiers=[6],button='l3')
                     self.assertEqual(clicked,[('b',True),('b',False)])
                     self.assertEqual(shown,[])
@@ -564,8 +571,11 @@ class RuntimeIntegrationTests(unittest.TestCase):
             self.assertFalse((state/'session.json').exists())
             return typed,shown
 
-    def test_mouse_only_toggles_and_clicks_without_loading_gtk(self):
+    def test_mouse_only_shows_indicator_without_opening_keyboard(self):
         self.exercise(mouse_only=True)
+
+    def test_mouse_still_toggles_and_clicks_without_display_overlay(self):
+        self.exercise(mouse_only=True, display_missing=True)
 
     def test_settings_and_l3_conflicts_are_independent(self):
         with tempfile.TemporaryDirectory() as directory:

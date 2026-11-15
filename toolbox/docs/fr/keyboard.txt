@@ -72,6 +72,8 @@ Dans Outils et compatibilité > Souris virtuelle à la manette, activez la souri
 pour tous les jeux Windows ou par jeu. Ce réglage est indépendant du clavier
 virtuel. Relancez le jeu, puis appuyez et relâchez Hotkey + L3 pour basculer.
 Le stick gauche déplace le pointeur et le droit permet un déplacement plus fin.
+Aussi longtemps que la souris est active, un rappel des touches apparaît en
+haut à droite de l’écran et laisse passer les clics.
 A / Croix fait un clic gauche et peut rester enfoncé pour glisser. X / Carré
 fait un clic droit. B / Rond envoie Échap. Haut et Bas défilent à la molette.
 Si les deux fonctions sont activées, Hotkey + Select ouvre le clavier à la

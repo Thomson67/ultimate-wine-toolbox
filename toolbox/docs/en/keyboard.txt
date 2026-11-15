@@ -58,6 +58,8 @@ In Tools and compatibility > Controller virtual mouse, enable mouse mode for
 all Windows games or per game. This setting is independent of the virtual
 keyboard. Restart the game, then press and release Hotkey + L3 to toggle it.
 The left stick moves the pointer and the right stick makes finer movements.
+While mouse mode is active, a click-through reminder appears in the upper-right
+corner with the available controls.
 A / Cross is left click and can be held to drag. X / Square is right click.
 B / Circle sends Escape. D-pad Up and Down scroll the wheel.
 When both features are enabled, Hotkey + Select opens the keyboard in place
