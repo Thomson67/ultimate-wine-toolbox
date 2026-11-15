@@ -1,4 +1,4 @@
-"""Honor a one-shot ES request without modifying the game's Wine prefix."""
+"""Force the configured launcher without modifying the game's Wine prefix."""
 import fcntl
 import hashlib
 import json
@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 from antimicrox_live import atomic
-from es_options import Overrides, game_key
+from es_options import Overrides
 
 SAVES = Path('/userdata/saves/windows')
 MAX_SCRIPT = 256 * 1024
@@ -118,13 +118,6 @@ def restore(journal, saves):
     journal.unlink()
 
 
-def clear_request(rom):
-    subprocess.run(['batocera-settings-set', game_key(rom, 'launcher'), 'normal'], check=True,
-                   timeout=5, stdout=subprocess.DEVNULL)
-    if Overrides(rom).get('launcher', game_only=True) == 'next':
-        raise ValueError('Could not consume the ES launcher request')
-
-
 def event(home, rom, action, saves=SAVES):
     if rom.suffix.casefold() not in ('.wsquashfs', '.wine', '.pc'):
         return
@@ -150,12 +143,7 @@ def event(home, rom, action, saves=SAVES):
                 raise ValueError('Launcher marker backup already exists')
             atomic(journal, json.dumps({'marker': relative}).encode())
             marker.rename(backup)
-        try:
-            clear_request(rom)
-        except (OSError, ValueError, subprocess.SubprocessError):
-            restore(journal, saves)
-            raise
-        print(f'Launcher requested for {rom.name}: {marker}')
+        print(f'Launcher enabled for {rom.name}: {marker}')
 
 
 if __name__ == '__main__':

@@ -640,11 +640,21 @@ def set_enabled(home, rom, enabled):
 
 
 def event(home, rom, action, runner='', bottles=Path('/userdata/system/wine-bottles/windows'), legacy=False, es=False):
+    override = None
+    if es:
+        import reshade_external
+        reshade_external.restore(reshade_external.es_session_home(home), rom)
+        if action == 'gameStart':
+            from es_options import Overrides
+            override = Overrides(rom).get('reshade', game_only=True)
     cfg = read_json(home / 'reshade/games' / (key(rom) + '.json'))
     if not cfg:
         if action == 'gameStart':
             import reshade_external
-            reshade_external.apply(home, rom, runner, bottles, legacy)
+            if es:
+                reshade_external.es_start(home, rom, override, runner, bottles, legacy)
+            else:
+                reshade_external.apply(home, rom, runner, bottles, legacy)
         import reshade_existing_preset
         reshade_existing_preset.event(home, rom, action, runner, bottles, legacy)
         return
@@ -656,10 +666,6 @@ def event(home, rom, action, runner='', bottles=Path('/userdata/system/wine-bott
         return
     if action != 'gameStart':
         return
-    override = None
-    if es:
-        from es_options import Overrides
-        override = Overrides(rom).get('reshade', game_only=True)
     if override == 'off' or (override is None and not cfg['enabled']):
         for jp in (home / 'reshade/installations' / key(rom)).glob('*.json'):
             restore_install(home, jp)
@@ -955,6 +961,9 @@ def main():
             event(home, rom, args.command, args.runner, args.bottles, args.legacy, es=True)
         elif args.command == 'disable-all':
             import reshade_external
+            for journal in (reshade_external.es_session_home(home)/'reshade/external-journals').glob('*/*.json'):
+                if journal.exists():
+                    reshade_external.restore(reshade_external.es_session_home(home), Path(read_json(journal)['rom']))
             for config in (home / 'reshade/external').glob('*.json'):
                 cfg = read_json(config)
                 if cfg.get('controlled'):

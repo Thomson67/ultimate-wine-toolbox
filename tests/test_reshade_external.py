@@ -56,6 +56,32 @@ class ExternalTests(unittest.TestCase):
         self.assertEqual(self.binary.read_bytes(),before)
         self.assertEqual(self.autorun.read_text(),self.original)
 
+    def test_es_disables_embedded_reshade_for_each_session_without_changing_toolbox_settings(self):
+        before, preset = self.binary.read_bytes(), self.preset.read_bytes()
+        with patch('es_options.Overrides') as overrides:
+            overrides.return_value.get.return_value = 'off'
+            for _ in range(2):
+                r.event(self.home, self.rom, 'gameStart', es=True)
+                self.assertFalse(self.binary.exists())
+                self.assertEqual(self.preset.read_bytes(), preset)
+                self.assertEqual(self.autorun.read_text(), self.original)
+                self.assertFalse(r.read_json(e.config_path(self.home, self.rom))['controlled'])
+                r.event(self.home, self.rom, 'gameStop', es=True)
+                self.assertEqual(self.binary.read_bytes(), before)
+            overrides.return_value.get.return_value = 'on'
+            r.event(self.home, self.rom, 'gameStart', es=True)
+            self.assertEqual(self.binary.read_bytes(), before)
+
+    def test_reenabling_in_es_recovers_a_mask_left_by_an_interrupted_session(self):
+        before = self.binary.read_bytes()
+        with patch('es_options.Overrides') as overrides:
+            overrides.return_value.get.return_value = 'off'
+            r.event(self.home, self.rom, 'gameStart', es=True)
+            self.assertFalse(self.binary.exists())
+            overrides.return_value.get.return_value = None
+            r.event(self.home, self.rom, 'gameStart', es=True)
+        self.assertEqual(self.binary.read_bytes(), before)
+
     def test_changed_dll_is_not_overwritten_on_restore(self):
         e.toggle(self.home,self.rom,False)
         self.binary.write_bytes(b'new DLL installed by user')

@@ -11,6 +11,14 @@ CONF = Path('/userdata/system/batocera.conf')
 OWNER = b'<!-- Managed by Ultimate Wine Toolbox -->'
 
 SWITCH = {'on': ('Activé', 'Enabled'), 'off': ('Désactivé', 'Disabled')}
+# Retain the stored values used by the original launcher option.
+LAUNCHER_TITLE = ('Afficher le launcher (par jeu)', 'Show launcher (per game)')
+LAUNCHER_CHOICES = {'normal': ('Non', 'No'), 'next': ('Oui', 'Yes')}
+LAUNCHER_DESCRIPTION = (
+    'Avec Oui, affiche le launcher à chaque démarrage de ce jeu.',
+    'With Yes, show the launcher every time this game starts.',
+)
+RESHADE_TITLE = ('ReShade (par jeu)', 'ReShade (per game)')
 OPTIONS = {
     'mangohud': (
         ('mangohud', ('MangoHud', 'MangoHud'), SWITCH),
@@ -27,10 +35,8 @@ OPTIONS = {
                     {'on': ('Utiliser le profil associé', 'Use the assigned profile'), 'off': SWITCH['off']}),),
     'keyboard': (('keyboard', ('Clavier virtuel', 'Virtual keyboard'), SWITCH),),
     'mouse': (('mouse', ('Souris virtuelle', 'Virtual mouse'), SWITCH),),
-    'reshade': (('reshade', ('ReShade configuré (par jeu)', 'Configured ReShade (per game)'), SWITCH),),
-    'launcher': (('launcher', ('Réafficher le launcher (par jeu)', 'Show the launcher again (per game)'),
-                   {'normal': ('Démarrage normal', 'Normal launch'),
-                    'next': ('Au prochain démarrage', 'On next launch')}),),
+    'reshade': (('reshade', RESHADE_TITLE, SWITCH),),
+    'launcher': (('launcher', LAUNCHER_TITLE, LAUNCHER_CHOICES),),
 }
 CHOICES = {key: choices for group in OPTIONS.values() for key, _, choices in group}
 
@@ -48,6 +54,42 @@ def exposed(path=FEATURES):
     xml = ET.fromstring(raw)
     return {feature.get('value', '').removeprefix('uwt_')
             for feature in xml.findall('./emulator/system/feature')}
+
+
+def write_features(path, xml):
+    ET.indent(xml)
+    atomic(path, OWNER + b'\n' + ET.tostring(xml, encoding='utf-8') + b'\n', mode=0o644)
+
+
+def launcher_choices(feature, index):
+    feature.set('name', LAUNCHER_TITLE[index])
+    feature.set('description', LAUNCHER_DESCRIPTION[index])
+    for choice in feature.findall('choice'):
+        feature.remove(choice)
+    for value, captions in LAUNCHER_CHOICES.items():
+        ET.SubElement(feature, 'choice', name=captions[index], value=value)
+
+
+def refresh(path=FEATURES):
+    if path.is_symlink():
+        return
+    raw = option_file(path)
+    if OWNER not in raw:
+        return
+    xml = ET.fromstring(raw)
+    launcher = xml.find('./emulator/system/feature[@value="uwt_launcher"]')
+    reshade = xml.find('./emulator/system/feature[@value="uwt_reshade"]')
+    old_launcher = ('Réafficher le launcher (par jeu)', 'Show the launcher again (per game)')
+    old_reshade = ('ReShade configuré (par jeu)', 'Configured ReShade (per game)')
+    changes = False
+    if launcher is not None and launcher.get('name') in old_launcher:
+        launcher_choices(launcher, old_launcher.index(launcher.get('name')))
+        changes = True
+    if reshade is not None and reshade.get('name') in old_reshade:
+        reshade.set('name', RESHADE_TITLE[old_reshade.index(reshade.get('name'))])
+        changes = True
+    if changes:
+        write_features(path, xml)
 
 
 def publish(groups, language, path=FEATURES):
@@ -68,17 +110,11 @@ def publish(groups, language, path=FEATURES):
             feature = ET.SubElement(system, 'feature', name=names[index], value=f'uwt_{key}',
                                     submenu='Ultimate Wine Toolbox')
             if key == 'launcher':
-                feature.set('description', (
-                    'Ouvrez les options du jeu. Si ES affiche encore « Au prochain démarrage » après usage, '
-                    'enregistrez « Démarrage normal », puis réactivez l’option.',
-                    'Use the game options. If ES still shows “On next launch” after use, '
-                    'save “Normal launch”, then enable the request again.',
-                )[index])
-            for value, captions in choices.items():
-                ET.SubElement(feature, 'choice', name=captions[index], value=value)
-    ET.indent(xml)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    atomic(path, OWNER + b'\n' + ET.tostring(xml, encoding='utf-8') + b'\n', mode=0o644)
+                launcher_choices(feature, index)
+            else:
+                for value, captions in choices.items():
+                    ET.SubElement(feature, 'choice', name=captions[index], value=value)
+    write_features(path, xml)
 
 
 def game_key(rom, key):
@@ -141,6 +177,7 @@ def main():
     sub = parser.add_subparsers(dest='action', required=True)
     sub.add_parser('list')
     sub.add_parser('remove')
+    sub.add_parser('refresh')
     put = sub.add_parser('publish')
     put.add_argument('language', choices=('fr', 'en'))
     put.add_argument('groups', nargs='*')
@@ -158,6 +195,8 @@ def main():
     elif args.action == 'remove':
         if not FEATURES.is_symlink() and OWNER in option_file():
             FEATURES.unlink()
+    elif args.action == 'refresh':
+        refresh()
     elif args.action == 'publish':
         if unknown := set(args.groups) - OPTIONS.keys():
             parser.error(f'unknown ES options: {", ".join(sorted(unknown))}')

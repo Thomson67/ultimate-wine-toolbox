@@ -153,6 +153,10 @@ if [ -s "$DEST/toolbox/hooks/antimicrox-game-event.sh" ]; then
     chmod +x "$ANTIMICROX_HOOK"
 fi
 install -m 0755 "$DEST/toolbox/hooks/es-launcher-game-event.sh" "$ES_LAUNCHER_HOOK"
+if ! python3 "$DEST/toolbox/helpers/es_options.py" refresh; then
+    say "Rechargez les rubriques ES depuis les paramètres de la Toolbox." \
+        "Republish the ES sections from the Toolbox settings."
+fi
 
 if [ -n "$OLD_DXVK_BUNDLE" ] && [ -d "$DEST/dxvk/bundles/$OLD_DXVK_BUNDLE" ]; then
     rm -f -- "$DXVK_PATH"

@@ -13,6 +13,29 @@ from reshade_manager import (atomic_bytes, directory_id, ensure_idle, key, locat
 NAMES = {'dxgi.dll', 'd3d9.dll', 'd3d10.dll', 'd3d11.dll', 'opengl32.dll', 'ddraw.dll', 'd3d8.dll', 'reshade.dll', 'reshade32.dll', 'reshade64.dll'}
 
 
+def es_session_home(home):
+    return home/'state/reshade-es-external'
+
+
+def es_start(home, rom, override, runner, bottles, legacy):
+    if override == 'on':
+        restore(home, rom)
+        return
+    cfg = read_json(config_path(home, rom))
+    if override != 'off' or (cfg.get('controlled') and not cfg.get('enabled')):
+        apply(home, rom, runner, bottles, legacy, desired=cfg)
+        return
+    cfg = scan_game(home, rom)
+    if not cfg['files']:
+        return
+    session = es_session_home(home)
+    try:
+        apply(session, rom, runner, bottles, legacy, desired=dict(cfg, controlled=True, enabled=False))
+    except Exception:
+        restore(session, rom)
+        raise
+
+
 def game_files(cfg):
     """Exclude prefix-wide installer resources, also when reading old indexes.
 
@@ -229,6 +252,7 @@ def apply(home, rom, runner='', bottles=Path('/userdata/system/wine-bottles/wind
 
 
 def release(home, rom):
+    restore(es_session_home(home), rom)
     restore(home, rom)
     cfg = read_json(config_path(home, rom))
     if cfg:
@@ -237,6 +261,7 @@ def release(home, rom):
 
 
 def toggle(home, rom, enabled, runner='', bottles=Path('/userdata/system/wine-bottles/windows'), legacy=False):
+    restore(es_session_home(home), rom)
     cfg = scan_game(home,rom,force=True)
     if not cfg['files'] or not all(f['controllable'] for f in cfg['files']):
         raise ValueError('nonstandard ReShade loader: listed, but cannot be toggled safely')

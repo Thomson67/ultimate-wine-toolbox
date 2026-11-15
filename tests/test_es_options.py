@@ -50,9 +50,24 @@ class OptionsTests(TestCase):
 
     def test_does_not_overwrite_a_foreign_fragment(self):
         self.xml.write_text('<features/>')
+        es.refresh(self.xml)
         with self.assertRaises(ValueError):
             es.publish(['mouse'], 'en', self.xml)
         self.assertEqual('<features/>', self.xml.read_text())
+
+    def test_upgrade_refreshes_labels_without_changing_selected_sections(self):
+        es.publish(['mouse', 'launcher', 'reshade'], 'fr', self.xml)
+        legacy = self.xml.read_text().replace('Afficher le launcher (par jeu)', 'Réafficher le launcher (par jeu)')
+        legacy = legacy.replace('name="Oui"', 'name="Au prochain démarrage"')
+        legacy = legacy.replace('ReShade (par jeu)', 'ReShade configuré (par jeu)')
+        self.xml.write_text(legacy)
+        es.refresh(self.xml)
+        root = ET.parse(self.xml)
+        feature = root.find('./emulator/system/feature[@value="uwt_launcher"]')
+        self.assertEqual(feature.get('name'), 'Afficher le launcher (par jeu)')
+        self.assertEqual({c.get('value'): c.get('name') for c in feature}, {'normal': 'Non', 'next': 'Oui'})
+        self.assertEqual(root.find('./emulator/system/feature[@value="uwt_reshade"]').get('name'), 'ReShade (par jeu)')
+        self.assertEqual(es.exposed(self.xml), {'mouse', 'launcher', 'reshade'})
 
 
 BATCH = r'''
@@ -79,32 +94,38 @@ class LauncherTests(TestCase):
         self.marker = self.saves/'Different Save Folder/conf-ok.txt'
         self.marker.parent.mkdir(parents=True)
         self.marker.write_bytes(b'old marker')
-        self.requested = 'next'
+        self.features = self.home/'features.cfg'
+        self.conf = self.home/'batocera.conf'
+        es.publish(['launcher'], 'fr', self.features)
+        self.setting = es.game_key(self.rom, 'launcher')
 
-    def test_one_shot_preserves_new_marker_and_restores_old_one_on_failure(self):
-        def consume(_):
-            self.requested = None
-        with mock.patch.object(launcher, 'Overrides') as overrides, \
-                mock.patch.object(launcher, 'clear_request', side_effect=consume):
-            overrides.return_value.get.side_effect = lambda *a, **kw: self.requested
+    def test_launcher_runs_on_consecutive_starts_until_disabled(self):
+        enabled = f'{self.setting}=next\n'
+        self.conf.write_text(enabled)
+        with mock.patch.object(launcher, 'Overrides',
+                               side_effect=lambda rom: es.Overrides(rom, self.features, self.conf)):
             launcher.event(self.home, self.rom, 'gameStart', self.saves)
             self.assertFalse(self.marker.exists())
             launcher.event(self.home, self.rom, 'gameStop', self.saves)
             self.assertEqual(self.marker.read_bytes(), b'old marker')
-            self.requested = 'next'
             launcher.event(self.home, self.rom, 'gameStart', self.saves)
+            self.assertFalse(self.marker.exists())
             self.marker.write_bytes(b'new marker')
             launcher.event(self.home, self.rom, 'gameStop', self.saves)
+            self.assertEqual(self.conf.read_text(), enabled)
+            self.conf.write_text(f'{self.setting}=normal\n')
             launcher.event(self.home, self.rom, 'gameStart', self.saves)
             self.assertEqual(self.marker.read_bytes(), b'new marker')
             self.assertEqual(list(self.marker.parent.iterdir()), [self.marker])
 
-    def test_failed_es_write_rolls_back_the_marker(self):
-        with mock.patch.object(launcher, 'Overrides') as overrides, \
-                mock.patch.object(launcher, 'clear_request', side_effect=OSError('disk full')):
-            overrides.return_value.get.return_value = 'next'
-            with self.assertRaises(OSError):
-                launcher.event(self.home, self.rom, 'gameStart', self.saves)
+    def test_disabling_after_an_interrupted_launch_restores_original(self):
+        self.conf.write_text(f'{self.setting}=next\n')
+        with mock.patch.object(launcher, 'Overrides',
+                               side_effect=lambda rom: es.Overrides(rom, self.features, self.conf)):
+            launcher.event(self.home, self.rom, 'gameStart', self.saves)
+            self.assertFalse(self.marker.exists())
+            self.conf.write_text(f'{self.setting}=normal\n')
+            launcher.event(self.home, self.rom, 'gameStart', self.saves)
         self.assertEqual(self.marker.read_bytes(), b'old marker')
 
     def test_rejects_ambiguous_marker_and_symlink_escape(self):
