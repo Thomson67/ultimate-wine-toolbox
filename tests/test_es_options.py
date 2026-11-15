@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -68,6 +69,72 @@ class OptionsTests(TestCase):
         self.assertEqual({c.get('value'): c.get('name') for c in feature}, {'normal': 'Non', 'next': 'Oui'})
         self.assertEqual(root.find('./emulator/system/feature[@value="uwt_reshade"]').get('name'), 'ReShade (par jeu)')
         self.assertEqual(es.exposed(self.xml), {'mouse', 'launcher', 'reshade'})
+
+    def add_bundle(self, name):
+        for arch in ('x32', 'x64'):
+            (self.root/'dxvk/bundles'/name/arch).mkdir(parents=True)
+
+    def test_dxvk_catalog_refreshes_only_installed_bundles(self):
+        bundles = self.root/'dxvk/bundles'
+        self.add_bundle('DXVK-2.7__VKD3D-3.0')
+        (bundles/'Incomplete/x32').mkdir(parents=True)
+        (bundles/'Link').symlink_to(bundles/'DXVK-2.7__VKD3D-3.0')
+        es.publish(['dxvk', 'mouse'], 'fr', self.xml, bundles)
+        self.assertEqual(es.dxvk_choices(bundles).keys(), {'batocera', 'DXVK-2.7__VKD3D-3.0'})
+        shutil.rmtree(bundles/'DXVK-2.7__VKD3D-3.0')
+        self.add_bundle('DXVK-3.0__VKD3D-3.1')
+        es.refresh(self.xml, bundles)
+        options = ET.parse(self.xml).findall('./emulator/system/feature[@value="uwt_dxvk"]/choice')
+        self.assertEqual([(choice.get('value'), choice.get('name')) for choice in options],
+                         [('batocera', 'Versions natives de Batocera'),
+                          ('DXVK-3.0__VKD3D-3.1', 'DXVK-3.0__VKD3D-3.1')])
+        self.assertEqual(es.exposed(self.xml), {'dxvk', 'mouse'})
+
+    def test_dxvk_hook_applies_scope_priority_and_restores_the_global_bundle(self):
+        bundles = self.root/'dxvk/bundles'
+        for bundle in ('Global', 'System', 'Game', 'Test', 'Toolbox'):
+            self.add_bundle(bundle)
+        es.publish(['dxvk'], 'en', self.xml, bundles)
+        self.conf.write_text(f'{es.game_key(self.rom, "dxvk")}=Game\nwindows.uwt_dxvk=System\n')
+        override = es.Overrides(self.rom, self.xml, self.conf, bundles)
+        self.assertEqual(override.assigned_dxvk_bundles(), {'Game', 'System'})
+        repo = Path(__file__).resolve().parents[1]
+        helpers = self.root/'toolbox/helpers'
+        helpers.mkdir(parents=True)
+        shutil.copy(repo/'toolbox/helpers/antimicrox_live.py', helpers)
+        code = (repo/'toolbox/helpers/es_options.py').read_text()
+        (helpers/'es_options.py').write_text(code.replace(str(es.FEATURES), str(self.xml)).replace(str(es.CONF), str(self.conf)))
+        path = self.root/'active'
+        path.symlink_to(bundles/'Global')
+        hook = self.root/'hook.sh'
+        code = (repo/'toolbox/hooks/dxvk-game-event.sh').read_text()
+        hook.write_text(code.replace('/userdata/system/ultimate-wine-toolbox', str(self.root))
+                        .replace('/userdata/system/wine/dxvk', str(path))
+                        .replace('/userdata/system/logs/ultimate-wine-toolbox', str(self.root/'logs'))
+                        .replace(str(es.FEATURES), str(self.xml)))
+        config = self.root/'config'
+        config.mkdir()
+        (config/'dxvk-games.tsv').write_text(f'Toolbox\t{self.rom}\n')
+
+        def launch(action):
+            subprocess.run(['bash', str(hook), action, 'windows', '', '', str(self.rom)],
+                           check=True, capture_output=True)
+            return path.resolve().name if path.is_symlink() else None
+
+        self.assertEqual(launch('gameStart'), 'Game')
+        self.assertEqual(launch('gameStop'), 'Global')
+        shutil.rmtree(bundles/'Game')
+        self.assertEqual(launch('gameStart'), 'Toolbox')
+        (config/'dxvk-games.tsv').unlink()
+        self.assertEqual(launch('gameStart'), 'System')
+        self.conf.write_text(f'{es.game_key(self.rom, "dxvk")}=batocera\n')
+        self.assertIsNone(launch('gameStart'))
+        self.assertEqual(launch('gameStop'), 'Global')
+        state = self.root/'state'
+        state.mkdir()
+        (state/f'wsq-dxvk-test.{os.getpid()}').write_text(f'{self.rom}\nTest\n')
+        self.assertEqual(launch('gameStart'), 'Test')
+        self.assertEqual(launch('gameStop'), 'Global')
 
 
 BATCH = r'''

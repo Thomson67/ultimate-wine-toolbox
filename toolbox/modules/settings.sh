@@ -97,7 +97,7 @@ es_options_menu() {
         msgbox "$title" "$(i18n es_options_failed)"
         return
     fi
-    for item in mangohud antimicrox keyboard mouse reshade launcher; do
+    for item in mangohud dxvk antimicrox keyboard mouse reshade launcher; do
         state=off
         [[ $'\n'"$current"$'\n' != *$'\n'"$item"$'\n'* ]] || state=on
         options+=("$item" "$(i18n "es_options_$item")" "$state")

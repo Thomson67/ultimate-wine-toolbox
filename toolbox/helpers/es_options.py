@@ -1,6 +1,7 @@
 """Opt-in Windows options exported to EmulationStation."""
 import argparse
 from pathlib import Path
+import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -8,6 +9,7 @@ from antimicrox_live import atomic
 
 FEATURES = Path('/userdata/system/configs/emulationstation/es_features_ultimate_wine_toolbox.cfg')
 CONF = Path('/userdata/system/batocera.conf')
+BUNDLES = Path(__file__).resolve().parents[2]/'dxvk/bundles'
 OWNER = b'<!-- Managed by Ultimate Wine Toolbox -->'
 
 SWITCH = {'on': ('Activé', 'Enabled'), 'off': ('Désactivé', 'Disabled')}
@@ -19,6 +21,8 @@ LAUNCHER_DESCRIPTION = (
     'With Yes, show the launcher every time this game starts.',
 )
 RESHADE_TITLE = ('ReShade (par jeu)', 'ReShade (per game)')
+DXVK_TITLE = ('Bundle DXVK / VKD3D', 'DXVK / VKD3D bundle')
+DXVK_NATIVE = ('Versions natives de Batocera', 'Batocera defaults')
 OPTIONS = {
     'mangohud': (
         ('mangohud', ('MangoHud', 'MangoHud'), SWITCH),
@@ -31,6 +35,7 @@ OPTIONS = {
          {'off': ('Immédiat', 'Immediate'), 'mailbox': ('Mailbox', 'Mailbox'),
           'on': ('VSync', 'VSync'), 'adaptive': ('Adaptatif', 'Adaptive')}),
     ),
+    'dxvk': (('dxvk', DXVK_TITLE, {'batocera': DXVK_NATIVE}),),
     'antimicrox': (('antimicrox', ('AntiMicroX', 'AntiMicroX'),
                     {'on': ('Utiliser le profil associé', 'Use the assigned profile'), 'off': SWITCH['off']}),),
     'keyboard': (('keyboard', ('Clavier virtuel', 'Virtual keyboard'), SWITCH),),
@@ -70,7 +75,18 @@ def launcher_choices(feature, index):
         ET.SubElement(feature, 'choice', name=captions[index], value=value)
 
 
-def refresh(path=FEATURES):
+def dxvk_choices(bundles):
+    choices = {'batocera': DXVK_NATIVE}
+    if bundles.is_dir():
+        for path in sorted(bundles.iterdir(), key=lambda item: item.name.casefold()):
+            if (re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+-]*', path.name) and path.name != 'batocera'
+                    and not path.is_symlink() and (path/'x32').is_dir() and (path/'x64').is_dir()
+                    and not (path/'x32').is_symlink() and not (path/'x64').is_symlink()):
+                choices[path.name] = (path.name, path.name)
+    return choices
+
+
+def refresh(path=FEATURES, bundles=BUNDLES):
     if path.is_symlink():
         return
     raw = option_file(path)
@@ -88,11 +104,22 @@ def refresh(path=FEATURES):
     if reshade is not None and reshade.get('name') in old_reshade:
         reshade.set('name', RESHADE_TITLE[old_reshade.index(reshade.get('name'))])
         changes = True
+    dxvk = xml.find('./emulator/system/feature[@value="uwt_dxvk"]')
+    if dxvk is not None:
+        index = int(dxvk.get('name') != DXVK_TITLE[0])
+        expected = [(value, names[index]) for value, names in dxvk_choices(bundles).items()]
+        current = [(choice.get('value'), choice.get('name')) for choice in dxvk.findall('choice')]
+        if current != expected:
+            for choice in dxvk.findall('choice'):
+                dxvk.remove(choice)
+            for value, label in expected:
+                ET.SubElement(dxvk, 'choice', name=label, value=value)
+            changes = True
     if changes:
         write_features(path, xml)
 
 
-def publish(groups, language, path=FEATURES):
+def publish(groups, language, path=FEATURES, bundles=BUNDLES):
     raw = option_file(path)
     if path.exists() and OWNER not in raw:
         raise ValueError(f'{path} is not owned by Ultimate Wine Toolbox')
@@ -112,6 +139,8 @@ def publish(groups, language, path=FEATURES):
             if key == 'launcher':
                 launcher_choices(feature, index)
             else:
+                if key == 'dxvk':
+                    choices = dxvk_choices(bundles)
                 for value, captions in choices.items():
                     ET.SubElement(feature, 'choice', name=captions[index], value=value)
     write_features(path, xml)
@@ -126,8 +155,9 @@ def game_key(rom, key):
 
 
 class Overrides:
-    def __init__(self, rom, features=FEATURES, conf=CONF):
+    def __init__(self, rom, features=FEATURES, conf=CONF, bundles=BUNDLES):
         self.rom = rom
+        self.bundles = bundles
         self.keys = set()
         self.values = {}
         try:
@@ -145,17 +175,23 @@ class Overrides:
     def get(self, key, game_only=False, toolbox_game=None):
         if key not in self.keys:
             return toolbox_game
-        allowed = CHOICES[key]
+        allowed = dxvk_choices(self.bundles) if key == 'dxvk' else CHOICES[key]
         game = self.values.get(game_key(self.rom, key))
         if game in allowed:
             return game
-        if toolbox_game is not None:
+        if toolbox_game is not None and (key != 'dxvk' or toolbox_game in allowed):
             return toolbox_game
         if not game_only:
             system = self.values.get(f'windows.uwt_{key}')
             if system in allowed:
                 return system
         return None
+
+    def assigned_dxvk_bundles(self):
+        if 'dxvk' in self.keys:
+            return {value for key, value in self.values.items() if key == 'windows.uwt_dxvk'
+                    or (key.startswith('windows["') and key.endswith('"].uwt_dxvk'))}
+        return set()
 
 
 def mangohud_settings(directory, rom):
@@ -178,6 +214,7 @@ def main():
     sub.add_parser('list')
     sub.add_parser('remove')
     sub.add_parser('refresh')
+    sub.add_parser('dxvk-assigned')
     put = sub.add_parser('publish')
     put.add_argument('language', choices=('fr', 'en'))
     put.add_argument('groups', nargs='*')
@@ -185,7 +222,7 @@ def main():
     get.add_argument('key', choices=tuple(CHOICES))
     get.add_argument('rom')
     get.add_argument('--game-only', action='store_true')
-    get.add_argument('--toolbox-game', choices=('on', 'off'))
+    get.add_argument('--toolbox-game')
     args = parser.parse_args()
     if args.action == 'list':
         enabled = exposed()
@@ -197,12 +234,18 @@ def main():
             FEATURES.unlink()
     elif args.action == 'refresh':
         refresh()
+    elif args.action == 'dxvk-assigned':
+        print('\n'.join(sorted(Overrides('').assigned_dxvk_bundles())))
     elif args.action == 'publish':
         if unknown := set(args.groups) - OPTIONS.keys():
             parser.error(f'unknown ES options: {", ".join(sorted(unknown))}')
         publish(args.groups, args.language)
     else:
-        print(Overrides(args.rom).get(args.key, game_only=args.game_only, toolbox_game=args.toolbox_game) or '')
+        if args.key != 'dxvk' and args.toolbox_game not in (None, 'on', 'off'):
+            parser.error('--toolbox-game requires on or off for this option')
+        overrides = Overrides(args.rom)
+        if args.key != 'dxvk' or 'dxvk' in overrides.keys:
+            print(overrides.get(args.key, game_only=args.game_only, toolbox_game=args.toolbox_game) or '')
 
 
 if __name__ == '__main__':

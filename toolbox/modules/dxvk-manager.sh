@@ -12,6 +12,12 @@ dxvk_ensure_dirs() {
     mkdir -p "$DXVK_BUNDLE_DIR" "$DXVK_CACHE_DIR"
 }
 
+dxvk_refresh_es_choices() {
+    if ! python3 "$WT_ROOT/helpers/es_options.py" refresh; then
+        msgbox "$(i18n dxvk_title)" "$(i18n es_options_failed)"
+    fi
+}
+
 dxvk_active_bundle() {
     local target
     [ -L "$BATOCERA_DXVK_PATH" ] || return 0
@@ -339,6 +345,7 @@ EOF
         }
     fi
     rm -rf "$tmp"
+    dxvk_refresh_es_choices
     msgbox "$(i18n dxvk_title)" "$(i18n dxvk_bundle_installed "$bundle_name")"
 }
 
@@ -595,7 +602,7 @@ dxvk_clear_games_menu() {
     fi
 }
 dxvk_remove_bundles_menu() {
-    local active rows="" name idx=1 selected="" id path failures=0
+    local active rows="" name idx=1 selected="" id path failures=0 assigned_es
     local -a items=()
 
     active="$(dxvk_active_bundle)"
@@ -618,12 +625,20 @@ dxvk_remove_bundles_menu() {
 
     selected="$(checklist_select "$(i18n dxvk_manage)" "$(i18n dxvk_remove_prompt)" "${items[@]}")" || return
     [ -n "$selected" ] || return
+    if ! assigned_es="$(python3 "$WT_ROOT/helpers/es_options.py" dxvk-assigned)"; then
+        msgbox "$(i18n dxvk_title)" "$(i18n es_options_failed)"
+        return
+    fi
 
     while IFS= read -r id; do
         [ -n "$id" ] || continue
         name="$(sed -n "${id}p" <<< "$rows")"
         [ -n "$name" ] || continue
         if [ "$name" = "$active" ]; then
+            failures=$((failures+1))
+            continue
+        fi
+        if [[ $'\n'"$assigned_es"$'\n' = *$'\n'"$name"$'\n'* ]]; then
             failures=$((failures+1))
             continue
         fi
@@ -634,11 +649,12 @@ dxvk_remove_bundles_menu() {
         path="$DXVK_BUNDLE_DIR/$name"
         case "$path" in "$DXVK_BUNDLE_DIR"/*) rm -rf -- "$path" || failures=$((failures+1)) ;; esac
     done <<< "$selected"
+    dxvk_refresh_es_choices
 
     if [ "$failures" -eq 0 ]; then
         msgbox "$(i18n dxvk_manage)" "$(i18n dxvk_remove_done)"
     else
-        msgbox "$(i18n dxvk_manage)" "$(i18n dxvk_remove_partial)"
+        msgbox "$(i18n dxvk_manage)" "$(i18n es_dxvk_remove_partial)"
     fi
 }
 
