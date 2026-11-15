@@ -167,6 +167,38 @@ class ExternalTests(unittest.TestCase):
             with self.assertRaises(ValueError): e.apply(self.home,archive,desired=cfg)
         self.assertEqual(target.read_bytes(),dll())
 
+    def test_es_masks_the_archived_injector_in_the_bottle_only(self):
+        archive = self.base/'Packed.wsquashfs'
+        original = b'unchanged SquashFS archive'
+        archive.write_bytes(original)
+        upper = self.base/'runner-bottle.wine'
+        upper.mkdir()
+        target = upper/'drive_c/game/dxgi.dll'
+        r.save_json(e.config_path(self.home, archive), {
+            'rom': str(archive), 'signature': e.signature(archive), 'controlled': False,
+            'enabled': True, 'files': [{'path': 'drive_c/game/dxgi.dll', 'controllable': True}],
+        })
+        read = Path.read_text
+        file_id = e.file_id
+        with patch('es_options.Overrides') as options, \
+                patch.object(e, 'locations', return_value=(upper, upper)), \
+                patch.object(Path, 'read_text', lambda path, *a, **kw:
+                             'mount -t overlay upperdir=' if str(path) == '/usr/bin/batocera-wine'
+                             else read(path, *a, **kw)), \
+                patch.object(e.os, 'mknod', lambda path, *_: Path(path).touch()), \
+                patch.object(e, 'file_id', lambda path:
+                             {'whiteout': True} if path == target and path.exists() else file_id(path)):
+            options.return_value.get.return_value = 'off'
+            r.event(self.home, archive, 'gameStart', es=True)
+            self.assertTrue(target.exists())
+            self.assertEqual(archive.read_bytes(), original)
+            r.event(self.home, archive, 'gameStop', es=True)
+            self.assertFalse(target.exists())
+            options.return_value.get.return_value = 'on'
+            r.event(self.home, archive, 'gameStart', es=True)
+            self.assertFalse(target.exists())
+        self.assertEqual(archive.read_bytes(), original)
+
     def test_wiki_matching_removes_runner_and_keeps_game_edition(self):
         self.assertEqual(a.game_title('Denshattack[Wine-11.5].wsquashfs'),'Denshattack')
         self.assertEqual(a.game_title('Game_Remastered[GE-Proton11-7-UMU].pc'),'Game Remastered')
