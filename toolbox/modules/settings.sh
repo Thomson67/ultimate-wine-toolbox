@@ -89,15 +89,40 @@ theme_menu() {
     done
 }
 
+es_options_menu() {
+    local helper="$WT_ROOT/helpers/es_options.py" current selected item state title
+    local -a options=() groups=()
+    title="$(i18n es_options_title)"
+    if ! current="$(python3 "$helper" list)"; then
+        msgbox "$title" "$(i18n es_options_failed)"
+        return
+    fi
+    for item in mangohud antimicrox keyboard mouse reshade launcher; do
+        state=off
+        [[ $'\n'"$current"$'\n' != *$'\n'"$item"$'\n'* ]] || state=on
+        options+=("$item" "$(i18n "es_options_$item")" "$state")
+    done
+    selected="$(checklist_select "$title" "$(i18n es_options_prompt)" "${options[@]}")" || return
+    if [ -n "$selected" ]; then mapfile -t groups <<< "$selected"; fi
+    if python3 "$helper" publish "$WT_LANGUAGE" "${groups[@]}"; then
+        msgbox "$title" "$(i18n es_options_saved)"
+    else
+        msgbox "$title" "$(i18n es_options_failed)"
+    fi
+}
+
 settings_menu() {
     while true; do
         local choice
-        choice="$(menu_select "$(i18n settings_title)" "$(i18n settings_title)"             "u" "$(i18n update_check_action)"             "l" "$(i18n settings_language)"             "d" "Affichage / Display"             "0" "$(i18n back)")" || return
+        choice="$(menu_select "$(i18n settings_title)" "$(i18n settings_title)" \
+            u "$(i18n update_check_action)" l "$(i18n settings_language)" d "Affichage / Display" \
+            es "$(i18n es_options_title)" 0 "$(i18n back)")" || return
 
         case "$choice" in
             u) manual_update_check ;;
             l) language_menu ;;
             d) display_mode_menu ;;
+            es) es_options_menu ;;
             0|"") return ;;
         esac
     done

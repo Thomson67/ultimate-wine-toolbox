@@ -70,6 +70,13 @@ if [ -f "$DEST/toolbox/helpers/virtual_keyboard.py" ]; then
 fi
 rm -f /userdata/system/scripts/ultimate-wine-toolbox-virtual-keyboard.sh
 rm -f /userdata/system/scripts/ultimate-wine-toolbox-antimicrox.sh
+rm -f /userdata/system/scripts/ultimate-wine-toolbox-es-launcher.sh
+if [ -f "$DEST/toolbox/helpers/es_launcher.py" ]; then
+    python3 "$DEST/toolbox/helpers/es_launcher.py" restore-all "$DEST"
+fi
+if [ -f "$DEST/toolbox/helpers/es_options.py" ]; then
+    python3 "$DEST/toolbox/helpers/es_options.py" remove
+fi
 rm -rf "$DEST" "$OLD_DEST"
 rm -f "$PORT" "$KEYS" "$MANGOHUD_HOOK" "$DXVK_HOOK" "$RESHADE_HOOK"
 rm -f "$MANGOHUD_LEGACY_LAYER" "$MANGOHUD_X86_LAYER"

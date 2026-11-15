@@ -639,7 +639,7 @@ def set_enabled(home, rom, enabled):
         save_json(config, cfg)
 
 
-def event(home, rom, action, runner='', bottles=Path('/userdata/system/wine-bottles/windows'), legacy=False):
+def event(home, rom, action, runner='', bottles=Path('/userdata/system/wine-bottles/windows'), legacy=False, es=False):
     cfg = read_json(home / 'reshade/games' / (key(rom) + '.json'))
     if not cfg:
         if action == 'gameStart':
@@ -656,7 +656,11 @@ def event(home, rom, action, runner='', bottles=Path('/userdata/system/wine-bott
         return
     if action != 'gameStart':
         return
-    if not cfg['enabled']:
+    override = None
+    if es:
+        from es_options import Overrides
+        override = Overrides(rom).get('reshade', game_only=True)
+    if override == 'off' or (override is None and not cfg['enabled']):
         for jp in (home / 'reshade/installations' / key(rom)).glob('*.json'):
             restore_install(home, jp)
         return
@@ -948,7 +952,7 @@ def main():
                     reshade_pack.remove(home, rom, args.runner, args.bottles, args.legacy)
                 (home / 'reshade/games' / (key(rom) + '.json')).unlink()
         elif args.command in ('gameStart', 'gameStop'):
-            event(home, rom, args.command, args.runner, args.bottles, args.legacy)
+            event(home, rom, args.command, args.runner, args.bottles, args.legacy, es=True)
         elif args.command == 'disable-all':
             import reshade_external
             for config in (home / 'reshade/external').glob('*.json'):

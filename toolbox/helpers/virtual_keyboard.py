@@ -32,6 +32,7 @@ def rom_key(rom):
 class Settings:
     def __init__(self, home=HOME, feature='keyboard'):
         self.home = Path(home)
+        self.feature = feature
         self.path = self.home/'config'/f'virtual-{feature}.json'
 
     def read(self):
@@ -48,8 +49,10 @@ class Settings:
         return self.read()['games'].get(rom_key(rom), 'inherit')
 
     def enabled(self, rom):
+        from es_options import Overrides
         data = self.read()
-        return {'on': True, 'off': False}.get(data['games'].get(rom_key(rom)), data['global'])
+        override = Overrides(rom).get(self.feature, toolbox_game=data['games'].get(rom_key(rom)))
+        return {'on': True, 'off': False}.get(override, data['global'])
 
     def game_states(self, roms):
         """Read the settings once for a complete game picker."""
@@ -127,6 +130,10 @@ def conflict(home, rom, global_keys=None, system_keys=Path('/usr/share/evmapy/ho
                 return f'Hotkey + {button.upper()} conflicts with Pad2Key in {path}'
     # Check the assigned AMX profile, including alternate sets. Global enable
     # must not grab a controller while the same chord runs a mapped action.
+    from es_options import Overrides
+    if (not (home/'state/antimicrox-live.json').exists()
+            and Overrides(rom).get('antimicrox') == 'off'):
+        return ''
     profiles = []
     association = home/'config/antimicrox-games.tsv'
     if association.exists():
