@@ -1,7 +1,7 @@
-"""Opt-in controller keyboard policy and owned, detached game lifecycle.
+"""Opt-in virtual input policy and owned, detached game lifecycle.
 
 This feature never edits Batocera hotkeys, autorun.cmd or ROM Pad2Key files.
-The watcher observes the otherwise unused Hotkey+Select chord itself.
+One watcher handles the keyboard and mouse shortcuts for a Windows game.
 """
 import argparse
 from contextlib import contextmanager
@@ -30,9 +30,9 @@ def rom_key(rom):
 
 
 class Settings:
-    def __init__(self, home=HOME):
+    def __init__(self, home=HOME, feature='keyboard'):
         self.home = Path(home)
-        self.path = self.home/'config/virtual-keyboard.json'
+        self.path = self.home/'config'/f'virtual-{feature}.json'
 
     def read(self):
         if not self.path.exists():
@@ -41,7 +41,7 @@ class Settings:
         if (not isinstance(data, dict) or type(data.get('global')) is not bool
                 or not isinstance(data.get('games'), dict)
                 or any(v not in ('on', 'off') for v in data['games'].values())):
-            raise ValueError('Invalid virtual keyboard settings; preserved')
+            raise ValueError(f'Invalid settings in {self.path.name}; preserved')
         return data
 
     def override(self, rom):
@@ -68,9 +68,9 @@ class Settings:
 
     def set(self, value, rom=None):
         if value not in ('on', 'off', 'inherit') or (rom is None and value == 'inherit'):
-            raise ValueError('Invalid keyboard activation')
+            raise ValueError('Invalid virtual input activation')
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with (self.path.parent/'virtual-keyboard.lock').open('a') as lock:
+        with self.path.with_suffix('.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             data = self.read()
             if rom is None:
@@ -82,8 +82,8 @@ class Settings:
             atomic(self.path, (json.dumps(data, ensure_ascii=False, indent=2)+'\n').encode())
 
 
-def chord_conflicts(actions):
-    """A Select-only mapping also fires while the modifier is held in evmapy."""
+def chord_conflicts(actions, button='select'):
+    """A single-button mapping can also fire with the modifier held."""
     if not isinstance(actions, list):
         raise ValueError('Invalid Pad2Key actions')
     for action in actions:
@@ -93,13 +93,20 @@ def chord_conflicts(actions):
         trigger = [trigger] if isinstance(trigger, str) else trigger
         if not isinstance(trigger, list):
             raise ValueError('Invalid Pad2Key trigger')
-        if action.get('target') and ('select' in trigger or trigger == ['hotkey']
-                                     or ('hotkey' in trigger and action.get('mode') == 'any')):
+        if not action.get('target'):
+            continue
+        if button == 'select':
+            if ('select' in trigger or trigger == ['hotkey']
+                    or ('hotkey' in trigger and action.get('mode') == 'any')):
+                return True
+        elif (trigger and set(trigger) <= {'hotkey', button}
+              or (action.get('mode') == 'any' and {'hotkey', button}.intersection(trigger))):
             return True
     return False
 
 
-def conflict(home, rom, global_keys=None, system_keys=Path('/usr/share/evmapy/hotkeys.keys'), modifiers=None):
+def conflict(home, rom, global_keys=None, system_keys=Path('/usr/share/evmapy/hotkeys.keys'),
+             modifiers=None, button='select'):
     """Refuse conflicting user bindings instead of silently replacing them."""
     home, rom = Path(home), Path(rom)
     global_keys = global_keys or Path('/userdata/system/configs/hotkeys.keys')
@@ -107,8 +114,8 @@ def conflict(home, rom, global_keys=None, system_keys=Path('/usr/share/evmapy/ho
     paths = [global_path, rom/'padto.keys' if rom.is_dir() else Path(str(rom)+'.keys')]
     for path in paths:
         if path.exists():
-            if chord_conflicts(json.loads(path.read_text()).get('actions_player1', [])):
-                return f'Hotkey + Select / Select already mapped in {path}'
+            if chord_conflicts(json.loads(path.read_text()).get('actions_player1', []), button):
+                return f'Hotkey + {button.upper()} conflicts with Pad2Key in {path}'
     # Check the assigned AMX profile, including alternate sets. Global enable
     # must not grab a controller while the same chord runs a mapped action.
     profiles = []
@@ -124,17 +131,27 @@ def conflict(home, rom, global_keys=None, system_keys=Path('/usr/share/evmapy/ho
         if not isinstance(data, dict) or data.get('rom') != str(rom):
             raise ValueError('Invalid launcher configuration')
         profiles.extend(Path(data[key]) for key in ('launcher_profile', 'game_profile') if data.get(key))
-    from virtual_keyboard_antimicrox import active_modifiers, reserved_profile
+    from virtual_keyboard_antimicrox import active_modifiers, reserved_profile, INDICES
     # One snapshot for all profiles. The watcher passes its already-open
     # controllers so opening the keyboard never re-enumerates input devices.
     if profiles and modifiers is None:
-        modifiers = active_modifiers()
+        modifiers = active_modifiers() if button == 'select' else active_modifiers(button=button)
     for path in dict.fromkeys(profiles):
         try:
-            reserved_profile(path, modifiers=modifiers)
+            if button == 'select':
+                reserved_profile(path, modifiers=modifiers)
+            else:
+                reserved_profile(path, modifiers=modifiers, buttons=(INDICES[button],))
         except ValueError as exc:
             return f'AntiMicroX: {exc}'
     return ''
+
+
+def shortcut_problem(home, rom, **options):
+    try:
+        return conflict(home, rom, **options)
+    except (OSError, ValueError, ET.ParseError) as exc:
+        return str(exc)
 
 
 def process_identity(pid):
@@ -182,11 +199,17 @@ def stop(home, rom=None):
 
 def start(home, rom, log=None):
     rom = rom_key(rom)
-    if not Settings(home).enabled(rom): return
+    keyboard = Settings(home).enabled(rom)
+    mouse = Settings(home, 'mouse').enabled(rom)
+    if not (keyboard or mouse): return
     if Path(rom).suffix.lower() not in FORMATS:
         raise ValueError('Unsupported game format')
-    problem = conflict(home, rom)
-    if problem: raise ValueError(problem)
+    problem = shortcut_problem(home, rom) if keyboard else ''
+    mouse_problem = shortcut_problem(home, rom, button='l3') if mouse else ''
+    if problem: print(f'virtual_keyboard_refused={problem}', flush=True)
+    if mouse_problem: print(f'virtual_mouse_refused={mouse_problem}', flush=True)
+    if not ((keyboard and not problem) or (mouse and not mouse_problem)):
+        raise ValueError(problem or mouse_problem)
     stop(home)
     log = Path(log or '/userdata/system/logs/ultimate-wine-toolbox/virtual-keyboard.log')
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -198,7 +221,7 @@ def start(home, rom, log=None):
         token = process_identity(child.pid)
         if not token:
             child.terminate()
-            raise RuntimeError('Cannot identify keyboard watcher')
+            raise RuntimeError('Cannot identify virtual input watcher')
         atomic(state/'session.json', json.dumps({'rom': rom, 'pid': child.pid, 'token': token}).encode())
 
 
@@ -206,12 +229,13 @@ def start(home, rom, log=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--home', type=Path, default=Path(os.environ.get('WT_HOME', HOME)))
+    parser.add_argument('--feature', choices=('keyboard', 'mouse'), default='keyboard')
     parser.add_argument('action', choices=('get', 'set', 'start', 'stop', 'run', 'diagnose', 'preview', 'profile', 'game-states', 'configured-games'))
     parser.add_argument('--rom')
     parser.add_argument('--profile')
     parser.add_argument('--value', choices=('on', 'off', 'inherit'))
     args = parser.parse_args()
-    settings = Settings(args.home)
+    settings = Settings(args.home, args.feature)
     if args.action == 'get':
         print(settings.override(args.rom) if args.rom else ('on' if settings.read()['global'] else 'off'))
     elif args.action == 'configured-games':

@@ -15,7 +15,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 
 from antimicrox_live import atomic
-from virtual_keyboard import Settings, conflict, process_identity
+from virtual_keyboard import Settings, process_identity, shortcut_problem
 
 
 class KeyboardModel:
@@ -57,7 +57,7 @@ class KeyboardModel:
         return None
 
 
-def bindings(config, hat_axes=None):
+def bindings(config, hat_axes=None, keyboard=True, mouse=False):
     """Use Linux event codes recorded by ES; never guess a controller layout."""
     result = {}
     for item in config.findall('input'):
@@ -88,21 +88,27 @@ def bindings(config, hat_axes=None):
         else:
             if code < 0 or (kind == 'button' and code < 0x100): continue
             result[name] = (kind, code, 1 if value >= 0 else -1)
-    if (result.get('hotkey') is None or result.get('select') is None
-            or result['hotkey'] == result['select']):
+    if keyboard and not valid_chord(result, 'select') and not (mouse and valid_chord(result, 'l3')):
         raise ValueError('Hotkey and Select require distinct recorded Linux event codes')
-    if any(result[k][0] != 'button' for k in ('hotkey', 'select')):
-        raise ValueError('Hotkey and Select must be buttons')
+    if not keyboard and not valid_chord(result, 'l3'):
+        raise ValueError('Hotkey and L3 require distinct recorded Linux event codes')
     for name in ('b', 'a', 'start'):
         if name not in result: raise ValueError(f'Missing Linux input mapping: {name}')
-    for source, first, second in [('joystick1left', 'left', 'right'), ('joystick1up', 'up', 'down')]:
-        if source in result:
-            kind, code, sign = result[source]
-            result.setdefault('joystick1'+second, (kind, code, -sign))
-            if first not in result:
-                result[first] = kind, code, sign
-                result[second] = kind, code, -sign
+    for stick in ('joystick1', 'joystick2'):
+        for first, second in (('left', 'right'), ('up', 'down')):
+            source = stick+first
+            if source in result:
+                kind, code, sign = result[source]
+                result.setdefault(stick+second, (kind, code, -sign))
+                if stick == 'joystick1' and not mouse and first not in result:
+                    result[first], result[second] = (kind, code, sign), (kind, code, -sign)
     return result
+
+
+def valid_chord(mapping, button):
+    hotkey = mapping.get('hotkey')
+    trigger = mapping.get(button)
+    return bool(hotkey and trigger and hotkey[0] == trigger[0] == 'button' and hotkey[1] != trigger[1])
 
 
 class Controller:
@@ -110,26 +116,39 @@ class Controller:
         self.device, self.mapping, self.e = device, mapping, ecodes
         self.values, self.down = {}, set(device.active_keys())
         self.captured = False
+        self.mouse_mode = False
+        self.shortcuts = {'select': 'toggle'} if valid_chord(mapping, 'select') else {}
         # A held shortcut at process startup must first be released.
         self.armed = not bool(device.active_keys())
         self.chord = False
+        self.mouse_chord = False
         self.syncing = False
         self.repeat_at, self.repeated = 0, None
         self.limits = {code: device.absinfo(code) for kind, code, _ in mapping.values() if kind == 'axis'}
         self.values = {code: info.value for code, info in self.limits.items()}
 
-    def logical(self):
+    def axis(self, code):
+        limits = self.limits[code]
+        center = (limits.min+limits.max)/2
+        radius = max(1, (limits.max-limits.min)/2)
+        return (self.values.get(code, center)-center)/radius
+
+    def stick(self, name):
+        def axis(direction):
+            kind, code, sign = self.mapping.get(name+direction, ('', 0, 0))
+            return -sign*self.axis(code) if kind == 'axis' else 0
+        return axis('left'), axis('up')
+
+    def logical(self, navigation=True):
         down = set()
         for name, (kind, code, sign) in self.mapping.items():
             if name in ('joystick1left', 'joystick1right', 'joystick1up', 'joystick1down'):
+                if not navigation: continue
                 name = name[len('joystick1'):]
             if kind == 'button':
                 if code in self.down: down.add(name)
             else:
-                limits = self.limits[code]
-                center = (limits.min+limits.max)/2
-                radius = max(1, (limits.max-limits.min)/2)
-                if sign*(self.values.get(code, center)-center)/radius > .55: down.add(name)
+                if sign*self.axis(code) > .55: down.add(name)
         return down
 
     def poll(self):
@@ -156,32 +175,41 @@ class Controller:
                 self.down = set(self.device.active_keys())
                 self.limits = {code: self.device.absinfo(code) for code in self.limits}
                 self.values = {code: info.value for code, info in self.limits.items()}
-                held = self.logical()
+                held = self.logical(not self.mouse_mode)
                 self.chord = {'hotkey', 'select'} <= held
+                self.mouse_chord = {'hotkey', 'l3'} <= held
                 self.armed = not bool(held)
                 self.syncing = False
                 print('virtual_keyboard_controller_resynced', flush=True)
-            return []
+            return ['mouse-reset'] if self.mouse_mode else []
         for event in events:
-            before = self.logical()
+            before = self.logical(not self.mouse_mode)
             if event.type == self.e.EV_KEY:
                 if event.value: self.down.add(event.code)
                 else: self.down.discard(event.code)
             elif event.type == self.e.EV_ABS: self.values[event.code] = event.value
-            after = self.logical()
+            after = self.logical(not self.mouse_mode)
             if not after: self.armed = True
             chord = {'hotkey', 'select'} <= after
-            if self.armed and chord and not self.chord: actions.append('toggle')
+            if self.armed and chord and not self.chord and 'select' in self.shortcuts: actions.append('toggle')
             self.chord = chord
+            chord = {'hotkey', 'l3'} <= after
+            if self.armed and chord and not self.mouse_chord and 'l3' in self.shortcuts: actions.append('mouse-toggle')
+            self.mouse_chord = chord
             if self.armed and {'hotkey', 'start'} <= after and 'start' not in before:
                 actions.append('exit')
+            if self.mouse_mode:
+                actions.extend((key, False) for key in ('b', 'y', 'a') if key in before-after)
+                if 'hotkey' not in after:
+                    actions.extend((key, True) for key in ('b', 'y', 'a', 'up', 'down') if key in after-before)
+                continue
             if self.captured and 'hotkey' not in after:
                 actions.extend(k for k in ('up', 'down', 'left', 'right', 'b', 'a', 'x', 'y', 'start', 'pageup', 'pagedown') if k in after-before)
             if self.captured:
                 direction = next((k for k in ('up', 'down', 'left', 'right') if k in after), None)
                 if direction != self.repeated:
                     self.repeated, self.repeat_at = direction, time.monotonic()+.38
-        if self.captured and self.repeated and time.monotonic() >= self.repeat_at:
+        if self.captured and not self.mouse_mode and self.repeated and time.monotonic() >= self.repeat_at:
             if 'hotkey' not in self.logical(): actions.append(self.repeated)
             self.repeat_at = time.monotonic()+.10
         return actions
@@ -199,6 +227,7 @@ class Controller:
             self.device.ungrab()
             self.captured = False
         self.repeated = None
+        self.mouse_mode = False
 
     def close(self):
         try: self.ungrab()
@@ -215,7 +244,7 @@ def guid_identity(value):
         return None
 
 
-def controllers(paths=None):
+def controllers(paths=None, keyboard=True, mouse=False):
     import evdev
     paths = paths or [Path('/userdata/system/configs/emulationstation/es_input.cfg'),
                       Path('/usr/share/emulationstation/es_input.cfg')]
@@ -242,7 +271,7 @@ def controllers(paths=None):
                            or guid_identity(item.get('deviceGUID')) == hardware), None)
             if config is None:
                 device.close(); continue
-            mapping = bindings(config, hat_axes=caps.get(evdev.ecodes.EV_ABS, []))
+            mapping = bindings(config, hat_axes=caps.get(evdev.ecodes.EV_ABS, []), keyboard=keyboard, mouse=mouse)
             keys = caps.get(evdev.ecodes.EV_KEY, [])
             if any(code not in keys for kind, code, _ in mapping.values() if kind == 'button'):
                 raise ValueError('Recorded button code does not match physical device')
@@ -251,6 +280,10 @@ def controllers(paths=None):
                 raise ValueError('Recorded axis code does not match physical device')
             from antimicrox_hotkey import logical_hotkey
             controller = Controller(device, mapping, evdev.ecodes)
+            if not keyboard:
+                controller.shortcuts.clear()
+            if mouse and valid_chord(mapping, 'l3'):
+                controller.shortcuts['l3'] = 'mouse-toggle'
             controller.amx_hotkey = logical_hotkey(config)
             result.append(controller)
         except (ValueError, OSError) as exc:
@@ -312,9 +345,7 @@ class KeySender:
 
 
 def gtk_dependencies():
-    os.environ.setdefault('DISPLAY', ':0')
-    if 'XAUTHORITY' not in os.environ and Path('/var/lib/.Xauthority').is_file():
-        os.environ['XAUTHORITY'] = '/var/lib/.Xauthority'
+    display_environment()
     os.environ.setdefault('NO_AT_BRIDGE', '1')
     os.environ['GDK_BACKEND'] = 'wayland' if os.environ.get('WAYLAND_DISPLAY') else 'x11'
     import gi
@@ -325,10 +356,15 @@ def gtk_dependencies():
     if os.environ.get('WAYLAND_DISPLAY'):
         gi.require_version('GtkLayerShell', '0.1')
         from gi.repository import GtkLayerShell
-        if not GtkLayerShell.is_supported():
-            raise RuntimeError('Non-focus-stealing Wayland layer unavailable')
+        if not GtkLayerShell.is_supported(): raise RuntimeError('Non-focus-stealing Wayland layer unavailable')
         layer = GtkLayerShell
     return Gtk, Gdk, GLib, layer
+
+
+def display_environment():
+    os.environ.setdefault('DISPLAY', ':0')
+    if 'XAUTHORITY' not in os.environ and Path('/var/lib/.Xauthority').is_file():
+        os.environ['XAUTHORITY'] = '/var/lib/.Xauthority'
 
 
 class Overlay:
@@ -452,8 +488,9 @@ def preview(home):
 
 def run(home, rom):
     import fcntl
-    from virtual_keyboard import conflict, lifecycle_lock
+    from virtual_keyboard import lifecycle_lock
     from virtual_keyboard_antimicrox import INDICES, priority
+    from virtual_mouse import Mouse
     home = Path(home)
     state = home/'state/virtual-keyboard'; state.mkdir(parents=True, exist_ok=True)
     with (state/'runtime.lock').open('a') as lock:
@@ -465,23 +502,52 @@ def run(home, rom):
             if not session.exists(): return
             owner = json.loads(session.read_text())
             if owner != {'rom': rom, 'pid': os.getpid(), 'token': token}: return
-        if not Settings(home).enabled(rom): return
-        deps = gtk_dependencies()
-        Gtk, _, GLib, _ = deps
-        devices, sender, overlay, windows = [], None, None, None
+        keyboard_enabled = Settings(home).enabled(rom)
+        mouse_enabled = Settings(home, 'mouse').enabled(rom)
+        if not (keyboard_enabled or mouse_enabled): return
+        display_environment()
+        devices, sender, overlay, windows, mouse = [], None, None, None, None
         try:
-            devices = controllers()
-            if not devices: raise RuntimeError('No configured controller with distinct Hotkey/Select and Linux codes')
+            devices = (controllers(keyboard=keyboard_enabled, mouse=True) if mouse_enabled else controllers())
+            if not devices: raise RuntimeError('No configured controller with a distinct shortcut and Linux codes')
             modifiers = sorted({INDICES[d.amx_hotkey] for d in devices
                                 if getattr(d, 'amx_hotkey', None) in INDICES})
-            sender = KeySender()
+            if keyboard_enabled:
+                try:
+                    deps = gtk_dependencies()
+                    Gtk, _, GLib, _ = deps
+                    main, quit_loop = Gtk.main, Gtk.main_quit
+                    sender = KeySender()
+                except (OSError, ImportError, ValueError, RuntimeError) as exc:
+                    if not mouse_enabled: raise
+                    print(f'virtual_keyboard_refused={exc}', flush=True)
+            if sender is None:
+                from gi.repository import GLib
+                loop = GLib.MainLoop()
+                main, quit_loop = loop.run, loop.quit
+            if mouse_enabled:
+                try:
+                    mouse = Mouse()
+                except (OSError, ImportError, RuntimeError) as exc:
+                    if sender is None: raise
+                    print(f'virtual_mouse_refused={exc}', flush=True)
             from antimicrox_focus import XWindows
             windows = XWindows()
             def safe_foreground(): return windows.current(0)[0] == 'game'
             pending = None
+            mouse_owner = None
+            pending_owner = None
             quiet_since = None
+            def keyboard_visible(): return overlay is not None and overlay.visible()
+            def active(): return mouse_owner is not None or keyboard_visible()
             def hide():
-                overlay.hide()
+                nonlocal mouse_owner
+                if mouse_owner is not None:
+                    mouse_owner = None
+                    try: mouse.release()
+                    except OSError as exc: print(f'virtual_mouse_release_error={exc}', flush=True)
+                    print('virtual_mouse_disabled', flush=True)
+                if overlay is not None: overlay.hide()
                 for device in devices: device.ungrab()
                 try: priority(home, rom, False)
                 except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
@@ -496,12 +562,15 @@ def run(home, rom):
                 try: sender.send(key)
                 except ValueError as exc: overlay.message.set_text(str(exc))
                 if key == 'enter': pending = 'hide'
-            overlay = Overlay(deps, action, language(home))
-            print(f'virtual_keyboard_ready rom={rom} shortcut=Hotkey+Select controllers={len(devices)}', flush=True)
+            if sender is not None:
+                overlay = Overlay(deps, action, language(home))
+                print(f'virtual_keyboard_ready rom={rom} shortcut=Hotkey+Select controllers={len(devices)}', flush=True)
+            if mouse is not None:
+                print(f'virtual_mouse_ready rom={rom} shortcut=Hotkey+L3 controllers={len(devices)}', flush=True)
             started, seen_game, last_poll, unknown_since = time.monotonic(), False, float('-inf'), None
             current_rom = None
             def tick():
-                nonlocal pending, quiet_since, last_poll, current_rom, seen_game, unknown_since
+                nonlocal pending, pending_owner, mouse_owner, quiet_since, last_poll, current_rom, seen_game, unknown_since
                 now = time.monotonic()
                 try:
                     if now-last_poll >= 1:
@@ -509,57 +578,89 @@ def run(home, rom):
                         if current_rom == rom: seen_game = True; unknown_since = None
                         elif current_rom is None:
                             unknown_since = unknown_since or now
-                            if overlay.visible(): hide()
+                            if active(): hide()
                         elif seen_game or (current_rom and current_rom != rom and now-started > 10):
-                            Gtk.main_quit(); return False
+                            quit_loop(); return False
                         if (not seen_game and now-started > 120) or (unknown_since and now-unknown_since > 10):
-                            Gtk.main_quit(); return False
-                    if overlay.visible() and (current_rom != rom or not safe_foreground()): hide()
+                            quit_loop(); return False
+                    if (active() or pending) and (current_rom != rom or not safe_foreground()):
+                        hide()
+                        pending = None
                     for device in devices:
                         for key in device.poll():
-                            if key == 'exit' and overlay.visible():
+                            if key == 'exit' and active():
                                 hide()
                                 command = ['hotkeygen', '--send', 'exit'] if __import__('shutil').which('hotkeygen') else ['batocera-wine', 'windows', 'stop']
                                 subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True, start_new_session=True)
-                                Gtk.main_quit(); return False
-                            if key == 'toggle' and current_rom == rom:
-                                if overlay.visible():
-                                    pending = 'hide'
-                                elif safe_foreground():
-                                    priority(home, rom, True)
-                                    pending = 'show'
+                                quit_loop(); return False
+                            target = {'toggle': 'keyboard', 'mouse-toggle': 'mouse'}.get(key)
+                            if target and current_rom == rom and safe_foreground():
+                                available = overlay is not None if target == 'keyboard' else mouse is not None
+                                if not available: continue
+                                visible = keyboard_visible() if target == 'keyboard' else mouse_owner is not None
+                                if not visible:
+                                    options = {'button': 'l3'} if target == 'mouse' else {}
+                                    problem = shortcut_problem(home, rom, modifiers=modifiers, **options)
+                                    if problem:
+                                        print(f'virtual_{target}_refused={problem}', flush=True)
+                                        continue
+                                    if not active(): priority(home, rom, True)
+                                pending = 'hide' if visible else target
+                                pending_owner = device
                                 quiet_since = None
-                            elif overlay.visible() and pending is None:
+                            elif device is mouse_owner and key == 'mouse-reset':
+                                mouse.release()
+                                pending = 'hide'
+                            elif device is mouse_owner and isinstance(key, tuple):
+                                if pending is None or not key[1]: mouse.button(*key, now)
+                            elif keyboard_visible() and pending is None:
                                 if key in ('up', 'down', 'left', 'right'):
                                     overlay.model.move(key); overlay.render()
                                 elif key in {'b', 'a', 'x', 'y', 'start', 'pageup', 'pagedown'}:
                                     action({'b': overlay.model.selected(), 'a': 'close', 'x': 'space',
                                             'y': 'backspace', 'start': 'enter', 'pageup': 'shift', 'pagedown': 'symbols'}[key])
+                    if mouse_owner is not None and pending is None:
+                        mouse.update(mouse_owner, now)
                     if pending:
                         if all(device.released() for device in devices):
                             quiet_since = quiet_since or now
                             if now-quiet_since >= .12:
                                 if pending == 'hide': hide()
                                 elif current_rom == rom and safe_foreground():
-                                    problem = conflict(home, rom, modifiers=modifiers)
-                                    if problem: raise RuntimeError(problem)
-                                    for device in devices: device.grab()
-                                    overlay.show()
-                                    print('virtual_keyboard_shown', flush=True)
+                                    if pending == 'keyboard':
+                                        if mouse_owner is not None:
+                                            mouse.release()
+                                            mouse_owner.mouse_mode = False
+                                        mouse_owner = None
+                                        for device in devices: device.grab()
+                                        overlay.show()
+                                        print('virtual_keyboard_shown', flush=True)
+                                    else:
+                                        if overlay is not None: overlay.hide()
+                                        # Grab first so a failed capture injects no pointer input.
+                                        pending_owner.grab()
+                                        for device in devices:
+                                            if device is not pending_owner: device.ungrab()
+                                        pending_owner.mouse_mode = True
+                                        mouse_owner = pending_owner
+                                        print('virtual_mouse_enabled', flush=True)
                                 else:
-                                    priority(home, rom, False)
-                                    print('virtual_keyboard_refused=No active Wine X11/XWayland window', flush=True)
-                                pending, quiet_since = None, None
+                                    hide()
+                                    print('virtual_input_refused=No active Wine X11/XWayland window', flush=True)
+                                pending, pending_owner, quiet_since = None, None, None
                         else: quiet_since = None
                     return True
                 except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
                     print(f'virtual_keyboard_runtime_error={exc}', flush=True)
-                    hide(); Gtk.main_quit(); return False
+                    quit_loop(); return False
             GLib.timeout_add(25, tick)
             for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-                GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, lambda: (Gtk.main_quit(), False)[1])
-            Gtk.main()
+                GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, lambda: (quit_loop(), False)[1])
+            main()
         finally:
+            if mouse:
+                try: mouse.close()
+                except OSError as exc: print(f'virtual_mouse_release_error={exc}', flush=True)
             if overlay: overlay.close()
             try: priority(home, rom, False)
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:

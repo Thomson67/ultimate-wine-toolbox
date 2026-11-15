@@ -1,7 +1,7 @@
 #!/bin/bash
 
 osk_cmd() {
-    python3 "$WT_ROOT/helpers/virtual_keyboard.py" --home "$WT_HOME" "$@"
+    python3 "$WT_ROOT/helpers/virtual_keyboard.py" --home "$WT_HOME" --feature "${virtual_feature:-keyboard}" "$@"
 }
 
 osk_label() {
@@ -11,6 +11,9 @@ osk_label() {
 osk_game_menu() {
     local mode="${1:-all}" rom selected state rows idx=1 title prompt empty_message
     title="$(i18n osk_game)"; prompt="$(i18n osk_game_help)"; empty_message="$(i18n mangohud_no_games)"
+    local feature_title="$(i18n "${virtual_title:-osk_title}")"
+    local error_key="${virtual_error:-osk_config_error}"
+    [ "${virtual_feature:-keyboard}" != mouse ] || prompt="$(i18n mouse_game_help)"
     local -a games=() items=()
     local -A labels=([on]="$(osk_label on)" [off]="$(osk_label off)" [inherit]="$(osk_label inherit)")
     local -A WT_MENU_GAME_LABELS=()
@@ -18,7 +21,7 @@ osk_game_menu() {
         title="$(i18n osk_configured)"; prompt="$(i18n osk_configured_help)"
         empty_message="$(i18n osk_no_configured)"
         if ! rows="$(osk_cmd configured-games)"; then
-            msgbox "$(i18n osk_title)" "$(i18n osk_config_error)"; return
+            msgbox "$feature_title" "$(i18n "$error_key")"; return
         fi
     else
         if have_dialog; then
@@ -26,7 +29,7 @@ osk_game_menu() {
             dialog --no-shadow --title "$title" --infobox "$(i18n osk_loading_games)" 8 80 >&2 || true
         fi
         if ! rows="$(mangohud_list_games | osk_cmd game-states)"; then
-            msgbox "$(i18n osk_title)" "$(i18n osk_config_error)"; return
+            msgbox "$feature_title" "$(i18n "$error_key")"; return
         fi
     fi
     while IFS=$'\t' read -r state rom; do
@@ -37,7 +40,7 @@ osk_game_menu() {
         idx=$((idx+1))
     done <<< "$rows"
     if [ "${#games[@]}" -eq 0 ]; then
-        msgbox "$(i18n osk_title)" "$empty_message"; return
+        msgbox "$feature_title" "$empty_message"; return
     fi
     selected="$(WT_MENU_LIST=1 menu_select "$title" "$prompt" "${items[@]}" back "$(i18n back)")" || return
     [[ "$selected" =~ ^[0-9]+$ ]] || return
@@ -45,19 +48,28 @@ osk_game_menu() {
     rom="${games[$((selected-1))]}"
     state="$(menu_select "${rom##*/}" "$prompt" \
         inherit "$(i18n osk_inherit)" on "$(i18n enabled)" off "$(i18n disabled)" back "$(i18n back)")" || return
-    case "$state" in on|off|inherit) osk_cmd set --rom "$rom" --value "$state" || msgbox "$(i18n osk_title)" "$(i18n osk_config_error)" ;; esac
+    case "$state" in on|off|inherit) osk_cmd set --rom "$rom" --value "$state" || msgbox "$feature_title" "$(i18n "$error_key")" ;; esac
 }
 
 virtual_keyboard_menu() {
-    local choice global report
+    local virtual_feature="${1:-keyboard}" virtual_title=osk_title virtual_error=osk_config_error intro=osk_intro
+    local choice global report title
+    local -a extra=(preview "$(i18n osk_preview)")
+    if [ "$virtual_feature" = mouse ]; then
+        virtual_title=mouse_title
+        virtual_error=mouse_config_error
+        intro=mouse_intro
+        extra=()
+    fi
+    title="$(i18n "$virtual_title")"
     while true; do
-        global="$(osk_cmd get)" || { msgbox "$(i18n osk_title)" "$(i18n osk_config_error)"; return; }
-        choice="$(menu_select "$(i18n osk_title)" "$(i18n osk_intro)\n\n$(i18n osk_global) : $(osk_label "$global")" \
+        global="$(osk_cmd get)" || { msgbox "$title" "$(i18n "$virtual_error")"; return; }
+        choice="$(menu_select "$title" "$(i18n "$intro")\n\n$(i18n osk_global) : $(osk_label "$global")" \
             on "$(i18n osk_global_on)" off "$(i18n osk_global_off)" \
             games "$(i18n osk_game)" configured "$(i18n osk_configured)" \
-            preview "$(i18n osk_preview)" back "$(i18n back)")" || return
+            "${extra[@]}" back "$(i18n back)")" || return
         case "$choice" in
-            on|off) osk_cmd set --value "$choice" || msgbox "$(i18n osk_title)" "$(i18n osk_config_error)" ;;
+            on|off) osk_cmd set --value "$choice" || msgbox "$title" "$(i18n "$virtual_error")" ;;
             games) osk_game_menu ;;
             configured) osk_game_menu configured ;;
             preview)

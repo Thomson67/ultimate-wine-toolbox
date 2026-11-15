@@ -18,11 +18,11 @@ INDICES = {'guide': 6, 'b': 1, 'a': 2, 'y': 3, 'x': 4, 'select': 5,
            'l3': 8, 'r3': 9, 'pageup': 10, 'pagedown': 11}
 
 
-def active_modifiers():
+def active_modifiers(button='select'):
     # Saved ES entries include disconnected controllers with other Hotkeys.
     # Only physical devices validated by the same watcher affect this session.
     from virtual_keyboard_runtime import controllers
-    devices = controllers()
+    devices = controllers() if button == 'select' else controllers(keyboard=False, mouse=True)
     try:
         return [INDICES[d.amx_hotkey] for d in devices if d.amx_hotkey in INDICES]
     finally:
@@ -30,7 +30,7 @@ def active_modifiers():
             device.close()
 
 
-def reserved_profile(source, modifiers=None):
+def reserved_profile(source, modifiers=None, buttons=(5,)):
     root = ET.parse(source).getroot()
     if root.tag != 'gamecontroller':
         raise ValueError(f'Unsupported AntiMicroX joystick profile: {source}')
@@ -42,8 +42,8 @@ def reserved_profile(source, modifiers=None):
     populated = [s for s in sets.findall('set') if any(c.tag != 'name' for c in s)]
     if not populated:
         return ET.tostring(root, encoding='utf-8', xml_declaration=True)
-    if len(modifiers) != 1 or 5 in modifiers:
-        raise ValueError('AntiMicroX keyboard requires one distinct configured Hotkey button')
+    if len(modifiers) != 1 or modifiers.intersection(buttons):
+        raise ValueError('Virtual input requires one distinct configured AntiMicroX Hotkey button')
     modifier = next(iter(modifiers))
     by_index = {s.get('index'): s for s in sets.findall('set')}
     switches = {}
@@ -65,6 +65,7 @@ def reserved_profile(source, modifiers=None):
             continue
         button = group.find(f'button[@index="{modifier}"]')
         target = button.findtext('setselect') if button is not None else None
+        existing_layer = bool(target)
         if not target:
             free = next((str(i) for i in range(1, 9)
                          if str(i) not in by_index or not any(c.tag != 'name' for c in by_index[str(i)])), None)
@@ -84,26 +85,43 @@ def reserved_profile(source, modifiers=None):
                 ET.SubElement(hk, 'setselectcondition').text = 'while-held'
             target = free
         layer = by_index[target]
-        select = layer.find('button[@index="5"]')
-        if select is not None:
-            layer.remove(select)
-        # An empty Select in the held layer reserves the chord for the OSK.
-        ET.SubElement(layer, 'button', {'index': '5'})
+        for index in buttons:
+            mapped = layer.find(f'button[@index="{index}"]')
+            if mapped is not None:
+                if index == INDICES['l3'] and existing_layer and len(mapped):
+                    raise ValueError('Hotkey + L3 already mapped in an AntiMicroX Hotkey set')
+                layer.remove(mapped)
+            ET.SubElement(layer, 'button', {'index': str(index)})
     return ET.tostring(root, encoding='utf-8', xml_declaration=True)+b'\n'
 
 
 def runtime_profile(home, rom, source):
-    from virtual_keyboard import Settings
+    from virtual_keyboard import Settings, conflict
     home = Path(home)
-    if not Settings(home).enabled(rom):
+    keyboard = Settings(home).enabled(rom)
+    mouse = Settings(home, 'mouse').enabled(rom)
+    buttons = (5,) if keyboard else ()
+    if mouse:
+        try:
+            if not conflict(home, rom, button='l3'):
+                buttons += (INDICES['l3'],)
+        except (OSError, ValueError, ET.ParseError) as exc:
+            print(f'virtual_mouse_profile_refused={exc}', file=sys.stderr)
+    if not buttons:
         return str(source)
     try:
-        raw = reserved_profile(source)
+        modifiers = None if keyboard else active_modifiers(button='l3')
+        raw = reserved_profile(source, modifiers=modifiers, buttons=buttons)
     except ValueError as exc:
         # Keep normal game controls if this unusual profile cannot be adapted.
         # The keyboard preflight reports the reason and refuses its own start.
         print(f'virtual_keyboard_profile_refused={exc}', file=sys.stderr)
-        return str(source)
+        if buttons != (5, INDICES['l3']):
+            return str(source)
+        try:
+            raw = reserved_profile(source)
+        except ValueError:
+            return str(source)
     state = home/'state/virtual-keyboard/profiles'
     state.mkdir(parents=True, exist_ok=True)
     path = state/(hashlib.sha256(raw).hexdigest()+'.amgp')

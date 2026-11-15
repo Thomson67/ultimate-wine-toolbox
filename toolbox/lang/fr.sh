@@ -896,6 +896,10 @@ I18N[wsq_update_replace_source_links]="La nouvelle version contient des liens au
 I18N[wsq_update_restore_source_links]="La nouvelle version contient des liens aux emplacements de sauvegarde connus :\n\n%s\n\nRemplacer ces liens par ceux de la configuration existante ? Les essais utiliseront les destinations de sauvegarde d’origine.\n\nSeuls les liens seront remplacés : leurs anciens dossiers cibles, y compris les sauvegardes d’un essai précédent, restent intacts. Leur contenu ne sera pas importé. Non interrompt la préparation avant le déplacement du dossier source."
 
 I18N[osk_title]="Clavier virtuel à la manette"
+I18N[mouse_title]="Souris virtuelle à la manette"
+I18N[mouse_intro]="Hotkey + L3 (clic du stick gauche) active ou désactive la souris en jeu. Stick gauche : déplacement. Stick droit : précision. A / Croix : clic gauche. B / Rond : Échap. X / Carré : clic droit. Haut / Bas : molette. Le réglage s’applique au prochain lancement Windows."
+I18N[mouse_game_help]="Choisissez le jeu, puis sa règle de souris virtuelle. Hotkey et L3 doivent être distincts. Relancez le jeu pour appliquer un changement."
+I18N[mouse_config_error]="Impossible de lire ou d’enregistrer le réglage de la souris virtuelle."
 I18N[osk_intro]="Afficher / masquer : Hotkey + Select, selon votre configuration EmulationStation. Désactivé par défaut. Valable pour les prochains lancements Windows. Les réglages par jeu sont prioritaires. Les raccourcis Batocera existants restent inchangés."
 I18N[osk_inherit]="Suivre le réglage global"
 I18N[osk_global]="Activation globale Windows"

@@ -52,3 +52,16 @@ MANAGE CONFIGURED GAMES
 List explicit enabled/disabled rules without scanning the full ROM library.
 Choose a game to edit its rule; Follow global setting removes the override.
 Games enabled only through the global setting are not included.
+
+CONTROLLER VIRTUAL MOUSE
+In Tools and compatibility > Controller virtual mouse, enable mouse mode for
+all Windows games or per game. This setting is independent of the virtual
+keyboard. Restart the game, then press and release Hotkey + L3 to toggle it.
+The left stick moves the pointer and the right stick makes finer movements.
+A / Cross is left click and can be held to drag. X / Square is right click.
+B / Circle sends Escape. D-pad Up and Down scroll the wheel.
+When both features are enabled, Hotkey + Select opens the keyboard in place
+of the mouse, and Hotkey + L3 switches from the keyboard to the mouse.
+Mouse mode uses the active Wine X11/XWayland window. Hotkey + L3 conflicts
+are logged. Games using HIDRAW may still read the controller directly.
+Both features share virtual-keyboard.log.

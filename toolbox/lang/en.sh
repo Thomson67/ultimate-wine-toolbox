@@ -896,6 +896,10 @@ I18N[wsq_update_replace_source_links]="The new version contains links at known s
 I18N[wsq_update_restore_source_links]="The new version contains links at known save locations:\n\n%s\n\nReplace these links using the existing configuration? Tests will use the original save destinations.\n\nOnly the links will be replaced: their old target folders, including saves from a previous test, remain untouched. Their contents will not be imported. No stops preparation before the source directory is moved."
 
 I18N[osk_title]="Controller virtual keyboard"
+I18N[mouse_title]="Controller virtual mouse"
+I18N[mouse_intro]="Hotkey + L3 (left stick click) toggles the mouse in game. Left stick: move. Right stick: precision. A / Cross: left click. B / Circle: Escape. X / Square: right click. Up / Down: wheel. Changes apply on the next Windows game launch."
+I18N[mouse_game_help]="Select a game and its virtual mouse setting. Hotkey and L3 must be distinct. Restart the game to apply changes."
+I18N[mouse_config_error]="Could not read or save the virtual mouse setting."
 I18N[osk_intro]="Show / hide: Hotkey + Select, as configured in EmulationStation. Off by default. Applies to upcoming Windows launches. Per-game settings take priority. Existing Batocera shortcuts are preserved."
 I18N[osk_inherit]="Follow global setting"
 I18N[osk_global]="Global Windows activation"

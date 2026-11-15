@@ -66,3 +66,16 @@ Le menu n'installe pas de dépendance système manquante.
 Journal : /userdata/system/logs/ultimate-wine-toolbox/virtual-keyboard.log
 Désactiver globalement ne supprime pas les exceptions par jeu activées : passez
 ces jeux sur Suivre le réglage global ou Désactivé pour les couper également.
+
+SOURIS VIRTUELLE
+Dans Outils et compatibilité > Souris virtuelle à la manette, activez la souris
+pour tous les jeux Windows ou par jeu. Ce réglage est indépendant du clavier
+virtuel. Relancez le jeu, puis appuyez et relâchez Hotkey + L3 pour basculer.
+Le stick gauche déplace le pointeur et le droit permet un déplacement plus fin.
+A / Croix fait un clic gauche et peut rester enfoncé pour glisser. X / Carré
+fait un clic droit. B / Rond envoie Échap. Haut et Bas défilent à la molette.
+Si les deux fonctions sont activées, Hotkey + Select ouvre le clavier à la
+place de la souris, et Hotkey + L3 passe du clavier à la souris.
+Le mode souris utilise la fenêtre Wine X11/XWayland active. Un conflit avec
+Hotkey + L3 est journalisé. Les jeux utilisant HIDRAW peuvent encore lire la
+manette directement. La souris et le clavier partagent virtual-keyboard.log.
