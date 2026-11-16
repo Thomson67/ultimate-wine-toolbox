@@ -57,8 +57,9 @@ export WT_SESSION_LOG="$LOG"
 } >>"$LOG" 2>&1
 
 # BEGIN UWT RETURN FOCUS
-# Activate the existing terminal only for a return, without delaying the UI.
-if [ "${WT_AUTO_RESUME_WSQ:-0}" = 1 ] || \
+# Bring the terminal forward on an ES handoff without delaying the UI.
+if [ "${1:-}" = --community-selection ] || \
+   [ "${WT_AUTO_RESUME_WSQ:-0}" = 1 ] || \
    [ "${WT_AUTO_RESUME_AMX:-0}" = 1 ] || \
    [ "${WT_AUTO_RESUME_RESH:-0}" = 1 ]; then
     python3 "$ROOT/helpers/toolbox_focus.py" --pid "$PPID" --owner "$$" \

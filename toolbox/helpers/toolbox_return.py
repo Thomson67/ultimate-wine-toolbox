@@ -25,7 +25,7 @@ def parent_alive(pid):
 
 def resume(home, parent_pid, api=None, clock=time.monotonic, sleep=time.sleep,
            alive=parent_alive, timeout=30, refresh_timeout=60, confirm_timeout=10,
-           request_name='resume-wsq.request'):
+           request_name='resume-wsq.request', max_attempts=3):
     """Shared confirmed return for every workflow; None means Ports already exited."""
     state = Path(home) / 'state'
     state.mkdir(parents=True, exist_ok=True)
@@ -36,11 +36,11 @@ def resume(home, parent_pid, api=None, clock=time.monotonic, sleep=time.sleep,
             print('Toolbox return already running; request retained', flush=True)
             return False
         return _resume(home, parent_pid, api, clock, sleep, alive, timeout,
-                       refresh_timeout, confirm_timeout, request_name)
+                       refresh_timeout, confirm_timeout, request_name, max_attempts)
 
 
 def _resume(home, parent_pid, api, clock, sleep, alive, timeout, refresh_timeout, confirm_timeout,
-            request_name='resume-wsq.request'):
+            request_name='resume-wsq.request', max_attempts=3):
     api = api or EsApi()
     request = Path(home) / 'state' / request_name
 
@@ -113,7 +113,7 @@ def _resume(home, parent_pid, api, clock, sleep, alive, timeout, refresh_timeout
     else:
         log('Reusing indexed Toolbox return entry; no ES reload')
 
-    for attempt in range(1, 4):
+    for attempt in range(1, max_attempts + 1):
         if not request.exists():
             return True
         code, _ = running()

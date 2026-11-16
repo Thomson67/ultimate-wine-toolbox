@@ -128,6 +128,27 @@ class ToolboxReturnTests(unittest.TestCase):
         self.assertTrue(self.run_return(api))
         self.assertEqual(api.launches, 2)
 
+    def test_slow_community_launcher_can_consume_the_request_after_five_seconds(self):
+        api = Api(self.request, consume_on=None)
+        def running():
+            if not api.launches:
+                return 201, ''
+            if self.time.now >= 8:
+                self.request.unlink(missing_ok=True)
+            return 200, helper.TOOLBOX
+        api.running = running
+        self.assertTrue(helper.resume(self.home, None, api, self.time.clock, self.time.sleep,
+                                      timeout=2, confirm_timeout=45, max_attempts=1))
+        self.assertEqual(api.launches, 1)
+        self.assertFalse(self.request.exists())
+
+    def test_single_attempt_for_community_selection_does_not_relaunch(self):
+        api = Api(self.request, consume_on=2)
+        self.assertFalse(helper.resume(self.home, None, api, self.time.clock, self.time.sleep,
+                                       timeout=1, confirm_timeout=1, max_attempts=1))
+        self.assertEqual(api.launches, 1)
+        self.assertTrue(self.request.exists())
+
     def test_ignored_requests_keep_recovery_state(self):
         api = Api(self.request, consume_on=10)
         self.assertFalse(self.run_return(api))

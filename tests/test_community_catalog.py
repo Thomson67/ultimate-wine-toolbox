@@ -130,6 +130,30 @@ class CatalogueTests(unittest.TestCase):
                 watcher.poll()
             self.assertEqual(json.loads(watcher.state.read_text()), {})
 
+    def test_unconfirmed_launch_is_not_retried_until_auto_is_saved(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            features = home/'es_features.cfg'
+            es_options.publish({'community'}, 'fr', features, home=home)
+            conf = home/'batocera.conf'
+            key = es_options.game_key('Game.wine', 'community_reshade')
+            watcher = community_es.Selections(home, lambda *_: {}, features, conf)
+            with patch.object(community_es, 'EsApi') as es, \
+                 patch.object(community_es, 'open_selection', return_value=False) as launch:
+                es.return_value.running.return_value = (201, '')
+                conf.write_text(f'{key}=preset\n')
+                watcher.poll()
+                watcher.poll()
+                watcher.poll()
+                launch.assert_called_once()
+                conf.write_text(f'{key}=auto\n')
+                watcher.poll()
+                watcher.poll()
+                conf.write_text(f'{key}=preset\n')
+                watcher.poll()
+                watcher.poll()
+                self.assertEqual(launch.call_count, 2)
+
     def test_selection_stages_literal_arguments_for_es_and_cleans_up(self):
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder)
@@ -138,6 +162,8 @@ class CatalogueTests(unittest.TestCase):
             def consume(folder, parent_pid, **kwargs):
                 self.assertEqual(kwargs['request_name'], request.name)
                 self.assertIsNone(parent_pid)
+                self.assertEqual(kwargs['max_attempts'], 1)
+                self.assertGreaterEqual(kwargs['confirm_timeout'], 30)
                 self.assertEqual(request.read_text().splitlines(), arguments)
                 request.unlink()
                 return True

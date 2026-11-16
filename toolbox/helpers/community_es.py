@@ -21,7 +21,7 @@ def open_selection(home, api, args):
     atomic(request, ('\n'.join(args) + '\n').encode())
     try:
         return resume(home, None, api=api, timeout=5, refresh_timeout=15,
-                      confirm_timeout=5, request_name=REQUEST)
+                      confirm_timeout=45, request_name=REQUEST, max_attempts=1)
     finally:
         request.unlink(missing_ok=True)
 
@@ -47,6 +47,7 @@ class Selections:
         self.dispatched = None
         self.current = None
         self.retry_at = 0
+        self.failed = {}
 
     def poll(self):
         stat = self.conf.stat()
@@ -74,7 +75,8 @@ class Selections:
                 self.dispatched = {}
         delivered = {key: value for key, value in self.dispatched.items() if self.current.get(key) == value}
         self.save_delivered(delivered)
-        pending = next(((key, value) for key, value in self.current.items() if key not in delivered), None)
+        self.failed = {key: value for key, value in self.failed.items() if self.current.get(key) == value}
+        pending = next(((key, value) for key, value in self.current.items() if key not in delivered and key not in self.failed), None)
         if pending and time.monotonic() >= self.retry_at:
             api = EsApi()
             if api.running()[0] != 201 or any((self.home / 'state' / name).exists() for name in OTHER_WORKFLOWS):
@@ -87,11 +89,15 @@ class Selections:
             rom = resolve_game(option, key, share) if share else None
             args = [kind, rom, value] if rom else ['unavailable']
             print(f'ES community {key}: {value} ({rom or "no matching game"})', flush=True)
-            if open_selection(self.home, api, args):
-                delivered[key] = value
-                self.save_delivered(delivered)
-            else:
-                self.retry_at = time.monotonic() + 1
+            try:
+                if open_selection(self.home, api, args):
+                    delivered[key] = value
+                    self.save_delivered(delivered)
+                    return
+            except (OSError, RuntimeError, ValueError) as error:
+                print(f'ES community launch: {error}', flush=True)
+            self.failed[key] = value
+            print('ES community: launch unconfirmed; save Auto before retrying this selection', flush=True)
 
     def save_delivered(self, delivered):
         if delivered != self.dispatched:
