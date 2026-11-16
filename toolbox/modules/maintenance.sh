@@ -26,26 +26,17 @@ maintenance_bottles_cache_build() {
     local tmp
     tmp="$(mktemp /tmp/wt-bottles-scan.XXXXXX)" || return 1
 
-    python3 - "$BOTTLES_ROOT" "$WINDOWS_ROMS_DIR" > "$tmp" <<'PY'
+    python3 - "$WT_ROOT/helpers" "$BOTTLES_ROOT" "$WINDOWS_ROMS_DIR" > "$tmp" <<'PY'
 from pathlib import Path
 import subprocess
 import sys
 
-root = Path(sys.argv[1])
-roms = Path(sys.argv[2])
+sys.path.insert(0, sys.argv[1])
+from maintenance_environment import ROM_SUFFIXES, bottle_inventory
 
-if not root.is_dir():
-    raise SystemExit
-
-def is_runner_container(p: Path) -> bool:
-    try:
-        if (p / "default-prefix").is_dir() or (p / "default-settings").exists():
-            return True
-        return any(c.is_dir() and c.name.endswith(".wine") for c in p.iterdir())
-    except OSError:
-        return False
-
-SUPPORTED_ROM_EXTENSIONS = (".pc", ".exe", ".wine", ".wsquashfs", ".wtgz")
+root = Path(sys.argv[2])
+roms = Path(sys.argv[3])
+SUPPORTED_ROM_EXTENSIONS = tuple(ROM_SUFFIXES)
 
 game_names = set()
 if roms.is_dir():
@@ -57,35 +48,7 @@ if roms.is_dir():
     except OSError:
         pass
 
-records = []
-
-try:
-    roots = sorted((p for p in root.iterdir() if p.is_dir()), key=lambda p: p.name.lower())
-except OSError:
-    roots = []
-
-# Batocera 43+ : <runner>/<rom>.wine
-for runner in roots:
-    if not is_runner_container(runner):
-        continue
-    try:
-        children = sorted((p for p in runner.iterdir() if p.is_dir()), key=lambda p: p.name.lower())
-    except OSError:
-        continue
-    for bottle in children:
-        if bottle.name in {"default-prefix", "default-settings"}:
-            continue
-        if not bottle.name.endswith(".wine"):
-            continue
-        records.append(("v43", runner.name, bottle.name, str(bottle)))
-
-# Legacy pre-v43 : direct children of wine-bottles/windows.
-for bottle in roots:
-    if bottle.name in {"default-prefix", "default-settings"}:
-        continue
-    if is_runner_container(bottle):
-        continue
-    records.append(("legacy", "-", bottle.name, str(bottle)))
+records = bottle_inventory(root)
 
 def bottle_has_game(kind: str, name: str) -> bool:
     # Batocera 43+ appends ".wine" to the complete ROM filename.
@@ -1194,56 +1157,23 @@ maintenance_uninstall_toolbox() {
 }
 
 maintenance_summary() {
-    local wine_count wine_kib umu_state bottle_count bottle_kib free_bytes free_human
-    local roms_free_bytes roms_free_human windows_kib mangohud_state dxvk_state hooks_state
-
-    wine_count="$(find "$BATOCERA_CUSTOM_WINE" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
-    wine_kib="$(maintenance_path_kib "$BATOCERA_CUSTOM_WINE")"
-    windows_kib="$(maintenance_path_kib "$WINDOWS_ROMS_DIR")"
-    umu_state="$(umu_toolbox_status)"
-
-    bottle_count="$(maintenance_bottle_count)"
-    bottle_kib="$(maintenance_bottle_total_kib)"
-
+    local report free_bytes roms_free_bytes free_human roms_free_human
+    report="$(mktemp /tmp/wt-environment.XXXXXX)" || return
     free_bytes="$(free_bytes_userdata)"
-    if [ -n "$free_bytes" ]; then
-        free_human="$(human_bytes "$free_bytes")"
-    else
-        free_human="$(i18n unknown)"
-    fi
-
     roms_free_bytes="$(free_bytes_roms)"
-    if [ -n "$roms_free_bytes" ]; then
-        roms_free_human="$(human_bytes "$roms_free_bytes")"
-    else
-        roms_free_human="$(i18n unknown)"
-    fi
-
-    mangohud_state="$(mangohud_global_state)"
-    dxvk_state="$(dxvk_status)"
-
-    if [ -x "/userdata/system/scripts/ultimate-wine-toolbox-mangohud.sh" ] && \
-       [ -x "/userdata/system/scripts/ultimate-wine-toolbox-dxvk.sh" ]; then
-        hooks_state="$(i18n maintenance_hooks_ok)"
-    else
-        hooks_state="$(i18n maintenance_hooks_incomplete)"
-    fi
-
-    msgbox "$(i18n maintenance_summary_title)" \
-        "$(i18n maintenance_summary_body \
-            "$(batocera_version)" \
-            "$(wt_version)" \
-            "$free_human" \
-            "$roms_free_human" \
-            "$wine_count" \
-            "$(maintenance_kib_human "$wine_kib")" \
-            "$(maintenance_kib_human "$windows_kib")" \
-            "$umu_state" \
-            "$mangohud_state" \
-            "$dxvk_state" \
-            "$bottle_count" \
-            "$(maintenance_kib_human "$bottle_kib")" \
-            "$hooks_state")"
+    free_human="$(i18n unknown)"
+    roms_free_human="$free_human"
+    [ -z "$free_bytes" ] || free_human="$(human_bytes "$free_bytes")"
+    [ -z "$roms_free_bytes" ] || roms_free_human="$(human_bytes "$roms_free_bytes")"
+    {
+        printf '%s\n' "$(i18n maintenance_environment_header "$(batocera_version)" "$(wt_version)" \
+            "$free_human" "$roms_free_human" "$(umu_toolbox_status)" "$(mangohud_global_state)" "$(dxvk_status)")"
+        python3 "$WT_ROOT/helpers/maintenance_environment.py" /userdata/system "$WT_HOME" \
+            "$WINDOWS_ROMS_DIR" "$BATOCERA_CUSTOM_WINE" "$BATOCERA_SYSTEM_WINE" "$WT_LANGUAGE" ||
+            printf '%s\n' "$(i18n maintenance_environment_unavailable)"
+    } > "$report"
+    maintenance_show_report "$(i18n maintenance_summary_title)" "$report"
+    rm -f -- "$report"
 }
 
 maintenance_menu() {

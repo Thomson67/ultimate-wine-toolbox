@@ -1,4 +1,5 @@
 import io
+import json
 import sys
 import tarfile
 import tempfile
@@ -53,6 +54,10 @@ class ToolboxBackupTests(unittest.TestCase):
 
     def test_restore_with_replacement_backs_up_conflicts_and_preserves_runner_links(self):
         backup.export(self.source, self.archive, True)
+        metadata = json.loads((self.source / backup.BACKUP_METADATA).read_text())
+        self.assertEqual(metadata["path"], str(self.archive))
+        self.assertEqual(metadata["bytes"], self.archive.stat().st_size)
+        self.assertTrue(metadata["runners"])
         backup.restore(self.target, self.archive, True, True)
         config = (self.target / "batocera.conf").read_text()
         self.assertIn("windows.emulator=wine", config)

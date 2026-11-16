@@ -355,6 +355,8 @@ declare -gA I18N=(
   [maintenance_intro]="Toolbox maintenance and diagnostic tools. Destructive operations always require confirmation."
   [maintenance_summary_title]="Environment summary"
   [maintenance_summary_body]="Batocera: %s\nToolbox: %s\nFree on /userdata: %s\nFree on /userdata/roms: %s\n\nCustom Wine runners: %s (%s)\nWindows games: %s\nUMU Toolbox: %s\nGlobal MangoHud: %s\nGlobal DXVK: %s\n\nWine bottles: %s (%s)\nToolbox hooks: %s"
+  [maintenance_environment_header]="Batocera: %s\nToolbox: %s\nFree on /userdata: %s\nFree on /userdata/roms: %s\nUMU Toolbox: %s\nGlobal MangoHud: %s\nGlobal DXVK: %s\n"
+  [maintenance_environment_unavailable]="Environment details unavailable."
   [maintenance_hooks_ok]="OK"
   [maintenance_hooks_incomplete]="incomplete"
 

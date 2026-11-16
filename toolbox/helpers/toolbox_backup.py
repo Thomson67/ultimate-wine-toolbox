@@ -12,6 +12,7 @@ import stat
 import sys
 import tarfile
 import tempfile
+import time
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 
@@ -21,6 +22,7 @@ import es_options
 HOME = "ultimate-wine-toolbox"
 FEATURES = Path("configs/emulationstation") / es_options.FEATURES.name
 RUNNERS = Path("wine/custom")
+BACKUP_METADATA = Path("backups/ultimate-wine-toolbox/last-export.json")
 # These roots contain portable settings and assets. Live recovery journals,
 # caches and Wine prefixes are deliberately outside this inventory.
 COLLECTIONS = tuple(Path(HOME, name) for name in (
@@ -150,8 +152,22 @@ def add_bytes(archive, name, data):
     archive.addfile(info, io.BytesIO(data))
 
 
+def record_export(system, output, runners):
+    metadata = safe_path(system, BACKUP_METADATA)
+    metadata.parent.mkdir(parents=True, exist_ok=True)
+    size = output.stat().st_size
+    with tempfile.TemporaryDirectory(prefix=".last-export-", dir=metadata.parent) as temporary:
+        staged = Path(temporary) / metadata.name
+        staged.write_text(json.dumps({
+            "path": str(output), "timestamp": time.time(), "bytes": size, "runners": runners,
+        }) + "\n")
+        staged.replace(metadata)
+
+
 def export(system, output, runners):
     output = output.resolve()
+    if output == system / BACKUP_METADATA:
+        raise ValueError("Select a different backup filename.")
     if output.exists():
         raise ValueError(f"Backup already exists: {output}")
     files = list(entries(system, runners, output))
@@ -188,6 +204,10 @@ def export(system, output, runners):
         if output.exists():
             raise ValueError(f"Backup already exists: {output}")
         pending.rename(output)
+    try:
+        record_export(system, output, runners)
+    except (OSError, ValueError) as error:
+        print(f"Could not record successful export: {error}", file=sys.stderr)
 
 
 def read_archive(source, staging=None, include_runners=True):

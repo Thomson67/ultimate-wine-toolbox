@@ -355,6 +355,8 @@ declare -gA I18N=(
   [maintenance_intro]="Outils de maintenance et de diagnostic de la Toolbox. Les opérations destructives demandent toujours une confirmation."
   [maintenance_summary_title]="Résumé de l'environnement"
   [maintenance_summary_body]="Batocera : %s\nToolbox : %s\nLibre sur /userdata : %s\nLibre sur /userdata/roms : %s\n\nRunners Wine custom : %s (%s)\nJeux Windows : %s\nUMU Toolbox : %s\nMangoHud global : %s\nDXVK global : %s\n\nWine bottles : %s (%s)\nHooks Toolbox : %s"
+  [maintenance_environment_header]="Batocera : %s\nToolbox : %s\nLibre sur /userdata : %s\nLibre sur /userdata/roms : %s\nUMU Toolbox : %s\nMangoHud global : %s\nDXVK global : %s\n"
+  [maintenance_environment_unavailable]="Détails de l’environnement indisponibles."
   [maintenance_hooks_ok]="OK"
   [maintenance_hooks_incomplete]="incomplets"
 
