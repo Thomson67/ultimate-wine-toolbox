@@ -39,7 +39,8 @@ def resume(home, parent_pid, api=None, clock=time.monotonic, sleep=time.sleep,
                        refresh_timeout, confirm_timeout, request_name)
 
 
-def _resume(home, parent_pid, api, clock, sleep, alive, timeout, refresh_timeout, confirm_timeout, request_name):
+def _resume(home, parent_pid, api, clock, sleep, alive, timeout, refresh_timeout, confirm_timeout,
+            request_name='resume-wsq.request'):
     api = api or EsApi()
     request = Path(home) / 'state' / request_name
 
