@@ -1185,9 +1185,11 @@ maintenance_menu() {
             "3" "$(i18n runner_check_title)" \
             "4" "$(i18n dxvk_check_title)" \
             "5" "$(i18n games_delete_title)" \
-            "6" "$(i18n cleanup_title)" \
-            "8" "$(maintenance_backup_label)" \
-            "7" "$(i18n toolbox_uninstall_title)" \
+            "6" "$(i18n batocera_conf_title)" \
+            "7" "$(i18n cleanup_title)" \
+            "10" "$(maintenance_backup_label)" \
+            "8" "$(i18n toolbox_uninstall_title)" \
+            "9" "$(i18n runner_normalize_title)" \
             "0" "$(i18n back)")" || return
 
         case "$choice" in
@@ -1196,9 +1198,11 @@ maintenance_menu() {
             3) maintenance_verify_runners ;;
             4) maintenance_verify_dxvk ;;
             5) maintenance_delete_windows_games ;;
-            6) maintenance_cleanup_menu ;;
-            7) maintenance_uninstall_toolbox ;;
-            8) maintenance_backup_menu ;;
+            6) batocera_conf_menu ;;
+            7) maintenance_cleanup_menu ;;
+            8) maintenance_uninstall_toolbox ;;
+            9) runner_offer_normalization ;;
+            10) maintenance_backup_menu ;;
             0|"") return ;;
         esac
     done

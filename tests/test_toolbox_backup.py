@@ -1,5 +1,6 @@
 import io
 import json
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -12,6 +13,35 @@ from batocera_conf_transfer import USER_MARKER
 
 
 class ToolboxBackupTests(unittest.TestCase):
+    def test_backup_menu_survives_loading_batocera_configuration(self):
+        modules = Path(__file__).resolve().parents[1] / "toolbox/modules"
+        script = r'''
+set -eu
+WT_LANGUAGE=fr
+source "$1/maintenance.sh"
+source "$1/batocera-conf.sh"
+i18n() { printf '%s' "$1"; }
+menu_select() {
+    shift 2
+    local backup_choice=
+    while [ "$#" -ge 2 ]; do
+        if [ "$2" = "Sauvegarder ou restaurer la Toolbox" ]; then
+            backup_choice="$1"
+        fi
+        shift 2
+    done
+    [ -n "$backup_choice" ] || return 1
+    printf '%s\n' "$backup_choice"
+}
+maintenance_backup_menu() { printf 'backup opened\n'; exit 0; }
+maintenance_menu
+'''
+        result = subprocess.run(
+            ["bash", "-c", script, "backup-menu-test", str(modules)],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.stdout, "backup opened\n")
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
