@@ -799,7 +799,7 @@ def main():
     parser.add_argument('--runner', default='')
     parser.add_argument('--legacy', action='store_true')
     parser.add_argument('command', choices=['backend-packs', 'exes', 'autorun-exe', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'external-scan', 'external-info', 'external-enable', 'external-disable', 'external-release', 'wiki-title', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
-                                           'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore', 'pack-info', 'pack-import', 'pack-remove', 'pack-status', 'pack-check', 'pack-dependency-source', 'pack-conflicts',
+                                           'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore', 'pack-info', 'pack-import', 'pack-remove', 'pack-status', 'pack-reactivate', 'pack-check', 'pack-dependency-source', 'pack-conflicts',
                                            'presets-list', 'presets-info', 'presets-select', 'presets-rename', 'presets-delete', 'presets-pack',
                                            'presets-catalog', 'presets-global-items', 'presets-global-info', 'presets-global-rename',
                                            'presets-global-copy', 'presets-global-export', 'presets-global-delete', 'presets-global-forget',
@@ -890,6 +890,8 @@ def main():
                 print(reshade_pack.dependency_source(home, rom))
             elif args.command == 'pack-status':
                 print(json.dumps(reshade_pack.manifest(home, rom), ensure_ascii=False))
+            elif args.command == 'pack-reactivate':
+                print(reshade_pack.reactivate_community(home, rom, args.args[0]))
             elif args.command == 'pack-check':
                 files, metadata = reshade_pack.archive(Path(args.args[0]))
                 if args.args[1] not in metadata['presets']:

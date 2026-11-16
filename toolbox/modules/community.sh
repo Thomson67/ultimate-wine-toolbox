@@ -817,8 +817,17 @@ $output"; fi
 
 
 community_download_selection() {
-  local kind="$1" title="$2" rom="$3" selected="$4" path details
+  local kind="$1" title="$2" rom="$3" selected="$4" path details preset
   if [ "$kind" = reshade ] && [[ "$selected" = zip:* ]]; then
+    if [ -n "$rom" ]; then
+      if ! preset="$(resh_cmd pack-reactivate "$rom" "${selected#zip:}" 2>&1)"; then
+        msgbox "$title" "$preset"; return 1
+      fi
+      if [ -n "$preset" ]; then
+        msgbox "$title" "$(community_txt 'Preset du pack réactivé :' 'Bundle preset reactivated:') $preset"
+        return 0
+      fi
+    fi
     path="$(community_fetch_reshade_pack "$title" "${selected#zip:}")" || return
     community_apply_reshade_pack "$title" "$rom" "$path"
     return

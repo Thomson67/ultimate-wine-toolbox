@@ -98,6 +98,32 @@ class LocalReShadePackTests(unittest.TestCase):
         self.assertEqual(index(self.home, self.rom)['active'], before)
         self.assertTrue(duplicate.is_file())
 
+    def test_selecting_installed_community_pack_reactivates_its_saved_preset(self):
+        import reshade_presets as presets
+
+        self.configure()
+        source = self.bundle()
+        meta = p.install(self.home, self.rom, source, 'Ultra.ini')
+        m.event(self.home, self.rom, 'gameStop')
+        identifier = 'pack-' + meta['archive_sha256']
+        original = (self.profile / 'ReShadePreset.ini').read_bytes()
+        chosen = presets.index(self.home, self.rom)['active']
+        presets.rename(self.home, self.rom, chosen, 'My edited name')
+        other = self.base / 'Another preset.ini'
+        other.write_bytes(b'Techniques=Citra@Citra.fx\n[Citra.fx]\nScreen=2\n')
+        other_id = presets.import_file(self.home, self.rom, other)
+        self.assertEqual(presets.index(self.home, self.rom)['active'], other_id)
+        self.assertEqual(p.reactivate_community(self.home, self.rom, 'pack-'+'0'*64), '')
+        manifest = (self.profile/'pack/manifest.json').read_bytes()
+        source.unlink()
+        self.assertEqual(p.reactivate_community(self.home, self.rom, identifier), 'Ultra.ini')
+        self.assertEqual((self.profile/'pack/manifest.json').read_bytes(), manifest)
+        self.assertEqual((self.profile/'ReShadePreset.ini').read_bytes(), original)
+        saved = presets.index(self.home, self.rom)
+        self.assertEqual(saved['active'], chosen)
+        self.assertEqual(saved['items'][chosen]['name'], 'My edited name')
+        self.assertIn(other_id, saved['items'])
+
     def test_directory_import_keeps_all_presets_and_survives_source_removal(self):
         import shutil
         import reshade_presets as presets

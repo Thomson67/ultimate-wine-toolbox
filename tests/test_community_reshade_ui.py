@@ -57,6 +57,20 @@ amx_profiles_cmd() { echo AMX-CALLED >> "$WT_HOME/ui"; return 1; }
         self.assertNotIn('AMX-CALLED', ui)
         return ui
 
+    def test_es_reselects_installed_zip_without_offering_download_again(self):
+        ui = self.shell(r"""
+WT_COMMUNITY_ES=1
+resh_cmd() {
+    [ "$1" = pack-reactivate ] && [ "$2" = "$TEST_ROM" ] && [ "$3" = pack-test ] || exit 2
+    printf '%s\n' Ultra.ini
+}
+community_fetch_reshade_pack() { echo unexpected-download >> "$WT_HOME/ui"; return 1; }
+community_apply_reshade_pack() { echo unexpected-install >> "$WT_HOME/ui"; return 1; }
+community_download_selection reshade Community "$TEST_ROM" zip:pack-test
+""")
+        self.assertIn('Ultra.ini', ui)
+        self.assertNotIn('unexpected-', ui)
+
     def test_es_applies_selected_ini_without_asking_to_pick_a_preset(self):
         self.shell(r"""
 WT_COMMUNITY_ES=1

@@ -206,6 +206,45 @@ def manifest(home, rom):
     return m.read_json(profile(home, rom) / 'pack/manifest.json')
 
 
+def reactivate_community(home, rom, identifier):
+    from community_packs import identifier as checked_identifier
+    import reshade_presets as presets
+
+    digest = checked_identifier(identifier)[5:]
+    config = m.read_json(home / 'reshade/games' / (m.key(rom) + '.json'))
+    if not config.get('pack'):
+        return ''
+    metadata = manifest(home, rom)
+    if metadata.get('archive_sha256') != digest:
+        return ''
+    selected = metadata['selected']
+    entries = presets.index(home, rom)['items']
+    matches = [(entry.get('origin') != 'pack', key) for key, entry in entries.items()
+               if entry.get('pack') == digest and entry.get('origin') in ('pack', 'current')
+               and entry.get('source_name', entry.get('name')) == selected
+               and presets.path(home, rom, key).is_file()]
+    if matches:
+        _, identity = min(matches)
+    else:
+        source = home / 'config/reshade-community-packs' / (identifier + '.zip')
+        if source.is_symlink() or not source.is_file():
+            raise ValueError('The pack is installed but its initial preset and cached ZIP are missing.')
+        files, _ = archive(source)
+        if source_digest(source, files) != digest or selected not in files:
+            raise ValueError('The cached ZIP does not match the installed pack preset.')
+        data = preset_bytes(files[selected], metadata)
+        identity = presets.add(home, rom, data, selected, 'pack', digest)
+        destination = presets.path(home, rom, identity)
+        if destination.is_symlink():
+            raise ValueError('The saved bundle preset must be a regular file.')
+        if not destination.exists():
+            m.atomic_bytes(destination, data)
+    presets.activate(home, rom, identity)
+    if not config.get('enabled'):
+        m.set_enabled(home, rom, True)
+    return selected
+
+
 def install(home, rom, source, preset, runner='', bottles=Path('/userdata/system/wine-bottles/windows'), legacy=False, shader_policy='pack', expected=''):
     files, meta = archive(source)
     config_path = home / 'reshade/games' / (m.key(rom) + '.json')
