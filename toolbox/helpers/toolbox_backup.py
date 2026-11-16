@@ -22,7 +22,6 @@ import es_options
 HOME = "ultimate-wine-toolbox"
 FEATURES = Path("configs/emulationstation") / es_options.FEATURES.name
 RUNNERS = Path("wine/custom")
-RESHADE_RUNTIME = Path(HOME, "reshade/runtime")
 BACKUP_METADATA = Path("backups/ultimate-wine-toolbox/last-export.json")
 # These roots contain portable settings and assets. Live recovery journals,
 # caches and Wine prefixes are deliberately outside this inventory.
@@ -83,42 +82,63 @@ def unit_for(relative):
     raise ValueError(f"Unexpected archive path: {relative}")
 
 
+def link_destination(relative, target):
+    return Path(os.path.normpath(relative.parent / target))
+
+
 def archive_link(relative, unit, target, system=None):
-    # A link may be a leaf of the staging tree, never an extraction parent.
+    # Links never serve as extraction parents. Preserve Wine's own link
+    # targets (such as dosdevices/z:) inside each complete runner.
     if relative != unit and target and "\0" not in target:
-        # Wine runners can contain absolute links such as dosdevices/z:.
         if unit.parent == RUNNERS:
             return target
-        if relative.is_relative_to(RESHADE_RUNTIME):
-            if system is not None:
-                resolved = (system / relative.parent / target).resolve()
-                if resolved.is_relative_to(system):
-                    destination = resolved.relative_to(system)
-                else:
-                    destination = resolved
+        if relative.is_relative_to(HOME):
+            if system is None:
+                destination = link_destination(relative, target)
             else:
-                destination = Path(os.path.normpath(relative.parent / target))
-            if destination.is_relative_to(RESHADE_RUNTIME):
+                resolved = (system / relative.parent / target).resolve()
+                destination = resolved.relative_to(system) if resolved.is_relative_to(system) else resolved
+            if destination.is_relative_to(HOME):
                 return os.path.relpath(destination, relative.parent)
     raise ValueError(f"Unsupported symbolic link: {relative} -> {target}")
 
+
 def entries(system, runners, output=None):
+    files = {}
+    links = []
+    problems = []
+
     def walk(relative, unit):
         path = system / relative
         if output is not None and (path == output or path in output.parents and path == system / unit):
             raise ValueError(f"Select a backup destination outside {system / unit}")
         info = path.lstat()
         if stat.S_ISLNK(info.st_mode):
-            archive_link(relative, unit, os.readlink(path), system)
-        elif not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode)):
+            links.append((relative, unit, info))
+        elif stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode):
+            files[relative] = (info, None)
+        else:
             raise ValueError(f"Unsupported file: {path}")
-        yield relative, info
         if stat.S_ISDIR(info.st_mode):
             for child in sorted(path.iterdir()):
-                yield from walk(relative / child.name, unit)
+                walk(relative / child.name, unit)
 
     for unit in inventory(system, runners):
-        yield from walk(unit, unit)
+        walk(unit, unit)
+    for relative, unit, info in links:
+        path = system / relative
+        target = os.readlink(path)
+        try:
+            portable_target = archive_link(relative, unit, target, system)
+            if unit.parent != RUNNERS and link_destination(relative, portable_target) not in files:
+                raise ValueError(f"Link target is missing or outside the backup: {relative} -> {target}")
+        except (OSError, RuntimeError, ValueError) as error:
+            problems.append(str(error))
+            continue
+        files[relative] = (info, portable_target)
+    if problems:
+        raise ValueError(f"Backup cannot include {len(problems)} symbolic link(s):\n" + "\n".join(problems))
+    return [(relative, info, target) for relative, (info, target) in files.items()]
 
 
 def external_profiles(system):
@@ -183,9 +203,9 @@ def export(system, output, runners):
         raise ValueError("Select a different backup filename.")
     if output.exists():
         raise ValueError(f"Backup already exists: {output}")
-    files = list(entries(system, runners, output))
+    files = entries(system, runners, output)
     replacements = external_profiles(system)
-    size = sum(info.st_size for path, info in files if stat.S_ISREG(info.st_mode) and path not in replacements)
+    size = sum(info.st_size for path, info, _ in files if stat.S_ISREG(info.st_mode) and path not in replacements)
     size += sum(map(len, replacements.values()))
     if shutil.disk_usage(output.parent).free < size:
         raise ValueError("Insufficient space for the estimated backup size.")
@@ -199,7 +219,7 @@ def export(system, output, runners):
         # Dereferencing hardlinks is unnecessary. Save each regular file so
         # restores never need to link to arbitrary paths supplied by the tar.
         with tarfile.open(pending, "w:gz", compresslevel=3) as archive:
-            for relative, checked in files:
+            for relative, checked, link_target in files:
                 if relative in replacements:
                     continue
                 source = system / relative
@@ -209,7 +229,7 @@ def export(system, output, runners):
                     archive.inodes.clear()
                 if stat.S_ISLNK(checked.st_mode):
                     member = archive.gettarinfo(source, arcname=f"data/{relative}")
-                    member.linkname = archive_link(relative, unit_for(relative), member.linkname, system)
+                    member.linkname = link_target
                     archive.addfile(member)
                 else:
                     archive.add(source, arcname=f"data/{relative}", recursive=False)
@@ -230,6 +250,7 @@ def export(system, output, runners):
 
 def read_archive(source, staging=None, include_runners=True):
     seen, units = set(), set()
+    regular_entries, linked_entries = set(), {}
     windows_data = None
     size = 0
     found_marker = False
@@ -257,8 +278,12 @@ def read_archive(source, staging=None, include_runners=True):
             units.add(unit)
             if member.issym():
                 link_target = archive_link(relative, unit, member.linkname)
+                if unit.parent != RUNNERS:
+                    linked_entries[relative] = link_destination(relative, link_target)
             elif not (member.isfile() or member.isdir()):
                 raise ValueError(f"Unsupported archive entry: {name}")
+            else:
+                regular_entries.add(relative)
             if unit == FEATURES and (relative != unit or not member.isfile()):
                 raise ValueError("Invalid EmulationStation settings.")
             if unit.parent == RUNNERS and not include_runners:
@@ -282,6 +307,9 @@ def read_archive(source, staging=None, include_runners=True):
             pass
     if not found_marker or windows_data is None:
         raise ValueError("Incomplete Toolbox backup.")
+    for link, target in linked_entries.items():
+        if target not in regular_entries:
+            raise ValueError(f"Missing link target in backup: {link} -> {target}")
     return units, size, windows_data
 
 
@@ -397,7 +425,7 @@ def main():
     system = args.system.resolve()
     if args.action == "estimate":
         replacements = external_profiles(system)
-        size = sum(info.st_size for path, info in entries(system, args.runners, args.archive.resolve())
+        size = sum(info.st_size for path, info, _ in entries(system, args.runners, args.archive.resolve())
                    if stat.S_ISREG(info.st_mode) and path not in replacements)
         size += sum(map(len, replacements.values()))
         print(f"{size}\t{shutil.disk_usage(args.archive.resolve().parent).free}")

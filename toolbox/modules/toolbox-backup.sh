@@ -8,6 +8,17 @@ maintenance_backup_label() {
     fi
 }
 
+maintenance_backup_error() {
+    local title="$1" message="$2" details="$3" report
+    report="$(mktemp /tmp/wt-backup-error.XXXXXX)" || {
+        msgbox "$title" "$message\n\n$details"
+        return
+    }
+    printf '%s\n\n%s\n' "$message" "$details" | fold -s -w 90 > "$report"
+    maintenance_show_report "$title" "$report"
+    rm -f -- "$report"
+}
+
 maintenance_backup_menu() {
     local title export_label restore_label runner_prompt restore_runners replace_prompt confirm_export
     local confirm_restore source_prompt output_prompt done_export done_restore failed estimate
@@ -51,7 +62,7 @@ maintenance_backup_menu() {
             [ -n "$path" ] || return
             if yesno_default_no "$title" "$runner_prompt"; then options+=(--runners); fi
             if ! estimate="$("${helper[@]}" estimate "$path" "${options[@]}" 2>&1)"; then
-                msgbox "$title" "$failed\n\n$estimate"
+                maintenance_backup_error "$title" "$failed" "$estimate"
                 return
             fi
             IFS=$'\t' read -r size free <<< "$estimate"
@@ -60,14 +71,14 @@ maintenance_backup_menu() {
             if output="$("${helper[@]}" export "$path" "${options[@]}" 2>&1)"; then
                 msgbox "$title" "$done_export\n\n$path"
             else
-                msgbox "$title" "$failed\n\n$output"
+                maintenance_backup_error "$title" "$failed" "$output"
             fi
             ;;
         2)
             path="$(input_text "$title" "$source_prompt" "$default_dir/")" || return
             [ -f "$path" ] || { msgbox "$title" "$failed\n\n$path"; return; }
             if ! summary="$("${helper[@]}" inspect "$path" 2>&1)"; then
-                msgbox "$title" "$failed\n\n$summary"
+                maintenance_backup_error "$title" "$failed" "$summary"
                 return
             fi
             yesno_default_no "$title" "$confirm_restore\n\n$summary" || return
@@ -78,7 +89,7 @@ maintenance_backup_menu() {
                 printf '%s\n' "$output" >> "${WT_SESSION_LOG:-/dev/null}"
                 msgbox "$title" "$done_restore"
             else
-                msgbox "$title" "$failed\n\n$output"
+                maintenance_backup_error "$title" "$failed" "$output"
             fi
             ;;
     esac

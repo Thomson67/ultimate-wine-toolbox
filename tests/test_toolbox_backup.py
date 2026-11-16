@@ -100,11 +100,16 @@ maintenance_menu
         self.assertTrue((self.target / self.runner / "bin/wine").stat().st_mode & 0o100)
 
     def test_backup_restores_absolute_reshade_shader_links_as_relative_links(self):
-        library = backup.RESHADE_RUNTIME / "ReShade_shaders/reshade-bur/BUR_fsr1.fxh"
-        merged = backup.RESHADE_RUNTIME / "game-shaders/path-example/Merged/BUR_fsr1.fxh"
+        library = Path(backup.HOME, "reshade/runtime") / "ReShade_shaders/reshade-bur/BUR_fsr1.fxh"
+        merged = Path(backup.HOME, "reshade/runtime") / "game-shaders/path-example/Merged/BUR_fsr1.fxh"
         self.write(self.source, library, "shader")
         (self.source / merged).parent.mkdir(parents=True)
         (self.source / merged).symlink_to(self.source / library)
+        pack_assets = Path(backup.HOME, "reshade/profiles/demo/pack/assets/Shaders/CAS.fx")
+        pack_view = Path(backup.HOME, "reshade/runtime/pack-shaders/demo/view-test/Shaders/CAS.fx")
+        self.write(self.source, pack_assets, "pack shader")
+        (self.source / pack_view).parent.mkdir(parents=True)
+        (self.source / pack_view).symlink_to(self.source / pack_assets)
 
         backup.export(self.source, self.archive, False)
         backup.restore(self.target, self.archive, False, False)
@@ -115,9 +120,24 @@ maintenance_menu
         self.assertEqual(restored.resolve(), self.target / library)
         self.assertEqual(restored.read_text(), "shader")
         self.assertTrue((self.source / merged).readlink().is_absolute())
+        self.assertEqual((self.target / pack_view).resolve(), self.target / pack_assets)
+        self.assertEqual((self.target / pack_view).read_text(), "pack shader")
 
-    def test_restore_rejects_reshade_link_outside_runtime(self):
-        merged = backup.RESHADE_RUNTIME / "game-shaders/path-example/Merged/BUR_fsr1.fxh"
+    def test_backup_reports_all_unsupported_links_before_creating_an_archive(self):
+        folder = self.source / backup.HOME / "reshade/runtime/pack-shaders"
+        folder.mkdir(parents=True)
+        (folder / "outside.fx").symlink_to(self.source / "batocera.conf")
+        (folder / "missing.fx").symlink_to(folder / "removed.fx")
+        with self.assertRaises(ValueError) as caught:
+            backup.export(self.source, self.archive, False)
+        message = str(caught.exception)
+        self.assertIn("2 symbolic link(s)", message)
+        self.assertIn("outside.fx", message)
+        self.assertIn("missing.fx", message)
+        self.assertFalse(self.archive.exists())
+
+    def test_restore_rejects_reshade_link_outside_toolbox(self):
+        merged = Path(backup.HOME, "reshade/runtime") / "game-shaders/path-example/Merged/BUR_fsr1.fxh"
         with tarfile.open(self.archive, "w:gz") as archive:
             member = tarfile.TarInfo(f"data/{merged}")
             member.type = tarfile.SYMTYPE
