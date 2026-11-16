@@ -10,7 +10,12 @@ import subprocess
 from reshade_manager import (atomic_bytes, directory_id, ensure_idle, key, locations, pe_arch,
                              read_json, relative, safe_leaf, save_json, source_header, valid_rom)
 
-NAMES = {'dxgi.dll', 'd3d9.dll', 'd3d10.dll', 'd3d11.dll', 'opengl32.dll', 'ddraw.dll', 'd3d8.dll', 'reshade.dll', 'reshade32.dll', 'reshade64.dll'}
+MASKABLE_NAMES = {
+    'dxgi.dll', 'd3d9.dll', 'd3d10.dll', 'd3d11.dll', 'opengl32.dll', 'ddraw.dll', 'd3d8.dll',
+    'reshade.asi', 'reshade32.asi', 'reshade64.asi',
+}
+NAMES = MASKABLE_NAMES | {'reshade.dll', 'reshade32.dll', 'reshade64.dll'}
+SCAN_VERSION = 2
 
 
 def es_session_home(home):
@@ -21,15 +26,16 @@ def es_start(home, rom, override, runner, bottles, legacy):
     if override == 'on':
         restore(home, rom)
         return
-    cfg = read_json(config_path(home, rom))
-    if override != 'off' or (cfg.get('controlled') and not cfg.get('enabled')):
-        root = apply(home, rom, runner, bottles, legacy, desired=cfg)
-        if override == 'off':
-            print(f'ReShade: masked {len(cfg["files"])} existing injector(s) in {root}', flush=True)
+    if override != 'off':
+        apply(home, rom, runner, bottles, legacy)
         return
     cfg = scan_game(home, rom)
     if not cfg['files']:
         print(f'ReShade: no existing injector detected for {rom}', flush=True)
+        return
+    if cfg.get('controlled') and not cfg.get('enabled'):
+        root = apply(home, rom, runner, bottles, legacy, desired=cfg)
+        print(f'ReShade: masked {len(cfg["files"])} existing injector(s) in {root}', flush=True)
         return
     session = es_session_home(home)
     try:
@@ -110,7 +116,8 @@ def scan_game(home, rom, force=False):
     valid_rom(rom)
     path = config_path(home, rom)
     old = read_json(path)
-    if not force and rom.suffix.casefold() == '.wsquashfs' and old.get('signature') == signature(rom):
+    if (not force and rom.suffix.casefold() == '.wsquashfs'
+            and old.get('scan_version') == SCAN_VERSION and old.get('signature') == signature(rom)):
         filtered = game_files(old)
         if filtered != old.get('files', []):
             old['files'] = filtered
@@ -123,14 +130,15 @@ def scan_game(home, rom, force=False):
         try:
             dll = identify(source_header(rom, rel, 64*1024*1024))
             if dll:
-                found.append(dict(dll, path=rel, controllable=PurePosixPath(rel).name.casefold() in {'dxgi.dll','d3d9.dll','d3d10.dll','d3d11.dll','opengl32.dll','ddraw.dll','d3d8.dll'}))
+                found.append(dict(dll, path=rel,
+                                  controllable=PurePosixPath(rel).name.casefold() in MASKABLE_NAMES))
         except (OSError, ValueError):
             continue
     if old.get('controlled') and rom.suffix.casefold() != '.wsquashfs':
         # Disabled proxies are saved outside the game; keep their indexed paths.
         known = {f['path'] for f in found}
         found.extend(f for f in old.get('files', []) if f['path'] not in known)
-    data = {'rom': str(rom), 'signature': signature(rom), 'files': found,
+    data = {'rom': str(rom), 'signature': signature(rom), 'scan_version': SCAN_VERSION, 'files': found,
             'controlled': old.get('controlled', False), 'enabled': old.get('enabled', True)}
     data['files'] = game_files(data)
     save_json(path, data)

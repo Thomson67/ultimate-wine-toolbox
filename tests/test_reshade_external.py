@@ -15,9 +15,10 @@ import reshade_manager as r
 import reshade_api as a
 
 
-def dll(supported=True):
-    data=bytearray(200);data[:2]=b'MZ';data[60:64]=(64).to_bytes(4,'little');data[64:68]=b'PE\0\0';data[68:70]=(0x8664).to_bytes(2,'little')
-    data.extend("crosire's ReShade post-processing injector for 64-bit".encode('utf-16le'))
+def dll(supported=True, arch=64):
+    machine = {32: 0x14c, 64: 0x8664}[arch]
+    data=bytearray(200);data[:2]=b'MZ';data[60:64]=(64).to_bytes(4,'little');data[64:68]=b'PE\0\0';data[68:70]=machine.to_bytes(2,'little')
+    data.extend(f"crosire's ReShade post-processing injector for {arch}-bit".encode('utf-16le'))
     if supported: data.extend(b'additional exports')
     return bytes(data)
 
@@ -100,6 +101,35 @@ class ExternalTests(unittest.TestCase):
         self.assertEqual(self.autorun.read_text(),self.original)
         self.assertFalse(r.read_json(e.config_path(self.home,self.rom))['controlled'])
 
+    def test_masks_only_verified_reshade_asi_plugins_and_restores_them(self):
+        self.binary.write_bytes(b'third-party Direct3D wrapper')
+        fov = self.folder/'FOV.asi'
+        unrelated = self.folder/'Other'/'ReShade32.asi'
+        unrelated.parent.mkdir()
+        fov.write_bytes(b'FOV plugin')
+        unrelated.write_bytes(dll().replace(b'i\0n\0j\0e\0c\0t\0o\0r\0', b'other resource!!'))
+        plugin = self.folder/'ReShade.asi'
+        named_x86 = self.folder/'ReShade32.asi'
+        x64 = self.folder/'ReShade64.asi'
+        x86 = dll(arch=32)
+        plugin.write_bytes(x86)
+        named_x86.write_bytes(x86)
+        x64.write_bytes(dll())
+        cfg = e.scan_game(self.home, self.rom)
+        self.assertEqual({Path(f['path']).name: f['arch'] for f in cfg['files']},
+                         {'ReShade.asi': 32, 'ReShade32.asi': 32, 'ReShade64.asi': 64})
+        e.toggle(self.home, self.rom, False)
+        self.assertFalse(plugin.exists())
+        self.assertFalse(named_x86.exists())
+        self.assertFalse(x64.exists())
+        self.assertEqual(self.binary.read_bytes(), b'third-party Direct3D wrapper')
+        self.assertEqual(fov.read_bytes(), b'FOV plugin')
+        self.assertTrue(unrelated.is_file())
+        e.toggle(self.home, self.rom, True)
+        self.assertEqual(plugin.read_bytes(), x86)
+        self.assertEqual(named_x86.read_bytes(), x86)
+        self.assertEqual(x64.read_bytes(), dll())
+
     def test_cached_lists_include_external_and_managed_without_scanning(self):
         cfg=e.scan_game(self.home,self.rom)
         with patch.object(e,'scan_game',side_effect=AssertionError('scan in list')):
@@ -125,7 +155,8 @@ class ExternalTests(unittest.TestCase):
     def test_stale_archive_index_is_filtered_without_reopening_archive(self):
         archive = self.base/'AC2.wsquashfs'; archive.touch()
         files = [{'path':'drive_c/PROGRAMDATA/reshade/ReShade32.dll','controllable':False}]
-        cfg = {'rom':str(archive),'signature':e.signature(archive),'files':files,'enabled':True}
+        cfg = {'rom':str(archive),'signature':e.signature(archive),'scan_version':e.SCAN_VERSION,
+               'files':files,'enabled':True}
         r.save_json(e.config_path(self.home,archive),cfg)
         with patch.object(e,'find_dlls',side_effect=AssertionError('archive reopened')):
             self.assertEqual(r.configured_games(self.home), [])
@@ -173,14 +204,17 @@ class ExternalTests(unittest.TestCase):
         archive.write_bytes(original)
         upper = self.base/'runner-bottle.wine'
         upper.mkdir()
-        target = upper/'drive_c/game/dxgi.dll'
+        plugin = 'drive_c/Beyond Good and Evil/ReShade.asi'
+        target = upper/plugin
         r.save_json(e.config_path(self.home, archive), {
             'rom': str(archive), 'signature': e.signature(archive), 'controlled': False,
-            'enabled': True, 'files': [{'path': 'drive_c/game/dxgi.dll', 'controllable': True}],
+            'enabled': True, 'files': [],
         })
         read = Path.read_text
         file_id = e.file_id
         with patch('es_options.Overrides') as options, \
+                patch.object(e, 'find_dlls', return_value=[plugin]) as scan, \
+                patch.object(e, 'source_header', return_value=dll(arch=32)) as read_dll, \
                 patch.object(e, 'locations', return_value=(upper, upper)), \
                 patch.object(Path, 'read_text', lambda path, *a, **kw:
                              'mount -t overlay upperdir=' if str(path) == '/usr/bin/batocera-wine'
@@ -190,6 +224,8 @@ class ExternalTests(unittest.TestCase):
                              {'whiteout': True} if path == target and path.exists() else file_id(path)):
             options.return_value.get.return_value = 'off'
             r.event(self.home, archive, 'gameStart', es=True)
+            scan.assert_called_once_with(archive)
+            read_dll.assert_called_once_with(archive, plugin, 64*1024*1024)
             self.assertTrue(target.exists())
             self.assertEqual(archive.read_bytes(), original)
             r.event(self.home, archive, 'gameStop', es=True)
@@ -209,6 +245,7 @@ class ExternalTests(unittest.TestCase):
         journal = r.journal_path(self.home, archive, upper, upper)
         r.save_json(e.config_path(self.home, archive), {
             'rom': str(archive), 'signature': e.signature(archive), 'controlled': False,
+            'scan_version': e.SCAN_VERSION,
             'enabled': True, 'files': [{'path': 'drive_c/game/d3d9.dll', 'controllable': True}],
         })
         original_read = Path.read_text
@@ -252,10 +289,13 @@ class ExternalTests(unittest.TestCase):
     def test_real_archive_detection_and_cache(self):
         import shutil
         if not shutil.which('mksquashfs'): self.skipTest('squashfs-tools unavailable')
-        archive=self.base/'Game.wsquashfs'
+        archive=self.base/'Beyond+Good+and+Evil[L][AmX].wsquashfs'
+        (self.folder/'ReShade32.asi').write_bytes(dll(arch=32))
+        (self.folder/'FOV.asi').write_bytes(b'FOV plugin')
         subprocess.run(['mksquashfs',str(self.rom),str(archive),'-noappend','-processors','1'],check=True,capture_output=True)
         cfg=e.scan_game(self.home,archive)
-        self.assertEqual(cfg['files'][0]['path'],'drive_c/game/dxgi.dll')
+        self.assertEqual({row['path'] for row in cfg['files']},
+                         {'drive_c/game/dxgi.dll', 'drive_c/game/ReShade32.asi'})
         with patch.object(e,'find_dlls',side_effect=AssertionError('unchanged archive rescanned')):
             self.assertEqual(e.scan_game(self.home,archive),cfg)
 
