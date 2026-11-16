@@ -154,13 +154,13 @@ class Pad2KeyStore:
             suffix += 1
         return destination
 
-    def assign(self, rom, profile):
-        return self._assign_profile(rom, profile)[1]
+    def assign(self, rom, profile, *, launcher_config=None):
+        return self._assign_profile(rom, profile, launcher_config=launcher_config)[1]
 
     def copy_and_assign(self, rom, profile, name):
         return self._assign_profile(rom, profile, name)
 
-    def _assign_profile(self, rom, profile, copy_name=None):
+    def _assign_profile(self, rom, profile, copy_name=None, launcher_config=None):
         if any(c in rom+profile for c in '\t\r\n'):
             raise ValueError('Paths cannot contain tabs or line breaks')
         if copy_name is not None and not profile:
@@ -170,13 +170,21 @@ class Pad2KeyStore:
             selected = Path(profile).resolve()
             if not selected.is_file() or selected.suffix.lower() != '.amgp' or not selected.is_relative_to(self.userdata):
                 raise ValueError('Select an existing .amgp profile under /userdata')
-        with self.locked():
+        with self.locked(), ExitStack() as locks:
             registry = self.read(self.registry)
             suspended = self.read(self.state)
             metadata = registry.get(str(selected), {})
             converted = 'source' in metadata
             managed = str(selected) in registry or self.is_community(profile)
             extra = [self.keys_path(rom)] if managed or rom in suspended else []
+            if launcher_config is not None:
+                if launcher_config['rom'] != rom or launcher_config['launcher_profile'] != str(selected):
+                    raise ValueError('Launcher configuration does not match the profile assignment')
+                from antimicrox_launcher import Store
+                launcher = Store(self.home)
+                locks.enter_context(launcher.locked())
+                launcher_path = launcher.path(rom)
+                extra.append(launcher_path)
             adoption = None
             if converted and rom in suspended:
                 path = self.keys_path(rom)
@@ -230,6 +238,8 @@ class Pad2KeyStore:
                                       'disabled': base64.b64encode(content).decode(), 'mode': mode}
                     atomic(self.state, json.dumps(suspended, ensure_ascii=False, indent=2).encode())
                 self._assign(rom, profile, managed, suspended, registry)
+                if launcher_config is not None:
+                    atomic(launcher_path, json.dumps(launcher_config, ensure_ascii=False, indent=2).encode())
                 cleanup.pop_all()
             return destination, adoption[3] if adoption else None
 

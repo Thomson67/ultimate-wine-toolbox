@@ -1,5 +1,6 @@
 """Dispatch a share selected in ES after EmulationStation saves batocera.conf."""
 import json
+import os
 from pathlib import Path
 import re
 import time
@@ -55,8 +56,27 @@ def antimicrox_already_assigned(home, rom, share):
         return False
     try:
         expected = apply_launcher_import(home, assigned, rom, check=True)
-        return expected is None or Store(home).load(rom, assigned) == expected
+        return expected is None or Store(home).load(rom, assigned) is not None
     except (OSError, ValueError, ET.ParseError):
+        return False
+
+
+def apply_downloaded_antimicrox(home, rom, share):
+    from antimicrox_pad2key_state import Pad2KeyStore
+    from antimicrox_profiles import Profiles
+
+    try:
+        if antimicrox_already_assigned(home, rom, share):
+            return True
+        local = Community(home).local_profile(share)
+        if not local or not os.access(home/'tools/antimicrox/antimicrox', os.X_OK) or Profiles(home).running():
+            return False
+        path = str(local[0])
+        launcher_config = apply_launcher_import(home, path, rom, check=True)
+        Pad2KeyStore(home).assign(rom, path, launcher_config=launcher_config)
+        return True
+    except (OSError, ValueError, KeyError, RuntimeError, ET.ParseError) as error:
+        print(f'ES community: could not apply cached AntiMicroX profile for {rom}: {error}', flush=True)
         return False
 
 
@@ -162,9 +182,9 @@ class Selections:
                     if handled:
                         print(f'ES community: reactivated installed ReShade preset for {rom}', flush=True)
                 elif rom and kind == 'antimicrox':
-                    handled = antimicrox_already_assigned(self.home, rom, share)
+                    handled = apply_downloaded_antimicrox(self.home, rom, share)
                     if handled:
-                        print(f'ES community: AntiMicroX profile already assigned to {rom}', flush=True)
+                        print(f'ES community: applied local AntiMicroX profile for {rom}', flush=True)
                 if handled or open_selection(self.home, api, args):
                     delivered[key] = value
                     self.save_delivered(delivered)

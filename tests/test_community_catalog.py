@@ -20,6 +20,8 @@ import xml.etree.ElementTree as ET
 from community_profiles import Community, apply_launcher_import, launcher_export
 from community_packs import Packs
 from antimicrox_launcher import Store
+from antimicrox_pad2key_state import Pad2KeyStore, atomic as pad_atomic
+from antimicrox_profiles import Profiles
 
 
 def profile(kind, game):
@@ -190,11 +192,88 @@ class CatalogueTests(unittest.TestCase):
             self.assertFalse(community_es.antimicrox_already_assigned(home, rom, share))
             config = apply_launcher_import(home, launcher, rom)
             self.assertTrue(community_es.antimicrox_already_assigned(home, rom, share))
+            store.save(rom, 'profiles', str(launcher), dict(rule, value='Customized'),
+                       config['game_profile'])
+            self.assertTrue(community_es.antimicrox_already_assigned(home, rom, share))
             game = Path(config['game_profile'])
             game.write_text('<gamecontroller>')
             self.assertFalse(community_es.antimicrox_already_assigned(home, rom, share))
             game.unlink()
             self.assertFalse(community_es.antimicrox_already_assigned(home, rom, share))
+
+    def test_es_applies_downloaded_profile_and_backs_up_pad2key_without_opening_toolbox(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            rom = home/'Renamed.wine'
+            rom.mkdir()
+            keys = rom/'padto.keys'
+            original = b'{"actions_player1": [{"trigger": "a", "type": "key", "target": ["KEY_A"]}]}'
+            keys.write_bytes(original)
+            features, conf = home/'es_features.cfg', home/'batocera.conf'
+            es_options.publish({'community'}, 'fr', features, home=home)
+            share = profile('antimicrox', 'Original title')
+            path = Community(home).install_profile(share, b'<gamecontroller><sets/></gamecontroller>')
+            binary = home/'tools/antimicrox/antimicrox'
+            binary.parent.mkdir(parents=True)
+            binary.touch(mode=0o755)
+            pad = Pad2KeyStore(home, home)
+            key = es_options.game_key(rom, 'community_antimicrox')
+            conf.write_text(f'{key}=profile\n')
+            watcher = community_es.Selections(home, lambda *_: {'profile': share}, features, conf)
+            with patch.object(community_es, 'es_games', return_value=[(str(rom), 'Renamed')]), \
+                 patch.object(community_es, 'EsApi') as api, \
+                 patch.object(community_es, 'open_selection') as launch, \
+                 patch('antimicrox_pad2key_state.Pad2KeyStore', return_value=pad), \
+                 patch.object(Profiles, 'running', return_value=False):
+                api.return_value.running.return_value = (201, '')
+                watcher.poll()
+                watcher.poll()
+                launch.assert_not_called()
+                self.assertEqual(watcher.dispatched, {key: 'profile'})
+            self.assertEqual(pad.cfg.read_text(), f'{rom}\t{path}\n')
+            self.assertEqual(json.loads(keys.read_bytes())['actions_player1'][0]['target'], [])
+            pad.assign(str(rom), '')
+            self.assertEqual(keys.read_bytes(), original)
+
+    def test_cached_launcher_and_pad2key_assignment_roll_back_together(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            rom = home/'Target.wine'
+            rom.mkdir()
+            keys = rom/'padto.keys'
+            original = b'{"actions_player1": []}'
+            keys.write_bytes(original)
+            source = home/'original.amgp'
+            source.write_bytes(b'<gamecontroller><sets/></gamecontroller>')
+            store = Store(home)
+            rule = {'field': 'title', 'match': 'exact', 'value': 'Launcher'}
+            store.save(str(rom), 'profiles', str(source), rule, str(source))
+            bundle = launcher_export(home, source, str(rom))
+            share = dict(profile('antimicrox', 'Original title'), sha256=hashlib.sha256(bundle).hexdigest())
+            launcher = Community(home).install_profile(share, bundle)
+            binary = home/'tools/antimicrox/antimicrox'
+            binary.parent.mkdir(parents=True)
+            binary.touch(mode=0o755)
+            pad = Pad2KeyStore(home, home)
+            launcher_path = store.path(str(rom))
+            before = launcher_path.read_bytes()
+
+            def fail_launcher_write(path, data, *args):
+                if path == launcher_path:
+                    raise OSError('Could not write launcher')
+                return pad_atomic(path, data, *args)
+
+            with patch('antimicrox_pad2key_state.Pad2KeyStore', return_value=pad), \
+                 patch.object(Profiles, 'running', return_value=False):
+                with patch('antimicrox_pad2key_state.atomic', side_effect=fail_launcher_write):
+                    self.assertFalse(community_es.apply_downloaded_antimicrox(home, str(rom), share))
+                self.assertEqual(keys.read_bytes(), original)
+                self.assertEqual(launcher_path.read_bytes(), before)
+                self.assertFalse(pad.cfg.exists())
+                self.assertFalse(pad.state.exists())
+                self.assertTrue(community_es.apply_downloaded_antimicrox(home, str(rom), share))
+            self.assertEqual(pad.cfg.read_text(), f'{rom}\t{launcher}\n')
+            self.assertEqual(store.load(str(rom), str(launcher))['launcher_rule'], rule)
 
     def test_local_preset_selection_does_not_relaunch_a_pending_community_request(self):
         with tempfile.TemporaryDirectory() as folder:
