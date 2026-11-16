@@ -7,10 +7,11 @@ import time
 from antimicrox_handoff import EsApi
 from toolbox_return import resume
 from community_profiles import atomic, dump, es_games, game_key as title_key
-from es_options import COMMUNITY_KEYS, CONF, FEATURES, Overrides, game_key
+from es_options import COMMUNITY_KEYS, CONF, FEATURES, RESHADE_PRESET_KEY, Overrides, game_key
 
 GAME_SETTING = re.compile(r'windows\["([^"\r\n]+)"\]\.uwt_(community_(?:antimicrox|reshade))')
 SHARE_ID = re.compile(r'(?:[a-z0-9][a-z0-9-]{0,79}|zip:pack-[a-f0-9]{64})')
+LOCAL_PRESET = re.compile(r'[a-f0-9]{24}:[a-f0-9]{24}')
 REQUEST = 'community-es.request'
 OTHER_WORKFLOWS = ('resume-wsq.request', 'launch-game.request', 'restart-es.request',
                    'reshade-diagnostic.json', 'antimicrox-live.json')
@@ -36,6 +37,32 @@ def resolve_game(option, setting, share):
     return None
 
 
+def apply_installed_reshade(home, rom, value, share):
+    import reshade_manager as manager
+    import reshade_pack
+    import reshade_presets as presets
+
+    rom = Path(rom)
+    with manager.locked(home):
+        if value.startswith('zip:'):
+            return bool(reshade_pack.reactivate_community(home, rom, value[4:]))
+        config = manager.read_json(home / 'reshade/games' / (manager.key(rom) + '.json'))
+        if not config:
+            return False
+        name = re.escape(f'community-{value}-{share["sha256"][:10]}')
+        pack = presets.context(home, rom)
+        matches = [identity for identity, item in presets.index(home, rom)['items'].items()
+                   if item.get('pack', '') == pack
+                   and re.fullmatch(rf'{name}(?:-[0-9]+)?\.ini', item.get('source_name', ''))
+                   and presets.path(home, rom, identity).is_file()]
+        if len(matches) != 1:
+            return False
+        presets.activate(home, rom, matches[0])
+        if not config.get('enabled'):
+            manager.set_enabled(home, rom, True)
+        return True
+
+
 class Selections:
     def __init__(self, home, catalogue, features=FEATURES, conf=CONF):
         self.home = home
@@ -46,6 +73,9 @@ class Selections:
         self.stamp = None
         self.dispatched = None
         self.current = None
+        self.observed = {}
+        self.local = None
+        self.superseded = {}
         self.retry_at = 0
         self.failed = {}
 
@@ -66,6 +96,18 @@ class Selections:
                 if (match and match[2] in overrides.keys and value not in {'auto', 'catalogue-unavailable'}
                         and SHARE_ID.fullmatch(value)):
                     current[key] = value
+            local = {}
+            if RESHADE_PRESET_KEY in overrides.keys:
+                suffix = '.uwt_' + RESHADE_PRESET_KEY
+                local = {key.removesuffix(suffix): value for key, value in overrides.values.items()
+                         if key.endswith(suffix) and LOCAL_PRESET.fullmatch(value)}
+            previous = current if self.local is None else self.observed
+            changed_games = {game for game, preset in local.items() if (self.local or {}).get(game) != preset}
+            community_suffix = '.uwt_community_reshade'
+            self.superseded = {key: value for key, value in current.items()
+                               if key.endswith(community_suffix) and previous.get(key) == value
+                               and key.removesuffix(community_suffix) in changed_games}
+            self.observed, self.local = current, local
             self.current = current
         if self.dispatched is None:
             try:
@@ -74,6 +116,7 @@ class Selections:
             except (FileNotFoundError, ValueError):
                 self.dispatched = {}
         delivered = {key: value for key, value in self.dispatched.items() if self.current.get(key) == value}
+        delivered.update(self.superseded)
         self.save_delivered(delivered)
         self.failed = {key: value for key, value in self.failed.items() if self.current.get(key) == value}
         pending = next(((key, value) for key, value in self.current.items() if key not in delivered and key not in self.failed), None)
@@ -90,11 +133,14 @@ class Selections:
             args = [kind, rom, value] if rom else ['unavailable']
             print(f'ES community {key}: {value} ({rom or "no matching game"})', flush=True)
             try:
-                if open_selection(self.home, api, args):
+                applied = kind == 'reshade' and rom and apply_installed_reshade(self.home, rom, value, share)
+                if applied:
+                    print(f'ES community: reactivated installed ReShade preset for {rom}', flush=True)
+                if applied or open_selection(self.home, api, args):
                     delivered[key] = value
                     self.save_delivered(delivered)
                     return
-            except (OSError, RuntimeError, ValueError) as error:
+            except (KeyError, OSError, RuntimeError, ValueError) as error:
                 print(f'ES community launch: {error}', flush=True)
             self.failed[key] = value
             print('ES community: launch unconfirmed; save Auto before retrying this selection', flush=True)

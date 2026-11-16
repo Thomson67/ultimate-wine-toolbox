@@ -72,6 +72,22 @@ class CatalogueTests(unittest.TestCase):
             es_options.enable_community('fr', features, home=home)
             self.assertNotIn('community_reshade', es_options.exposed(features))
 
+    def test_reshade_es_labels_put_the_preset_first_and_remove_repeated_game_names(self):
+        game = 'The Legend of Zelda - Ocarina of Time 3D'
+        short = 'The Legend of…Ocarina of Time 3D'
+        entries = {
+            'named': dict(game=game, title=f'{game} — Sans CRT', author='Auteur'),
+            'zip:pack-bundle': dict(game=game, title=f'Ultra — ({game})', author='Auteur'),
+            'same': dict(game=game, title=game.upper(), author='Auteur'),
+            'partial': dict(game='Control', title='Controller preset', author='Auteur'),
+        }
+        with patch.object(catalogue, 'cached_entries', return_value=entries):
+            choices = dict(catalogue.es_choices(Path('/unused'), 'reshade'))
+        self.assertEqual(choices['named'], f'Sans CRT — {short} — Auteur')
+        self.assertEqual(choices['zip:pack-bundle'], f'Ultra [ZIP] — {short} — Auteur')
+        self.assertEqual(choices['same'], f'{short} — Auteur')
+        self.assertEqual(choices['partial'], 'Controller preset — Control — Auteur')
+
     def test_es_selection_targets_the_game_once_and_auto_rearms_it(self):
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder)
@@ -112,6 +128,54 @@ class CatalogueTests(unittest.TestCase):
                 watcher.poll()
                 watcher.poll()
                 self.assertEqual(launch.call_args.args[2], ['unavailable'])
+
+    def test_local_preset_selection_does_not_relaunch_a_pending_community_request(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            rom = home/'Game.wine'
+            rom.mkdir()
+            features, conf = home/'es_features.cfg', home/'batocera.conf'
+            es_options.publish({'community'}, 'fr', features, home=home)
+            community_key = es_options.game_key(rom, 'community_reshade')
+            local_key = es_options.game_key(rom, es_options.RESHADE_PRESET_KEY)
+            local_value = 'a'*24+':'+'b'*24
+            watcher = community_es.Selections(home, lambda *_: {}, features, conf)
+            with patch.object(community_es, 'EsApi') as api, patch.object(community_es, 'open_selection') as launch:
+                api.return_value.running.return_value = (200, '/gamelist')
+                conf.write_text(f'{community_key}=old-share\n')
+                watcher.poll()
+                watcher.poll()
+                watcher.retry_at = 0
+                api.return_value.running.return_value = (201, '')
+                conf.write_text(f'{community_key}=old-share\n{local_key}={local_value}\n')
+                watcher.poll()
+                watcher.poll()
+                launch.assert_not_called()
+                conf.write_text(f'{community_key}=new-share\n{local_key}={local_value}\n')
+                watcher.poll()
+                watcher.poll()
+                launch.assert_called_once()
+
+    def test_community_pack_reactivation_keeps_the_toolbox_closed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            rom = home/'Game.wine'
+            rom.mkdir()
+            features, conf = home/'es_features.cfg', home/'batocera.conf'
+            es_options.publish({'community'}, 'fr', features, home=home)
+            key = es_options.game_key(rom, 'community_reshade')
+            value = 'zip:pack-'+'a'*64
+            conf.write_text(f'{key}={value}\n')
+            watcher = community_es.Selections(home, lambda *_: {value: {'game': 'Game'}}, features, conf)
+            with patch.object(community_es, 'EsApi') as api, \
+                 patch.object(community_es, 'es_games', return_value=[(str(rom), 'Game')]), \
+                 patch.object(community_es, 'apply_installed_reshade', return_value=True) as apply, \
+                 patch.object(community_es, 'open_selection') as launch:
+                api.return_value.running.return_value = (201, '')
+                watcher.poll()
+                watcher.poll()
+                apply.assert_called_once()
+                launch.assert_not_called()
 
     def test_auto_clears_delivered_state_even_when_another_selection_cannot_launch(self):
         with tempfile.TemporaryDirectory() as folder:

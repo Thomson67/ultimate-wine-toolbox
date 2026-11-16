@@ -5,6 +5,7 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import sys
@@ -14,7 +15,7 @@ import time
 
 from community_packs import Packs
 from community_profiles import Community, atomic, catalogue, dump, entry_label
-from es_options import refresh as refresh_es_options
+from es_options import refresh as refresh_es_options, short_game_name
 
 REFRESH_INTERVAL = 6 * 60 * 60
 RETRY_INTERVAL = 15 * 60
@@ -68,14 +69,33 @@ def cached_entries(home, kind):
     return entries
 
 
+def reshade_label(row, is_pack):
+    game = row['game'].strip()
+    preset = row['title'].strip()
+    if game:
+        words = r'\s+'.join(re.escape(word) for word in game.split())
+        repeated = rf'(?:\({words}\)|{words})'
+        separators = ' :|-–—/'
+        preset = re.sub(rf'^{repeated}(?=$|[\s:|/–—-])', '', preset, flags=re.I)
+        preset = re.sub(rf'(?<!\w){repeated}$', '', preset.strip(separators), flags=re.I).strip(separators)
+    parts = [value for value in (preset, short_game_name(game), row['author']) if value]
+    if is_pack and parts:
+        parts[0] += ' [ZIP]'
+    return ' — '.join(parts)
+
+
 def es_choices(home, kind):
     labels = []
     for identifier, row in cached_entries(home, kind).items():
-        suffix = ' [Pack ZIP]' if identifier.startswith('zip:') else ''
-        if kind == 'antimicrox' and 'UWT launcher-package-v1' in row.get('requirements', ()):
-            suffix = ' [Launcher]'
-        labels.append((identifier, entry_label(row) + suffix))
-    return sorted(labels, key=lambda row: (row[1].casefold(), row[0]))
+        if kind == 'reshade':
+            label = reshade_label(row, identifier.startswith('zip:'))
+        else:
+            label = entry_label(row)
+            if 'UWT launcher-package-v1' in row.get('requirements', ()):
+                label += ' [Launcher]'
+        labels.append((identifier, label, row['game'].casefold() if kind == 'reshade' else ''))
+    return [(identifier, label) for identifier, label, _ in
+            sorted(labels, key=lambda row: (row[2], row[1].casefold(), row[0]))]
 
 
 def sync_catalogues(home):

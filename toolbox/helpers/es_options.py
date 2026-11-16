@@ -25,7 +25,7 @@ LAUNCHER_DESCRIPTION = (
 )
 RESHADE_TITLE = ('ReShade (par jeu)', 'ReShade (per game)')
 RESHADE_PRESET_KEY = 'reshade_preset'
-RESHADE_PRESET_TITLES = ('Preset ReShade installé (par jeu)', 'Installed ReShade preset (per game)')
+RESHADE_PRESET_TITLES = ('Preset local', 'Local preset')
 DXVK_TITLE = ('Bundle DXVK / VKD3D', 'DXVK / VKD3D bundle')
 DXVK_NATIVE = ('Versions natives de Batocera', 'Batocera defaults')
 COMMUNITY_KEYS = {'reshade': 'community_reshade', 'antimicrox': 'community_antimicrox'}
@@ -116,6 +116,17 @@ def community_choices(home, key, name):
     return [('catalogue-unavailable', 'Catalogue en attente' if french else 'Waiting for catalogue')]
 
 
+def shorten_menu_text(text, limit, tail):
+    if len(text) <= limit:
+        return text
+    head = limit - tail - 1
+    return f'{text[:head].rstrip()}…{text[-tail:].lstrip()}'
+
+
+def short_game_name(game, limit=32):
+    return shorten_menu_text(game, limit, min(18, limit - 4))
+
+
 def update_choices(feature, expected):
     current = [(choice.get('value'), choice.get('name')) for choice in feature.findall('choice')]
     if current == expected:
@@ -161,13 +172,17 @@ def update_reshade_presets(system, home):
     french = anchor.get('name') in (COMMUNITY_NAMES['community_reshade'][0], RESHADE_TITLE[0])
     value = f'uwt_{RESHADE_PRESET_KEY}'
     feature = features.get(value)
+    name = RESHADE_PRESET_TITLES[0 if french else 1]
     changed = feature is None
     if changed:
-        feature = ET.Element('feature', name=RESHADE_PRESET_TITLES[0 if french else 1], value=value,
+        feature = ET.Element('feature', name=name, value=value,
                              submenu='Ultimate Wine Toolbox')
         feature.set('description', 'Choisissez un preset portant le nom du jeu. Le choix s’applique au prochain lancement.'
                     if french else 'Choose a preset labelled with the game name. It applies on the next launch.')
         system.insert(list(system).index(anchor) + 1, feature)
+    if feature.get('name') != name:
+        feature.set('name', name)
+        changed = True
     rows = es_choices(home)
     if not rows:
         rows = [('unavailable', 'Aucun preset installé' if french else 'No installed presets')]

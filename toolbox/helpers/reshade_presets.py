@@ -150,6 +150,7 @@ def listing(home, rom):
 def es_choices(home):
     """Read saved compatible presets without touching live profiles or game archives."""
     from community_profiles import game_title
+    from es_options import short_game_name, shorten_menu_text
 
     rows = []
     for config in (home / 'reshade/games').glob('*.json'):
@@ -167,16 +168,19 @@ def es_choices(home):
                 rows.append((f'{config.stem}:{identity}', game, preset))
         except (KeyError, OSError, TypeError, ValueError) as error:
             print(f'ES ReShade presets: {config.name}: {error}', file=sys.stderr)
-    labels = []
-    for value, game, preset in sorted(rows, key=lambda row: (row[1].casefold(), row[2].casefold(), row[0])):
-        short_game = game if len(game) <= 32 else f'{game[:13].rstrip()}…{game[-18:].lstrip()}'
-        labels.append((value, preset, short_game))
-    counts = Counter((preset.casefold(), game.casefold()) for _, preset, game in labels)
+
+    def menu_label(game, preset, suffix=''):
+        name = shorten_menu_text(preset, 21 - len(suffix), 7) + suffix
+        return f'{name} — {short_game_name(game, 38 - len(name) - 3)}'
+
+    rows.sort(key=lambda row: (row[1].casefold(), row[2].casefold(), row[0]))
+    counts = Counter(menu_label(game, preset).casefold() for _, game, preset in rows)
     choices = []
-    for value, preset, game in labels:
-        if counts[preset.casefold(), game.casefold()] > 1:
-            preset += f' [{value.rsplit(":", 1)[1][:8]}]'
-        choices.append((value, f'{preset} — {game}'))
+    for value, game, preset in rows:
+        label = menu_label(game, preset)
+        if counts[label.casefold()] > 1:
+            label = menu_label(game, preset, f' [{value.rsplit(":", 1)[1][:6]}]')
+        choices.append((value, label))
     return choices
 
 
