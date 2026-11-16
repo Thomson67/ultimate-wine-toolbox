@@ -22,7 +22,7 @@ community_import_actions() {
   local kind="$1" path="$2" title="$3" rom="${4:-}" choice output details selected launcher_notice old_profile
   local reshade_installed="${5:-0}"
   local -a test_options=(live "$(community_txt 'Modifier les commandes et tester en jeu' 'Edit controls and test in game')")
-  [ "${WT_COMMUNITY_PORT:-0}" != 1 ] || test_options=()
+  [ "${WT_COMMUNITY_ES:-0}" != 1 ] || test_options=()
   while true; do
     if [ "$kind" = antimicrox ]; then
       launcher_notice="$(community_cmd launcher-info "$path" 2>/dev/null)" || launcher_notice=""
@@ -828,50 +828,6 @@ community_download_selection() {
   fi
   community_import_actions "$kind" "$path" "$title" "$rom"
 }
-
-community_es_menu() {
-  local title selected rom game kind rows id label choice output
-  local -a items=()
-  local catalog="$WT_ROOT/helpers/community_catalog.py"
-  title="$(community_txt 'Profils communautaires' 'Community Profiles')"
-  while selected="$(community_pick_game "$title")"; do
-    rom="${selected%%$'\t'*}"
-    game="${selected#*$'\t'}"
-    while kind="$(menu_select "$title" "$game" \
-      reshade 'ReShade' antimicrox 'AntiMicroX' \
-      refresh "$(community_txt 'Actualiser le catalogue' 'Refresh the catalogue')" back "$(i18n back)")"; do
-      case "$kind" in
-        refresh)
-          community_pack_progress "$title" "$(community_txt 'Actualisation du catalogue…' 'Refreshing the catalogue…')"
-          if output="$(python3 "$catalog" --home "$WT_HOME" refresh 2>&1)"; then
-            msgbox "$title" "$(community_txt 'Catalogue actualisé.' 'Catalogue refreshed.')"
-          else
-            msgbox "$title" "$(community_txt 'Actualisation incomplète. Le cache précédent est conservé.' 'Refresh incomplete. The previous cache is retained.')"$'\n'"$output"
-          fi
-          continue ;;
-        reshade|antimicrox) ;;
-        *) break ;;
-      esac
-      if ! rows="$(python3 "$catalog" --home "$WT_HOME" list "$kind" "$rom" "$game" 2>&1)"; then
-        msgbox "$title" "$(community_txt 'Catalogue indisponible ou incomplet pour ce jeu.' 'Catalogue unavailable or incomplete for this game.')"$'\n'"$rows"
-        continue
-      fi
-      if [ -z "$rows" ]; then
-        msgbox "$title" "$(community_txt 'Aucun partage publié pour ce jeu.' 'No published entries for this game.')"
-        continue
-      fi
-      items=()
-      while IFS=$'\t' read -r id label; do
-        items+=("$id" "$label")
-      done <<< "$rows"
-      choice="$(WT_MENU_LIST=1 menu_select "$title" "$game" "${items[@]}" back "$(i18n back)")" || continue
-      [ "$choice" != back ] || continue
-      community_download_selection "$kind" "$title" "$rom" "$choice"
-    done
-  done
-  return 0
-}
-
 
 # Selectors return a path on stdout; keep the terminal display separate.
 community_pack_progress() {

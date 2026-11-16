@@ -1,5 +1,7 @@
 """Opt-in Windows options exported to EmulationStation."""
 import argparse
+from contextlib import contextmanager
+import fcntl
 from pathlib import Path
 import re
 import sys
@@ -10,6 +12,7 @@ from antimicrox_live import atomic
 FEATURES = Path('/userdata/system/configs/emulationstation/es_features_ultimate_wine_toolbox.cfg')
 CONF = Path('/userdata/system/batocera.conf')
 BUNDLES = Path(__file__).resolve().parents[2]/'dxvk/bundles'
+HOME = Path('/userdata/system/ultimate-wine-toolbox')
 OWNER = b'<!-- Managed by Ultimate Wine Toolbox -->'
 
 SWITCH = {'on': ('Activé', 'Enabled'), 'off': ('Désactivé', 'Disabled')}
@@ -23,7 +26,13 @@ LAUNCHER_DESCRIPTION = (
 RESHADE_TITLE = ('ReShade (par jeu)', 'ReShade (per game)')
 DXVK_TITLE = ('Bundle DXVK / VKD3D', 'DXVK / VKD3D bundle')
 DXVK_NATIVE = ('Versions natives de Batocera', 'Batocera defaults')
+COMMUNITY_KEYS = {'reshade': 'community_reshade', 'antimicrox': 'community_antimicrox'}
+COMMUNITY_NAMES = {
+    'community_reshade': ('Presets ReShade communautaires (par jeu)', 'Community ReShade presets (per game)'),
+    'community_antimicrox': ('Profils AntiMicroX communautaires (par jeu)', 'Community AntiMicroX profiles (per game)'),
+}
 OPTIONS = {
+    'community': tuple((key, names, {}) for key, names in COMMUNITY_NAMES.items()),
     'mangohud': (
         ('mangohud', ('MangoHud', 'MangoHud'), SWITCH),
         ('mangohud_display', ('Profil MangoHud', 'MangoHud profile'),
@@ -86,7 +95,42 @@ def dxvk_choices(bundles):
     return choices
 
 
-def refresh(path=FEATURES, bundles=BUNDLES):
+@contextmanager
+def features_lock(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with (path.parent / '.uwt-features.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
+def community_choices(home, key, name):
+    from community_catalog import es_choices
+
+    french = name == COMMUNITY_NAMES[key][0]
+    kind = next(kind for kind, option in COMMUNITY_KEYS.items() if option == key)
+    rows = es_choices(home, kind)
+    if rows:
+        return rows
+    return [('catalogue-unavailable', 'Catalogue en attente' if french else 'Waiting for catalogue')]
+
+
+def update_choices(feature, expected):
+    current = [(choice.get('value'), choice.get('name')) for choice in feature.findall('choice')]
+    if current == expected:
+        return False
+    for choice in feature.findall('choice'):
+        feature.remove(choice)
+    for value, label in expected:
+        ET.SubElement(feature, 'choice', name=label, value=value)
+    return True
+
+
+def refresh(path=FEATURES, bundles=BUNDLES, home=HOME):
+    with features_lock(path):
+        refresh_features(path, bundles, home)
+
+
+def refresh_features(path, bundles, home):
     if path.is_symlink():
         return
     raw = option_file(path)
@@ -108,18 +152,21 @@ def refresh(path=FEATURES, bundles=BUNDLES):
     if dxvk is not None:
         index = int(dxvk.get('name') != DXVK_TITLE[0])
         expected = [(value, names[index]) for value, names in dxvk_choices(bundles).items()]
-        current = [(choice.get('value'), choice.get('name')) for choice in dxvk.findall('choice')]
-        if current != expected:
-            for choice in dxvk.findall('choice'):
-                dxvk.remove(choice)
-            for value, label in expected:
-                ET.SubElement(dxvk, 'choice', name=label, value=value)
-            changes = True
+        changes |= update_choices(dxvk, expected)
+    for key in COMMUNITY_NAMES:
+        feature = xml.find(f'./emulator/system/feature[@value="uwt_{key}"]')
+        if feature is not None:
+            changes |= update_choices(feature, community_choices(home, key, feature.get('name')))
     if changes:
         write_features(path, xml)
 
 
-def publish(groups, language, path=FEATURES, bundles=BUNDLES):
+def publish(groups, language, path=FEATURES, bundles=BUNDLES, home=HOME):
+    with features_lock(path):
+        publish_features(groups, language, path, bundles, home)
+
+
+def publish_features(groups, language, path, bundles, home):
     raw = option_file(path)
     if path.exists() and OWNER not in raw:
         raise ValueError(f'{path} is not owned by Ultimate Wine Toolbox')
@@ -136,7 +183,13 @@ def publish(groups, language, path=FEATURES, bundles=BUNDLES):
         for key, names, choices in OPTIONS[group]:
             feature = ET.SubElement(system, 'feature', name=names[index], value=f'uwt_{key}',
                                     submenu='Ultimate Wine Toolbox')
-            if key == 'launcher':
+            if key in COMMUNITY_NAMES:
+                feature.set('description', (
+                    'Choisissez un partage portant le nom du jeu, puis quittez le menu avec Retour.',
+                    'Choose a share labelled with the game name, then leave the menu with Back.',
+                )[index])
+                update_choices(feature, community_choices(home, key, names[index]))
+            elif key == 'launcher':
                 launcher_choices(feature, index)
             else:
                 if key == 'dxvk':
@@ -144,6 +197,18 @@ def publish(groups, language, path=FEATURES, bundles=BUNDLES):
                 for value, captions in choices.items():
                     ET.SubElement(feature, 'choice', name=captions[index], value=value)
     write_features(path, xml)
+
+
+def enable_community(language, path=FEATURES, bundles=BUNDLES, home=HOME):
+    marker = home / 'state/community/es-options-initialized'
+    with features_lock(path):
+        if marker.is_file():
+            return
+        keys = exposed(path)
+        groups = {group for group, items in OPTIONS.items() if any(key in keys for key, _, _ in items)}
+        publish_features(groups | {'community'}, language, path, bundles, home)
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch()
 
 
 def game_key(rom, key):
@@ -215,11 +280,13 @@ def main():
     sub.add_parser('remove')
     sub.add_parser('refresh')
     sub.add_parser('dxvk-assigned')
+    enable = sub.add_parser('enable-community')
+    enable.add_argument('language', choices=('fr', 'en'))
     put = sub.add_parser('publish')
     put.add_argument('language', choices=('fr', 'en'))
     put.add_argument('groups', nargs='*')
     get = sub.add_parser('get')
-    get.add_argument('key', choices=tuple(CHOICES))
+    get.add_argument('key', choices=tuple(key for key in CHOICES if key not in COMMUNITY_NAMES))
     get.add_argument('rom')
     get.add_argument('--game-only', action='store_true')
     get.add_argument('--toolbox-game')
@@ -234,6 +301,8 @@ def main():
             FEATURES.unlink()
     elif args.action == 'refresh':
         refresh()
+    elif args.action == 'enable-community':
+        enable_community(args.language)
     elif args.action == 'dxvk-assigned':
         print('\n'.join(sorted(Overrides('').assigned_dxvk_bundles())))
     elif args.action == 'publish':

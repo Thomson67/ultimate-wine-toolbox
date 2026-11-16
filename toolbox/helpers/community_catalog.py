@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cache public community listings and serve the game-specific ES picker."""
+"""Cache public community listings and publish choices for EmulationStation."""
 import argparse
 import fcntl
 import json
@@ -8,10 +8,13 @@ from pathlib import Path
 import signal
 import subprocess
 import sys
+import threading
+import xml.etree.ElementTree as ET
 import time
 
 from community_packs import Packs
-from community_profiles import Community, atomic, dump, entry_label, game_key
+from community_profiles import Community, atomic, catalogue, dump, entry_label
+from es_options import refresh as refresh_es_options
 
 REFRESH_INTERVAL = 6 * 60 * 60
 RETRY_INTERVAL = 15 * 60
@@ -41,45 +44,65 @@ def refresh_packs(packs):
     return rows
 
 
-def load_packs(packs):
-    path = pack_cache(packs)
-    if path.is_file():
-        saved = json.loads(path.read_text(encoding='utf-8'))
-        if saved.get('source') == packs.api:
-            return saved['entries']
-    return refresh_packs(packs)
-
-
-def game_entries(rows, rom, name):
-    keys = {game_key(rom), game_key(name)} - {''}
-    return [row for row in rows if game_key(row['game']) in keys]
-
-
-def list_for_game(home, kind, rom, name):
-    sources = [('profiles', '', lambda: (row for row in Community(home).load()['entries']
-                                          if row['kind'] == kind))]
+def cached_entries(home, kind):
+    entries = {}
+    try:
+        community = Community(home)
+        if community.cache.is_file():
+            saved = json.loads(community.cache.read_text(encoding='utf-8'))
+            if saved['source'] == community.base:
+                entries.update((row['id'], row) for row in catalogue(saved['catalog'])['entries']
+                               if row['kind'] == kind)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f'Profiles cache: {error}', file=sys.stderr)
     if kind == 'reshade':
-        sources.append(('packs', 'zip:', lambda: load_packs(Packs(home))))
-    results = []
-    errors = []
-    for source, prefix, load in sources:
         try:
-            for row in game_entries(load(), rom, name):
-                suffix = ' [Pack ZIP]' if prefix else ''
-                results.append((prefix + row['id'], entry_label(row) + suffix))
+            packs = Packs(home)
+            path = pack_cache(packs)
+            if path.is_file():
+                saved = json.loads(path.read_text(encoding='utf-8'))
+                if saved['source'] == packs.api:
+                    entries.update(('zip:' + row['id'], row) for row in saved['entries'])
         except (OSError, ValueError, KeyError, TypeError) as error:
-            errors.append(f'{source}: {error}')
-    return sorted(results, key=lambda row: row[1].casefold()), errors
+            print(f'Packs cache: {error}', file=sys.stderr)
+    return entries
 
 
-def serve(home):
+def es_choices(home, kind):
+    labels = []
+    for identifier, row in cached_entries(home, kind).items():
+        suffix = ' [Pack ZIP]' if identifier.startswith('zip:') else ''
+        if kind == 'antimicrox' and 'UWT launcher-package-v1' in row.get('requirements', ()):
+            suffix = ' [Launcher]'
+        labels.append((identifier, entry_label(row) + suffix))
+    return sorted(labels, key=lambda row: (row[1].casefold(), row[0]))
+
+
+def sync_catalogues(home):
     while Path(__file__).is_file():
         try:
             succeeded = refresh(Community(home), lambda: Packs(home))
-        except (OSError, ValueError, KeyError, TypeError) as error:
+            refresh_es_options(home=home)
+        except (OSError, ValueError, KeyError, TypeError, ET.ParseError) as error:
             print(error, file=sys.stderr)
             succeeded = False
         time.sleep(REFRESH_INTERVAL if succeeded else RETRY_INTERVAL)
+
+
+def serve(home):
+    from community_es import Selections
+
+    threading.Thread(target=sync_catalogues, args=(home,), daemon=True).start()
+    selections = Selections(home, cached_entries)
+    while Path(__file__).is_file():
+        try:
+            selections.poll()
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            print(f'ES community: {error}', file=sys.stderr)
+            time.sleep(15)
+        time.sleep(1)
 
 
 def service(home, action, log):
@@ -129,23 +152,12 @@ def main():
     parser.add_argument('--home', type=Path, required=True)
     parser.add_argument('--log', type=Path)
     parser.add_argument('--serve', action='store_true', help=argparse.SUPPRESS)
-    parser.add_argument('action', nargs='?', choices=('start', 'stop', 'status', 'refresh', 'list'))
-    parser.add_argument('kind', nargs='?', choices=('reshade', 'antimicrox'))
-    parser.add_argument('rom', nargs='?')
-    parser.add_argument('name', nargs='?')
+    parser.add_argument('action', nargs='?', choices=('start', 'stop', 'status', 'refresh'))
     args = parser.parse_args()
     if args.serve:
         serve(args.home)
     if args.action == 'refresh':
         return 0 if refresh(Community(args.home), lambda: Packs(args.home)) else 1
-    if args.action == 'list':
-        rows, errors = list_for_game(args.home, args.kind, args.rom, args.name)
-        for identifier, label in rows:
-            print(f'{identifier}\t{label}')
-        if errors and not rows:
-            print('\n'.join(errors), file=sys.stderr)
-            return 1
-        return 0
     return service(args.home, args.action, args.log)
 
 

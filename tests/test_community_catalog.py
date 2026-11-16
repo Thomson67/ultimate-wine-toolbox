@@ -1,4 +1,4 @@
-"""Check ES catalogue filtering, cache preservation and service lifecycle."""
+"""Check ES choices, selection dispatch, cache preservation and service lifecycle."""
 import hashlib
 import json
 from pathlib import Path
@@ -14,6 +14,9 @@ HELPERS = ROOT / 'toolbox/helpers'
 sys.path.insert(0, str(HELPERS))
 
 import community_catalog as catalogue
+import community_es
+import es_options
+import xml.etree.ElementTree as ET
 from community_profiles import Community
 from community_packs import Packs
 
@@ -25,37 +28,76 @@ def profile(kind, game):
 
 
 class CatalogueTests(unittest.TestCase):
-    def test_cached_profiles_and_packs_are_filtered_by_rom_and_es_name(self):
+    def test_cached_profiles_and_packs_are_published_as_native_choices(self):
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder)
             digest = hashlib.sha256(b'zip').hexdigest()
             pack = dict(id='pack-'+digest, sha256=digest, game='Psychonauts',
                         title='Graphics pack', author='Author')
-            other = dict(pack, game='Psychonauts 2')
             community = Community(home)
             community.cache.parent.mkdir(parents=True)
             community.cache.write_text(json.dumps({
                 'source': community.base,
                 'catalog': {'schema': 1, 'entries': [
-                    profile('antimicrox', 'Psychonauts'),
+                    dict(profile('antimicrox', 'Psychonauts'), requirements=['UWT launcher-package-v1']),
                     dict(profile('antimicrox', 'Psychonauts 2'), id='other',
                          file='antimicrox/other.amgp'),
                     dict(profile('reshade', 'Psychonauts'), id='preset', file='reshade/preset.ini'),
                 ]},
             }))
             packs = Packs(home)
-            for entry in (pack, other):
-                with patch.object(Packs, 'listing', return_value=[entry]):
-                    catalogue.refresh_packs(packs)
-                with patch.object(Packs, 'listing', side_effect=AssertionError('network on cached list')):
-                    rom = '/userdata/roms/windows/Psychonauts[GE-Proton11-11-UMU].wsquashfs'
-                    rows, errors = catalogue.list_for_game(home, 'antimicrox', rom, 'Release')
-                    self.assertEqual([identifier for identifier, _ in rows], ['profile'])
-                    self.assertFalse(errors)
-                    rows, errors = catalogue.list_for_game(home, 'reshade', '/windows/test.wine', 'Psychonauts')
-                    expected = {'preset', 'zip:'+pack['id']} if entry is pack else {'preset'}
-                    self.assertEqual({identifier for identifier, _ in rows}, expected)
-                    self.assertFalse(errors)
+            with patch.object(Packs, 'listing', return_value=[pack]):
+                catalogue.refresh_packs(packs)
+            features = home / 'es_features.cfg'
+            es_options.publish({'mangohud'}, 'fr', features, home=home)
+            with patch.object(Packs, 'listing', side_effect=AssertionError('network during feature generation')):
+                es_options.enable_community('fr', features, home=home)
+            tree = ET.parse(features)
+            node = tree.find('.//feature[@value="uwt_community_reshade"]')
+            self.assertEqual({choice.get('value') for choice in node}, {'preset', 'zip:'+pack['id']})
+            node = tree.find('.//feature[@value="uwt_community_antimicrox"]')
+            self.assertEqual({choice.get('value') for choice in node}, {'profile', 'other'})
+            self.assertIn('[Launcher]', node.find('choice[@value="profile"]').get('name'))
+            self.assertIn('mangohud', es_options.exposed(features))
+            es_options.publish({'mangohud'}, 'fr', features, home=home)
+            es_options.enable_community('fr', features, home=home)
+            self.assertNotIn('community_reshade', es_options.exposed(features))
+
+    def test_es_selection_targets_the_game_once_and_auto_rearms_it(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            rom = home / 'Psychonauts[GE-Proton11-11-UMU].wsquashfs'
+            rom.touch()
+            features = home / 'es_features.cfg'
+            es_options.publish({'community'}, 'fr', features, home=home)
+            conf = home / 'batocera.conf'
+            key = es_options.game_key(rom, 'community_antimicrox')
+            entries = {'matching': {'game': 'Psychonauts'}, 'other': {'game': 'Psychonauts 2'}}
+            watcher = community_es.Selections(home, lambda *_: entries, features, conf)
+            with patch.object(community_es, 'es_games', return_value=[(str(rom), 'Psychonauts')]), \
+                 patch.object(community_es, 'es_environment', return_value={'DISPLAY': ':1'}), \
+                 patch.object(community_es.subprocess, 'Popen') as launch:
+                launch.return_value.poll.return_value = 0
+                conf.write_text(f'windows.uwt_community_reshade=system-value\n{key}=matching\n')
+                watcher.poll()
+                launch.assert_not_called()
+                watcher.poll()
+                self.assertEqual(launch.call_args.args[0][-3:], ['antimicrox', str(rom), 'matching'])
+                watcher = community_es.Selections(home, lambda *_: entries, features, conf)
+                watcher.poll()
+                watcher.poll()
+                self.assertEqual(launch.call_count, 1)
+                conf.write_text(f'{key}=auto\n')
+                watcher.poll()
+                watcher.poll()
+                conf.write_text(f'{key}=matching\n')
+                watcher.poll()
+                watcher.poll()
+                self.assertEqual(launch.call_count, 2)
+                conf.write_text(f'{key}=other\n')
+                watcher.poll()
+                watcher.poll()
+                self.assertEqual(launch.call_args.args[0][-1], 'unavailable')
 
     def test_failed_refresh_preserves_existing_catalogues(self):
         with tempfile.TemporaryDirectory() as folder:

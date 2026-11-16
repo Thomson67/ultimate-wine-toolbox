@@ -130,9 +130,15 @@ if [ ! -s "$DEST/toolbox/ports/$PORT_NAME.keys" ]; then
 fi
 cp -f "$DEST/toolbox/ports/$PORT_NAME.keys" "$KEYS"
 
-install -m 0755 "$DEST/toolbox/ports/$COMMUNITY_PORT_NAME" "$PORTS/$COMMUNITY_PORT_NAME"
-cp -f "$KEYS" "$PORTS/$COMMUNITY_PORT_NAME.keys"
+# Remove the separate launcher installed by the v0.11.6-dev3 preview.
+rm -f -- "$PORTS/$COMMUNITY_PORT_NAME" "$PORTS/$COMMUNITY_PORT_NAME.keys"
 mkdir -p "$(dirname "$COMMUNITY_SERVICE")" "$DEST/state/community"
+community_language="$(batocera-settings-get system.language 2>/dev/null || true)"
+case "$community_language" in fr*) community_language=fr ;; "") community_language="$L" ;; *) community_language=en ;; esac
+if ! python3 "$DEST/toolbox/helpers/es_options.py" enable-community "$community_language"; then
+    say "Activez les profils communautaires dans Paramètres → Options EmulationStation." \
+        "Enable community profiles in Settings → EmulationStation options."
+fi
 install -m 0755 "$DEST/toolbox/services/uwt_community" "$COMMUNITY_SERVICE"
 if [ ! -f "$DEST/state/community/service-initialized" ]; then
     if batocera-services enable uwt_community; then

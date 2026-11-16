@@ -165,7 +165,7 @@ resh_launch_preset() {
 
 resh_offer_preset_launch() {
     local rom="$1" message="$2" choice
-    if [ "${WT_COMMUNITY_PORT:-0}" = 1 ]; then
+    if [ "${WT_COMMUNITY_ES:-0}" = 1 ]; then
         msgbox "$(i18n resh_title)" "$message"
         return 0
     fi
@@ -244,7 +244,7 @@ resh_api_select() {
         if [[ ",$candidates," == *',legacy,'* ]]; then
             prompt+="\n$(i18n resh_api_unsupported)"
         fi
-        if [ "${WT_COMMUNITY_PORT:-0}" != 1 ]; then
+        if [ "${WT_COMMUNITY_ES:-0}" != 1 ]; then
             rows+=(diagnostic "$(i18n resh_diag_title)")
         fi
         choice="$(menu_select "$(i18n resh_title)" "$prompt" "${rows[@]}" wiki "$(i18n resh_api_wiki)")" || return 1

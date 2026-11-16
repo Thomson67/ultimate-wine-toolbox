@@ -33,10 +33,15 @@ source "$WT_ROOT/modules/settings.sh"
 source "$WT_ROOT/modules/documentation.sh"
 
 ensure_batocera_paths
-if [ "${1:-}" = --community ]; then
-    WT_COMMUNITY_PORT=1
-    community_es_menu
-    exit $?
+if [ "${1:-}" = --community-selection ]; then
+    WT_COMMUNITY_ES=1
+    title="$(community_txt 'Profils communautaires' 'Community profiles')"
+    if [ "${2:-}" = unavailable ]; then
+        msgbox "$title" "$(community_txt 'Ce partage ne correspond pas au jeu ou son entrée est indisponible. Choisissez un partage portant le nom du jeu.' 'This share does not match the game or its entry is unavailable. Choose a share labelled with the game name.')" >&2
+        exit 0
+    fi
+    community_download_selection "$2" "$title" "$3" "$4" || true
+    exit 0
 fi
 runner_offer_normalization_at_startup
 [ -f "$WT_HOME/state/antimicrox-live.json" ] || startup_update_check
