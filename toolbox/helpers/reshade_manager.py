@@ -95,7 +95,7 @@ def source_header(rom, rel, limit=1024*1024):
             raise ValueError('source executable escapes the game')
         with path.open('rb') as stream:
             return stream.read(limit)
-    with subprocess.Popen(['unsquashfs', '-cat', str(rom), relative(rel)],
+    with subprocess.Popen(['unsquashfs', '-cat', '-no-wildcards', str(rom), relative(rel)],
                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
         data = proc.stdout.read(limit)
         proc.stdout.close()
@@ -128,9 +128,18 @@ def launch_path(text):
 
 def autorun_executable(rom):
     valid_rom(rom)
-    exe = launch_path(autorun_source(rom))
-    if not exe:
-        raise ValueError('autorun.cmd does not name a Windows executable')
+    autorun = autorun_source(rom)
+    command = next((line.partition('=')[2].strip() for line in reversed(autorun.splitlines())
+                    if line.partition('=')[0].strip().upper() == 'CMD'), '')
+    target = re.match(r'^"([^"]+\.(?:bat|cmd|exe))"(?=\s|$)|^(.+?\.(?:bat|cmd|exe))(?=\s|$)',
+                      command, re.I)
+    if target and (target[1] or target[2]).casefold().endswith(('.bat', '.cmd')):
+        from reshade_batch import batch_executable
+        exe = batch_executable(rom, autorun)
+    else:
+        exe = launch_path(autorun)
+        if not exe:
+            raise ValueError('autorun.cmd does not name a Windows executable')
     pe_arch(source_header(rom, exe))
     return exe
 

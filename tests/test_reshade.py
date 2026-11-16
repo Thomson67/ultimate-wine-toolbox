@@ -46,12 +46,47 @@ class ReShadeTests(unittest.TestCase):
             subprocess.run(['mksquashfs', str(source), str(archive), '-processors', '1', '-no-progress'],
                            check=True, stdout=subprocess.DEVNULL)
             self.assertEqual(r.autorun_executable(archive), expected)
-        autorun.write_text('CMD=start.bat\n')
-        with self.assertRaisesRegex(ValueError, 'does not name'):
+        autorun.write_text('CMD=cmd /c start.bat\n')
+        with self.assertRaises(ValueError):
             r.autorun_executable(source)
         autorun.write_text('CMD=drive_c/Game Folder/Missing.exe\n')
         with self.assertRaises(FileNotFoundError):
             r.autorun_executable(source)
+
+    def test_autorun_resolves_one_literal_batch_executable(self):
+        source = self.base/'Batch game.wine'
+        folder = source/'drive_c/Folder with spaces'
+        folder.mkdir(parents=True)
+        (folder/'Game.exe').write_bytes(pe(64))
+        (folder/'Launcher.exe').write_bytes(pe(32))
+        autorun = source/'autorun.cmd'
+        batch = folder/'Launch Game.bat'
+        expected = 'drive_c/Folder with spaces/Game.exe'
+        for command, body in (
+            ('DIR="drive_c/Folder with spaces"\nCMD="Launch Game.bat"\n',
+             '@echo off\r\ncd /d "%~dp0"\r\nstart /wait "" ".\\Game.exe" --fullscreen\r\n'),
+            ('CMD="C:\\Folder with spaces\\Launch Game.bat"\n',
+             '"%~dp0Game.exe"\n'),
+            ('DIR="drive_c/Folder with spaces"\nCMD=Launch Game.bat --argument.exe\n',
+             '@echo off\nGame.exe --fullscreen\n'),
+        ):
+            with self.subTest(command=command, body=body):
+                autorun.write_text(command)
+                batch.write_text(body)
+                self.assertEqual(r.autorun_executable(source), expected)
+        for body in ('Game.exe\nLauncher.exe\n', 'start "" "%GAME%"\n',
+                     'if exist flag.txt Game.exe\nLauncher.exe\n',
+                     'cmd /c Launcher.exe\nGame.exe\n'):
+            with self.subTest(body=body):
+                batch.write_text(body)
+                with self.assertRaises(ValueError):
+                    r.autorun_executable(source)
+        batch.write_text('start "" "%~dp0Game.exe"\n')
+        if shutil.which('mksquashfs') and shutil.which('unsquashfs'):
+            archive = self.base/'Batch game.wsquashfs'
+            subprocess.run(['mksquashfs', str(source), str(archive), '-processors', '1', '-no-progress'],
+                           check=True, stdout=subprocess.DEVNULL)
+            self.assertEqual(r.autorun_executable(archive), expected)
 
     def test_export_uses_latest_game_preset_and_requires_overwrite_confirmation(self):
         r.event(self.home, self.rom, 'gameStart')
