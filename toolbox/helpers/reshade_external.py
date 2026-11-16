@@ -23,14 +23,18 @@ def es_start(home, rom, override, runner, bottles, legacy):
         return
     cfg = read_json(config_path(home, rom))
     if override != 'off' or (cfg.get('controlled') and not cfg.get('enabled')):
-        apply(home, rom, runner, bottles, legacy, desired=cfg)
+        root = apply(home, rom, runner, bottles, legacy, desired=cfg)
+        if override == 'off':
+            print(f'ReShade: masked {len(cfg["files"])} existing injector(s) in {root}', flush=True)
         return
     cfg = scan_game(home, rom)
     if not cfg['files']:
+        print(f'ReShade: no existing injector detected for {rom}', flush=True)
         return
     session = es_session_home(home)
     try:
-        apply(session, rom, runner, bottles, legacy, desired=dict(cfg, controlled=True, enabled=False))
+        root = apply(session, rom, runner, bottles, legacy, desired=dict(cfg, controlled=True, enabled=False))
+        print(f'ReShade: masked {len(cfg["files"])} existing injector(s) in {root} for this launch', flush=True)
     except Exception:
         restore(session, rom)
         raise
@@ -249,6 +253,7 @@ def apply(home, rom, runner='', bottles=Path('/userdata/system/wine-bottles/wind
         for _, temporary in staged:
             if temporary:
                 temporary.unlink(missing_ok=True)
+    return root
 
 
 def release(home, rom):

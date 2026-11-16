@@ -689,6 +689,10 @@ def event(home, rom, action, runner='', bottles=Path('/userdata/system/wine-bott
     if override == 'off' or (override is None and not cfg['enabled']):
         for jp in (home / 'reshade/installations' / key(rom)).glob('*.json'):
             restore_install(home, jp)
+        if es:
+            # Restoring a managed install can reveal the game's original injector,
+            # including a lower-layer DLL packaged inside a WSquashFS.
+            reshade_external.es_start(home, rom, 'off', runner, bottles, legacy)
         return
     valid_rom(rom)
     root, prefix = locations(rom, runner, bottles, legacy)

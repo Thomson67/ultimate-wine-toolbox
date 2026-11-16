@@ -199,6 +199,50 @@ class ExternalTests(unittest.TestCase):
             self.assertFalse(target.exists())
         self.assertEqual(archive.read_bytes(), original)
 
+    def test_es_masks_the_archived_injector_after_restoring_a_managed_install(self):
+        archive = self.base/'Managed.wsquashfs'
+        archive.write_bytes(b'original archive')
+        upper = self.base/'runner-bottle.wine'
+        target = upper/'drive_c/game/d3d9.dll'
+        target.parent.mkdir(parents=True)
+        config = self.home/'reshade/games'/(r.key(archive)+'.json')
+        journal = r.journal_path(self.home, archive, upper, upper)
+        r.save_json(e.config_path(self.home, archive), {
+            'rom': str(archive), 'signature': e.signature(archive), 'controlled': False,
+            'enabled': True, 'files': [{'path': 'drive_c/game/d3d9.dll', 'controllable': True}],
+        })
+        original_read = Path.read_text
+        file_id = e.file_id
+
+        def restore_install(home, path):
+            self.assertEqual((home, path), (self.home, journal))
+            self.assertEqual(target.read_bytes(), b'managed injector')
+            target.unlink()
+            path.unlink()
+
+        with patch('es_options.Overrides') as options, \
+                patch.object(r, 'restore_install', side_effect=restore_install) as restore, \
+                patch.object(e, 'locations', return_value=(upper, upper)), \
+                patch.object(Path, 'read_text', lambda path, *a, **kw:
+                             'mount -t overlay upperdir=' if str(path) == '/usr/bin/batocera-wine'
+                             else original_read(path, *a, **kw)), \
+                patch.object(e.os, 'mknod', lambda path, *_: Path(path).touch()), \
+                patch.object(e, 'file_id', lambda path: {'whiteout': True}
+                             if path == target and path.is_file() and path.stat().st_size == 0 else file_id(path)):
+            for override, enabled in [('off', True), (None, False)]:
+                with self.subTest(override=override, enabled=enabled):
+                    target.write_bytes(b'managed injector')
+                    r.save_json(journal, {})
+                    r.save_json(config, {'enabled': enabled})
+                    options.return_value.get.return_value = override
+                    r.event(self.home, archive, 'gameStart', es=True)
+                    self.assertEqual(target.read_bytes(), b'')
+                    self.assertEqual(r.read_json(config)['enabled'], enabled)
+                    r.event(self.home, archive, 'gameStop', es=True)
+                    self.assertFalse(target.exists())
+            self.assertEqual(restore.call_count, 2)
+        self.assertEqual(archive.read_bytes(), b'original archive')
+
     def test_wiki_matching_removes_runner_and_keeps_game_edition(self):
         self.assertEqual(a.game_title('Denshattack[Wine-11.5].wsquashfs'),'Denshattack')
         self.assertEqual(a.game_title('Game_Remastered[GE-Proton11-7-UMU].pc'),'Game Remastered')
