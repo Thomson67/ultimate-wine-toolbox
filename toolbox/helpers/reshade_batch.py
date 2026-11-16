@@ -10,6 +10,7 @@ TOKEN = re.compile(r'"[^"]*"|[^\s"]+')
 NON_LITERAL = re.compile(r'[:%!*?<>|&^"\r\n\t]')
 SETUP = {'echo', 'echo.', 'rem', 'set', 'setlocal', 'endlocal', 'chcp', 'cls', 'pause', 'ping', 'timeout', 'taskkill'}
 START_FLAGS = {'/wait', '/b', '/min', '/max', '/normal', '/i'}
+AUXILIARY_EXECUTABLES = {'antimicrox.exe', 'borderlessgaming.exe', 'borderless gaming.exe'}
 
 
 def prefix_path(value, directory, batch_folder):
@@ -71,7 +72,7 @@ def batch_executable(rom, autorun):
         if executable.suffix.casefold() != '.exe':
             raise ValueError('Batch launcher does not name a single literal executable')
         targets.add(executable)
-    games = {target for target in targets if target.name.casefold() != 'antimicrox.exe'}
+    games = {target for target in targets if target.name.casefold() not in AUXILIARY_EXECUTABLES}
     if len(games) == 1:
         game = games.pop()
         folder = game.parent.as_posix().casefold()

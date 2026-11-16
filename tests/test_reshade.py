@@ -108,6 +108,29 @@ class ReShadeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             r.autorun_executable(source)
 
+    def test_batch_ignores_borderless_gaming_outside_the_game_directory(self):
+        source = self.base/'Borderless game.wine'
+        folder = source/'drive_c/game'
+        folder.mkdir(parents=True)
+        (source/'autorun.cmd').write_text('DIR=drive_c/game\nCMD=start.bat\n')
+        (folder/'Game.exe').write_bytes(pe(64))
+        batch = folder/'start.bat'
+        for utility in (r'C:\Tools\BorderlessGaming.exe', r'%~dp0..\Tools\Borderless Gaming.exe'):
+            with self.subTest(utility=utility):
+                batch.write_text(f'start "" "{utility}"\n'
+                                 'start "" "C:\\antimicrox\\antimicrox.exe"\n'
+                                 'start /wait "" ".\\Game.exe"\n')
+                self.assertEqual(r.autorun_executable(source), 'drive_c/game/Game.exe')
+        for commands in (
+            'start "" "BorderlessGaming.exe"\nstart "" "Game.exe"\n',
+            'start "" "C:\\Tools\\BorderlessGaming.exe"\n',
+            'start "" "C:\\Tools\\BorderlessGaming.exe"\nstart "" "Game.exe"\nstart "" "Launcher.exe"\n',
+        ):
+            with self.subTest(commands=commands):
+                batch.write_text(commands)
+                with self.assertRaises(ValueError):
+                    r.autorun_executable(source)
+
     def test_export_uses_latest_game_preset_and_requires_overwrite_confirmation(self):
         r.event(self.home, self.rom, 'gameStart')
         (self.game / 'ReShadePreset.ini').write_text('Techniques=CAS@CAS.fx\n')
