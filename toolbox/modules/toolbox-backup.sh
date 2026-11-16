@@ -8,6 +8,17 @@ maintenance_backup_label() {
     fi
 }
 
+maintenance_backup_wait() {
+    local title="$1" message="$2"
+    if have_dialog; then
+        wt_clear_tty
+        if dialog --no-shadow --title "$title" --infobox "$message" 7 78; then
+            return
+        fi
+    fi
+    printf '%s\n' "$message"
+} >&2
+
 maintenance_backup_error() {
     local title="$1" message="$2" details="$3" report
     report="$(mktemp /tmp/wt-backup-error.XXXXXX)" || {
@@ -23,6 +34,7 @@ maintenance_backup_menu() {
     local title export_label restore_label runner_prompt restore_runners replace_prompt confirm_export
     local confirm_restore source_prompt output_prompt done_export done_restore failed estimate
     local path default_dir choice output size free summary
+    local analyzing creating checking restoring
     local -a options=()
     title="$(maintenance_backup_label)"
     if [ "$WT_LANGUAGE" = fr ]; then
@@ -38,6 +50,10 @@ maintenance_backup_menu() {
         done_export="Sauvegarde créée"
         done_restore="Restauration terminée. Redémarrez la Toolbox et EmulationStation. Vérifiez les associations des jeux renommés ou déplacés."
         failed="Opération interrompue"
+        analyzing="Analyse des fichiers à sauvegarder…"
+        creating="Création et compression de la sauvegarde…"
+        checking="Vérification de l’archive…"
+        restoring="Restauration de la sauvegarde…"
     else
         export_label="Create a backup"
         restore_label="Restore a backup"
@@ -51,6 +67,10 @@ maintenance_backup_menu() {
         done_export="Backup created"
         done_restore="Restore complete. Restart the Toolbox and EmulationStation. Check associations for renamed or moved games."
         failed="Operation failed"
+        analyzing="Scanning files to back up…"
+        creating="Creating and compressing the backup…"
+        checking="Checking the archive…"
+        restoring="Restoring the backup…"
     fi
     local -a helper=(python3 "$WT_ROOT/helpers/toolbox_backup.py")
     default_dir="/userdata/system/backups/ultimate-wine-toolbox"
@@ -61,6 +81,7 @@ maintenance_backup_menu() {
             path="$(input_text "$title" "$output_prompt" "$default_dir/UWT-$(date +%Y%m%d-%H%M%S).tar.gz")" || return
             [ -n "$path" ] || return
             if yesno_default_no "$title" "$runner_prompt"; then options+=(--runners); fi
+            maintenance_backup_wait "$title" "$analyzing"
             if ! estimate="$("${helper[@]}" estimate "$path" "${options[@]}" 2>&1)"; then
                 maintenance_backup_error "$title" "$failed" "$estimate"
                 return
@@ -68,6 +89,7 @@ maintenance_backup_menu() {
             IFS=$'\t' read -r size free <<< "$estimate"
             summary="$(awk -v size="$size" -v free="$free" 'BEGIN {printf "%.2f / %.2f GiB", size/1073741824, free/1073741824}')"
             yesno_default_no "$title" "$confirm_export\n\n$summary\n\n$path" || return
+            maintenance_backup_wait "$title" "$creating"
             if output="$("${helper[@]}" export "$path" "${options[@]}" 2>&1)"; then
                 msgbox "$title" "$done_export\n\n$path"
             else
@@ -77,6 +99,7 @@ maintenance_backup_menu() {
         2)
             path="$(input_text "$title" "$source_prompt" "$default_dir/")" || return
             [ -f "$path" ] || { msgbox "$title" "$failed\n\n$path"; return; }
+            maintenance_backup_wait "$title" "$checking"
             if ! summary="$("${helper[@]}" inspect "$path" 2>&1)"; then
                 maintenance_backup_error "$title" "$failed" "$summary"
                 return
@@ -84,6 +107,7 @@ maintenance_backup_menu() {
             yesno_default_no "$title" "$confirm_restore\n\n$summary" || return
             if yesno_default_no "$title" "$restore_runners"; then options+=(--runners); fi
             if yesno_default_no "$title" "$replace_prompt"; then options+=(--replace); fi
+            maintenance_backup_wait "$title" "$restoring"
             if output="$("${helper[@]}" restore "$path" "${options[@]}" 2>&1)"; then
                 python3 "$WT_ROOT/helpers/es_options.py" refresh >> "${WT_SESSION_LOG:-/dev/null}" 2>&1 || true
                 printf '%s\n' "$output" >> "${WT_SESSION_LOG:-/dev/null}"
