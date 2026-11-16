@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import re
+import time
 
 from antimicrox_handoff import EsApi
 from toolbox_return import resume
@@ -45,6 +46,7 @@ class Selections:
         self.stamp = None
         self.dispatched = None
         self.current = None
+        self.retry_at = 0
 
     def poll(self):
         stat = self.conf.stat()
@@ -71,10 +73,12 @@ class Selections:
             except (FileNotFoundError, ValueError):
                 self.dispatched = {}
         delivered = {key: value for key, value in self.dispatched.items() if self.current.get(key) == value}
+        self.save_delivered(delivered)
         pending = next(((key, value) for key, value in self.current.items() if key not in delivered), None)
-        if pending:
+        if pending and time.monotonic() >= self.retry_at:
             api = EsApi()
             if api.running()[0] != 201 or any((self.home / 'state' / name).exists() for name in OTHER_WORKFLOWS):
+                self.retry_at = time.monotonic() + 1
                 return
             key, value = pending
             option = GAME_SETTING.fullmatch(key)[2]
@@ -85,6 +89,11 @@ class Selections:
             print(f'ES community {key}: {value} ({rom or "no matching game"})', flush=True)
             if open_selection(self.home, api, args):
                 delivered[key] = value
+                self.save_delivered(delivered)
+            else:
+                self.retry_at = time.monotonic() + 1
+
+    def save_delivered(self, delivered):
         if delivered != self.dispatched:
             atomic(self.state, dump(delivered))
             self.dispatched = delivered

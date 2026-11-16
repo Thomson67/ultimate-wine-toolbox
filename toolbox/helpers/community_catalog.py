@@ -102,7 +102,7 @@ def serve(home):
         except (OSError, ValueError, KeyError, TypeError, RuntimeError) as error:
             print(f'ES community: {error}', file=sys.stderr)
             time.sleep(15)
-        time.sleep(1)
+        time.sleep(.2)
 
 
 def service(home, action, log):
@@ -139,7 +139,7 @@ def service(home, action, log):
         command = [sys.executable, str(Path(__file__).resolve()), '--home', str(home), '--serve']
         with log.open('a', encoding='utf-8') as output:
             process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=output,
-                                       stderr=output, start_new_session=True,
+                                       stderr=output, start_new_session=True, cwd=home,
                                        pass_fds=(lock.fileno(),))
         lock.seek(0)
         lock.truncate()

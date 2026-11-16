@@ -94,6 +94,7 @@ class CatalogueTests(unittest.TestCase):
                 watcher.poll()
                 launch.assert_not_called()
                 es.return_value.running.return_value = (201, '')
+                watcher.retry_at = 0
                 watcher.poll()
                 self.assertEqual(launch.call_args.args[2], ['antimicrox', str(rom), 'matching'])
                 watcher = community_es.Selections(home, lambda *_: entries, features, conf)
@@ -111,6 +112,23 @@ class CatalogueTests(unittest.TestCase):
                 watcher.poll()
                 watcher.poll()
                 self.assertEqual(launch.call_args.args[2], ['unavailable'])
+
+    def test_auto_clears_delivered_state_even_when_another_selection_cannot_launch(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            features = home/'es_features.cfg'
+            es_options.publish({'community'}, 'fr', features, home=home)
+            conf = home/'batocera.conf'
+            first = es_options.game_key('First.wine', 'community_reshade')
+            second = es_options.game_key('Second.wine', 'community_antimicrox')
+            watcher = community_es.Selections(home, lambda *_: {}, features, conf)
+            watcher.save_delivered({first: 'already-opened'})
+            conf.write_text(f'{second}=pending\n')
+            with patch.object(community_es, 'EsApi') as api:
+                api.return_value.running.return_value = (200, '/toolbox')
+                watcher.poll()
+                watcher.poll()
+            self.assertEqual(json.loads(watcher.state.read_text()), {})
 
     def test_selection_stages_literal_arguments_for_es_and_cleans_up(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -159,6 +177,7 @@ class CatalogueTests(unittest.TestCase):
                     time.sleep(0.02)
                 self.assertTrue((home / 'test.log').stat().st_size)
                 first_pid = lock.read_text()
+                self.assertEqual(Path(f'/proc/{first_pid}/cwd').resolve(), home.resolve())
                 subprocess.run([*helper, 'start'], check=True)
                 self.assertEqual(lock.read_text(), first_pid)
                 subprocess.run([*helper, 'status'], check=True)
