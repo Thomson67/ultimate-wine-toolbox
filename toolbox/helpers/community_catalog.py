@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 import time
 
 from community_packs import Packs
-from community_profiles import Community, atomic, catalogue, dump, entry_label
+from community_profiles import Community, atomic, catalogue, dump
 from es_options import refresh as refresh_es_options
 
 REFRESH_INTERVAL = 6 * 60 * 60
@@ -78,7 +78,7 @@ def es_choices(home, kind):
             else:
                 label = Path(row['file']).name
         else:
-            label = entry_label(row)
+            label = Path(row['file']).name
             if 'UWT launcher-package-v1' in row.get('requirements', ()):
                 label += ' [Launcher]'
         labels.append((identifier, label, row['game'].casefold() if kind == 'reshade' else ''))

@@ -171,8 +171,8 @@ def apply_launcher_import(home, source, rom, check=False):
     profile_bytes('antimicrox', Path(source).read_bytes(), export=True)
     if config['mode'] == 'profiles':
         profile_bytes('antimicrox', Path(config['game_profile']).read_bytes(), export=True)
-    Store(home).save(rom, config['mode'], str(source), config['launcher_rule'],
-                     config.get('game_profile', ''), config['game_rule'], validate_only=check)
+    return Store(home).save(rom, config['mode'], str(source), config['launcher_rule'],
+                            config.get('game_profile', ''), config['game_rule'], validate_only=check)
 
 
 def profile_bytes(kind, data, export=False):
@@ -524,16 +524,17 @@ class Community:
     def find(self, kind, identifier):
         return next((item for item in self.load()['entries'] if item['kind'] == kind and item['id'] == identifier), None)
 
-    def local_profile(self, item):
+    def local_profile(self, item, *, assigned=None):
         imports = self.home/'state/community/imports.json'
         values = json.loads(imports.read_text()) if imports.exists() else {}
         for filename, saved in values.items():
-            if (saved.get('id'), saved.get('kind'), saved.get('sha256')) != (item['id'], item['kind'], item['sha256']): continue
             path = Path(filename)
+            if assigned is not None and path != assigned: continue
+            if (saved.get('id'), saved.get('kind'), saved.get('sha256')) != (item['id'], item['kind'], item['sha256']): continue
             try:
                 if path.is_symlink() or not path.is_file() or path.stat().st_size > LIMIT: continue
                 data = path.read_bytes()
-                profile_bytes(item['kind'], data)
+                profile_bytes(item['kind'], data, export=assigned is not None)
             except (OSError, ValueError, ET.ParseError, configparser.Error): continue
             return path, hashlib.sha256(data).hexdigest() != saved.get('installed_sha256', item['sha256'])
         return None

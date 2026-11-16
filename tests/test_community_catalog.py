@@ -17,8 +17,9 @@ import community_catalog as catalogue
 import community_es
 import es_options
 import xml.etree.ElementTree as ET
-from community_profiles import Community
+from community_profiles import Community, apply_launcher_import, launcher_export
 from community_packs import Packs
+from antimicrox_launcher import Store
 
 
 def profile(kind, game):
@@ -57,7 +58,8 @@ class CatalogueTests(unittest.TestCase):
             self.assertEqual({choice.get('value') for choice in node}, {'preset', 'zip:'+pack['id']})
             node = tree.find('.//feature[@value="uwt_community_antimicrox"]')
             self.assertEqual({choice.get('value') for choice in node}, {'profile', 'other'})
-            self.assertIn('[Launcher]', node.find('choice[@value="profile"]').get('name'))
+            self.assertEqual(node.find('choice[@value="profile"]').get('name'), 'profile.amgp [Launcher]')
+            self.assertEqual(node.find('choice[@value="other"]').get('name'), 'other.amgp')
             system = tree.find('./emulator/system')
             keys = [feature.get('value') for feature in system]
             for kind in ('reshade', 'antimicrox'):
@@ -123,7 +125,76 @@ class CatalogueTests(unittest.TestCase):
                 conf.write_text(f'{key}=other\n')
                 watcher.poll()
                 watcher.poll()
-                self.assertEqual(launch.call_args.args[2], ['unavailable'])
+                self.assertEqual(launch.call_args.args[2], ['antimicrox', str(rom), 'other'])
+
+    def test_selection_requires_a_unique_registered_game(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            rom = home/'Renamed.wine'
+            rom.mkdir()
+            duplicate = home/'other'/rom.name
+            duplicate.mkdir(parents=True)
+            share = {'game': 'Original title'}
+            amx = 'community_antimicrox'
+            reshade = 'community_reshade'
+            games = [(str(rom), 'Custom ES title')]
+            with patch.object(community_es, 'es_games', return_value=games):
+                self.assertEqual(community_es.resolve_game(amx, es_options.game_key(rom, amx), share), str(rom))
+                self.assertIsNone(community_es.resolve_game(reshade, es_options.game_key(rom, reshade), share))
+                games.append((str(duplicate), 'Original title'))
+                self.assertIsNone(community_es.resolve_game(amx, es_options.game_key(rom, amx), share))
+
+    def test_reselecting_assigned_antimicrox_profile_keeps_toolbox_closed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            rom = home/'Renamed.wine'
+            rom.mkdir()
+            features, conf = home/'es_features.cfg', home/'batocera.conf'
+            es_options.publish({'community'}, 'fr', features, home=home)
+            share = profile('antimicrox', 'Original title')
+            path = Community(home).install_profile(share, b'<gamecontroller><sets/></gamecontroller>')
+            associations = home/'config/antimicrox-games.tsv'
+            associations.write_text(f'{rom}\t{path}\n')
+            edited = b'<gamecontroller><uniqueID>local-pad</uniqueID><sets/></gamecontroller>'
+            path.write_bytes(edited)
+            key = es_options.game_key(rom, 'community_antimicrox')
+            conf.write_text(f'{key}=profile\n')
+            watcher = community_es.Selections(home, lambda *_: {'profile': share}, features, conf)
+            with patch.object(community_es, 'es_games', return_value=[(str(rom), 'Custom ES title')]), \
+                 patch.object(community_es, 'EsApi') as api, \
+                 patch.object(community_es, 'open_selection') as launch:
+                api.return_value.running.return_value = (201, '')
+                watcher.poll()
+                watcher.poll()
+                launch.assert_not_called()
+                self.assertEqual(watcher.dispatched, {key: 'profile'})
+            self.assertEqual(path.read_bytes(), edited)
+            self.assertEqual(associations.read_text(), f'{rom}\t{path}\n')
+            self.assertFalse(community_es.antimicrox_already_assigned(home, str(rom), dict(share, sha256='f'*64)))
+            self.assertFalse(community_es.antimicrox_already_assigned(home, str(home/'Other.wine'), share))
+
+    def test_reselecting_launcher_requires_the_complete_configuration(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            rom = str(home/'Target.wine')
+            source = home/'original.amgp'
+            source.write_bytes(b'<gamecontroller><sets/></gamecontroller>')
+            store = Store(home)
+            rule = {'field': 'title', 'match': 'exact', 'value': 'Launcher'}
+            store.save(rom, 'profiles', str(source), rule, str(source))
+            bundle = launcher_export(home, source, rom)
+            share = profile('antimicrox', 'Original title')
+            share['sha256'] = hashlib.sha256(bundle).hexdigest()
+            launcher = Community(home).install_profile(share, bundle)
+            (home/'config/antimicrox-games.tsv').write_text(f'{rom}\t{launcher}\n')
+            self.assertFalse(community_es.antimicrox_already_assigned(home, rom, share))
+            config = apply_launcher_import(home, launcher, rom)
+            self.assertTrue(community_es.antimicrox_already_assigned(home, rom, share))
+            game = Path(config['game_profile'])
+            game.write_text('<gamecontroller>')
+            self.assertFalse(community_es.antimicrox_already_assigned(home, rom, share))
+            game.unlink()
+            self.assertFalse(community_es.antimicrox_already_assigned(home, rom, share))
 
     def test_local_preset_selection_does_not_relaunch_a_pending_community_request(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -19,13 +19,17 @@ community_report() {
 } >&2
 
 community_import_actions() {
-  local kind="$1" path="$2" title="$3" rom="${4:-}" choice output details selected launcher_notice old_profile
+  local kind="$1" path="$2" title="$3" rom="${4:-}" choice output details selected launcher_notice old_profile assign_label
   local reshade_installed="${5:-0}"
   local -a test_options=(live "$(community_txt 'Modifier les commandes et tester en jeu' 'Edit controls and test in game')")
   [ "${WT_COMMUNITY_ES:-0}" != 1 ] || test_options=()
   local es_preset_attempted=0
   while [ "$es_preset_attempted" -eq 0 ]; do
     if [ "$kind" = antimicrox ]; then
+      assign_label="$(community_txt 'Utiliser ce profil pour un jeu' 'Use this profile for a game')"
+      if [ "${WT_COMMUNITY_ES:-0}" = 1 ] && [ -n "$rom" ]; then
+        assign_label="$(community_txt 'Associer au jeu sélectionné' 'Assign to the selected game')"
+      fi
       launcher_notice="$(community_cmd launcher-info "$path" 2>/dev/null)" || launcher_notice=""
       if [ -n "$launcher_notice" ]; then
         launcher_notice="$(community_txt 'Configuration launcher complète : règles de fenêtres et profils inclus. Ils seront installés pour le jeu choisi.' 'Complete launcher configuration: window rules and profiles included. They will be installed for the selected game.')"
@@ -41,7 +45,7 @@ $launcher_notice
 Check the Hotkey in the editor before enabling. The game’s Pad2Key will be backed up and suspended on assignment.")" \
         info "$(community_txt 'Voir les commandes de la manette' 'View controller mappings')" \
         edit "$(community_txt 'Modifier le profil sans lancer de jeu' 'Edit the profile without starting a game')" \
-        assign "$(community_txt 'Utiliser ce profil pour un jeu' 'Use this profile for a game')" \
+        assign "$assign_label" \
         "${test_options[@]}" back "$(i18n back)")" || return 0
       case "$choice" in
         info) amx_profile_info "$path" ;;

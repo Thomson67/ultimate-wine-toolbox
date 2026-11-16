@@ -3,10 +3,11 @@ import json
 from pathlib import Path
 import re
 import time
+import xml.etree.ElementTree as ET
 
 from antimicrox_handoff import EsApi
 from toolbox_return import resume
-from community_profiles import atomic, dump, es_games, game_key as title_key
+from community_profiles import Community, apply_launcher_import, atomic, dump, es_games, game_key as title_key
 from es_options import COMMUNITY_KEYS, CONF, FEATURES, RESHADE_PRESET_KEY, Overrides, game_key
 
 GAME_SETTING = re.compile(r'windows\["([^"\r\n]+)"\]\.uwt_(community_(?:antimicrox|reshade))')
@@ -32,9 +33,31 @@ def resolve_game(option, setting, share):
                if game_key(rom, option) == setting and Path(rom).exists()]
     if len(matches) == 1:
         rom, title = matches[0]
-        if title_key(share['game']) in ({title_key(rom), title_key(title)} - {''}):
+        if (option == COMMUNITY_KEYS['antimicrox']
+                or title_key(share['game']) in ({title_key(rom), title_key(title)} - {''})):
             return rom
     return None
+
+
+def antimicrox_already_assigned(home, rom, share):
+    from antimicrox_launcher import Store
+
+    try:
+        config = (home / 'config/antimicrox-games.tsv').read_text()
+    except FileNotFoundError:
+        return False
+    assigned = ''
+    for line in config.splitlines():
+        game, _, path = line.partition('\t')
+        if game == rom:
+            assigned = path
+    if not assigned or not Community(home).local_profile(share, assigned=Path(assigned)):
+        return False
+    try:
+        expected = apply_launcher_import(home, assigned, rom, check=True)
+        return expected is None or Store(home).load(rom, assigned) == expected
+    except (OSError, ValueError, ET.ParseError):
+        return False
 
 
 def apply_installed_reshade(home, rom, value, share):
@@ -133,10 +156,16 @@ class Selections:
             args = [kind, rom, value] if rom else ['unavailable']
             print(f'ES community {key}: {value} ({rom or "no matching game"})', flush=True)
             try:
-                applied = kind == 'reshade' and rom and apply_installed_reshade(self.home, rom, value, share)
-                if applied:
-                    print(f'ES community: reactivated installed ReShade preset for {rom}', flush=True)
-                if applied or open_selection(self.home, api, args):
+                handled = False
+                if rom and kind == 'reshade':
+                    handled = apply_installed_reshade(self.home, rom, value, share)
+                    if handled:
+                        print(f'ES community: reactivated installed ReShade preset for {rom}', flush=True)
+                elif rom and kind == 'antimicrox':
+                    handled = antimicrox_already_assigned(self.home, rom, share)
+                    if handled:
+                        print(f'ES community: AntiMicroX profile already assigned to {rom}', flush=True)
+                if handled or open_selection(self.home, api, args):
                     delivered[key] = value
                     self.save_delivered(delivered)
                     return

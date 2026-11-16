@@ -202,8 +202,8 @@ def community_description(key, french):
     if key == 'community_reshade':
         return ('Choisissez un preset ou un pack pour ce jeu, puis quittez avec Retour.' if french else
                 'Choose a preset or bundle for this game, then leave the menu with Back.')
-    return ('Choisissez un partage portant le nom du jeu, puis quittez le menu avec Retour.' if french else
-            'Choose a share labelled with the game name, then leave the menu with Back.')
+    return ('Choisissez un profil pour ce jeu, puis quittez avec Retour.' if french else
+            'Choose a profile for this game, then leave the menu with Back.')
 
 
 def refresh_features(path, bundles, home):
