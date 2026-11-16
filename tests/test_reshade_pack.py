@@ -98,6 +98,20 @@ class LocalReShadePackTests(unittest.TestCase):
         self.assertEqual(index(self.home, self.rom)['active'], before)
         self.assertTrue(duplicate.is_file())
 
+    def test_es_keeps_the_preset_first_and_the_end_of_long_game_names(self):
+        import reshade_presets as presets
+
+        rom = self.base/'The Legend of Zelda - Ocarina of Time 3D.wine'
+        rom.mkdir()
+        key = m.key(rom)
+        m.save_json(self.home/'reshade/games'/f'{key}.json', {'rom': str(rom)})
+        identity = presets.add(self.home, rom, b'Techniques=\n', 'Sans CRT.ini')
+        choices = dict(presets.es_choices(self.home))
+        label = choices[f'{key}:{identity}']
+        self.assertTrue(label.startswith('Sans CRT.ini — '))
+        self.assertTrue(label.endswith('Ocarina of Time 3D'))
+        self.assertIn('…', label)
+
     def test_es_lists_pack_variants_and_individual_presets_and_applies_the_choice(self):
         import es_options as es
         import reshade_presets as presets
@@ -119,7 +133,7 @@ class LocalReShadePackTests(unittest.TestCase):
         key = m.key(self.rom)
         choices = {node.get('name'): node.get('value') for node in ET.parse(features).findall(
             './/feature[@value="uwt_reshade_preset"]/choice')}
-        names = {label.split(' — ', 1)[1]: value for label, value in choices.items()}
+        names = {label.split(' — ', 1)[0]: value for label, value in choices.items()}
         self.assertEqual(set(names), {'Ultra.ini', 'Second.ini', individual.name})
         self.assertEqual(names[individual.name], f'{key}:{individual_id}')
         option = es.game_key(self.rom, es.RESHADE_PRESET_KEY)

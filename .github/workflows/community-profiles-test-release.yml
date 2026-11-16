@@ -1,7 +1,7 @@
 name: Publish Community profiles test prerelease
 on:
   push:
-    branches: ["release-test/v0.11.6-dev14"]
+    branches: ["release-test/v0.11.6-dev15"]
     paths:
       - .github/workflows/community-profiles-test-release.yml
 
@@ -12,7 +12,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      TAG: v0.11.6-dev14
+      TAG: v0.11.6-dev15
     steps:
       - uses: actions/checkout@v4
       - name: Verify and package the prerelease

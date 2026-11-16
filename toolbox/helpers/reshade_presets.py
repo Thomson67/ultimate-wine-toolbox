@@ -161,14 +161,23 @@ def es_choices(home):
             for identity, entry in index(home, rom)['items'].items():
                 if entry.get('pack', '') != pack or not path(home, rom, identity).is_file():
                     continue
-                label = f"{game_title(rom.name)} — {title(entry['name'])}"
-                label.encode('utf-8', errors='strict')
-                rows.append((f'{config.stem}:{identity}', label))
+                game = game_title(rom.name)
+                preset = title(entry['name'])
+                (game + preset).encode('utf-8', errors='strict')
+                rows.append((f'{config.stem}:{identity}', game, preset))
         except (KeyError, OSError, TypeError, ValueError) as error:
             print(f'ES ReShade presets: {config.name}: {error}', file=sys.stderr)
-    counts = Counter(label.casefold() for _, label in rows)
-    return [(value, f'{label} [{value.rsplit(":", 1)[1][:8]}]' if counts[label.casefold()] > 1 else label)
-            for value, label in sorted(rows, key=lambda row: (row[1].casefold(), row[0]))]
+    labels = []
+    for value, game, preset in sorted(rows, key=lambda row: (row[1].casefold(), row[2].casefold(), row[0])):
+        short_game = game if len(game) <= 32 else f'{game[:13].rstrip()}…{game[-18:].lstrip()}'
+        labels.append((value, preset, short_game))
+    counts = Counter((preset.casefold(), game.casefold()) for _, preset, game in labels)
+    choices = []
+    for value, preset, game in labels:
+        if counts[preset.casefold(), game.casefold()] > 1:
+            preset += f' [{value.rsplit(":", 1)[1][:8]}]'
+        choices.append((value, f'{preset} — {game}'))
+    return choices
 
 
 def activate_es(home, rom, overrides):
