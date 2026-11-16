@@ -8,6 +8,8 @@ OLD_DEST="/userdata/system/thomsonito-wine-toolbox"
 PORTS="/userdata/roms/ports"
 PORT_NAME="Ultimate Wine Toolbox.sh"
 PORT="$PORTS/$PORT_NAME"
+COMMUNITY_PORT_NAME="Ultimate Wine Toolbox - Community Profiles.sh"
+COMMUNITY_SERVICE="/userdata/system/services/uwt_community"
 KEYS="$PORTS/$PORT_NAME.keys"
 OLD_PORT="$PORTS/Thomsonito Batocera Wine Toolbox.sh"
 
@@ -80,6 +82,9 @@ rm -rf -- "$OLD_DEST" "$OLD_LOG_DIR" "$OLD_BACKUP_DIR"
 rm -f -- "$OLD_PORT" "$OLD_PORT.keys" "$OLD_MANGOHUD_HOOK" "$OLD_DXVK_HOOK"
 
 mkdir -p "$DEST" "$DEST/templates" "$PORTS" "$SCRIPTS" "$LOG_DIR" "$BACKUP_DIR"
+if [ -f "$COMMUNITY_SERVICE" ]; then
+    bash "$COMMUNITY_SERVICE" stop
+fi
 rm -rf "$DEST/toolbox"
 cp -a "$SRC/toolbox" "$DEST/toolbox"
 if [ -f "$DEST/v41-savedir/enabled" ]; then
@@ -124,6 +129,25 @@ if [ ! -s "$DEST/toolbox/ports/$PORT_NAME.keys" ]; then
     exit 1
 fi
 cp -f "$DEST/toolbox/ports/$PORT_NAME.keys" "$KEYS"
+
+install -m 0755 "$DEST/toolbox/ports/$COMMUNITY_PORT_NAME" "$PORTS/$COMMUNITY_PORT_NAME"
+cp -f "$KEYS" "$PORTS/$COMMUNITY_PORT_NAME.keys"
+mkdir -p "$(dirname "$COMMUNITY_SERVICE")" "$DEST/state/community"
+install -m 0755 "$DEST/toolbox/services/uwt_community" "$COMMUNITY_SERVICE"
+if [ ! -f "$DEST/state/community/service-initialized" ]; then
+    if batocera-services enable uwt_community; then
+        touch "$DEST/state/community/service-initialized"
+    else
+        say "Activez uwt_community dans les services Batocera pour synchroniser le catalogue." \
+            "Enable uwt_community in Batocera services to synchronize the catalogue."
+    fi
+fi
+if batocera-settings-get system.services | tr ' ' '\n' | grep -Fxq uwt_community; then
+    if ! batocera-services start uwt_community; then
+        say "Le service du catalogue communautaire n’a pas pu démarrer." \
+            "The community catalogue service could not be started."
+    fi
+fi
 
 if [ -s "$DEST/toolbox/hooks/mangohud-game-event.sh" ]; then
     cp -f "$DEST/toolbox/hooks/mangohud-game-event.sh" "$MANGOHUD_HOOK"

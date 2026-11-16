@@ -21,6 +21,8 @@ community_report() {
 community_import_actions() {
   local kind="$1" path="$2" title="$3" rom="${4:-}" choice output details selected launcher_notice old_profile
   local reshade_installed="${5:-0}"
+  local -a test_options=(live "$(community_txt 'Modifier les commandes et tester en jeu' 'Edit controls and test in game')")
+  [ "${WT_COMMUNITY_PORT:-0}" != 1 ] || test_options=()
   while true; do
     if [ "$kind" = antimicrox ]; then
       launcher_notice="$(community_cmd launcher-info "$path" 2>/dev/null)" || launcher_notice=""
@@ -39,7 +41,7 @@ Check the Hotkey in the editor before enabling. The game’s Pad2Key will be bac
         info "$(community_txt 'Voir les commandes de la manette' 'View controller mappings')" \
         edit "$(community_txt 'Modifier le profil sans lancer de jeu' 'Edit the profile without starting a game')" \
         assign "$(community_txt 'Utiliser ce profil pour un jeu' 'Use this profile for a game')" \
-        live "$(community_txt 'Modifier les commandes et tester en jeu' 'Edit controls and test in game')" back "$(i18n back)")" || return 0
+        "${test_options[@]}" back "$(i18n back)")" || return 0
       case "$choice" in
         info) amx_profile_info "$path" ;;
         edit) amx_editor "$path" ;;
@@ -740,7 +742,7 @@ community_share_menu() {
 
 
 community_menu() {
-  local kind="$1" rom="${2:-}" title choice query="" rows id label selected details path output share_label empty_label count_label search_prompt
+  local kind="$1" rom="${2:-}" title choice query="" rows id label selected output share_label empty_label count_label search_prompt
   local -a items=()
   local browse_label intro game_name
   local -A WT_MENU_GAME_LABELS=()
@@ -803,21 +805,71 @@ $output"; fi
     done <<< "$rows"
     selected="$(WT_MENU_LIST=1 menu_select "$title" "$(community_txt 'Choisir un profil ou un preset' 'Choose a profile or preset')" "${items[@]}" back "$(i18n back)")" || continue
     [ "$selected" != back ] || continue
-    if [ "$kind" = reshade ] && [[ "$selected" = zip:* ]]; then
-      path="$(community_fetch_reshade_pack "$title" "${selected#zip:}")" || continue
-      community_apply_reshade_pack "$title" "$rom" "$path"
-      continue
-    fi
-    details="$(community_cmd show "$kind" "$selected" 2>&1)" || { msgbox "$title" "$details"; continue; }
-    path="$(community_cmd local "$kind" "$selected" 2>/dev/null)" || path=""
-    if [ -n "$path" ]; then
-      yesno "$title" "$details"$'\n\n'"$(community_txt 'Ce fichier est déjà téléchargé. Utiliser votre copie locale ?' 'This file is already downloaded. Use your local copy?')" || continue
-      community_import_actions "$kind" "$path" "$title" "$rom"
-      continue
-    fi
-    yesno "$title" "$details"$'\n\n'"$(community_txt 'Télécharger ce fichier ? Vous pourrez ensuite l’utiliser pour un jeu.' 'Download this file? You can then use it for a game.')" || continue
-    if path="$(community_cmd fetch "$kind" "$selected" 2>&1)"; then community_import_actions "$kind" "$path" "$title" "$rom"; else msgbox "$title" "$path"; fi
+    community_download_selection "$kind" "$title" "$rom" "$selected"
   done
+}
+
+
+community_download_selection() {
+  local kind="$1" title="$2" rom="$3" selected="$4" path details
+  if [ "$kind" = reshade ] && [[ "$selected" = zip:* ]]; then
+    path="$(community_fetch_reshade_pack "$title" "${selected#zip:}")" || return
+    community_apply_reshade_pack "$title" "$rom" "$path"
+    return
+  fi
+  details="$(community_cmd show "$kind" "$selected" 2>&1)" || { msgbox "$title" "$details"; return 1; }
+  path="$(community_cmd local "$kind" "$selected" 2>/dev/null)" || path=""
+  if [ -n "$path" ]; then
+    yesno "$title" "$details"$'\n\n'"$(community_txt 'Ce fichier est déjà téléchargé. Utiliser votre copie locale ?' 'This file is already downloaded. Use your local copy?')" || return
+  else
+    yesno "$title" "$details"$'\n\n'"$(community_txt 'Télécharger ce fichier ?' 'Download this file?')" || return
+    community_pack_progress "$title" "$(community_txt 'Téléchargement et vérification…' 'Downloading and verifying…')"
+    path="$(community_cmd fetch "$kind" "$selected" 2>&1)" || { msgbox "$title" "$path"; return 1; }
+  fi
+  community_import_actions "$kind" "$path" "$title" "$rom"
+}
+
+community_es_menu() {
+  local title selected rom game kind rows id label choice output
+  local -a items=()
+  local catalog="$WT_ROOT/helpers/community_catalog.py"
+  title="$(community_txt 'Profils communautaires' 'Community Profiles')"
+  while selected="$(community_pick_game "$title")"; do
+    rom="${selected%%$'\t'*}"
+    game="${selected#*$'\t'}"
+    while kind="$(menu_select "$title" "$game" \
+      reshade 'ReShade' antimicrox 'AntiMicroX' \
+      refresh "$(community_txt 'Actualiser le catalogue' 'Refresh the catalogue')" back "$(i18n back)")"; do
+      case "$kind" in
+        refresh)
+          community_pack_progress "$title" "$(community_txt 'Actualisation du catalogue…' 'Refreshing the catalogue…')"
+          if output="$(python3 "$catalog" --home "$WT_HOME" refresh 2>&1)"; then
+            msgbox "$title" "$(community_txt 'Catalogue actualisé.' 'Catalogue refreshed.')"
+          else
+            msgbox "$title" "$(community_txt 'Actualisation incomplète. Le cache précédent est conservé.' 'Refresh incomplete. The previous cache is retained.')"$'\n'"$output"
+          fi
+          continue ;;
+        reshade|antimicrox) ;;
+        *) break ;;
+      esac
+      if ! rows="$(python3 "$catalog" --home "$WT_HOME" list "$kind" "$rom" "$game" 2>&1)"; then
+        msgbox "$title" "$(community_txt 'Catalogue indisponible ou incomplet pour ce jeu.' 'Catalogue unavailable or incomplete for this game.')"$'\n'"$rows"
+        continue
+      fi
+      if [ -z "$rows" ]; then
+        msgbox "$title" "$(community_txt 'Aucun partage publié pour ce jeu.' 'No published entries for this game.')"
+        continue
+      fi
+      items=()
+      while IFS=$'\t' read -r id label; do
+        items+=("$id" "$label")
+      done <<< "$rows"
+      choice="$(WT_MENU_LIST=1 menu_select "$title" "$game" "${items[@]}" back "$(i18n back)")" || continue
+      [ "$choice" != back ] || continue
+      community_download_selection "$kind" "$title" "$rom" "$choice"
+    done
+  done
+  return 0
 }
 
 

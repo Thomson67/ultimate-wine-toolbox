@@ -4,6 +4,8 @@ set -euo pipefail
 DEST="/userdata/system/ultimate-wine-toolbox"
 PORT="/userdata/roms/ports/Ultimate Wine Toolbox.sh"
 KEYS="$PORT.keys"
+COMMUNITY_PORT="/userdata/roms/ports/Ultimate Wine Toolbox - Community Profiles.sh"
+COMMUNITY_SERVICE="/userdata/system/services/uwt_community"
 MANGOHUD_HOOK="/userdata/system/scripts/ultimate-wine-toolbox-mangohud.sh"
 DXVK_HOOK="/userdata/system/scripts/ultimate-wine-toolbox-dxvk.sh"
 RESHADE_HOOK="/userdata/system/scripts/ultimate-wine-toolbox-reshade.sh"
@@ -77,6 +79,12 @@ fi
 if [ -f "$DEST/toolbox/helpers/es_options.py" ]; then
     python3 "$DEST/toolbox/helpers/es_options.py" remove
 fi
+if [ -f "$COMMUNITY_SERVICE" ]; then
+    bash "$COMMUNITY_SERVICE" stop
+    batocera-services disable uwt_community
+    rm -f "$COMMUNITY_SERVICE"
+fi
+rm -f "$COMMUNITY_PORT" "$COMMUNITY_PORT.keys"
 rm -rf "$DEST" "$OLD_DEST"
 rm -f "$PORT" "$KEYS" "$MANGOHUD_HOOK" "$DXVK_HOOK" "$RESHADE_HOOK"
 rm -f "$MANGOHUD_LEGACY_LAYER" "$MANGOHUD_X86_LAYER"

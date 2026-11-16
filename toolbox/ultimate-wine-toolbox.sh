@@ -33,6 +33,11 @@ source "$WT_ROOT/modules/settings.sh"
 source "$WT_ROOT/modules/documentation.sh"
 
 ensure_batocera_paths
+if [ "${1:-}" = --community ]; then
+    WT_COMMUNITY_PORT=1
+    community_es_menu
+    exit $?
+fi
 runner_offer_normalization_at_startup
 [ -f "$WT_HOME/state/antimicrox-live.json" ] || startup_update_check
 

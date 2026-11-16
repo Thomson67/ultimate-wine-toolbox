@@ -165,6 +165,10 @@ resh_launch_preset() {
 
 resh_offer_preset_launch() {
     local rom="$1" message="$2" choice
+    if [ "${WT_COMMUNITY_PORT:-0}" = 1 ]; then
+        msgbox "$(i18n resh_title)" "$message"
+        return 0
+    fi
     choice="$(menu_select "$(i18n resh_title)" "$message" \
         later "$(i18n resh_launch_later)" launch "$(i18n resh_launch_preset)")" || return 0
     if [ "$choice" = launch ]; then resh_launch_preset "$rom" || true; fi
@@ -240,7 +244,10 @@ resh_api_select() {
         if [[ ",$candidates," == *',legacy,'* ]]; then
             prompt+="\n$(i18n resh_api_unsupported)"
         fi
-        choice="$(menu_select "$(i18n resh_title)" "$prompt" "${rows[@]}" diagnostic "$(i18n resh_diag_title)" wiki "$(i18n resh_api_wiki)")" || return 1
+        if [ "${WT_COMMUNITY_PORT:-0}" != 1 ]; then
+            rows+=(diagnostic "$(i18n resh_diag_title)")
+        fi
+        choice="$(menu_select "$(i18n resh_title)" "$prompt" "${rows[@]}" wiki "$(i18n resh_api_wiki)")" || return 1
         case "$choice" in
             dxgi|d3d9|opengl32) printf '%s' "$choice"; return 0 ;;
             vulkan)

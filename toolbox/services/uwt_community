@@ -1,0 +1,10 @@
+#!/bin/bash
+# Catalogue des profils communautaires / Community profiles catalogue
+case "${1:-}" in
+    start|stop|status) ;;
+    *) exit 1 ;;
+esac
+UWT=/userdata/system/ultimate-wine-toolbox
+[ -f "$UWT/toolbox/helpers/community_catalog.py" ] || exit 0
+exec python3 "$UWT/toolbox/helpers/community_catalog.py" --home "$UWT" \
+    --log /userdata/system/logs/ultimate-wine-toolbox/community-catalog.log "$1"

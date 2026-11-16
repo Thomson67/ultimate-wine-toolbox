@@ -73,7 +73,7 @@ elif ! /bin/bash -n "$MAIN" >>"$LOG" 2>&1; then
     echo "ERROR: main script syntax check failed. See $LOG" >&2
     rc=71
 else
-    /bin/bash "$MAIN"
+    /bin/bash "$MAIN" "$@"
     rc=$?
 fi
 

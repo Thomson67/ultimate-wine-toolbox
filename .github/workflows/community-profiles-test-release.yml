@@ -1,9 +1,9 @@
-name: Publish Batocera 44 DXVK model test prerelease
+name: Publish Community profiles test prerelease
 on:
   push:
-    branches: ["release-test/v0.11.6-dev2"]
+    branches: ["release-test/v0.11.6-dev3"]
     paths:
-      - .github/workflows/batocera-44-test-release.yml
+      - .github/workflows/community-profiles-test-release.yml
 
 permissions:
   contents: write
@@ -12,7 +12,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      TAG: v0.11.6-dev2
+      TAG: v0.11.6-dev3
     steps:
       - uses: actions/checkout@v4
       - name: Verify and package the prerelease
@@ -23,6 +23,7 @@ jobs:
           git ls-files -z '*.sh' | xargs -0 -n 1 bash -n
           python3 -m unittest discover -s tests -p "test_dxvk_*.py"
           python3 -m unittest discover -s tests -p 'test_es_options.py'
+          python3 -m unittest discover -s tests -p "test_community_*.py"
           root="Ultimate-Wine-Toolbox-$TAG"
           mkdir dist
           git archive --format=zip --prefix="$root/" --output="dist/$root.zip" HEAD \

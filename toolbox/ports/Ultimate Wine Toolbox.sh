@@ -85,6 +85,11 @@ if [ ! -s "$LAUNCHER" ]; then
     exit 1
 fi
 
+if [ "${1:-}" = --community ]; then
+    exec /usr/bin/xterm +lc -u8 +pc -fa "DejaVu Sans Mono" -fs "$WT_FONT_SIZE" \
+        -title "Community Profiles" "${WT_XTERM_DISPLAY_ARGS[@]}" -e /bin/bash "$LAUNCHER" --community
+fi
+
 resume_requested=0
 if [ -f "$RESUME_REQUEST" ]; then
     case "$(cat "$RESUME_REQUEST")" in
