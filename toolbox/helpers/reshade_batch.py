@@ -1,5 +1,6 @@
 """Identify a single literal game executable in a simple Windows batch launcher."""
 from pathlib import PurePosixPath
+import posixpath
 import re
 
 from es_launcher import batch_path, script
@@ -7,7 +8,7 @@ from es_launcher import batch_path, script
 # Keep quotes on the tokens: START consumes the first quoted argument as a title.
 TOKEN = re.compile(r'"[^"]*"|[^\s"]+')
 NON_LITERAL = re.compile(r'[:%!*?<>|&^"\r\n\t]')
-SETUP = {'echo', 'echo.', 'rem', 'set', 'setlocal', 'endlocal', 'chcp', 'cls', 'pause'}
+SETUP = {'echo', 'echo.', 'rem', 'set', 'setlocal', 'endlocal', 'chcp', 'cls', 'pause', 'ping', 'timeout', 'taskkill'}
 START_FLAGS = {'/wait', '/b', '/min', '/max', '/normal', '/i'}
 
 
@@ -19,7 +20,7 @@ def prefix_path(value, directory, batch_folder):
         path = 'drive_c/' + path[3:]
     elif not path.startswith('/'):
         path = str(directory / path)
-    result = PurePosixPath(path)
+    result = PurePosixPath(posixpath.normpath(path))
     if result.is_absolute() or '..' in result.parts or NON_LITERAL.search(path):
         raise ValueError('Batch launcher uses a nonliteral or external path')
     return result
@@ -48,9 +49,12 @@ def batch_executable(rom, autorun):
         line = line.strip().removeprefix('@').lstrip()
         if not line or line.startswith('::'):
             continue
+        line = re.sub(r'\s*(?:[12])?>>?\s*nul\s*$', '', line, flags=re.I).strip()
         args = TOKEN.findall(line)
         if line.count('"') % 2 or any(re.search(r'[&|<>^()]', token) for token in args if not token.startswith('"')):
             raise ValueError('Batch launcher has compound or redirected commands')
+        if not args:
+            continue
         command = args[0].casefold()
         if command in SETUP:
             continue
@@ -67,6 +71,10 @@ def batch_executable(rom, autorun):
         if executable.suffix.casefold() != '.exe':
             raise ValueError('Batch launcher does not name a single literal executable')
         targets.add(executable)
-    if len(targets) != 1:
-        raise ValueError('Batch launcher does not name a single literal executable')
-    return targets.pop().as_posix()
+    games = {target for target in targets if target.name.casefold() != 'antimicrox.exe'}
+    if len(games) == 1:
+        game = games.pop()
+        folder = game.parent.as_posix().casefold()
+        if all(target == game or target.parent.as_posix().casefold() != folder for target in targets):
+            return game.as_posix()
+    raise ValueError('Batch launcher does not name a single literal game executable')

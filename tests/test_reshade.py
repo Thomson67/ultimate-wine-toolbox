@@ -88,6 +88,26 @@ class ReShadeTests(unittest.TestCase):
                            check=True, stdout=subprocess.DEVNULL)
             self.assertEqual(r.autorun_executable(archive), expected)
 
+    def test_batch_ignores_antimicrox_when_it_is_in_a_separate_directory(self):
+        source = self.base/'Game with controller launcher.wine'
+        folder = source/'drive_c/game'
+        folder.mkdir(parents=True)
+        (source/'autorun.cmd').write_text('DIR=drive_c/game\nCMD=start.bat\n')
+        (folder/'Game.exe').write_bytes(pe(64))
+        batch = folder/'start.bat'
+        for antimicrox in (r'C:\antimicrox\antimicrox.exe', r'%~dp0..\antimicrox\AntiMicroX.exe'):
+            batch.write_text(f'@echo off\nstart "" "{antimicrox}"\n'
+                             'ping -n 2 127.0.0.1 > NUL\n'
+                             'start /wait "" ".\\Game.exe"\n'
+                             'taskkill /im antimicrox.exe >NUL\n')
+            self.assertEqual(r.autorun_executable(source), 'drive_c/game/Game.exe')
+        batch.write_text('start "" "antimicrox.exe"\nstart "" "Game.exe"\n')
+        with self.assertRaises(ValueError):
+            r.autorun_executable(source)
+        batch.write_text('start "" "C:\\antimicrox\\antimicrox.exe"\n')
+        with self.assertRaises(ValueError):
+            r.autorun_executable(source)
+
     def test_export_uses_latest_game_preset_and_requires_overwrite_confirmation(self):
         r.event(self.home, self.rom, 'gameStart')
         (self.game / 'ReShadePreset.ini').write_text('Techniques=CAS@CAS.fx\n')
