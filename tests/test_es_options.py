@@ -68,7 +68,7 @@ class OptionsTests(TestCase):
         self.assertEqual(feature.get('name'), 'Afficher le launcher (par jeu)')
         self.assertEqual({c.get('value'): c.get('name') for c in feature}, {'normal': 'Non', 'next': 'Oui'})
         self.assertEqual(root.find('./emulator/system/feature[@value="uwt_reshade"]').get('name'), 'ReShade (par jeu)')
-        self.assertEqual(es.exposed(self.xml), {'mouse', 'launcher', 'reshade'})
+        self.assertEqual(es.exposed(self.xml), {'mouse', 'launcher', 'reshade', es.RESHADE_PRESET_KEY})
 
     def add_bundle(self, name):
         for arch in ('x32', 'x64'):

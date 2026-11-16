@@ -659,12 +659,14 @@ def set_enabled(home, rom, enabled):
 
 def event(home, rom, action, runner='', bottles=Path('/userdata/system/wine-bottles/windows'), legacy=False, es=False):
     override = None
+    overrides = None
     if es:
         import reshade_external
         reshade_external.restore(reshade_external.es_session_home(home), rom)
         if action == 'gameStart':
             from es_options import Overrides
-            override = Overrides(rom).get('reshade', game_only=True)
+            overrides = Overrides(rom)
+            override = overrides.get('reshade', game_only=True)
     cfg = read_json(home / 'reshade/games' / (key(rom) + '.json'))
     if not cfg:
         if action == 'gameStart':
@@ -696,6 +698,12 @@ def event(home, rom, action, runner='', bottles=Path('/userdata/system/wine-bott
             raise ValueError('executable architecture changed; reconfigure ReShade')
     elif not safe_leaf(rom, cfg['exe']).is_file():
         raise ValueError('configured executable is missing; reconfigure ReShade')
+    if overrides is not None:
+        from reshade_presets import activate_es
+        try:
+            activate_es(home, rom, overrides)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            print(f'ES ReShade preset ignored: {error}', file=sys.stderr)
     for old_path in (home / 'reshade/installations' / key(rom)).glob('*.json'):
         j = read_json(old_path)
         if j['root'] == str(root) and j['prefix'] != str(prefix):
@@ -1007,6 +1015,19 @@ def main():
                 raise ValueError('preset changed during review; select it again')
             from reshade_presets import import_file
             import_file(home, rom, Path(args.args[0]))
+
+
+    if (args.command in {'finish', 'preset', 'pack-import', 'pack-remove', 'uninstall',
+                         'presets-list', 'presets-rename', 'presets-delete', 'presets-pack',
+                         'presets-clear', 'presets-global-rename', 'presets-global-copy',
+                         'presets-global-clear', 'presets-global-forget'} or
+            (args.command == 'gameStop' and (home / 'reshade/games' / (key(rom) + '.json')).is_file())):
+        from es_options import refresh_reshade_presets
+        import xml.etree.ElementTree as ET
+        try:
+            refresh_reshade_presets(home=home)
+        except (OSError, ValueError, ET.ParseError) as error:
+            print(f'ES ReShade presets: {error}', file=sys.stderr)
 
 
 if __name__ == '__main__':

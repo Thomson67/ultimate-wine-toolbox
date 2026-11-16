@@ -98,6 +98,51 @@ class LocalReShadePackTests(unittest.TestCase):
         self.assertEqual(index(self.home, self.rom)['active'], before)
         self.assertTrue(duplicate.is_file())
 
+    def test_es_lists_pack_variants_and_individual_presets_and_applies_the_choice(self):
+        import es_options as es
+        import reshade_presets as presets
+        import xml.etree.ElementTree as ET
+
+        self.configure()
+        before = self.base/'Independent before the pack.ini'
+        before.write_bytes(b'Techniques=\n')
+        original = presets.import_file(self.home, self.rom, before)
+        source = self.bundle({'Second.ini': b'Techniques=Citra@Citra.fx\n[Citra.fx]\nScreen=2\n'})
+        p.install(self.home, self.rom, source, 'Ultra.ini')
+        m.event(self.home, self.rom, 'gameStop')
+        individual = self.base/'Individual after the pack.ini'
+        individual.write_bytes(b'Techniques=Citra@Citra.fx\n[Citra.fx]\nScreen=3\n')
+        individual_id = presets.import_file(self.home, self.rom, individual)
+        features = self.base/'es_features.cfg'
+        es.publish({'reshade'}, 'fr', features, home=self.home)
+        config = self.base/'batocera.conf'
+        key = m.key(self.rom)
+        choices = {node.get('name'): node.get('value') for node in ET.parse(features).findall(
+            './/feature[@value="uwt_reshade_preset"]/choice')}
+        names = {label.split(' — ', 1)[1]: value for label, value in choices.items()}
+        self.assertEqual(set(names), {'Ultra.ini', 'Second.ini', individual.name})
+        self.assertEqual(names[individual.name], f'{key}:{individual_id}')
+        option = es.game_key(self.rom, es.RESHADE_PRESET_KEY)
+        real_overrides = es.Overrides
+        with patch.object(es, 'Overrides', side_effect=lambda rom: real_overrides(rom, features, config)):
+            config.write_text(f'{option}={names["Second.ini"]}\n')
+            m.event(self.home, self.rom, 'gameStart', es=True)
+            self.assertIn(b'Screen=2', (self.game/'ReShadePreset.ini').read_bytes())
+            m.event(self.home, self.rom, 'gameStop')
+            for invalid in ('0'*24 + ':' + individual_id, key + ':' + original):
+                config.write_text(f'{option}={invalid}\n')
+                m.event(self.home, self.rom, 'gameStart', es=True)
+                self.assertIn(b'Screen=2', (self.game/'ReShadePreset.ini').read_bytes())
+            config.write_text(f'{option}={names[individual.name]}\n')
+            m.event(self.home, self.rom, 'gameStart', es=True)
+            self.assertIn(b'Screen=3', (self.game/'ReShadePreset.ini').read_bytes())
+        p.remove(self.home, self.rom)
+        es.refresh_reshade_presets(features, self.home)
+        choices = [node.get('value') for node in ET.parse(features).findall(
+            './/feature[@value="uwt_reshade_preset"]/choice')]
+        self.assertIn(f'{key}:{original}', choices)
+        self.assertNotIn(names['Second.ini'], choices)
+
     def test_selecting_installed_community_pack_reactivates_its_saved_preset(self):
         import reshade_presets as presets
 

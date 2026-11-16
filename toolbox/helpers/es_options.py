@@ -24,6 +24,8 @@ LAUNCHER_DESCRIPTION = (
     'With Yes, show the launcher every time this game starts.',
 )
 RESHADE_TITLE = ('ReShade (par jeu)', 'ReShade (per game)')
+RESHADE_PRESET_KEY = 'reshade_preset'
+RESHADE_PRESET_TITLES = ('Preset ReShade installé (par jeu)', 'Installed ReShade preset (per game)')
 DXVK_TITLE = ('Bundle DXVK / VKD3D', 'DXVK / VKD3D bundle')
 DXVK_NATIVE = ('Versions natives de Batocera', 'Batocera defaults')
 COMMUNITY_KEYS = {'reshade': 'community_reshade', 'antimicrox': 'community_antimicrox'}
@@ -128,9 +130,11 @@ def update_choices(feature, expected):
 def order_community_features(system):
     original = list(system)
     features = {feature.get('value'): feature for feature in original}
+    near = {key: kind for kind, key in COMMUNITY_KEYS.items()}
+    near[RESHADE_PRESET_KEY] = ('community_reshade' if 'uwt_community_reshade' in features else 'reshade')
     ordered = [feature for feature in original
-               if feature.get('value') not in {f'uwt_{key}' for key in COMMUNITY_NAMES}]
-    for kind, key in COMMUNITY_KEYS.items():
+               if feature.get('value', '').removeprefix('uwt_') not in near]
+    for key, kind in near.items():
         feature = features.get(f'uwt_{key}')
         if feature is None:
             continue
@@ -143,6 +147,45 @@ def order_community_features(system):
         return False
     system[:] = ordered
     return True
+
+
+def update_reshade_presets(system, home):
+    features = {feature.get('value'): feature for feature in system.findall('feature')}
+    anchor = features.get('uwt_community_reshade')
+    if anchor is None:
+        anchor = features.get('uwt_reshade')
+    if anchor is None:
+        return False
+    from reshade_presets import es_choices
+
+    french = anchor.get('name') in (COMMUNITY_NAMES['community_reshade'][0], RESHADE_TITLE[0])
+    value = f'uwt_{RESHADE_PRESET_KEY}'
+    feature = features.get(value)
+    changed = feature is None
+    if changed:
+        feature = ET.Element('feature', name=RESHADE_PRESET_TITLES[0 if french else 1], value=value,
+                             submenu='Ultimate Wine Toolbox')
+        feature.set('description', 'Choisissez un preset portant le nom du jeu. Le choix s’applique au prochain lancement.'
+                    if french else 'Choose a preset labelled with the game name. It applies on the next launch.')
+        system.insert(list(system).index(anchor) + 1, feature)
+    rows = es_choices(home)
+    if not rows:
+        rows = [('unavailable', 'Aucun preset installé' if french else 'No installed presets')]
+    changed |= update_choices(feature, rows)
+    return changed
+
+
+def refresh_reshade_presets(path=FEATURES, home=HOME):
+    if not path.is_file() or path.is_symlink():
+        return
+    with features_lock(path):
+        raw = option_file(path)
+        if OWNER not in raw:
+            return
+        xml = ET.fromstring(raw)
+        system = xml.find('./emulator/system')
+        if system is not None and update_reshade_presets(system, home):
+            write_features(path, xml)
 
 
 def refresh(path=FEATURES, bundles=BUNDLES, home=HOME):
@@ -179,6 +222,7 @@ def refresh_features(path, bundles, home):
             changes |= update_choices(feature, community_choices(home, key, feature.get('name')))
     system = xml.find('./emulator/system')
     if system is not None:
+        changes |= update_reshade_presets(system, home)
         changes |= order_community_features(system)
     if changes:
         write_features(path, xml)
@@ -219,6 +263,7 @@ def publish_features(groups, language, path, bundles, home):
                     choices = dxvk_choices(bundles)
                 for value, captions in choices.items():
                     ET.SubElement(feature, 'choice', name=captions[index], value=value)
+    update_reshade_presets(system, home)
     order_community_features(system)
     write_features(path, xml)
 

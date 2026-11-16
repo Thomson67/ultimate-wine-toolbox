@@ -1,9 +1,11 @@
 """Per-game preset collection; one working INI remains staged beside the game."""
+from collections import Counter
 from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
+import sys
 import uuid
 
 import reshade_manager as m
@@ -143,6 +145,44 @@ def listing(home, rom):
     pack = context(home, rom)
     return [dict(v, id=i, active=i == value['active'], compatible=v.get('pack', '') == pack)
             for i, v in sorted(value['items'].items(), key=lambda pair: (pair[0] != value['active'], pair[1]['name'].casefold()))]
+
+
+def es_choices(home):
+    """Read saved compatible presets without touching live profiles or game archives."""
+    from community_profiles import game_title
+
+    rows = []
+    for config in (home / 'reshade/games').glob('*.json'):
+        try:
+            rom = Path(m.read_json(config)['rom'])
+            if config.stem != m.key(rom) or not rom.exists():
+                continue
+            pack = context(home, rom)
+            for identity, entry in index(home, rom)['items'].items():
+                if entry.get('pack', '') != pack or not path(home, rom, identity).is_file():
+                    continue
+                label = f"{game_title(rom.name)} — {title(entry['name'])}"
+                label.encode('utf-8', errors='strict')
+                rows.append((f'{config.stem}:{identity}', label))
+        except (KeyError, OSError, TypeError, ValueError) as error:
+            print(f'ES ReShade presets: {config.name}: {error}', file=sys.stderr)
+    counts = Counter(label.casefold() for _, label in rows)
+    return [(value, f'{label} [{value.rsplit(":", 1)[1][:8]}]' if counts[label.casefold()] > 1 else label)
+            for value, label in sorted(rows, key=lambda row: (row[1].casefold(), row[0]))]
+
+
+def activate_es(home, rom, overrides):
+    from es_options import RESHADE_PRESET_KEY, game_key
+
+    if RESHADE_PRESET_KEY not in overrides.keys:
+        return
+    value = overrides.values.get(game_key(rom, RESHADE_PRESET_KEY), '')
+    if not value or value in ('auto', 'unavailable'):
+        return
+    game, _, identity = value.partition(':')
+    if game != m.key(rom) or not re.fullmatch(r'[a-f0-9]{24}', identity):
+        raise ValueError('Selected preset belongs to another game or is invalid')
+    activate(home, rom, identity)
 
 
 def activate(home, rom, identity):
