@@ -369,7 +369,7 @@ dxvk_install_model_menu() {
     done < <(python3 "$WT_ROOT/helpers/dxvk_models.py" list)
     [ "${#items[@]}" -gt 0 ] || return 1
     choice="$(WT_MENU_LIST=1 menu_select "$(i18n dxvk_install_model)" "$(i18n dxvk_model_prompt)" "${items[@]}" "0" "$(i18n back)")" || return
-    case "$choice" in 40|41|42|43) ;; *) return ;; esac
+    [ -n "$choice" ] && [ "$choice" != 0 ] || return 0
     lines="$(python3 "$WT_ROOT/helpers/dxvk_models.py" releases "$choice")" || return 1
     mapfile -t parts <<< "$lines"
     [ "${#parts[@]}" -eq 3 ] || return 1

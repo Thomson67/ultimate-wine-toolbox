@@ -57,7 +57,7 @@ Les partages INI existants restent compatibles.
 - gestion individuelle des runners Wine classiques
 - GE-Proton classiques adaptés à Batocera, y compris 11.x (Batocera v44 conseillée)
 - gestion globale et par jeu de MangoHud : profils d’affichage, mode masqué, VSync Vulkan (dont Mailbox) et OpenGL ; limiteur de FPS personnalisé en option avancée
-- bundles DXVK / VKD3D-Proton / DXVK-NVAPI, modèles Batocera 40 à 43 / 43.1 et choix global ou par jeu
+- bundles DXVK / VKD3D-Proton / DXVK-NVAPI, modèles Batocera 40 à 44 et choix global ou par jeu
 - filtrage des versions NVAPI selon la compatibilité connue avec DXVK
 - ReShade par jeu : installation, activation/désactivation, presets, modèles d’effets, aide au choix de l’API et Vulkan sous Wine (expérimental)
 - AntiMicroX : profils manette, bascule launcher/jeu, édition en jeu et conversion Pad2Key
@@ -287,7 +287,7 @@ Une version plus récente ne garantit pas un meilleur résultat avec un ancien r
 
 ### Modèles graphiques Batocera
 
-Dans le gestionnaire DXVK / VKD3D, **Installer un modèle Batocera** propose les combinaisons officielles de Batocera 40, 41, 42 et 43 / 43.1. Les versions sont fixes, les archives sont vérifiées par SHA-256 et leur provenance est conservée dans `model.json`. Le catalogue se trouve dans `toolbox/data/batocera-dxvk-models.json`.
+Dans le gestionnaire DXVK / VKD3D, **Installer un modèle Batocera** propose les combinaisons officielles de Batocera 40, 41, 42, 43 / 43.1 et 44. Le modèle Batocera 44 s’appuie sur la branche RC et utilise les mêmes versions de composants que 43 / 43.1. Les versions sont fixes, les archives sont vérifiées par SHA-256 et leur provenance est conservée dans `model.json`. Le catalogue se trouve dans `toolbox/data/batocera-dxvk-models.json`.
 
 Après installation, choisissez le modèle globalement ou par jeu. NVAPI reste contrôlé par les options du jeu. Le modèle ne remplace pas le runner, les pilotes ou la configuration de Batocera : notamment, un VKD3D récent peut provoquer des crashes DirectX 12 avec Vanilla-Proton-9.0-4. Les modèles 40 à 42 permettent de tester des composants plus anciens.
 

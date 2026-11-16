@@ -56,7 +56,7 @@ INI sharing remains compatible.
 - classic Wine runner management
 - classic GE-Proton support, including 11.x (Batocera v44 recommended)
 - Global and per-game MangoHud controls: display profiles, hidden mode, Vulkan VSync (including Mailbox) and OpenGL VSync; optional advanced custom FPS limiter
-- DXVK / VKD3D-Proton / DXVK-NVAPI bundles, Batocera 40–43 / 43.1 models and global or per-game selection
+- DXVK / VKD3D-Proton / DXVK-NVAPI bundles, Batocera 40–44 models and global or per-game selection
 - NVAPI version filtering based on known DXVK requirements
 - per-game ReShade: installation, toggling, presets, effect templates, API hints and Vulkan under Wine (experimental)
 - AntiMicroX: controller profiles, launcher/game switching, in-game editing and Pad2Key conversion
@@ -284,7 +284,7 @@ A newer version is not guaranteed to work better with an older runner. If changi
 
 ### Batocera graphics models
 
-In the DXVK / VKD3D manager, **Install a Batocera model** offers the official combinations from Batocera 40, 41, 42 and 43 / 43.1. Versions are pinned, archives are verified with SHA-256, and provenance is recorded in `model.json`. The catalog is stored in `toolbox/data/batocera-dxvk-models.json`.
+In the DXVK / VKD3D manager, **Install a Batocera model** offers the official combinations from Batocera 40, 41, 42, 43 / 43.1 and 44. The Batocera 44 model is pinned to the RC branch and uses the same component versions as 43 / 43.1. Versions are pinned, archives are verified with SHA-256, and provenance is recorded in `model.json`. The catalog is stored in `toolbox/data/batocera-dxvk-models.json`.
 
 After installation, select the model globally or per game. NVAPI remains controlled through game settings. Models do not replace your runner, drivers or Batocera configuration: recent VKD3D versions may crash DirectX 12 games with Vanilla-Proton-9.0-4. Models 40 to 42 let you test older graphics components.
 

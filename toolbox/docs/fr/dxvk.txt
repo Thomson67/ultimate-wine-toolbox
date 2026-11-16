@@ -5,7 +5,7 @@ DXVK traduit les appels DirectX 9/10/11 vers Vulkan. VKD3D-Proton remplit ce rô
 CHOIX DU BUNDLE
 Dans Outils et compatibilité, ouvrir le gestionnaire DXVK / VKD3D. Un bundle regroupe les versions choisies des composants. Il peut être sélectionné globalement ou pour un jeu précis, qui conserve alors son propre choix.
 
-Pour commencer, utiliser les composants intégrés à Batocera. Si un jeu pose problème, essayer un modèle Batocera ou un bundle adapté. Les modèles proposés reprennent les combinaisons de composants des versions Batocera 40 à 43/43.1 ; ils ne changent pas la version de votre système.
+Pour commencer, utiliser les composants intégrés à Batocera. Si un jeu pose problème, essayer un modèle Batocera ou un bundle adapté. Les modèles proposés reprennent les combinaisons de composants des versions Batocera 40 à 44 (modèle 44 basé sur la branche RC) ; ils ne changent pas la version de votre système.
 
 COMPATIBILITÉ
 Le bundle le plus récent n’est pas forcément le meilleur choix. Un ancien runner peut mal fonctionner avec un VKD3D-Proton récent. Modifier un seul élément à la fois et conserver une combinaison qui fonctionne facilite le dépannage.
