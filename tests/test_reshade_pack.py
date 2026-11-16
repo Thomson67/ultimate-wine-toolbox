@@ -114,23 +114,16 @@ class LocalReShadePackTests(unittest.TestCase):
         self.assertEqual(presets.index(self.home, self.rom)['active'], identity)
         self.assertIn(b'Screen=4', (self.profile/'ReShadePreset.ini').read_bytes())
 
-    def test_es_keeps_the_preset_first_and_the_end_of_long_game_names(self):
+    def test_es_shows_the_complete_local_preset_name_without_the_game(self):
         import reshade_presets as presets
 
         rom = self.base/'The Legend of Zelda - Ocarina of Time 3D.wine'
         rom.mkdir()
         key = m.key(rom)
         m.save_json(self.home/'reshade/games'/f'{key}.json', {'rom': str(rom)})
-        identity = presets.add(self.home, rom, b'Techniques=\n', 'Sans CRT.ini')
-        choices = dict(presets.es_choices(self.home))
-        label = choices[f'{key}:{identity}']
-        self.assertTrue(label.startswith('Sans CRT.ini — '))
-        self.assertTrue(label.endswith('Ocarina of Time 3D'))
-        self.assertIn('…', label)
-        long_id = presets.add(self.home, rom, b'Techniques=\n', 'A very long preset name with an Ultra variant.ini')
-        long_label = dict(presets.es_choices(self.home))[f'{key}:{long_id}']
-        self.assertLessEqual(len(long_label), 38)
-        self.assertTrue(long_label.endswith('of Time 3D'))
+        name = 'A very long preset name with an Ultra variant.ini'
+        identity = presets.add(self.home, rom, b'Techniques=\n', name)
+        self.assertEqual(dict(presets.es_choices(self.home))[f'{key}:{identity}'], name)
 
     def test_es_lists_pack_variants_and_individual_presets_and_applies_the_choice(self):
         import es_options as es
@@ -153,9 +146,9 @@ class LocalReShadePackTests(unittest.TestCase):
         key = m.key(self.rom)
         choices = {node.get('name'): node.get('value') for node in ET.parse(features).findall(
             './/feature[@value="uwt_reshade_preset"]/choice')}
-        names = {label.split(' — ', 1)[0]: value for label, value in choices.items()}
-        self.assertEqual(set(names), {'Ultra.ini', 'Second.ini', 'Individual af…ack.ini'})
-        self.assertEqual(names['Individual af…ack.ini'], f'{key}:{individual_id}')
+        names = choices
+        self.assertEqual(set(names), {'Ultra.ini', 'Second.ini', individual.name})
+        self.assertEqual(names[individual.name], f'{key}:{individual_id}')
         option = es.game_key(self.rom, es.RESHADE_PRESET_KEY)
         real_overrides = es.Overrides
         with patch.object(es, 'Overrides', side_effect=lambda rom: real_overrides(rom, features, config)):
@@ -167,7 +160,7 @@ class LocalReShadePackTests(unittest.TestCase):
                 config.write_text(f'{option}={invalid}\n')
                 m.event(self.home, self.rom, 'gameStart', es=True)
                 self.assertIn(b'Screen=2', (self.game/'ReShadePreset.ini').read_bytes())
-            config.write_text(f'{option}={names["Individual af…ack.ini"]}\n')
+            config.write_text(f'{option}={names[individual.name]}\n')
             m.event(self.home, self.rom, 'gameStart', es=True)
             self.assertIn(b'Screen=3', (self.game/'ReShadePreset.ini').read_bytes())
         p.remove(self.home, self.rom)

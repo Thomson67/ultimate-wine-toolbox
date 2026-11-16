@@ -150,7 +150,6 @@ def listing(home, rom):
 def es_choices(home):
     """Read saved compatible presets without touching live profiles or game archives."""
     from community_profiles import game_title
-    from es_options import short_game_name, shorten_menu_text
 
     rows = []
     for config in (home / 'reshade/games').glob('*.json'):
@@ -169,18 +168,13 @@ def es_choices(home):
         except (KeyError, OSError, TypeError, ValueError) as error:
             print(f'ES ReShade presets: {config.name}: {error}', file=sys.stderr)
 
-    def menu_label(game, preset, suffix=''):
-        name = shorten_menu_text(preset, 21 - len(suffix), 7) + suffix
-        return f'{name} — {short_game_name(game, 38 - len(name) - 3)}'
-
     rows.sort(key=lambda row: (row[1].casefold(), row[2].casefold(), row[0]))
-    counts = Counter(menu_label(game, preset).casefold() for _, game, preset in rows)
+    counts = Counter(preset.casefold() for _, _, preset in rows)
     choices = []
-    for value, game, preset in rows:
-        label = menu_label(game, preset)
-        if counts[label.casefold()] > 1:
-            label = menu_label(game, preset, f' [{value.rsplit(":", 1)[1][:6]}]')
-        choices.append((value, label))
+    for value, _, preset in rows:
+        if counts[preset.casefold()] > 1:
+            preset += f' [{value.rsplit(":", 1)[1][:6]}]'
+        choices.append((value, preset))
     return choices
 
 

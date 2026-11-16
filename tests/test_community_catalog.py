@@ -72,21 +72,17 @@ class CatalogueTests(unittest.TestCase):
             es_options.enable_community('fr', features, home=home)
             self.assertNotIn('community_reshade', es_options.exposed(features))
 
-    def test_reshade_es_labels_put_the_preset_first_and_remove_repeated_game_names(self):
+    def test_reshade_es_labels_only_show_the_preset_or_bundle_filename(self):
         game = 'The Legend of Zelda - Ocarina of Time 3D'
-        short = 'The Legend of…Ocarina of Time 3D'
         entries = {
-            'named': dict(game=game, title=f'{game} — Sans CRT', author='Auteur'),
-            'zip:pack-bundle': dict(game=game, title=f'Ultra — ({game})', author='Auteur'),
-            'same': dict(game=game, title=game.upper(), author='Auteur'),
-            'partial': dict(game='Control', title='Controller preset', author='Auteur'),
+            'named': dict(game=game, title=f'{game} — Sans CRT', file='reshade/sans-crt.ini', author='Auteur'),
+            'zip:pack-bundle': dict(game=game, title='Pack Ultra', author='Auteur'),
+            'zip:pack-second': dict(game=game, title='Original.zip', author='Auteur'),
         }
         with patch.object(catalogue, 'cached_entries', return_value=entries):
             choices = dict(catalogue.es_choices(Path('/unused'), 'reshade'))
-        self.assertEqual(choices['named'], f'Sans CRT — {short} — Auteur')
-        self.assertEqual(choices['zip:pack-bundle'], f'Ultra [ZIP] — {short} — Auteur')
-        self.assertEqual(choices['same'], f'{short} — Auteur')
-        self.assertEqual(choices['partial'], 'Controller preset — Control — Auteur')
+        self.assertEqual(choices, {'named': 'sans-crt.ini',
+                                   'zip:pack-bundle': 'Pack Ultra.zip', 'zip:pack-second': 'Original.zip'})
 
     def test_es_selection_targets_the_game_once_and_auto_rearms_it(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -25,7 +25,7 @@ LAUNCHER_DESCRIPTION = (
 )
 RESHADE_TITLE = ('ReShade (par jeu)', 'ReShade (per game)')
 RESHADE_PRESET_KEY = 'reshade_preset'
-RESHADE_PRESET_TITLES = ('Preset local', 'Local preset')
+RESHADE_PRESET_TITLES = ('Preset ReShade installé (par jeu)', 'Installed ReShade preset (per game)')
 DXVK_TITLE = ('Bundle DXVK / VKD3D', 'DXVK / VKD3D bundle')
 DXVK_NATIVE = ('Versions natives de Batocera', 'Batocera defaults')
 COMMUNITY_KEYS = {'reshade': 'community_reshade', 'antimicrox': 'community_antimicrox'}
@@ -116,17 +116,6 @@ def community_choices(home, key, name):
     return [('catalogue-unavailable', 'Catalogue en attente' if french else 'Waiting for catalogue')]
 
 
-def shorten_menu_text(text, limit, tail):
-    if len(text) <= limit:
-        return text
-    head = limit - tail - 1
-    return f'{text[:head].rstrip()}…{text[-tail:].lstrip()}'
-
-
-def short_game_name(game, limit=32):
-    return shorten_menu_text(game, limit, min(18, limit - 4))
-
-
 def update_choices(feature, expected):
     current = [(choice.get('value'), choice.get('name')) for choice in feature.findall('choice')]
     if current == expected:
@@ -177,12 +166,13 @@ def update_reshade_presets(system, home):
     if changed:
         feature = ET.Element('feature', name=name, value=value,
                              submenu='Ultimate Wine Toolbox')
-        feature.set('description', 'Choisissez un preset portant le nom du jeu. Le choix s’applique au prochain lancement.'
-                    if french else 'Choose a preset labelled with the game name. It applies on the next launch.')
         system.insert(list(system).index(anchor) + 1, feature)
-    if feature.get('name') != name:
-        feature.set('name', name)
-        changed = True
+    description = ('Choisissez un preset du jeu. Il s’applique au prochain lancement.' if french else
+                   'Choose a preset for this game. It applies on the next launch.')
+    for attribute, text in (('name', name), ('description', description)):
+        if feature.get(attribute) != text:
+            feature.set(attribute, text)
+            changed = True
     rows = es_choices(home)
     if not rows:
         rows = [('unavailable', 'Aucun preset installé' if french else 'No installed presets')]
@@ -206,6 +196,14 @@ def refresh_reshade_presets(path=FEATURES, home=HOME):
 def refresh(path=FEATURES, bundles=BUNDLES, home=HOME):
     with features_lock(path):
         refresh_features(path, bundles, home)
+
+
+def community_description(key, french):
+    if key == 'community_reshade':
+        return ('Choisissez un preset ou un pack pour ce jeu, puis quittez avec Retour.' if french else
+                'Choose a preset or bundle for this game, then leave the menu with Back.')
+    return ('Choisissez un partage portant le nom du jeu, puis quittez le menu avec Retour.' if french else
+            'Choose a share labelled with the game name, then leave the menu with Back.')
 
 
 def refresh_features(path, bundles, home):
@@ -234,6 +232,11 @@ def refresh_features(path, bundles, home):
     for key in COMMUNITY_NAMES:
         feature = xml.find(f'./emulator/system/feature[@value="uwt_{key}"]')
         if feature is not None:
+            french = feature.get('name') == COMMUNITY_NAMES[key][0]
+            description = community_description(key, french)
+            if feature.get('description') != description:
+                feature.set('description', description)
+                changes = True
             changes |= update_choices(feature, community_choices(home, key, feature.get('name')))
     system = xml.find('./emulator/system')
     if system is not None:
@@ -266,10 +269,7 @@ def publish_features(groups, language, path, bundles, home):
             feature = ET.SubElement(system, 'feature', name=names[index], value=f'uwt_{key}',
                                     submenu='Ultimate Wine Toolbox')
             if key in COMMUNITY_NAMES:
-                feature.set('description', (
-                    'Choisissez un partage portant le nom du jeu, puis quittez le menu avec Retour.',
-                    'Choose a share labelled with the game name, then leave the menu with Back.',
-                )[index])
+                feature.set('description', community_description(key, index == 0))
                 update_choices(feature, community_choices(home, key, names[index]))
             elif key == 'launcher':
                 launcher_choices(feature, index)
