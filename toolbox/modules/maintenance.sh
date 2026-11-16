@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/operations.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/toolbox-backup.sh"
 
 BOTTLES_ROOT="/userdata/system/wine-bottles/windows"
 WINDOWS_ROMS_DIR="/userdata/roms/windows"
@@ -1255,6 +1256,7 @@ maintenance_menu() {
             "4" "$(i18n dxvk_check_title)" \
             "5" "$(i18n games_delete_title)" \
             "6" "$(i18n cleanup_title)" \
+            "8" "$(maintenance_backup_label)" \
             "7" "$(i18n toolbox_uninstall_title)" \
             "0" "$(i18n back)")" || return
 
@@ -1266,6 +1268,7 @@ maintenance_menu() {
             5) maintenance_delete_windows_games ;;
             6) maintenance_cleanup_menu ;;
             7) maintenance_uninstall_toolbox ;;
+            8) maintenance_backup_menu ;;
             0|"") return ;;
         esac
     done

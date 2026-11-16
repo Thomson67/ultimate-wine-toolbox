@@ -201,6 +201,14 @@ Ports -> Ultimate Wine Toolbox
 
 La version stable peut être mise à jour depuis la toolbox ou avec la commande d’installation ci-dessus.
 
+## Sauvegarde et restauration de la Toolbox
+
+Dans **Maintenance → Sauvegarder ou restaurer la Toolbox**, choisissez où écrire l’archive `.tar.gz`. Elle contient les réglages Windows globaux et par jeu de `batocera.conf`, avec les exclusions de l’export Windows existant (`windows.dxvk` et `windows.dxvk_hud` globaux), les profils AntiMicroX, presets et packs ReShade, préférences de la Toolbox, options EmulationStation et bundles DXVK/VKD3D.
+
+Les runners Wine personnalisés et UMU de `/userdata/system/wine/custom` sont facultatifs. L’estimation affiche leur volume avant compression et l’espace disponible à destination. Les ROMs, bouteilles, sauvegardes de jeu et journaux de récupération restent en dehors de l’archive.
+
+Fermez les jeux et les menus de réglages d’EmulationStation avant la restauration. Le mode par défaut garde les réglages et fichiers existants en cas de conflit. Si vous choisissez le remplacement, les valeurs Windows contenues dans l’archive priment et les fichiers précédents sont conservés sous `/userdata/system/backups/ultimate-wine-toolbox/before-restore-*/`. Les associations reposent sur les chemins d’origine. Réassociez les jeux renommés ou déplacés, puis redémarrez la Toolbox et EmulationStation. Utilisez vos propres archives de confiance.
+
 ## Sécurité
 
 Ultimate Wine Toolbox adopte volontairement un comportement conservateur lorsqu'elle modifie les données Batocera :
