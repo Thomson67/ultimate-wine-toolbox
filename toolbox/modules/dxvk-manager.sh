@@ -313,7 +313,12 @@ PY_VERSION
         cp -f "$dxvk_x32/$dll" "$target/x32/" || { rm -rf "$target" "$tmp"; return 1; }
     done
 
-    [ -f "$dxvk_x32/d3d8.dll" ] && cp -f "$dxvk_x32/d3d8.dll" "$target/x32/"
+    if [ -f "$dxvk_x32/d3d8.dll" ]; then
+        cp -f "$dxvk_x32/d3d8.dll" "$target/x32/" || { rm -rf "$target" "$tmp"; return 1; }
+    fi
+    if [ -f "$dxvk_x64/d3d8.dll" ]; then
+        cp -f "$dxvk_x64/d3d8.dll" "$target/x64/" || { rm -rf "$target" "$tmp"; return 1; }
+    fi
 
     for dll in d3d12.dll d3d12core.dll; do
         cp -f "$vkd3d_x64/$dll" "$target/x64/" || { rm -rf "$target" "$tmp"; return 1; }

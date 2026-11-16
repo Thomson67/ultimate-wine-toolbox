@@ -17,7 +17,7 @@ class ModelTests(unittest.TestCase):
     def test_pinned_combinations_and_complete_checksums(self):
         expected = [("2.3.1", "2.12", "0.7.0"), ("2.5.1", "2.13", "0.7.1"),
                     ("2.7", "2.14.1", "0.9.0"), ("2.7.1", "3.0a", "0.9.0"),
-                    ("2.7.1", "3.0a", "0.9.0")]
+                    ("3.1.1", "3.0.1", "0.9.2")]
         models = json.loads(CATALOG.read_text())
         for model, versions in zip(models, expected):
             self.assertEqual(tuple(c["version"] for c in model["components"].values()), versions)
@@ -34,7 +34,7 @@ class ModelTests(unittest.TestCase):
 i18n() { printf '%s' "$1"; }
 menu_select() {
     for item in "$@"; do
-        if [[ "$item" == 'Batocera 44 — DXVK 2.7.1 / VKD3D 3.0a / NVAPI 0.9.0' ]]; then
+        if [[ "$item" == 'Batocera 44 — DXVK 3.1.1 / VKD3D 3.0.1 / NVAPI 0.9.2' ]]; then
             echo 44
             return
         fi
@@ -50,7 +50,7 @@ dxvk_install_model_menu
         lines = result.stdout.splitlines()
         self.assertEqual(lines[0], "44")
         self.assertEqual([line.split("\t", 1)[0] for line in lines[1:]],
-                         ["v2.7.1", "v3.0a", "v0.9.0"])
+                         ["v3.1.1", "v3.0.1", "v0.9.2"])
 
     def test_build_models_with_and_without_optical_flow_dll(self):
         for model in ("40", "42"):

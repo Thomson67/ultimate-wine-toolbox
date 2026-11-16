@@ -287,7 +287,7 @@ Une version plus récente ne garantit pas un meilleur résultat avec un ancien r
 
 ### Modèles graphiques Batocera
 
-Dans le gestionnaire DXVK / VKD3D, **Installer un modèle Batocera** propose les combinaisons officielles de Batocera 40, 41, 42, 43 / 43.1 et 44. Le modèle Batocera 44 s’appuie sur la branche RC et utilise les mêmes versions de composants que 43 / 43.1. Les versions sont fixes, les archives sont vérifiées par SHA-256 et leur provenance est conservée dans `model.json`. Le catalogue se trouve dans `toolbox/data/batocera-dxvk-models.json`.
+Dans le gestionnaire DXVK / VKD3D, **Installer un modèle Batocera** propose les combinaisons officielles de Batocera 40, 41, 42, 43 / 43.1 et 44. Le modèle Batocera 44 utilise DXVK 3.1.1, VKD3D-Proton 3.0.1 et DXVK-NVAPI 0.9.2. Les versions sont fixes, les archives sont vérifiées par SHA-256 et leur provenance est conservée dans `model.json`. Le catalogue se trouve dans `toolbox/data/batocera-dxvk-models.json`.
 
 Après installation, choisissez le modèle globalement ou par jeu. NVAPI reste contrôlé par les options du jeu. Le modèle ne remplace pas le runner, les pilotes ou la configuration de Batocera : notamment, un VKD3D récent peut provoquer des crashes DirectX 12 avec Vanilla-Proton-9.0-4. Les modèles 40 à 42 permettent de tester des composants plus anciens.
 

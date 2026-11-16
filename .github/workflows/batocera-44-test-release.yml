@@ -1,7 +1,7 @@
 name: Publish Batocera 44 DXVK model test prerelease
 on:
   push:
-    branches: ["release-test/v0.11.6-dev1"]
+    branches: ["release-test/v0.11.6-dev2"]
     paths:
       - .github/workflows/batocera-44-test-release.yml
 
@@ -12,7 +12,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      TAG: v0.11.6-dev1
+      TAG: v0.11.6-dev2
     steps:
       - uses: actions/checkout@v4
       - name: Verify and package the prerelease
