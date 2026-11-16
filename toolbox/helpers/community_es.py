@@ -1,43 +1,28 @@
 """Dispatch a share selected in ES after EmulationStation saves batocera.conf."""
 import json
-import os
 from pathlib import Path
 import re
-import subprocess
 
+from antimicrox_handoff import EsApi
+from toolbox_return import resume
 from community_profiles import atomic, dump, es_games, game_key as title_key
 from es_options import COMMUNITY_KEYS, CONF, FEATURES, Overrides, game_key
 
 GAME_SETTING = re.compile(r'windows\["([^"\r\n]+)"\]\.uwt_(community_(?:antimicrox|reshade))')
 SHARE_ID = re.compile(r'(?:[a-z0-9][a-z0-9-]{0,79}|zip:pack-[a-f0-9]{64})')
-PORT = Path('/userdata/roms/ports/Ultimate Wine Toolbox.sh')
-DISPLAY_VARS = {'DISPLAY', 'XAUTHORITY', 'WAYLAND_DISPLAY', 'XDG_RUNTIME_DIR',
-                'DBUS_SESSION_BUS_ADDRESS', 'HOME', 'SDL_VIDEODRIVER'}
+REQUEST = 'community-es.request'
+OTHER_WORKFLOWS = ('resume-wsq.request', 'launch-game.request', 'restart-es.request',
+                   'reshade-diagnostic.json', 'antimicrox-live.json')
 
 
-def es_environment():
-    for process in Path('/proc').iterdir():
-        if not process.name.isdigit():
-            continue
-        try:
-            # Linux truncates comm to 15 characters. Check the executable too.
-            if (process / 'comm').read_text().strip() != 'emulationstatio':
-                continue
-            executable = Path(os.readlink(process / 'exe')).name
-            if executable != 'emulationstation':
-                continue
-            environment = {}
-            for field in (process / 'environ').read_bytes().split(b'\0'):
-                key, _, value = os.fsdecode(field).partition('=')
-                if key in DISPLAY_VARS and value:
-                    environment[key] = value
-            environment.setdefault('DISPLAY', ':0')
-            if Path('/var/lib/.Xauthority').is_file():
-                environment.setdefault('XAUTHORITY', '/var/lib/.Xauthority')
-            return dict(os.environ, **environment)
-        except OSError:
-            continue
-    return None
+def open_selection(home, api, args):
+    request = home / 'state' / REQUEST
+    atomic(request, ('\n'.join(args) + '\n').encode())
+    try:
+        return resume(home, None, api=api, timeout=5, refresh_timeout=15,
+                      confirm_timeout=5, request_name=REQUEST)
+    finally:
+        request.unlink(missing_ok=True)
 
 
 def resolve_game(option, setting, share):
@@ -57,14 +42,11 @@ class Selections:
         self.features = features
         self.conf = conf
         self.state = home / 'state/community/es-selections.json'
-        self.process = None
         self.stamp = None
         self.dispatched = None
         self.current = None
 
     def poll(self):
-        if self.process is not None and self.process.poll() is None:
-            return
         stat = self.conf.stat()
         features_stat = self.features.stat() if self.features.is_file() else None
         stamp = (stat.st_ino, stat.st_mtime_ns, stat.st_size,
@@ -90,7 +72,10 @@ class Selections:
                 self.dispatched = {}
         delivered = {key: value for key, value in self.dispatched.items() if self.current.get(key) == value}
         pending = next(((key, value) for key, value in self.current.items() if key not in delivered), None)
-        if pending and (environment := es_environment()):
+        if pending:
+            api = EsApi()
+            if api.running()[0] != 201 or any((self.home / 'state' / name).exists() for name in OTHER_WORKFLOWS):
+                return
             key, value = pending
             option = GAME_SETTING.fullmatch(key)[2]
             kind = next(kind for kind, name in COMMUNITY_KEYS.items() if name == option)
@@ -98,11 +83,8 @@ class Selections:
             rom = resolve_game(option, key, share) if share else None
             args = [kind, rom, value] if rom else ['unavailable']
             print(f'ES community {key}: {value} ({rom or "no matching game"})', flush=True)
-            self.process = subprocess.Popen(
-                ['/bin/bash', str(PORT), '--community-selection', *args],
-                env=environment, stdin=subprocess.DEVNULL, start_new_session=True,
-            )
-            delivered[key] = value
+            if open_selection(self.home, api, args):
+                delivered[key] = value
         if delivered != self.dispatched:
             atomic(self.state, dump(delivered))
             self.dispatched = delivered

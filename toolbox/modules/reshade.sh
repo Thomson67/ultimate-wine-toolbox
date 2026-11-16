@@ -244,9 +244,7 @@ resh_api_select() {
         if [[ ",$candidates," == *',legacy,'* ]]; then
             prompt+="\n$(i18n resh_api_unsupported)"
         fi
-        if [ "${WT_COMMUNITY_ES:-0}" != 1 ]; then
-            rows+=(diagnostic "$(i18n resh_diag_title)")
-        fi
+        rows+=(diagnostic "$(i18n resh_diag_title)")
         choice="$(menu_select "$(i18n resh_title)" "$prompt" "${rows[@]}" wiki "$(i18n resh_api_wiki)")" || return 1
         case "$choice" in
             dxgi|d3d9|opengl32) printf '%s' "$choice"; return 0 ;;

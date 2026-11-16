@@ -170,8 +170,10 @@ def ensure_proxy(home, config_directory=None, system_directory=None, port=None, 
     # the queued duplicate must exit without opening another terminal. Keep
     # this guard in the technical proxy, not in the normal manual Ports entry.
     request = home / 'state/resume-wsq.request'
+    community = home / 'state/community-es.request'
     wrapper = ('#!/bin/bash\n# ' + MARKER + '\n'
-               'if [ ! -f ' + shlex.quote(str(request)) + ' ]; then\n'
+               'if [ ! -f ' + shlex.quote(str(request)) + ' ] &&\n'
+               '   [ ! -f ' + shlex.quote(str(community)) + ' ]; then\n'
                '    echo "Toolbox return proxy: no pending return; duplicate launch skipped" >&2\n'
                '    exit 0\n'
                'fi\n'

@@ -119,6 +119,32 @@ class DiagnosticTests(unittest.TestCase):
             data=json.loads((home/'state/reshade-diagnostic.json').read_text())
             self.assertEqual(data,{'rom':str(game),'installation_exe':exe})
 
+    def test_community_install_includes_runtime_detection_and_queues_launch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            game = home / 'Game with spaces.wine'
+            game.mkdir()
+            script = """
+                WT_COMMUNITY_ES=1
+                export WT_HOME="$1" WT_ROOT="$2"
+                source "$WT_ROOT/modules/reshade.sh"
+                i18n() { printf '%s' "$1"; }
+                yesno_default_no() { return 0; }
+                resh_cmd() { printf 'dxgi\\tunknown\\t?'; }
+                menu_select() {
+                    for item; do
+                        if [ "$item" = diagnostic ]; then printf diagnostic; return 0; fi
+                    done
+                    return 1
+                }
+                resh_api_select "$3" "drive_c/Game.exe"
+            """
+            result = subprocess.run(['bash', '-c', script, 'test', str(home), str(ROOT/'toolbox'), str(game)],
+                                    capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertEqual((home/'state/launch-game.request').read_text(), str(game)+'\n')
+            self.assertTrue((home/'state/restart-es.request').exists())
+
     def test_port_stops_observer_before_resuming(self):
         source=(ROOT/'toolbox/ports/Ultimate Wine Toolbox.sh').read_text()
         function=source.split('monitor_wsq_launch() {',1)[1].split('\nresume_wsq_unavailable()',1)[0]

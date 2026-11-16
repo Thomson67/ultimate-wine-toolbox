@@ -49,7 +49,7 @@ class CatalogueTests(unittest.TestCase):
             with patch.object(Packs, 'listing', return_value=[pack]):
                 catalogue.refresh_packs(packs)
             features = home / 'es_features.cfg'
-            es_options.publish({'mangohud'}, 'fr', features, home=home)
+            es_options.publish({'mangohud', 'antimicrox', 'reshade'}, 'fr', features, home=home)
             with patch.object(Packs, 'listing', side_effect=AssertionError('network during feature generation')):
                 es_options.enable_community('fr', features, home=home)
             tree = ET.parse(features)
@@ -58,6 +58,15 @@ class CatalogueTests(unittest.TestCase):
             node = tree.find('.//feature[@value="uwt_community_antimicrox"]')
             self.assertEqual({choice.get('value') for choice in node}, {'profile', 'other'})
             self.assertIn('[Launcher]', node.find('choice[@value="profile"]').get('name'))
+            system = tree.find('./emulator/system')
+            keys = [feature.get('value') for feature in system]
+            for kind in ('reshade', 'antimicrox'):
+                self.assertEqual(keys[keys.index(f'uwt_{kind}')+1], f'uwt_community_{kind}')
+            system.insert(0, system[-1])
+            del system[-1]
+            es_options.write_features(features, tree.getroot())
+            es_options.refresh(features, home=home)
+            self.assertEqual([feature.get('value') for feature in ET.parse(features).find('./emulator/system')], keys)
             self.assertIn('mangohud', es_options.exposed(features))
             es_options.publish({'mangohud'}, 'fr', features, home=home)
             es_options.enable_community('fr', features, home=home)
@@ -75,14 +84,18 @@ class CatalogueTests(unittest.TestCase):
             entries = {'matching': {'game': 'Psychonauts'}, 'other': {'game': 'Psychonauts 2'}}
             watcher = community_es.Selections(home, lambda *_: entries, features, conf)
             with patch.object(community_es, 'es_games', return_value=[(str(rom), 'Psychonauts')]), \
-                 patch.object(community_es, 'es_environment', return_value={'DISPLAY': ':1'}), \
-                 patch.object(community_es.subprocess, 'Popen') as launch:
-                launch.return_value.poll.return_value = 0
+                 patch.object(community_es, 'EsApi') as es, \
+                 patch.object(community_es, 'open_selection', return_value=True) as launch:
+                es.return_value.running.return_value = (200, '/another/game')
+
                 conf.write_text(f'windows.uwt_community_reshade=system-value\n{key}=matching\n')
                 watcher.poll()
                 launch.assert_not_called()
                 watcher.poll()
-                self.assertEqual(launch.call_args.args[0][-3:], ['antimicrox', str(rom), 'matching'])
+                launch.assert_not_called()
+                es.return_value.running.return_value = (201, '')
+                watcher.poll()
+                self.assertEqual(launch.call_args.args[2], ['antimicrox', str(rom), 'matching'])
                 watcher = community_es.Selections(home, lambda *_: entries, features, conf)
                 watcher.poll()
                 watcher.poll()
@@ -97,7 +110,24 @@ class CatalogueTests(unittest.TestCase):
                 conf.write_text(f'{key}=other\n')
                 watcher.poll()
                 watcher.poll()
-                self.assertEqual(launch.call_args.args[0][-1], 'unavailable')
+                self.assertEqual(launch.call_args.args[2], ['unavailable'])
+
+    def test_selection_stages_literal_arguments_for_es_and_cleans_up(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            request = home / 'state' / community_es.REQUEST
+            arguments = ['reshade', '/userdata/roms/windows/Game with spaces & accents é.wine', 'preset']
+            def consume(folder, parent_pid, **kwargs):
+                self.assertEqual(kwargs['request_name'], request.name)
+                self.assertIsNone(parent_pid)
+                self.assertEqual(request.read_text().splitlines(), arguments)
+                request.unlink()
+                return True
+            with patch.object(community_es, 'resume', side_effect=consume):
+                self.assertTrue(community_es.open_selection(home, object(), arguments))
+            with patch.object(community_es, 'resume', return_value=False):
+                self.assertFalse(community_es.open_selection(home, object(), arguments))
+            self.assertFalse(request.exists())
 
     def test_failed_refresh_preserves_existing_catalogues(self):
         with tempfile.TemporaryDirectory() as folder:

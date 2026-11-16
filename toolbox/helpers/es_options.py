@@ -125,6 +125,26 @@ def update_choices(feature, expected):
     return True
 
 
+def order_community_features(system):
+    original = list(system)
+    features = {feature.get('value'): feature for feature in original}
+    ordered = [feature for feature in original
+               if feature.get('value') not in {f'uwt_{key}' for key in COMMUNITY_NAMES}]
+    for kind, key in COMMUNITY_KEYS.items():
+        feature = features.get(f'uwt_{key}')
+        if feature is None:
+            continue
+        adjacent = features.get(f'uwt_{kind}')
+        if adjacent is None:
+            ordered.append(feature)
+        else:
+            ordered.insert(ordered.index(adjacent) + 1, feature)
+    if ordered == original:
+        return False
+    system[:] = ordered
+    return True
+
+
 def refresh(path=FEATURES, bundles=BUNDLES, home=HOME):
     with features_lock(path):
         refresh_features(path, bundles, home)
@@ -157,6 +177,9 @@ def refresh_features(path, bundles, home):
         feature = xml.find(f'./emulator/system/feature[@value="uwt_{key}"]')
         if feature is not None:
             changes |= update_choices(feature, community_choices(home, key, feature.get('name')))
+    system = xml.find('./emulator/system')
+    if system is not None:
+        changes |= order_community_features(system)
     if changes:
         write_features(path, xml)
 
@@ -196,6 +219,7 @@ def publish_features(groups, language, path, bundles, home):
                     choices = dxvk_choices(bundles)
                 for value, captions in choices.items():
                     ET.SubElement(feature, 'choice', name=captions[index], value=value)
+    order_community_features(system)
     write_features(path, xml)
 
 

@@ -1,7 +1,7 @@
 name: Publish Community profiles test prerelease
 on:
   push:
-    branches: ["release-test/v0.11.6-dev4"]
+    branches: ["release-test/v0.11.6-dev5"]
     paths:
       - .github/workflows/community-profiles-test-release.yml
 
@@ -12,7 +12,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      TAG: v0.11.6-dev4
+      TAG: v0.11.6-dev5
     steps:
       - uses: actions/checkout@v4
       - name: Verify and package the prerelease
@@ -24,6 +24,9 @@ jobs:
           python3 -m unittest discover -s tests -p "test_dxvk_*.py"
           python3 -m unittest discover -s tests -p 'test_es_options.py'
           python3 -m unittest discover -s tests -p "test_community_*.py"
+          python3 -m unittest discover -s tests -p 'test_reshade_diagnostic.py'
+          python3 -m unittest discover -s tests -p 'test_toolbox_return.py'
+          python3 -m unittest discover -s tests -p 'test_es_return_proxy.py'
           root="Ultimate-Wine-Toolbox-$TAG"
           mkdir dist
           git archive --format=zip --prefix="$root/" --output="dist/$root.zip" HEAD \

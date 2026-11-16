@@ -99,7 +99,7 @@ def serve(home):
             selections.poll()
         except FileNotFoundError:
             pass
-        except (OSError, ValueError, KeyError, TypeError) as error:
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError) as error:
             print(f'ES community: {error}', file=sys.stderr)
             time.sleep(15)
         time.sleep(1)

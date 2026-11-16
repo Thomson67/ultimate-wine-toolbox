@@ -7,7 +7,8 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'toolbox/helpers'))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'toolbox/helpers'))
 import es_return_proxy as proxy
 
 
@@ -38,6 +39,26 @@ class ReturnProxyTests(unittest.TestCase):
                 self.assertEqual(second.returncode, 0, second.stderr)
                 self.assertIn('duplicate launch skipped', second.stderr)
                 self.assertFalse(trace.exists())
+
+    def test_community_request_uses_same_controller_enabled_proxy(self):
+        state = self.home/'state'
+        state.mkdir()
+        request = state/'community-es.request'
+        request.write_text('reshade\nGame with spaces.wine\npreset\n')
+        source = (ROOT/'toolbox/ports/Ultimate Wine Toolbox.sh').read_text()
+        block = source[source.index('community_args=()'):source.index('resume_requested=0')]
+        self.port.write_text('#!/bin/bash\n'
+                             f'STATE_DIR={shlex.quote(str(state))}\n'
+                             'RESUME_REQUEST="$STATE_DIR/resume-wsq.request"\n' + block +
+                             'printf "%s\\n" "${community_args[@]}"\n')
+        _, launcher = self.create()
+        self.assertEqual(Path(launcher + '.keys').read_bytes(), self.keys.read_bytes())
+        first = subprocess.run(['bash', launcher], capture_output=True, text=True, check=True)
+        self.assertEqual(first.stdout.splitlines(),
+                         ['--community-selection', 'reshade', 'Game with spaces.wine', 'preset'])
+        self.assertFalse(request.exists())
+        second = subprocess.run(['bash', launcher], capture_output=True, text=True, check=True)
+        self.assertIn('duplicate launch skipped', second.stderr)
 
     def test_proxy_without_pending_request_does_not_call_native_port(self):
         _, launcher = self.create()

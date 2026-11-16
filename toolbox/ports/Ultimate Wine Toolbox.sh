@@ -85,9 +85,20 @@ if [ ! -s "$LAUNCHER" ]; then
     exit 1
 fi
 
-if [ "${1:-}" = --community-selection ]; then
-    exec /usr/bin/xterm +lc -u8 +pc -fa "DejaVu Sans Mono" -fs "$WT_FONT_SIZE" \
-        -title "Ultimate Wine Toolbox" "${WT_XTERM_DISPLAY_ARGS[@]}" -e /bin/bash "$LAUNCHER" "$@"
+community_args=()
+community_request="$STATE_DIR/community-es.request"
+claimed_request="$community_request.$$"
+if [ ! -f "$RESUME_REQUEST" ] && [ -f "$community_request" ] &&
+   mv -T -- "$community_request" "$claimed_request"; then
+    mapfile -t request_args < "$claimed_request"
+    rm -f -- "$claimed_request"
+    case "${request_args[0]:-}" in
+        unavailable) community_args=(--community-selection unavailable) ;;
+        reshade|antimicrox)
+            if [ "${#request_args[@]}" -eq 3 ]; then
+                community_args=(--community-selection "${request_args[@]}")
+            fi ;;
+    esac
 fi
 
 resume_requested=0
@@ -126,7 +137,7 @@ else
             -fs "$WT_FONT_SIZE" \
             -title "Ultimate Wine Toolbox" \
             "${WT_XTERM_DISPLAY_ARGS[@]}" \
-            -e /bin/bash "$LAUNCHER" \
+            -e /bin/bash "$LAUNCHER" "${community_args[@]}" \
             >>"$BOOT_LOG" 2>&1
     fi
 
