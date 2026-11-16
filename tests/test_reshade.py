@@ -31,6 +31,28 @@ def pe(arch):
 
 
 class ReShadeTests(unittest.TestCase):
+    def test_autorun_executable_targets_the_declared_binary(self):
+        source = self.base/'Game with launcher.pc'
+        folder = source/'drive_c/Game Folder'
+        folder.mkdir(parents=True)
+        (folder/'Game.exe').write_bytes(pe(64))
+        (folder/'Another.exe').write_bytes(pe(32))
+        autorun = source/'autorun.cmd'
+        autorun.write_bytes(b'DIR="drive_c/Game Folder"\r\nCMD="Game.exe" --fullscreen\r\n')
+        expected = 'drive_c/Game Folder/Game.exe'
+        self.assertEqual(r.autorun_executable(source), expected)
+        if shutil.which('mksquashfs') and shutil.which('unsquashfs'):
+            archive = self.base/'Game with launcher.wsquashfs'
+            subprocess.run(['mksquashfs', str(source), str(archive), '-processors', '1', '-no-progress'],
+                           check=True, stdout=subprocess.DEVNULL)
+            self.assertEqual(r.autorun_executable(archive), expected)
+        autorun.write_text('CMD=start.bat\n')
+        with self.assertRaisesRegex(ValueError, 'does not name'):
+            r.autorun_executable(source)
+        autorun.write_text('CMD=drive_c/Game Folder/Missing.exe\n')
+        with self.assertRaises(FileNotFoundError):
+            r.autorun_executable(source)
+
     def test_export_uses_latest_game_preset_and_requires_overwrite_confirmation(self):
         r.event(self.home, self.rom, 'gameStart')
         (self.game / 'ReShadePreset.ini').write_text('Techniques=CAS@CAS.fx\n')

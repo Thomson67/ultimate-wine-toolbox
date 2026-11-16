@@ -191,6 +191,7 @@ resh_resume_preset() {
 
 resh_resume_diagnostic() {
     local rom exe detected candidates evidence result community_preset community_pack
+    local WT_COMMUNITY_ES=0
     rom="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["rom"])' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || return
     if [ "$(cat "$WT_HOME/state/launch-game.request" 2>/dev/null)" = "$rom" ]; then
         rm -f -- "$WT_HOME/state/launch-game.request"
@@ -202,6 +203,7 @@ resh_resume_diagnostic() {
     exe="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("installation_exe", ""))' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || exe=""
     community_preset="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("community_preset", ""))' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || community_preset=""
     community_pack="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("community_pack", ""))' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || community_pack=""
+    WT_COMMUNITY_ES="$(python3 -c 'import json,sys; print(int(json.load(open(sys.argv[1])).get("community_es") is True))' "$WT_HOME/state/reshade-diagnostic.json" 2>/dev/null)" || WT_COMMUNITY_ES=0
     rm -f -- "$WT_HOME/state/reshade-diagnostic.json" "$WT_HOME/state/reshade-diagnostic.stop"
     detected="$(python3 "$WT_ROOT/helpers/reshade_diagnostic.py" --home "$WT_HOME" result "$rom")"
     candidates="${detected%%$'\t'*}"; evidence="${detected##*$'\t'}"
@@ -212,6 +214,7 @@ resh_resume_diagnostic() {
             community_import_actions reshade "$community_preset" "ReShade — $(community_txt 'Presets communautaires' 'Community presets')" "$rom" 1
         fi
     fi
+    [ "$WT_COMMUNITY_ES" != 1 ] || exit 0
     resh_game_menu "$rom"
 }
 
@@ -344,39 +347,46 @@ resh_install_game() {
     local resume_exe="${2:-}" community_preset="${3:-}" resumed=0 index apply_community=0
     local local_pack="${4:-}" local_pack_preset="" pack_selection pack_error
     local -a exes=() items=() shaders=()
-    local listing
-    listing="$(resh_cmd exes "$rom" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
-        msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"
-        return 1
-    }
-    while IFS= read -r exe; do
-        [ -n "$exe" ] || continue
-        exes+=("$exe")
-        items+=("${#exes[@]}" "$exe")
-    done <<< "$listing"
-    [ "${#exes[@]}" -gt 0 ] || { msgbox "$(i18n resh_title)" "$(i18n resh_no_exe)"; return 1; }
-    for index in "${!exes[@]}"; do
-        if [ "${exes[$index]}" = "$resume_exe" ]; then
-            exe="$resume_exe"; resumed=1; break
+    if [ "${WT_COMMUNITY_ES:-0}" = 1 ] && [ -z "$resume_exe" ] &&
+       exe="$(resh_cmd autorun-exe "$rom" 2>> "${WT_SESSION_LOG:-/dev/null}")"; then
+        printf 'ES ReShade executable from autorun.cmd: %s\n' "$exe" >> "${WT_SESSION_LOG:-/dev/null}"
+    else
+        local listing
+        listing="$(resh_cmd exes "$rom" 2>> "${WT_SESSION_LOG:-/dev/null}")" || {
+            msgbox "$(i18n resh_title)" "$(i18n resh_failed "${WT_SESSION_LOG:-}")"
+            return 1
+        }
+        while IFS= read -r exe; do
+            [ -n "$exe" ] || continue
+            exes+=("$exe")
+            items+=("${#exes[@]}" "$exe")
+        done <<< "$listing"
+        [ "${#exes[@]}" -gt 0 ] || { msgbox "$(i18n resh_title)" "$(i18n resh_no_exe)"; return 1; }
+        for index in "${!exes[@]}"; do
+            if [ "${exes[$index]}" = "$resume_exe" ]; then
+                exe="$resume_exe"; resumed=1; break
+            fi
+        done
+        if [ "$resumed" -eq 0 ] && [ "${#exes[@]}" -eq 1 ]; then
+            exe="${exes[0]}"
+        elif [ "$resumed" -eq 0 ]; then
+            selected="$(WT_MENU_LIST=1 menu_select "$(i18n resh_title)" "$(i18n resh_exe_prompt)" "${items[@]}")" || return 1
+            case "$selected" in ''|*[!0-9]*) return 1 ;; esac
+            [ "$selected" -ge 1 ] && [ "$selected" -le "${#exes[@]}" ] || return 1
+            exe="${exes[$((selected-1))]}"
         fi
-    done
-    if [ "$resumed" -eq 0 ] && [ "${#exes[@]}" -eq 1 ]; then
-        exe="${exes[0]}"
-    elif [ "$resumed" -eq 0 ]; then
-        selected="$(WT_MENU_LIST=1 menu_select "$(i18n resh_title)" "$(i18n resh_exe_prompt)" "${items[@]}")" || return 1
-        case "$selected" in ''|*[!0-9]*) return 1 ;; esac
-        [ "$selected" -ge 1 ] && [ "$selected" -le "${#exes[@]}" ] || return 1
-        exe="${exes[$((selected-1))]}"
     fi
     dll="$(resh_api_select "$rom" "$exe")" || {
         if [ -f "$WT_HOME/state/reshade-diagnostic.json" ]; then
             if [ -n "$community_preset" ] || [ -n "$local_pack" ]; then
-                python3 - "$WT_HOME/state/reshade-diagnostic.json" "$community_preset" "$local_pack" <<'PY_PENDING'
+                python3 - "$WT_HOME/state/reshade-diagnostic.json" "$community_preset" "$local_pack" "${WT_COMMUNITY_ES:-0}" <<'PY_PENDING'
 import json, os, sys, tempfile
 from pathlib import Path
 path = Path(sys.argv[1]); data = json.loads(path.read_text())
 data['community_preset'] = sys.argv[2]
 data['community_pack'] = sys.argv[3]
+if sys.argv[4] == '1':
+    data['community_es'] = True
 fd, name = tempfile.mkstemp(dir=path.parent, prefix='.reshade-pending-')
 try:
     with os.fdopen(fd, 'w') as stream: json.dump(data, stream, ensure_ascii=False)

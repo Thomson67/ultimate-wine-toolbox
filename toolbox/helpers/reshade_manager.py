@@ -126,6 +126,15 @@ def launch_path(text):
     return relative((directory + '/' if directory else '') + exe)
 
 
+def autorun_executable(rom):
+    valid_rom(rom)
+    exe = launch_path(autorun_source(rom))
+    if not exe:
+        raise ValueError('autorun.cmd does not name a Windows executable')
+    pe_arch(source_header(rom, exe))
+    return exe
+
+
 def executable_list(rom):
     if rom.suffix.casefold() == '.wsquashfs':
         output = subprocess.run(['unsquashfs', '-ls', str(rom)], check=True,
@@ -780,7 +789,7 @@ def main():
     parser.add_argument('--bottles', type=Path, default=Path('/userdata/system/wine-bottles/windows'))
     parser.add_argument('--runner', default='')
     parser.add_argument('--legacy', action='store_true')
-    parser.add_argument('command', choices=['backend-packs', 'exes', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'external-scan', 'external-info', 'external-enable', 'external-disable', 'external-release', 'wiki-title', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
+    parser.add_argument('command', choices=['backend-packs', 'exes', 'autorun-exe', 'prepare', 'finish', 'status', 'status-list', 'configured-list', 'export', 'api', 'external-scan', 'external-info', 'external-enable', 'external-disable', 'external-release', 'wiki-title', 'wiki-search', 'wiki-page', 'enable', 'disable', 'uninstall',
                                            'gameStart', 'gameStop', 'disable-all', 'preset', 'profile', 'details', 'existing-targets', 'existing-import', 'existing-restore', 'pack-info', 'pack-import', 'pack-remove', 'pack-status', 'pack-check', 'pack-dependency-source', 'pack-conflicts',
                                            'presets-list', 'presets-info', 'presets-select', 'presets-rename', 'presets-delete', 'presets-pack',
                                            'presets-catalog', 'presets-global-items', 'presets-global-info', 'presets-global-rename',
@@ -803,6 +812,8 @@ def main():
             valid_rom(rom)
             for exe in executable_list(rom):
                 print(exe)
+        elif args.command == 'autorun-exe':
+            print(autorun_executable(rom))
         elif args.command == 'prepare':
             print(prepare(home, rom, *args.args))
         elif args.command == 'finish':

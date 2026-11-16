@@ -57,6 +57,63 @@ amx_profiles_cmd() { echo AMX-CALLED >> "$WT_HOME/ui"; return 1; }
         self.assertNotIn('AMX-CALLED', ui)
         return ui
 
+    def test_es_applies_selected_ini_without_asking_to_pick_a_preset(self):
+        self.shell(r"""
+WT_COMMUNITY_ES=1
+menu_select() { echo unexpected-menu >> "$WT_HOME/ui"; return 1; }
+resh_cmd() {
+    case "$1" in
+        status) echo enabled ;;
+        export) cp -- "$TEST_INI" "$3" ;;
+        *) return 1 ;;
+    esac
+}
+resh_import_ini() { [ "$1" = "$TEST_ROM" ] && [ "$2" = "$TEST_INI" ] && touch "$WT_HOME/applied"; }
+community_import_actions reshade "$TEST_INI" Community "$TEST_ROM" || exit 1
+[ -f "$WT_HOME/applied" ] && ! grep -q unexpected-menu "$WT_HOME/ui"
+""")
+
+    def test_es_prefers_autorun_while_the_normal_setup_offers_executables(self):
+        self.shell(r"""
+resh_cmd() {
+    case "$1" in
+        pack-status) echo '{}' ;;
+        autorun-exe) echo 'drive_c/Game Folder/Game.exe' ;;
+        exes) printf '%s\n' 'drive_c/Game Folder/Game.exe' 'drive_c/Launcher.exe' ;;
+        *) return 1 ;;
+    esac
+}
+menu_select() { echo selected-in-menu >> "$WT_HOME/ui"; echo 2; }
+resh_api_select() { printf '%s\n' "$2" >> "$WT_HOME/exe"; return 1; }
+if WT_COMMUNITY_ES=1 resh_install_game "$TEST_ROM" "" "$TEST_INI"; then exit 1; fi
+[ "$(cat "$WT_HOME/exe")" = 'drive_c/Game Folder/Game.exe' ] || exit 1
+[ ! -f "$WT_HOME/ui" ] || exit 1
+if resh_install_game "$TEST_ROM"; then exit 1; fi
+[ "$(tail -1 "$WT_HOME/exe")" = 'drive_c/Launcher.exe' ] && grep -q selected-in-menu "$WT_HOME/ui"
+""")
+
+    def test_api_diagnostic_resumes_the_es_selection_and_exits_to_es(self):
+        self.shell(r"""
+mkdir -p "$WT_HOME/state"
+python3 - "$WT_HOME/state/reshade-diagnostic.json" "$TEST_ROM" "$TEST_INI" <<'PY_STATE'
+import json, sys
+from pathlib import Path
+Path(sys.argv[1]).write_text(json.dumps(dict(rom=sys.argv[2], installation_exe="Game.exe",
+    community_preset=sys.argv[3], community_es=True)))
+PY_STATE
+resh_install_game() {
+    [ "$WT_COMMUNITY_ES" = 1 ] && [ "$1" = "$TEST_ROM" ] && [ "$2" = Game.exe ] &&
+        [ "$3" = "$TEST_INI" ] || exit 1
+    touch "$WT_HOME/resumed"
+}
+community_import_actions() {
+    [ "$WT_COMMUNITY_ES" = 1 ] && [ "$2" = "$TEST_INI" ] && [ -f "$WT_HOME/resumed" ] || exit 1
+}
+resh_game_menu() { exit 1; }
+resh_resume_diagnostic
+exit 1
+""")
+
     def test_reshade_detection_keeps_terminal_output_out_of_selected_game(self):
         for language in ('fr', 'en'):
             for cancel in (False, True):

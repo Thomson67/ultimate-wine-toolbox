@@ -23,7 +23,8 @@ community_import_actions() {
   local reshade_installed="${5:-0}"
   local -a test_options=(live "$(community_txt 'Modifier les commandes et tester en jeu' 'Edit controls and test in game')")
   [ "${WT_COMMUNITY_ES:-0}" != 1 ] || test_options=()
-  while true; do
+  local es_preset_attempted=0
+  while [ "$es_preset_attempted" -eq 0 ]; do
     if [ "$kind" = antimicrox ]; then
       launcher_notice="$(community_cmd launcher-info "$path" 2>/dev/null)" || launcher_notice=""
       if [ -n "$launcher_notice" ]; then
@@ -69,20 +70,24 @@ Check its requirements and Hotkey. Pad2Key will be backed up and suspended.")" |
         *) return 0 ;;
       esac
     else
-      choice="$(menu_select "$title" "$(community_txt "Preset téléchargé :
+      if [ "${WT_COMMUNITY_ES:-0}" = 1 ] && [ -n "$rom" ]; then
+        es_preset_attempted=1
+      else
+        choice="$(menu_select "$title" "$(community_txt "Preset téléchargé :
 $path
 
 Choisissez le jeu cible. Si nécessaire, l’assistant proposera de configurer ReShade et ses effets avant l’application." "Preset downloaded:
 $path
 
 Choose the target game. If necessary, the wizard will offer to configure ReShade and its effects before applying the preset.")" \
-        info "$(community_txt 'Voir les effets et les réglages' 'View effects and settings')" \
-        apply "$(community_txt 'Appliquer ce preset à un jeu' 'Apply this preset to a game')" back "$(i18n back)")" || return 0
-      case "$choice" in
-        info) output="$(community_cmd preset-info "$path" 2>&1)"; community_report "$title" "$output"; continue ;;
-        apply) : ;;
-        *) return 0 ;;
-      esac
+          info "$(community_txt 'Voir les effets et les réglages' 'View effects and settings')" \
+          apply "$(community_txt 'Appliquer ce preset à un jeu' 'Apply this preset to a game')" back "$(i18n back)")" || return 0
+        case "$choice" in
+          info) output="$(community_cmd preset-info "$path" 2>&1)"; community_report "$title" "$output"; continue ;;
+          apply) : ;;
+          *) return 0 ;;
+        esac
+      fi
       if [ -z "$rom" ]; then
         local preferred
         preferred="$(community_cmd suggest-game reshade "$path" 2>/dev/null)" || preferred=""
@@ -145,6 +150,7 @@ $output")"
       fi
     fi
   done
+  return 1
 }
 
 community_apply_existing_reshade() {
