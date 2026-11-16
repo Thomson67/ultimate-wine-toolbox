@@ -34,7 +34,7 @@ COMMUNITY_NAMES = {
     'community_antimicrox': ('Profils AntiMicroX communautaires (par jeu)', 'Community AntiMicroX profiles (per game)'),
 }
 OPTIONS = {
-    'community': tuple((key, names, {}) for key, names in COMMUNITY_NAMES.items()),
+    **{key: ((key, names, {}),) for key, names in COMMUNITY_NAMES.items()},
     'mangohud': (
         ('mangohud', ('MangoHud', 'MangoHud'), SWITCH),
         ('mangohud_display', ('Profil MangoHud', 'MangoHud profile'),
@@ -252,6 +252,9 @@ def publish(groups, language, path=FEATURES, bundles=BUNDLES, home=HOME):
 
 
 def publish_features(groups, language, path, bundles, home):
+    groups = set(groups)
+    if 'community' in groups:
+        groups.update(COMMUNITY_NAMES)
     raw = option_file(path)
     if path.exists() and OWNER not in raw:
         raise ValueError(f'{path} is not owned by Ultimate Wine Toolbox')
@@ -290,7 +293,7 @@ def enable_community(language, path=FEATURES, bundles=BUNDLES, home=HOME):
             return
         keys = exposed(path)
         groups = {group for group, items in OPTIONS.items() if any(key in keys for key, _, _ in items)}
-        publish_features(groups | {'community'}, language, path, bundles, home)
+        publish_features(groups | COMMUNITY_NAMES.keys(), language, path, bundles, home)
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.touch()
 
@@ -390,7 +393,7 @@ def main():
     elif args.action == 'dxvk-assigned':
         print('\n'.join(sorted(Overrides('').assigned_dxvk_bundles())))
     elif args.action == 'publish':
-        if unknown := set(args.groups) - OPTIONS.keys():
+        if unknown := set(args.groups) - OPTIONS.keys() - {'community'}:
             parser.error(f'unknown ES options: {", ".join(sorted(unknown))}')
         publish(args.groups, args.language)
     else:

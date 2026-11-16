@@ -56,6 +56,20 @@ class OptionsTests(TestCase):
             es.publish(['mouse'], 'en', self.xml)
         self.assertEqual('<features/>', self.xml.read_text())
 
+    def test_community_reshade_and_antimicrox_can_be_published_independently(self):
+        home = self.root/'toolbox'
+        es.enable_community('fr', self.xml, home=home)
+        self.assertEqual(es.exposed(self.xml), {'community_reshade', 'community_antimicrox', es.RESHADE_PRESET_KEY})
+        for chosen, expected in (
+            ('community_reshade', {'community_reshade', es.RESHADE_PRESET_KEY}),
+            ('community_antimicrox', {'community_antimicrox'}),
+        ):
+            with self.subTest(chosen=chosen):
+                es.publish({chosen, 'mouse'}, 'fr', self.xml, home=home)
+                es.enable_community('fr', self.xml, home=home)
+                es.refresh(self.xml, home=home)
+                self.assertEqual(es.exposed(self.xml), expected | {'mouse'})
+
     def test_upgrade_refreshes_labels_without_changing_selected_sections(self):
         es.publish(['mouse', 'launcher', 'reshade'], 'fr', self.xml)
         legacy = self.xml.read_text().replace('Afficher le launcher (par jeu)', 'Réafficher le launcher (par jeu)')
