@@ -99,6 +99,34 @@ maintenance_menu
         self.assertEqual((self.target / self.runner / "wine").read_text(), "runner")
         self.assertTrue((self.target / self.runner / "bin/wine").stat().st_mode & 0o100)
 
+    def test_backup_restores_absolute_reshade_shader_links_as_relative_links(self):
+        library = backup.RESHADE_RUNTIME / "ReShade_shaders/reshade-bur/BUR_fsr1.fxh"
+        merged = backup.RESHADE_RUNTIME / "game-shaders/path-example/Merged/BUR_fsr1.fxh"
+        self.write(self.source, library, "shader")
+        (self.source / merged).parent.mkdir(parents=True)
+        (self.source / merged).symlink_to(self.source / library)
+
+        backup.export(self.source, self.archive, False)
+        backup.restore(self.target, self.archive, False, False)
+
+        restored = self.target / merged
+        self.assertTrue(restored.is_symlink())
+        self.assertFalse(restored.readlink().is_absolute())
+        self.assertEqual(restored.resolve(), self.target / library)
+        self.assertEqual(restored.read_text(), "shader")
+        self.assertTrue((self.source / merged).readlink().is_absolute())
+
+    def test_restore_rejects_reshade_link_outside_runtime(self):
+        merged = backup.RESHADE_RUNTIME / "game-shaders/path-example/Merged/BUR_fsr1.fxh"
+        with tarfile.open(self.archive, "w:gz") as archive:
+            member = tarfile.TarInfo(f"data/{merged}")
+            member.type = tarfile.SYMTYPE
+            member.linkname = "../../../../../../batocera.conf"
+            archive.addfile(member)
+        with self.assertRaisesRegex(ValueError, "Unsupported symbolic link"):
+            backup.restore(self.target, self.archive, False, False)
+        self.assertFalse((self.target / merged).is_symlink())
+
     def test_rejects_archive_entries_outside_managed_directories(self):
         with tarfile.open(self.archive, "w:gz") as archive:
             info = tarfile.TarInfo("data/../untouched")

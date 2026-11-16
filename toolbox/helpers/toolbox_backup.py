@@ -22,6 +22,7 @@ import es_options
 HOME = "ultimate-wine-toolbox"
 FEATURES = Path("configs/emulationstation") / es_options.FEATURES.name
 RUNNERS = Path("wine/custom")
+RESHADE_RUNTIME = Path(HOME, "reshade/runtime")
 BACKUP_METADATA = Path("backups/ultimate-wine-toolbox/last-export.json")
 # These roots contain portable settings and assets. Live recovery journals,
 # caches and Wine prefixes are deliberately outside this inventory.
@@ -82,12 +83,24 @@ def unit_for(relative):
     raise ValueError(f"Unexpected archive path: {relative}")
 
 
-def check_link(relative, unit, target):
-    # Wine can use absolute symlinks in a runner (for example dosdevices/z:).
-    # Restore the link itself; safe_path rejects links in extraction parents.
-    if unit.parent != RUNNERS or relative == unit or not target or "\0" in target:
-        raise ValueError(f"Unsupported symbolic link: {relative} -> {target}")
-
+def archive_link(relative, unit, target, system=None):
+    # A link may be a leaf of the staging tree, never an extraction parent.
+    if relative != unit and target and "\0" not in target:
+        # Wine runners can contain absolute links such as dosdevices/z:.
+        if unit.parent == RUNNERS:
+            return target
+        if relative.is_relative_to(RESHADE_RUNTIME):
+            if system is not None:
+                resolved = (system / relative.parent / target).resolve()
+                if resolved.is_relative_to(system):
+                    destination = resolved.relative_to(system)
+                else:
+                    destination = resolved
+            else:
+                destination = Path(os.path.normpath(relative.parent / target))
+            if destination.is_relative_to(RESHADE_RUNTIME):
+                return os.path.relpath(destination, relative.parent)
+    raise ValueError(f"Unsupported symbolic link: {relative} -> {target}")
 
 def entries(system, runners, output=None):
     def walk(relative, unit):
@@ -96,7 +109,7 @@ def entries(system, runners, output=None):
             raise ValueError(f"Select a backup destination outside {system / unit}")
         info = path.lstat()
         if stat.S_ISLNK(info.st_mode):
-            check_link(relative, unit, os.readlink(path))
+            archive_link(relative, unit, os.readlink(path), system)
         elif not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode)):
             raise ValueError(f"Unsupported file: {path}")
         yield relative, info
@@ -194,7 +207,12 @@ def export(system, output, runners):
                     raise ValueError(f"Changed during export: {source}")
                 if stat.S_ISREG(checked.st_mode):
                     archive.inodes.clear()
-                archive.add(source, arcname=f"data/{relative}", recursive=False)
+                if stat.S_ISLNK(checked.st_mode):
+                    member = archive.gettarinfo(source, arcname=f"data/{relative}")
+                    member.linkname = archive_link(relative, unit_for(relative), member.linkname, system)
+                    archive.addfile(member)
+                else:
+                    archive.add(source, arcname=f"data/{relative}", recursive=False)
                 if source.lstat() != checked:
                     raise ValueError(f"Changed during export: {source}")
             for relative, data in sorted(replacements.items()):
@@ -238,7 +256,7 @@ def read_archive(source, staging=None, include_runners=True):
             unit = unit_for(relative)
             units.add(unit)
             if member.issym():
-                check_link(relative, unit, member.linkname)
+                link_target = archive_link(relative, unit, member.linkname)
             elif not (member.isfile() or member.isdir()):
                 raise ValueError(f"Unsupported archive entry: {name}")
             if unit == FEATURES and (relative != unit or not member.isfile()):
@@ -254,7 +272,7 @@ def read_archive(source, staging=None, include_runners=True):
             else:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if member.issym():
-                    target.symlink_to(member.linkname)
+                    target.symlink_to(link_target)
                 else:
                     with archive.extractfile(member) as stream, target.open("xb") as out:
                         shutil.copyfileobj(stream, out)
