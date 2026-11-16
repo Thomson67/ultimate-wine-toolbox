@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import stat
+from textwrap import fill
 from xml.etree.ElementTree import ParseError
 
 import es_options
@@ -154,7 +155,10 @@ def report(system, home, roms, custom, native, language):
     missing_runners, missing_bundles = missing_assignments(system, home, runners, native)
 
     def line(fr_label, en_label, value):
-        print(f"{fr_label if fr else en_label} : {value}")
+        label = fr_label if fr else en_label
+        # Leave room for the textbox border and wrap long lists and paths.
+        for paragraph in f"{label} : {value}".splitlines():
+            print(fill(paragraph, width=88, subsequent_indent="  ", break_on_hyphens=False))
 
     line("Rubriques EmulationStation", "EmulationStation sections", sections)
     line("Catalogue communautaire", "Community catalogue",
