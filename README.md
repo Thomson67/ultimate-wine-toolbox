@@ -6,7 +6,15 @@
 
 Created by **Thomsonito**.
 
-**Stable version: [v0.11.6](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.6).**
+**Stable version: [v0.11.7](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.7).**
+
+## New in v0.11.7
+
+- **Backup and restore.** Under **Maintenance → Back up or restore the Toolbox**, export global and per-game Windows settings, EmulationStation options, AntiMicroX profiles, ReShade presets and packs, and DXVK/VKD3D bundles into one archive. Wine and UMU runners are optional
+- **Archive checks.** Internal symbolic links across backed-up folders, including ReShade shader links, are stored as relative links. Problematic links are reported together before archive creation
+- **Environment summary.** Opens faster by counting games, runners and prefixes without recursively measuring their size. The summary shows the last recorded backup, EmulationStation options, community catalogue status and references to missing runners or bundles.
+
+[v0.11.7 release notes](release-notes/v0.11.7.md)
 
 ## New in v0.11.6
 

@@ -6,7 +6,15 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.11.6](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.6).**
+**Version stable : [v0.11.7](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.7).**
+
+## Nouveautés de la v0.11.7
+
+- **Sauvegarde et restauration.** Dans **Maintenance → Sauvegarder ou restaurer la Toolbox**, exportez vos réglages Windows globaux et par jeu, vos options EmulationStation, vos profils AntiMicroX, vos presets et packs ReShade et vos bundles DXVK/VKD3D dans une archive. Les runners Wine et UMU sont facultatifs
+- **Vérification des archives.** Les liens symboliques entre les dossiers sauvegardés, notamment ceux des shaders ReShade, sont conservés sous forme relative. Les liens problématiques sont signalés ensemble avant la création de l’archive
+- **Résumé de l’environnement.** Ouverture plus rapide grâce au comptage des jeux, runners et préfixes sans mesure récursive de leur taille. Le résumé affiche la dernière sauvegarde enregistrée, les options EmulationStation, l’état du catalogue communautaire et les références à des runners ou bundles manquants.
+
+[Notes de version v0.11.7](release-notes/v0.11.7.md)
 
 ## Nouveautés de la v0.11.6
 
