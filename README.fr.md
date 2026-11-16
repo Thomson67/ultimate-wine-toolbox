@@ -6,7 +6,15 @@
 
 Créée par **Thomsonito**.
 
-**Version stable : [v0.11.5](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.5).**
+**Version stable : [v0.11.6](https://github.com/Thomson67/ultimate-wine-toolbox/releases/tag/v0.11.6).**
+
+## Nouveautés de la v0.11.6
+
+- Choisissez les presets et packs ReShade ou les profils AntiMicroX communautaires depuis les options avancées du jeu dans EmulationStation. Leur affichage se règle dans **Paramètres → Options EmulationStation**.
+- Changez de preset ReShade installé ou réutilisez un profil AntiMicroX téléchargé directement dans EmulationStation. La désactivation de ReShade prend aussi en charge les injecteurs `.asi` intégrés et reconnus.
+- Installez le bundle graphique Batocera 44 avec DXVK 3.1.1, VKD3D-Proton 3.0.1 et DXVK-NVAPI 0.9.2.
+
+[Notes de version v0.11.6](release-notes/v0.11.6.md)
 
 ## Nouveautés de la v0.11.5
 

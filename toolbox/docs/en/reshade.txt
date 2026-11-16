@@ -40,6 +40,8 @@ Settings and presets are kept per game and retrieved when the game closes. Expor
 WSquashFS games are supported without recompressing the archive. ReShade installations already bundled with a game are detected and managed separately; nonstandard loaders may require their original manager.
 
 COMMUNITY PRESETS
+Use the Ultimate Wine Toolbox submenu in EmulationStation’s advanced game options to choose a community preset or bundle. Leave the menu to apply the selection. If ReShade is missing, the Toolbox offers to install it with the selected preset. Use Installed ReShade preset to switch presets directly in ES afterwards.
+
 Open the catalogue from the ReShade menu. Search by game or author and use Refresh the list to retrieve new submissions. Downloaded marks a local copy that is still present; modified marks an edited copy. Local copies can be reused without downloading again.
 
 After downloading, choose Apply this preset to a game. Games with similar names appear first, while all ES games remain available. If ReShade is missing, the wizard offers installation using this preset: it skips the model selection and identifies packs from active effects on the Techniques= line. Saved settings sections and TechniqueSorting= may contain inactive effects and do not select packs. Unknown or ambiguous effects require manual review. Downloads still include complete packs and their dependencies, rather than individual effects.
@@ -61,8 +63,8 @@ A user validated Windows Azahar under Wine using Vulkan on their AMD configurati
 
 Local bundles: choose ZIP archive or Directory to import add-ons, isolated shaders
 and presets. For Henriko/Citra, install ReShade 6.3.3 with full add-on support
-first. Removing the bundle restores previous settings. Community sharing
-still transfers INI presets only.
+first. Removing the bundle restores previous settings. The community
+catalogue offers INI presets and approved ZIP bundles.
 
 Game presets and details: keep multiple presets, inspect enabled effects and
 all INI settings, rename and activate variants (close the game first).

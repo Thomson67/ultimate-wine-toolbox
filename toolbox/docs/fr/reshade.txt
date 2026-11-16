@@ -40,6 +40,8 @@ Les réglages et presets sont conservés par jeu et récupérés à sa fermeture
 Les WSquashFS sont pris en charge sans recompression de l’archive. Les installations ReShade déjà intégrées au jeu sont détectées et disposent d’une gestion distincte ; un chargeur non standard peut nécessiter son gestionnaire d’origine.
 
 PRESETS COMMUNAUTAIRES
+Dans les options avancées du jeu d’EmulationStation, les presets et packs communautaires sont accessibles depuis le sous-menu Ultimate Wine Toolbox. Quittez le menu pour appliquer la sélection. Quand ReShade est absent, la Toolbox propose l’installation avec le preset choisi. L’option Preset ReShade installé permet ensuite de changer de preset directement dans ES.
+
 Le catalogue est accessible depuis le menu ReShade. Rechercher par jeu ou auteur et utiliser Mettre à jour la liste pour récupérer les nouveaux partages. Téléchargé repère une copie locale encore présente ; modifié indique une copie retouchée. Elle peut être réutilisée sans nouveau téléchargement.
 
 Après le téléchargement, choisir Appliquer ce preset à un jeu. Les jeux au nom proche sont proposés en priorité, mais tous les jeux ES restent accessibles. Si ReShade est absent, l’assistant propose de l’installer avec ce preset : le choix d’un modèle est sauté et les packs sont déduits des effets actifs de la ligne Techniques=. Les sections de réglages et TechniqueSorting= peuvent contenir des effets désactivés et ne servent pas à sélectionner les packs. Un effet inconnu ou ambigu demande une vérification manuelle. Le téléchargement reste effectué par packs complets avec leurs dépendances, pas effet par effet.
@@ -61,8 +63,8 @@ Un utilisateur a validé Azahar Windows sous Wine en Vulkan sur sa configuration
 
 Packs locaux : choisir Archive ZIP ou Dossier pour importer add-ons, shaders
 et presets isolés. Pour Henriko/Citra, installer d’abord ReShade 6.3.3 avec
-add-ons complets. Retirer le pack restaure les réglages précédents. Les
-partages communautaires restent limités aux presets INI.
+add-ons complets. Retirer le pack restaure les réglages précédents. Le
+catalogue communautaire propose des presets INI et des packs ZIP validés.
 
 Presets du jeu et détails : conserver plusieurs presets, afficher les effets
 actifs et tous les paramètres INI, renommer et activer une variante (jeu fermé).
