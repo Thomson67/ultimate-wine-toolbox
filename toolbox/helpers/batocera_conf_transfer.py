@@ -183,7 +183,7 @@ def cmd_merge(args: argparse.Namespace) -> int:
     before: list[str] = []
     for i, raw in enumerate(lines[:marker_index]):
         text = raw.rstrip("\r\n")
-        if i in protected_indexes:
+        if i in protected_indexes or PROTECTED_RE.match(text):
             before.append(raw)
         elif WINDOWS_RE.match(text):
             continue
@@ -194,6 +194,10 @@ def cmd_merge(args: argparse.Namespace) -> int:
     inside_windows_header = False
     for raw in lines[marker_index + 1:]:
         text = raw.rstrip("\r\n")
+        if PROTECTED_RE.match(text):
+            after.append(raw)
+            inside_windows_header = False
+            continue
         header = HEADER_RE.match(text)
         if header:
             inside_windows_header = header.group(1).casefold() == "windows"

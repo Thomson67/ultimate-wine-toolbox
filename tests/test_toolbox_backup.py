@@ -55,7 +55,8 @@ maintenance_menu
                    f"{USER_MARKER}\nwindows.dxvk=0\nwindows.emulator=wine\n"
                    'windows["Game.wine"].uwt_community_antimicrox=sample\n')
         self.write(self.target, "batocera.conf",
-                   f"{USER_MARKER}\nwindows.dxvk=1\nwindows.emulator=auto\nwifi.enabled=1\n")
+                   f"windows.dxvk_hud=1\n{USER_MARKER}\nwindows.dxvk=1\n"
+                   "windows.emulator=auto\nwifi.enabled=1\n")
         self.write(self.source, self.settings, "fr\n")
         self.write(self.target, self.settings, "en\n")
         self.profile = Path(backup.HOME, "reshade", "profiles", "game", "presets", "test.ini")
@@ -75,7 +76,8 @@ maintenance_menu
         backup.export(self.source, self.archive, False)
         backup.restore(self.target, self.archive, False, True)
         config = (self.target / "batocera.conf").read_text()
-        for entry in ("windows.dxvk=1", "windows.emulator=auto", "uwt_community_antimicrox=sample", "wifi.enabled=1"):
+        for entry in ("windows.dxvk=1", "windows.dxvk_hud=1", "windows.emulator=auto",
+                      "uwt_community_antimicrox=sample", "wifi.enabled=1"):
             self.assertIn(entry, config)
         self.assertEqual((self.target / self.settings).read_text(), "en\n")
         self.assertEqual((self.target / self.profile).read_text(), "Techniques=Sample\n")
