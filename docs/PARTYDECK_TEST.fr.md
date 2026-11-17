@@ -50,7 +50,8 @@ joueur dans `/userdata/system/partydeck-test/coop`. Le test démarre avec ses
 propres sauvegardes. OverlayFS est nécessaire pour les écritures du jeu.
 
 - Choisissez `1`, `2`, `3`, `4` ou `auto`. `auto` adapte le nombre de joueurs
-  aux manettes détectées au lancement, avec un maximum de quatre.
+  aux manettes détectées au lancement, avec un maximum de quatre. Avec une
+  seule manette et un clavier et une souris, il démarre deux joueurs.
 - `horizontal` place deux fenêtres l'une au-dessus de l'autre. `vertical`
   les place côte à côte. À trois ou quatre joueurs, le lanceur utilise une
   grille 2 × 2. Le placement vise l'écran principal.

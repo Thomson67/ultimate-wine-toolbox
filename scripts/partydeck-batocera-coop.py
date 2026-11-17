@@ -41,7 +41,7 @@ NATIVE_GRAPHICS_ENV = (
     "LIBGL_DRIVERS_PATH", "LIBVA_DRIVERS_PATH", "GBM_BACKENDS_PATH", "DRIRC_CONFIGDIR",
     "__EGL_VENDOR_LIBRARY_DIRS", "__EGL_VENDOR_LIBRARY_FILENAMES", "__GLX_VENDOR_LIBRARY_NAME",
     "VK_DRIVER_FILES", "VK_ICD_FILENAMES", "VK_LAYER_PATH", "VK_ADD_LAYER_PATH",
-    "MESA_LOADER_DRIVER_OVERRIDE", "LIBGL_KOPPER_DRI2",
+    "MESA_LOADER_DRIVER_OVERRIDE", "LIBGL_KOPPER_DRI2", "SDL_VIDEO_X11_WMCLASS",
 )
 
 
@@ -87,7 +87,8 @@ def assign_players(devices, count, input_mode):
                       for kind in (KEYBOARDS, MICE)]
     available = all(keyboard_mouse)
     if count == "auto":
-        count = max(1, min(4, len(pads) + (input_mode != "auto")))
+        add_keyboard = input_mode != "auto" or (available and len(pads) == 1)
+        count = max(1, min(4, len(pads) + add_keyboard))
         if input_mode == "clavier-j2":
             count = max(2, count)
     count = int(count)
@@ -168,8 +169,9 @@ def remove_fullscreen(window):
         x11.XCloseDisplay(display)
 
 
-def top_window(pid):
-    result = subprocess.run(["xdotool", "search", "--onlyvisible", "--pid", str(pid)], text=True,
+def top_window(window_class):
+    result = subprocess.run(["xdotool", "search", "--onlyvisible", "--class",
+                             f"^{window_class}$"], text=True,
                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     ids = result.stdout.split()
     return ids[0] if result.returncode == 0 and len(ids) == 1 else None
@@ -347,7 +349,7 @@ def run_wine(original, target, player):
     return 128 - status if status < 0 else status
 
 
-def start_player(app, player, original, target, devices, rectangle):
+def start_player(app, player, original, target, devices, rectangle, window_class):
     _, _, width, height = rectangle
     args = [str(app / "AppRun"), "gamescope-kbm", "--backend=sdl", "--borderless",
             "-W", str(width), "-H", str(height),
@@ -361,7 +363,10 @@ def start_player(app, player, original, target, devices, rectangle):
                  *bubblewrap_command(app), *sandbox_arguments(player, devices),
                  "--", sys.executable, helper, "_wine",
                  str(original), str(target), str(player)])
-    return subprocess.Popen(args, env={**os.environ, "SDL_VIDEODRIVER": "x11"},
+    # SDL writes this identifier to the outer X11 window's WM_CLASS. The
+    # AppImage's launcher PID and the game's title can both differ.
+    return subprocess.Popen(args, env={**os.environ, "SDL_VIDEODRIVER": "x11",
+                                       "SDL_VIDEO_X11_WMCLASS": window_class},
                             start_new_session=True)
 
 
@@ -393,6 +398,8 @@ def run_session(app, base, original, target, count, split, input_mode):
             raise RuntimeError(f"Commande indisponible : {tool}")
     players = assign_players(read_input_devices(), count, input_mode)
     boxes = layout(primary_monitor(), len(players), split)
+    print(f"Joueurs : {len(players)} | demande : {count} | entrées : {input_mode} | "
+          f"partage : {split}", flush=True)
     probe = subprocess.run([*bubblewrap_command(app), *MOUNT_CAPS,
                             "--ro-bind", "/", "/", "--unshare-pid", "--proc", "/proc",
                             "--", "/bin/true"])
@@ -401,6 +408,7 @@ def run_session(app, base, original, target, count, split, input_mode):
     print("Vérification Bubblewrap Wine OK.", flush=True)
     game_id = hashlib.sha256(os.fsencode(original)).hexdigest()[:16]
     processes = []
+    window_classes = [f"partydeck-coop-{os.getpid()}-j{i}" for i in range(1, len(players) + 1)]
     for signum in SIGNALS:
         signal.signal(signum, handle_exit)
     try:
@@ -408,9 +416,11 @@ def run_session(app, base, original, target, count, split, input_mode):
             player = base / "coop" / game_id / f"j{index}"
             player.mkdir(parents=True, exist_ok=True)
             print(f"J{index} : {', '.join(str(d.node) for d in devices)} → {rectangle}", flush=True)
-            processes.append(start_player(app, player, original, target, devices, rectangle))
+            processes.append(start_player(app, player, original, target, devices, rectangle,
+                                          window_classes[index - 1]))
         pending = dict(enumerate(processes))
-        attempts = dict.fromkeys(pending, 0)
+        seen_windows = {}
+        next_attempt = dict.fromkeys(pending, 0)
         deadline = time.monotonic() + 120
         while pending and time.monotonic() < deadline:
             for index, process in list(pending.items()):
@@ -419,9 +429,14 @@ def run_session(app, base, original, target, count, split, input_mode):
                     print(f"J{index + 1} a quitté avant l’affichage (code {status}).", flush=True)
                     del pending[index]
                     continue
-                window = top_window(process.pid)
+                if time.monotonic() < next_attempt[index]:
+                    continue
+                window = top_window(window_classes[index])
                 if window:
-                    attempts[index] += 1
+                    if seen_windows.get(index) != window:
+                        seen_windows[index] = window
+                        print(f"Fenêtre J{index + 1} repérée : {window}", flush=True)
+                    next_attempt[index] = time.monotonic() + 1
                     try:
                         if place_window(window, boxes[index]):
                             print(f"Fenêtre J{index + 1} placée : {window}", flush=True)
@@ -429,13 +444,13 @@ def run_session(app, base, original, target, count, split, input_mode):
                             continue
                     except subprocess.CalledProcessError:
                         pass  # The window can disappear during startup.
-                    if attempts[index] >= 4:
-                        print(f"Placement J{index + 1} non confirmé : {window}", flush=True)
-                        del pending[index]
             if pending:
                 time.sleep(0.5)
-        if pending:
-            print("Fenêtres non repérées : " + ", ".join(f"J{i + 1}" for i in pending), flush=True)
+        for index in pending:
+            if index in seen_windows:
+                print(f"Placement J{index + 1} non confirmé : {seen_windows[index]}", flush=True)
+            else:
+                print(f"Fenêtre J{index + 1} non repérée : {window_classes[index]}", flush=True)
         statuses = [process.wait() for process in processes]
         return next((status for status in statuses if status), 0)
     finally:
