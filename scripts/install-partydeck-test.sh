@@ -10,6 +10,7 @@ appdir="$release/AppDir"
 data="$base/data/partydeck"
 games="$base/jeux"
 launcher="$base/partydeck-test"
+xwayland_dir="$base/releases/xwayland-24.1.15-1"
 
 die() { printf 'Erreur : %s\n' "$*" >&2; exit 1; }
 
@@ -26,6 +27,85 @@ Usage :
 une copie de test autonome du jeu dans /userdata/system/partydeck-test/jeux/.
 L'EXE doit pouvoir se lancer avec un préfixe Wine neuf.
 HELP
+}
+
+install_portable_xwayland() {
+    local staging checksum path package
+    staging=$(mktemp -d "$base/releases/.xwayland-XXXXXX")
+    trap 'rm -rf -- "$staging"' EXIT
+    printf 'Installation de Xwayland portable dans le dossier PartyDeck.\n'
+
+    # Debian upstream packages, pinned by SHA-256 from the amd64 package indexes.
+    # PartyDeck's pinned AppImage provides glibc, Mesa and the Wayland libraries.
+    while read -r checksum path; do
+        package="${path##*/}"
+        curl --fail --silent --show-error --location --retry 2 --connect-timeout 15 \
+            --proto '=https' "https://deb.debian.org/debian/$path" --output "$staging/$package" ||
+            die "Téléchargement de $package impossible."
+        (cd "$staging" && printf '%s  %s\n' "$checksum" "$package" | sha256sum -c -) ||
+            die "Somme SHA-256 incorrecte pour $package."
+    done <<'PACKAGES'
+bd43e020b8fed399db3eebf098111f10fba4c436fff99ccad72cc7e27c9764ec pool/main/e/e2fsprogs/libcom-err2_1.47.2-3+b12_amd64.deb
+e4947f3291528f03d574f2b01d5c5fc45c58c47480f32888a5cdf0f231ab584e pool/main/f/freetype/libfreetype6_2.13.3+dfsg-1+deb13u1_amd64.deb
+0b11ad17be0300b63ad4eeb4c6450fed24d34b7b740f23e5363dcb29ee6d5eba pool/main/k/keyutils/libkeyutils1_1.6.3-6_amd64.deb
+30847c1fde4240567d7ed3aeab4f655dd591203758b857e85e824045aae70299 pool/main/k/krb5/libgssapi-krb5-2_1.21.3-5+deb13u1_amd64.deb
+7da07ee674b47f1f0be7cc89317c25310086a1f1761217d0f72e6ae2c5a69b84 pool/main/k/krb5/libk5crypto3_1.21.3-5+deb13u1_amd64.deb
+47d71d6a7f2e59b9bae5f89602397594805113b95889ad18fa703cd53abafc97 pool/main/k/krb5/libkrb5-3_1.21.3-5+deb13u1_amd64.deb
+3a0acd8b37955c0e102c756b52c97df2a31f67b96453c35dab70df218d309117 pool/main/k/krb5/libkrb5support0_1.21.3-5+deb13u1_amd64.deb
+de3e735f2ecf97cdcd51251ec5c1f84d5ff0ce9f8f822dd7b345dc293af446f0 pool/main/libe/libei/libei1_1.3.901-1_amd64.deb
+d61d40a3dfc0b7030854237c5445f6b9b469c6c3b53a2ff1f98dfa0ae0c7b3f1 pool/main/libe/libei/liboeffis1_1.3.901-1_amd64.deb
+4c4c8024f2175086de65bca9fdc3fbb967f2863ebf249d489c66d0c8103dd3a3 pool/main/libe/libepoxy/libepoxy0_1.5.10-2_amd64.deb
+49f7330e1bbe3f48946fee5c07870df660374f9f77b378840d6edf1a3b3444cd pool/main/libf/libfontenc/libfontenc1_1.1.8-1+b2_amd64.deb
+e2736abceb853d036da0eb0e9f93992dcd31636fe667ef3372d203f53fe30d9c pool/main/libg/libgcrypt20/libgcrypt20_1.12.4-2_amd64.deb
+ef307016953fca2d257786cb323ad7c3b8b84fe9e17a64c9adeaae5d5a434d30 pool/main/libg/libgpg-error/libgpg-error0_1.61-5_amd64.deb
+2465b4e9fa85cff54dc10a6da3e64074d8d9292c86e4a8f989b809d6b158e97e pool/main/libp/libpng1.6/libpng16-16t64_1.6.48-1+deb13u5_amd64.deb
+ef4536c09bf5063554310e22d586ae90990100ba66d2fe7c35660e9e658913b6 pool/main/libt/libtirpc/libtirpc3t64_1.3.6+ds-1_amd64.deb
+0faccb95f5d306fc30c8b128572b92ff97bf59c547f1f8a46b57e0b4c6dd045b pool/main/libx/libxcvt/libxcvt0_0.1.3-1_amd64.deb
+79a7f56e4a0c7b1defa706c7b1f3076f7d80aaeea9de253b2a87406253319681 pool/main/libx/libxfont/libxfont2_2.0.6-1+deb13u1_amd64.deb
+312acac8172454463645ebaf574eb586b2a04a93d6c62349df7bf46ee3daf78d pool/main/x/xwayland/xwayland_24.1.15-1_amd64.deb
+PACKAGES
+
+    python3 - "$staging" <<'PYTHON'
+import io
+from pathlib import Path
+import sys
+import tarfile
+
+destination = Path(sys.argv[1])
+for deb in destination.glob("*.deb"):
+    with deb.open("rb") as archive:
+        if archive.read(8) != b"!<arch>\n":
+            raise ValueError(f"Invalid Debian archive: {deb.name}")
+        while header := archive.read(60):
+            size = int(header[48:58])
+            if header[:16].strip().rstrip(b"/") == b"data.tar.xz":
+                payload = archive.read(size)
+                with tarfile.open(fileobj=io.BytesIO(payload), mode="r:xz") as data:
+                    members = (
+                        entry for entry in data
+                        if entry.name.removeprefix("./") == "usr/bin/Xwayland"
+                        or entry.name.removeprefix("./").startswith("usr/lib/x86_64-linux-gnu/")
+                    )
+                    data.extractall(destination, members=members, filter="data")
+                break
+            archive.seek(size + size % 2, io.SEEK_CUR)
+        else:
+            raise ValueError(f"Missing data.tar.xz in {deb.name}")
+    deb.unlink()
+PYTHON
+
+    cat > "$staging/Xwayland" <<'WRAPPER'
+#!/bin/sh
+runtime=${0%/*}
+partydeck_lib="$PARTYDECK_XWAYLAND_APPDIR/lib"
+exec "$partydeck_lib/ld-linux-x86-64.so.2" \
+    --library-path "$runtime/usr/lib/x86_64-linux-gnu:$partydeck_lib" \
+    "$runtime/usr/bin/Xwayland" "$@"
+WRAPPER
+    chmod 0755 "$staging/Xwayland"
+    "$staging/Xwayland" -version || die 'Le Xwayland portable ne démarre pas.'
+    mv -T -- "$staging" "$xwayland_dir"
+    trap - EXIT
 }
 
 case "${1:-verifier}" in
@@ -150,9 +230,19 @@ else
         die "Socket X11 introuvable ($DISPLAY)."
 fi
 
-if ! command -v Xwayland >/dev/null && [[ ! -x $appdir/bin/Xwayland ]]; then
-    die 'Xwayland est absent. Gamescope en a besoin même lorsque la session principale utilise Xorg.'
+# Even on Xorg, Gamescope uses its own Xwayland server. Recent wlroots
+# builds use a compiled-in path unless WLR_XWAYLAND is set explicitly.
+if native_xwayland=$(command -v Xwayland); then
+    export WLR_XWAYLAND="$native_xwayland"
+else
+    export PARTYDECK_XWAYLAND_APPDIR="$appdir"
+    if [[ ! -x $xwayland_dir/Xwayland ]]; then
+        install_portable_xwayland
+    fi
+    export WLR_XWAYLAND="$xwayland_dir/Xwayland"
 fi
+printf 'Xwayland utilisé par Gamescope : %s\n' "$WLR_XWAYLAND"
+"$WLR_XWAYLAND" -version || die 'Le Xwayland sélectionné ne démarre pas.'
 
 if [[ ${1:-verifier} == verifier ]]; then
     printf '\nVérifications de base OK. Dossier des jeux de test : %s\n' "$games"

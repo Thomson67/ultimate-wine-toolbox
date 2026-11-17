@@ -25,7 +25,11 @@ Avec EmulationStation affiché, lancez le diagnostic depuis SSH.
 
 Le journal indique le type de session et l'état des dépendances. Gamescope a
 besoin de Xwayland pour ses fenêtres internes, y compris quand Batocera utilise
-Xorg comme session principale.
+Xorg comme session principale. Si Batocera fournit Xwayland, le script l'utilise.
+Sinon, la première vérification télécharge une version portable dont les paquets
+sont vérifiés par SHA-256. Elle est rangée dans
+`/userdata/system/partydeck-test/releases` et utilisée uniquement par le test
+PartyDeck.
 
 Placez une copie autonome du jeu dans `/userdata/system/partydeck-test/jeux`.
 Choisissez un jeu capable de démarrer dans un préfixe neuf et doté d'un mode
