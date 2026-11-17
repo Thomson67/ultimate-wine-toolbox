@@ -34,6 +34,15 @@ UMU_PRIVATE = ("compatdata", "materialized-prefixes", "merged-prefixes",
                "gameviews", "exports")
 SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
 MOUNT_CAPS = ["--cap-add", "CAP_SYS_ADMIN", "--cap-add", "CAP_MKNOD"]
+# AppRun and sharun set these for the bundled compositor. The native Wine
+# runner must resolve its utilities and graphics libraries as on Batocera.
+NATIVE_GRAPHICS_ENV = (
+    "PATH", "LD_LIBRARY_PATH", "LD_PRELOAD", "XDG_CONFIG_DIRS", "XDG_DATA_DIRS",
+    "LIBGL_DRIVERS_PATH", "LIBVA_DRIVERS_PATH", "GBM_BACKENDS_PATH", "DRIRC_CONFIGDIR",
+    "__EGL_VENDOR_LIBRARY_DIRS", "__EGL_VENDOR_LIBRARY_FILENAMES", "__GLX_VENDOR_LIBRARY_NAME",
+    "VK_DRIVER_FILES", "VK_ICD_FILENAMES", "VK_LAYER_PATH", "VK_ADD_LAYER_PATH",
+    "MESA_LOADER_DRIVER_OVERRIDE", "LIBGL_KOPPER_DRI2",
+)
 
 
 @dataclass(frozen=True)
@@ -251,10 +260,16 @@ def sandbox_arguments(player, devices, hidraw=Path("/sys/class/hidraw")):
     args = ["--die-with-parent", "--unshare-pid", "--ro-bind", "/", "/",
             "--proc", "/proc", "--dev-bind", "/dev", "/dev",
             *MOUNT_CAPS,
-            "--tmpfs", "/tmp", "--tmpfs", "/dev/input", "--unsetenv", "VK_DRIVER_FILES",
+            "--tmpfs", "/tmp", "--tmpfs", "/dev/input",
             # The Batocera UMU runner derives its runtime directory from its own HOME.
             "--unsetenv", "XDG_DATA_HOME",
+            "--setenv", "ENABLE_GAMESCOPE_WSI", "0",
             "--bind", str(player), str(player)]
+    for key in NATIVE_GRAPHICS_ENV:
+        if key in os.environ:
+            args.extend(["--setenv", key, os.environ[key]])
+        else:
+            args.extend(["--unsetenv", key])
     for item in dbus_socket_mounts(os.environ.get("DBUS_SESSION_BUS_ADDRESS", "")):
         args.extend(item)
     if UMU_HOME.is_dir():
@@ -262,6 +277,13 @@ def sandbox_arguments(player, devices, hidraw=Path("/sys/class/hidraw")):
         # PID namespaces. Keep state writable and private to each launch.
         UMU_SESSION_STATE.mkdir(parents=True, exist_ok=True)
         args.extend(["--tmpfs", str(UMU_SESSION_STATE)])
+        proton_logs = player / "proton-logs"
+        proton_logs.mkdir(exist_ok=True)
+        shared = os.environ.get("PRESSURE_VESSEL_FILESYSTEMS_RW", "")
+        shared = f"{shared}:{proton_logs}" if shared else str(proton_logs)
+        args.extend(["--setenv", "PRESSURE_VESSEL_FILESYSTEMS_RW", shared,
+                     "--setenv", "PROTON_LOG", os.environ.get("PROTON_LOG", "1"),
+                     "--setenv", "PROTON_LOG_DIR", str(proton_logs)])
     for item in player_paths(player):
         args.extend(item)
     for device in devices:
@@ -274,6 +296,29 @@ def sandbox_arguments(player, devices, hidraw=Path("/sys/class/hidraw")):
         if node.exists() and not any(dev.is_relative_to(parent) for dev in pad_paths):
             args.extend(["--ro-bind", "/dev/null", str(node)])
     return args
+
+
+def enter_sandbox(outer_display, command):
+    # The Gamescope child is the first place where DISPLAY names this player's
+    # Xwayland. Pass its socket through the private /tmp for Pressure Vessel.
+    display = os.environ.get("DISPLAY", "")
+    nested = re.fullmatch(r":([0-9]+)(?:\.[0-9]+)?", display)
+    if not nested or display.split(".")[0] == outer_display.split(".")[0]:
+        raise RuntimeError(f"Affichage Xwayland du joueur indisponible ({display!r}).")
+    socket = Path("/tmp/.X11-unix") / f"X{nested[1]}"
+    mounts = []
+    if socket.is_socket():
+        mounts.extend(["--ro-bind", str(socket), str(socket)])
+    authority = os.environ.get("XAUTHORITY")
+    if authority:
+        path = Path(authority).absolute()
+        if path.is_relative_to("/tmp") and path.is_file():
+            mounts.extend(["--ro-bind", str(path), str(path)])
+    print(f"Wine DISPLAY={display} | socket X11 : "
+          f"{socket if socket.is_socket() else 'abstrait uniquement'}", flush=True)
+    end = command.index("--")
+    command[end:end] = mounts
+    os.execv(command[0], command)
 
 
 def mount_overlay(target, area):
@@ -297,7 +342,9 @@ def run_wine(original, target, player):
             destination.mkdir(parents=True, exist_ok=True)
             subprocess.run(["mount", "--bind", str(private), str(destination)], check=True)
     # Keep the original ROM name for Batocera's per-game runner/settings lookup.
-    os.execvp("batocera-wine", ["batocera-wine", "windows", "play", str(original)])
+    status = subprocess.run(["batocera-wine", "windows", "play", str(original)]).returncode
+    print(f"{player.name.upper()} batocera-wine : code {status}", flush=True)
+    return 128 - status if status < 0 else status
 
 
 def start_player(app, player, original, target, devices, rectangle):
@@ -308,8 +355,11 @@ def start_player(app, player, original, target, devices, rectangle):
     kb_mouse = [str(d.node) for d in devices if d.category in {KEYBOARDS, MICE}]
     if kb_mouse:
         args.extend(["--libinput-hold-dev=" + ",".join(kb_mouse) + ",", "--grab"])
-    args.extend(["--", *bubblewrap_command(app), *sandbox_arguments(player, devices),
-                 "--", sys.executable, str(Path(__file__).resolve()), "_wine",
+    helper = str(Path(__file__).resolve())
+    args.extend(["--", "/bin/sh", "-c", 'unset LD_LIBRARY_PATH LD_PRELOAD; exec "$@"', "sh",
+                 sys.executable, helper, "_sandbox", os.environ.get("DISPLAY", ""),
+                 *bubblewrap_command(app), *sandbox_arguments(player, devices),
+                 "--", sys.executable, helper, "_wine",
                  str(original), str(target), str(player)])
     return subprocess.Popen(args, env={**os.environ, "SDL_VIDEODRIVER": "x11"},
                             start_new_session=True)
@@ -395,9 +445,10 @@ def run_session(app, base, original, target, count, split, input_mode):
 
 
 def main():
+    if len(sys.argv) > 3 and sys.argv[1] == "_sandbox":
+        enter_sandbox(sys.argv[2], sys.argv[3:])
     if len(sys.argv) == 5 and sys.argv[1] == "_wine":
-        run_wine(*(Path(path) for path in sys.argv[2:]))
-        return 0
+        return run_wine(*(Path(path) for path in sys.argv[2:]))
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("prepare", "play"))

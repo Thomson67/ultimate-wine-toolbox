@@ -64,6 +64,11 @@ placement automatique, le runner sélectionné et les entrées. Sous
 Wayland/labwc, le placement des fenêtres Xwayland reste à valider.
 Le jeu doit permettre à chaque instance de rejoindre une même partie.
 
+Pour un jeu UMU, chaque joueur a ses journaux dans `coop/<jeu>/jN/umu-logs`
+et, avec Proton, dans `coop/<jeu>/jN/proton-logs` sous le dossier PartyDeck.
+Le journal principal indique l'affichage Xwayland attribué à chaque instance
+et le code de sortie de `batocera-wine`.
+
 ## Essai manuel avec un exécutable autonome
 
 Placez une copie autonome du jeu dans `/userdata/system/partydeck-test/jeux`.
