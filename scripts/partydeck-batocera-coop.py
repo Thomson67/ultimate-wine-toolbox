@@ -242,6 +242,8 @@ def sandbox_arguments(player, devices, hidraw=Path("/sys/class/hidraw")):
             "--proc", "/proc", "--dev-bind", "/dev", "/dev",
             *MOUNT_CAPS,
             "--tmpfs", "/tmp", "--tmpfs", "/dev/input", "--unsetenv", "VK_DRIVER_FILES",
+            # The Batocera UMU runner derives its runtime directory from its own HOME.
+            "--unsetenv", "XDG_DATA_HOME",
             "--bind", str(player), str(player)]
     if UMU_HOME.is_dir():
         # Session filenames include a PID, which can repeat across players'
