@@ -49,6 +49,10 @@ Dans PartyDeck, ajoutez chaque manette comme joueur distinct et sélectionnez
 simultanément, avec le focus sur chaque fenêtre à tour de rôle. Essayez ensuite
 de rejoindre la même partie LAN depuis les deux instances.
 
+Sous Xorg, le lanceur demande à Batocera d'afficher le pointeur pendant
+la session PartyDeck et le masque à sa fermeture, si `unclutter-remote` est
+disponible.
+
 Chaque exécution affiche le chemin de son journal sous
 `/userdata/system/partydeck-test/logs`. Pour confirmer la compatibilité avec
 votre build, lancez le même test sous Xorg et sous Wayland.

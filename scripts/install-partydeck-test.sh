@@ -274,4 +274,12 @@ PY
 
 printf 'Lancement avec le jeu de test : %s\n' "$executable"
 cd "$base"
+if [[ $session == Xorg ]] && command -v unclutter-remote >/dev/null; then
+    if unclutter-remote -s; then
+        trap 'unclutter-remote -h || true' EXIT
+        printf 'Curseur Xorg affiché pendant la session PartyDeck.\n'
+    else
+        printf 'Impossible de réafficher le curseur Xorg via unclutter-remote.\n' >&2
+    fi
+fi
 "$appdir/AppRun" --exec "$executable"
