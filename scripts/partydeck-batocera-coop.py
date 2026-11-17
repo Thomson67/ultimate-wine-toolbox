@@ -31,6 +31,7 @@ UMU_LOGS = Path("/userdata/system/logs/umu-runner")
 UMU_PRIVATE = ("compatdata", "materialized-prefixes", "merged-prefixes",
                "gameviews", "exports")
 SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+MOUNT_CAPS = ["--cap-add", "CAP_SYS_ADMIN", "--cap-add", "CAP_MKNOD"]
 
 
 @dataclass(frozen=True)
@@ -227,10 +228,18 @@ def player_paths(player):
         yield "--bind", str(source), destination
 
 
+def bubblewrap_command(app):
+    # The AppImage's bin/bwrap wrapper breaks --cap-add argument parsing.
+    # Invoke its packaged binary with its own loader, including on Batocera.
+    library = app / "lib"
+    return [str(library / "ld-linux-x86-64.so.2"), "--library-path",
+            str(library), str(app / "shared/bin/bwrap")]
+
+
 def sandbox_arguments(player, devices, hidraw=Path("/sys/class/hidraw")):
     args = ["--die-with-parent", "--unshare-pid", "--ro-bind", "/", "/",
             "--proc", "/proc", "--dev-bind", "/dev", "/dev",
-            "--cap-add", "CAP_SYS_ADMIN", "--cap-add", "CAP_MKNOD",
+            *MOUNT_CAPS,
             "--tmpfs", "/tmp", "--tmpfs", "/dev/input", "--unsetenv", "VK_DRIVER_FILES",
             "--bind", str(player), str(player)]
     for item in player_paths(player):
@@ -279,7 +288,7 @@ def start_player(app, player, original, target, devices, rectangle):
     kb_mouse = [str(d.node) for d in devices if d.category in {KEYBOARDS, MICE}]
     if kb_mouse:
         args.extend(["--libinput-hold-dev=" + ",".join(kb_mouse) + ",", "--grab"])
-    args.extend(["--", str(app / "bin/bwrap"), *sandbox_arguments(player, devices),
+    args.extend(["--", *bubblewrap_command(app), *sandbox_arguments(player, devices),
                  "--", sys.executable, str(Path(__file__).resolve()), "_wine",
                  str(original), str(target), str(player)])
     return subprocess.Popen(args, env={**os.environ, "SDL_VIDEODRIVER": "x11"},
@@ -314,6 +323,12 @@ def run_session(app, base, original, target, count, split, input_mode):
             raise RuntimeError(f"Commande indisponible : {tool}")
     players = assign_players(read_input_devices(), count, input_mode)
     boxes = layout(primary_monitor(), len(players), split)
+    probe = subprocess.run([*bubblewrap_command(app), *MOUNT_CAPS,
+                            "--ro-bind", "/", "/", "--unshare-pid", "--proc", "/proc",
+                            "--", "/bin/true"])
+    if probe.returncode:
+        raise RuntimeError("Bubblewrap ne peut pas initialiser l’espace de noms Wine.")
+    print("Vérification Bubblewrap Wine OK.", flush=True)
     game_id = hashlib.sha256(os.fsencode(original)).hexdigest()[:16]
     processes = []
     for signum in SIGNALS:
