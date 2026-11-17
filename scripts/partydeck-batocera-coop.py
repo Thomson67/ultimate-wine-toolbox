@@ -28,6 +28,7 @@ WRITABLE = {
 }
 UMU_HOME = Path("/userdata/system/umu")
 UMU_LOGS = Path("/userdata/system/logs/umu-runner")
+UMU_SESSION_STATE = Path("/run/umu-batocera")
 UMU_PRIVATE = ("compatdata", "materialized-prefixes", "merged-prefixes",
                "gameviews", "exports")
 SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
@@ -242,6 +243,11 @@ def sandbox_arguments(player, devices, hidraw=Path("/sys/class/hidraw")):
             *MOUNT_CAPS,
             "--tmpfs", "/tmp", "--tmpfs", "/dev/input", "--unsetenv", "VK_DRIVER_FILES",
             "--bind", str(player), str(player)]
+    if UMU_HOME.is_dir():
+        # Session filenames include a PID, which can repeat across players'
+        # PID namespaces. Keep state writable and private to each launch.
+        UMU_SESSION_STATE.mkdir(parents=True, exist_ok=True)
+        args.extend(["--tmpfs", str(UMU_SESSION_STATE)])
     for item in player_paths(player):
         args.extend(item)
     for device in devices:
