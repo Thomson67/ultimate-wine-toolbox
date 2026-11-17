@@ -10,6 +10,7 @@ appdir="$release/AppDir"
 data="$base/data/partydeck"
 games="$base/jeux"
 launcher="$base/partydeck-test"
+coop_helper="$base/partydeck-batocera-coop.py"
 xwayland_dir="$base/releases/xwayland-24.1.15-1"
 ports_dir='/userdata/roms/ports'
 
@@ -22,10 +23,12 @@ Usage :
   /userdata/system/partydeck-test/partydeck-test verifier
   /userdata/system/partydeck-test/partydeck-test preparer-port "Dossier/Jeu.exe" [chemin-absolu-vers-Proton]
   /userdata/system/partydeck-test/partydeck-test jouer "Dossier/Jeu.exe" [chemin-absolu-vers-Proton]
+  /userdata/system/partydeck-test/partydeck-test preparer-coop "/chemin/Jeu.wine" [auto|1|2|3|4] [horizontal|vertical] [auto|clavier-j1|clavier-j2]
 
 « installer » installe PartyDeck et la commande locale, même sans session graphique.
 « verifier » vérifie la session Xorg ou Wayland, Gamescope, Xwayland et Bubblewrap.
 « preparer-port » crée l'entrée de test dans Ports pour lancer depuis EmulationStation.
+« preparer-coop » crée une entrée Ports à lancement direct pour un .wine, .pc ou .wsquashfs.
 « jouer » sélectionne les manettes dans PartyDeck. Placez au préalable
 une copie de test autonome du jeu dans /userdata/system/partydeck-test/jeux/.
 L'EXE doit pouvoir se lancer avec un préfixe Wine neuf.
@@ -160,6 +163,7 @@ case "${1:-verifier}" in
     -h|--help) usage; exit 0 ;;
     installer|verifier) [[ $# -le 1 ]] || die 'Argument inattendu.' ;;
     jouer|preparer-port) [[ $# -ge 2 && $# -le 3 ]] || { usage; exit 2; } ;;
+    coop|preparer-coop) [[ $# -ge 2 && $# -le 5 ]] || { usage; exit 2; } ;;
     *) usage; exit 2 ;;
 esac
 
@@ -172,6 +176,13 @@ done
 mkdir -p "$base/releases" "$base/logs" "$base/cache" "$data" "$games"
 exec 9>"$base/test.lock"
 flock -n 9 || die 'Un test PartyDeck est déjà en cours.'
+
+if [[ ${1:-verifier} == preparer-coop ]]; then
+    [[ -x $launcher && -f $coop_helper ]] || die 'Installez cette version de PartyDeck avant de préparer un port coop.'
+    shift
+    python3 "$coop_helper" prepare "$appdir" "$base" "$ports_dir" "$@"
+    exit 0
+fi
 
 if [[ ${1:-verifier} == installer ]]; then
     [[ -f ${BASH_SOURCE[0]} ]] ||
@@ -246,6 +257,16 @@ unset ARGV0
 
 "$appdir/AppRun" --help
 if [[ ${1:-verifier} == installer ]]; then
+    staging=$(mktemp -d "$base/.coop-XXXXXX")
+    trap 'rm -rf -- "$staging"' EXIT
+    curl --fail --silent --show-error --location --retry 2 --connect-timeout 15 --proto '=https' \
+        'https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/a9e509c9bb251dc00d9a4e47601a1e9bb9b5e6c8/scripts/partydeck-batocera-coop.py' \
+        --output "$staging/partydeck-batocera-coop.py"
+    (cd "$staging" && printf '%s  %s\n' '0abea002e7c2168602c59cf144521d9d1afa786322c1f4cd382f694fac8a4ec1' partydeck-batocera-coop.py | sha256sum -c -)
+    mv -fT -- "$staging/partydeck-batocera-coop.py" "$coop_helper"
+    rmdir -- "$staging"
+    trap - EXIT
+
     temporary_launcher=$(mktemp "$base/.launcher-XXXXXX")
     trap 'rm -f -- "$temporary_launcher"' EXIT
     cp -- "${BASH_SOURCE[0]}" "$temporary_launcher"
@@ -319,6 +340,13 @@ printf 'Xwayland utilisé par Gamescope : %s\n' "$WLR_XWAYLAND"
 
 if [[ ${1:-verifier} == verifier ]]; then
     printf '\nVérifications de base OK. Dossier des jeux de test : %s\n' "$games"
+    exit 0
+fi
+
+if [[ ${1:-verifier} == coop ]]; then
+    [[ -f $coop_helper ]] || die 'Réinstallez le lanceur pour restaurer le module coop.'
+    shift
+    python3 "$coop_helper" play "$appdir" "$base" "$ports_dir" "$@"
     exit 0
 fi
 

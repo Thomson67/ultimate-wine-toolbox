@@ -1,8 +1,8 @@
 # Tester PartyDeck sur Batocera
 
 Ce prototype s'installe dans `/userdata/system/partydeck-test` et se configure depuis SSH.
-Il utilise PartyDeck v0.8.7-e avec Gamescope et UMU. Le placement des fenêtres
-reste manuel sous Xorg et labwc. L'installation demande un PC x86-64 et un accès à GitHub.
+Il utilise PartyDeck v0.8.7-e avec Gamescope et UMU. L'installation demande un
+PC x86-64 et un accès à GitHub.
 L'UMU embarqué passe par le pont d'UMU Runner Toolbox lorsque la session
 Batocera tourne en root. Le pont est installé dans le dossier de test.
 
@@ -32,6 +32,39 @@ Sinon, la première vérification télécharge une version portable dont les paq
 sont vérifiés par SHA-256. Elle est rangée dans
 `/userdata/system/partydeck-test/releases` et utilisée uniquement par le test
 PartyDeck.
+
+## Jeux Wine et écran partagé automatique
+
+Préparez une entrée pour un jeu Batocera existant. Les formats acceptés sont
+`.wine`, `.pc` et `.wsquashfs`.
+
+```bash
+/userdata/system/partydeck-test/partydeck-test preparer-coop \
+  "/userdata/roms/windows/Mon Jeu.wsquashfs" 2 horizontal clavier-j2
+```
+
+Actualisez les listes dans EmulationStation, puis ouvrez le jeu dans **Ports**.
+Le jeu démarre directement avec le runner et l'`autorun.cmd` lus par
+`batocera-wine`. Les sauvegardes et écritures du test sont isolées pour chaque
+joueur dans `/userdata/system/partydeck-test/coop`. Le test démarre avec ses
+propres sauvegardes. OverlayFS est nécessaire pour les écritures du jeu.
+
+- Choisissez `1`, `2`, `3`, `4` ou `auto`. `auto` adapte le nombre de joueurs
+  aux manettes détectées au lancement, avec un maximum de quatre.
+- `horizontal` place deux fenêtres l'une au-dessus de l'autre. `vertical`
+  les place côte à côte. À trois ou quatre joueurs, le lanceur utilise une
+  grille 2 × 2. Le placement vise l'écran principal.
+- Le choix d'entrées `auto` privilégie les manettes. S'il en manque une, le
+  dernier joueur peut utiliser le clavier et la souris. `clavier-j1` et
+  `clavier-j2` permettent de réserver ce duo à un joueur. Les manettes
+  utilisent un ordre stable par périphérique lorsqu'udev fournit un chemin.
+
+Lancez d'abord depuis **Ports** sur Xorg pour valider sur la machine le
+placement automatique, le runner sélectionné et les entrées. Sous
+Wayland/labwc, le placement des fenêtres Xwayland reste à valider.
+Le jeu doit permettre à chaque instance de rejoindre une même partie.
+
+## Essai manuel avec un exécutable autonome
 
 Placez une copie autonome du jeu dans `/userdata/system/partydeck-test/jeux`.
 Choisissez un jeu capable de démarrer dans un préfixe neuf et doté d'un mode
