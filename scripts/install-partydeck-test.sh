@@ -260,9 +260,9 @@ if [[ ${1:-verifier} == installer ]]; then
     staging=$(mktemp -d "$base/.coop-XXXXXX")
     trap 'rm -rf -- "$staging"' EXIT
     curl --fail --silent --show-error --location --retry 2 --connect-timeout 15 --proto '=https' \
-        'https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/f329f844846bb9e9aa91670d6fd882ca00d38338/scripts/partydeck-batocera-coop.py' \
+        'https://raw.githubusercontent.com/Thomson67/ultimate-wine-toolbox/52db7147081bc1de78bdb13079585fe277a3c263/scripts/partydeck-batocera-coop.py' \
         --output "$staging/partydeck-batocera-coop.py"
-    (cd "$staging" && printf '%s  %s\n' 'ffe3816ec5710fc621d9f9039145327fedd3c9049e9d14748ffdf534a081746c' partydeck-batocera-coop.py | sha256sum -c -)
+    (cd "$staging" && printf '%s  %s\n' '4994f16a48f3516f6e196830c87f81efa7f56b41e6e7a2beeddc45f3c36a1094' partydeck-batocera-coop.py | sha256sum -c -)
     mv -fT -- "$staging/partydeck-batocera-coop.py" "$coop_helper"
     rmdir -- "$staging"
     trap - EXIT
