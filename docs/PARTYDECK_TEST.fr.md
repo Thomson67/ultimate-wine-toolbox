@@ -3,6 +3,8 @@
 Ce prototype s'installe dans `/userdata/system/partydeck-test` et se configure depuis SSH.
 Il utilise PartyDeck v0.8.7-e avec Gamescope et UMU. Le placement des fenêtres
 reste manuel sous Xorg et labwc. L'installation demande un PC x86-64 et un accès à GitHub.
+L'UMU embarqué passe par le pont d'UMU Runner Toolbox lorsque la session
+Batocera tourne en root. Le pont est installé dans le dossier de test.
 
 ## Installer
 

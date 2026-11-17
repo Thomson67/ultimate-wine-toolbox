@@ -111,6 +111,51 @@ WRAPPER
     trap - EXIT
 }
 
+prepare_batocera_umu() {
+    local bin="$appdir/bin"
+    local bridge_revision="2c541f40f62f40a8c8c58d6430cd5c1731711ce7"
+    local bridge_checksum="12d6c194bea55b0ee723a45e9379e1551cd8f9d07a1ea84263613074b60f6239"
+    local upstream_checksum="d0005a58602041229cc467dab03dc0c0b9e8cce09a8145b16b7683244cf17804"
+    local bridge_url="https://raw.githubusercontent.com/Thomson67/umu-runner-toolbox/$bridge_revision/toolbox/overlay/umu-batocera/umu-root-runner.py"
+    local marker='# PartyDeck Batocera UMU bridge'
+    local staging original="$bin/umu-run.upstream"
+
+    if [[ -x $original && -f $bin/umu-root-runner.py ]] &&
+       grep -qxF -- "$marker" "$bin/umu-run"; then
+        return
+    fi
+
+    staging=$(mktemp -d "$bin/.umu-batocera-XXXXXX")
+    trap 'rm -rf -- "$staging"' EXIT
+    curl --fail --silent --show-error --location --retry 2 --connect-timeout 15 \
+        --proto '=https' "$bridge_url" --output "$staging/umu-root-runner.py" ||
+        die 'Téléchargement du pont UMU pour Batocera impossible.'
+    (cd "$staging" && printf '%s  %s\n' "$bridge_checksum" umu-root-runner.py | sha256sum -c -) ||
+        die 'Somme SHA-256 incorrecte pour le pont UMU.'
+
+    if [[ ! -x $original ]]; then
+        (cd "$bin" && printf '%s  %s\n' "$upstream_checksum" umu-run | sha256sum -c -) ||
+            die 'Le binaire UMU ne correspond pas à celui de l’AppImage PartyDeck.'
+        cp -p -- "$bin/umu-run" "$staging/umu-run.upstream"
+        mv -fT -- "$staging/umu-run.upstream" "$original"
+    fi
+
+    cat > "$staging/umu-run" <<'WRAPPER'
+#!/bin/sh
+# PartyDeck Batocera UMU bridge
+bin=${0%/*}
+if [ "$(id -u)" = 0 ]; then
+    exec python3 "$bin/umu-root-runner.py" "$bin/umu-run.upstream" "$@"
+fi
+exec "$bin/umu-run.upstream" "$@"
+WRAPPER
+    chmod 0755 "$staging/umu-run"
+    mv -fT -- "$staging/umu-root-runner.py" "$bin/umu-root-runner.py"
+    mv -fT -- "$staging/umu-run" "$bin/umu-run"
+    rm -rf -- "$staging"
+    trap - EXIT
+}
+
 case "${1:-verifier}" in
     -h|--help) usage; exit 0 ;;
     installer|verifier) [[ $# -le 1 ]] || die 'Argument inattendu.' ;;
@@ -190,6 +235,8 @@ if [[ ! -x $appdir/AppRun ]]; then
     mv -T -- "$staging" "$release"
     trap - EXIT
 fi
+
+prepare_batocera_umu
 
 # PartyDeck masque /tmp dans chaque instance. Son AppImage est extraite dans
 # un emplacement persistant pour que le lanceur UMU reste accessible.
