@@ -1,6 +1,6 @@
 # Tester PartyDeck sur Batocera
 
-Ce prototype s'installe dans `/userdata/system/partydeck-test` et se lance depuis SSH.
+Ce prototype s'installe dans `/userdata/system/partydeck-test` et se configure depuis SSH.
 Il utilise PartyDeck v0.8.7-e avec Gamescope et UMU. Le placement des fenêtres
 reste manuel sous Xorg et labwc. L'installation demande un PC x86-64 et un accès à GitHub.
 
@@ -36,10 +36,15 @@ Choisissez un jeu capable de démarrer dans un préfixe neuf et doté d'un mode
 LAN et d'un support manette.
 
 ```bash
-/userdata/system/partydeck-test/partydeck-test jouer "Mon Jeu/Jeu.exe"
+/userdata/system/partydeck-test/partydeck-test preparer-port "Mon Jeu/Jeu.exe"
 ```
 
-La commande accepte un troisième paramètre après `jouer` et le chemin de l'EXE,
+Actualisez les listes de jeux dans EmulationStation, puis ouvrez **Ports →
+PartyDeck - Test**. EmulationStation libère les manettes pendant le lancement
+d'un port. Relancez `preparer-port` pour changer de jeu dans cette entrée.
+Pour les essais directs depuis SSH, la commande `jouer` reste disponible.
+
+Le chemin de l'EXE peut être suivi d'un paramètre optionnel,
 à savoir le chemin absolu d'un dossier Proton contenant l'exécutable `proton`.
 Sans runner configuré, PartyDeck utilise GE-Proton via UMU. Le premier lancement
 peut télécharger le runner et le runtime.

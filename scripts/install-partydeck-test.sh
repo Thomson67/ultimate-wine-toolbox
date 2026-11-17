@@ -11,6 +11,7 @@ data="$base/data/partydeck"
 games="$base/jeux"
 launcher="$base/partydeck-test"
 xwayland_dir="$base/releases/xwayland-24.1.15-1"
+ports_dir='/userdata/roms/ports'
 
 die() { printf 'Erreur : %s\n' "$*" >&2; exit 1; }
 
@@ -19,10 +20,12 @@ usage() {
 Usage :
   bash install-partydeck-test.sh installer
   /userdata/system/partydeck-test/partydeck-test verifier
+  /userdata/system/partydeck-test/partydeck-test preparer-port "Dossier/Jeu.exe" [chemin-absolu-vers-Proton]
   /userdata/system/partydeck-test/partydeck-test jouer "Dossier/Jeu.exe" [chemin-absolu-vers-Proton]
 
 « installer » installe PartyDeck et la commande locale, même sans session graphique.
 « verifier » vérifie la session Xorg ou Wayland, Gamescope, Xwayland et Bubblewrap.
+« preparer-port » crée l'entrée de test dans Ports pour lancer depuis EmulationStation.
 « jouer » sélectionne les manettes dans PartyDeck. Placez au préalable
 une copie de test autonome du jeu dans /userdata/system/partydeck-test/jeux/.
 L'EXE doit pouvoir se lancer avec un préfixe Wine neuf.
@@ -111,7 +114,7 @@ WRAPPER
 case "${1:-verifier}" in
     -h|--help) usage; exit 0 ;;
     installer|verifier) [[ $# -le 1 ]] || die 'Argument inattendu.' ;;
-    jouer) [[ $# -ge 2 && $# -le 3 ]] || { usage; exit 2; } ;;
+    jouer|preparer-port) [[ $# -ge 2 && $# -le 3 ]] || { usage; exit 2; } ;;
     *) usage; exit 2 ;;
 esac
 
@@ -130,7 +133,7 @@ if [[ ${1:-verifier} == installer ]]; then
         die 'Téléchargez le script dans un fichier avant de lancer son installation.'
 fi
 
-if [[ ${1:-verifier} == jouer ]]; then
+if [[ ${1:-verifier} == jouer || ${1:-verifier} == preparer-port ]]; then
     executable=$(realpath -e -- "$games/$2") || die "EXE introuvable dans $games"
     [[ $executable == "$games/"* && -f $executable && ${executable,,} == *.exe ]] ||
         die "Indiquez un EXE situé dans $games."
@@ -140,6 +143,29 @@ if [[ ${1:-verifier} == jouer ]]; then
             die 'Indiquez le dossier absolu du runner qui contient le fichier exécutable proton.'
         proton=$(realpath -e -- "$proton")
     fi
+fi
+
+if [[ ${1:-verifier} == preparer-port ]]; then
+    [[ -x $launcher ]] || die 'Installez le lanceur PartyDeck avant de créer l’entrée Ports.'
+    port="$ports_dir/PartyDeck - Test.sh"
+    marker='# Entrée gérée par partydeck-test'
+    mkdir -p -- "$ports_dir"
+    if [[ -L $port ]] || { [[ -e $port ]] && ! grep -qxF -- "$marker" "$port"; }; then
+        die "Un fichier existe déjà à cet emplacement : $port"
+    fi
+
+    temporary_port=$(mktemp "$ports_dir/.partydeck-XXXXXX")
+    trap 'rm -f -- "$temporary_port"' EXIT
+    {
+        printf '#!/bin/bash\n%s\n' "$marker"
+        printf 'exec %q jouer %q %q\n' "$launcher" "$2" "$proton"
+    } > "$temporary_port"
+    chmod 0755 "$temporary_port"
+    mv -fT -- "$temporary_port" "$port"
+    trap - EXIT
+    printf 'Entrée enregistrée : %s\n' "$port"
+    printf 'Actualisez les listes de jeux dans EmulationStation, puis lancez Ports → PartyDeck - Test.\n'
+    exit 0
 fi
 
 log=$(mktemp "$base/logs/partydeck-$(date +%Y%m%d-%H%M%S)-XXXXXX")
