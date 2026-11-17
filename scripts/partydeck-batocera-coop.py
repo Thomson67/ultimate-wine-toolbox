@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from urllib.parse import unquote_to_bytes
 
 
 ROM_TYPES = {".wine", ".pc", ".wsquashfs"}
@@ -237,6 +238,15 @@ def bubblewrap_command(app):
             str(library), str(app / "shared/bin/bwrap")]
 
 
+def dbus_socket_mounts(address):
+    # Pressure Vessel needs the filesystem socket named by the session address.
+    # Abstract addresses and filesystem sockets outside /tmp are already visible.
+    for value in dict.fromkeys(re.findall(r"(?:^|;)unix:(?:[^;,]+,)*path=([^;,]+)", address)):
+        path = Path(os.path.normpath(os.fsdecode(unquote_to_bytes(value))))
+        if path.is_relative_to("/tmp") and path.is_socket():
+            yield "--ro-bind", str(path), str(path)
+
+
 def sandbox_arguments(player, devices, hidraw=Path("/sys/class/hidraw")):
     args = ["--die-with-parent", "--unshare-pid", "--ro-bind", "/", "/",
             "--proc", "/proc", "--dev-bind", "/dev", "/dev",
@@ -245,6 +255,8 @@ def sandbox_arguments(player, devices, hidraw=Path("/sys/class/hidraw")):
             # The Batocera UMU runner derives its runtime directory from its own HOME.
             "--unsetenv", "XDG_DATA_HOME",
             "--bind", str(player), str(player)]
+    for item in dbus_socket_mounts(os.environ.get("DBUS_SESSION_BUS_ADDRESS", "")):
+        args.extend(item)
     if UMU_HOME.is_dir():
         # Session filenames include a PID, which can repeat across players'
         # PID namespaces. Keep state writable and private to each launch.
